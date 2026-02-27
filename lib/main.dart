@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'core/config/app_mode.dart';
 import 'shared/theme/app_theme.dart';
-import 'core/database/database_test.dart';  // เพิ่มบรรทัดนี้
+import 'core/server/server_test.dart';  // ✅ เปลี่ยนเป็นหน้าทดสอบ Server
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,7 +32,7 @@ class MyApp extends StatelessWidget {
           title: 'POS + ERP System',
           theme: AppTheme.lightTheme,
           debugShowCheckedModeBanner: false,
-          home: const DatabaseTestPage(),  // เปลี่ยนเป็นหน้าทดสอบ
+          home: const ServerTestPage(),  // ✅ เปลี่ยนเป็นหน้าทดสอบ Server
         );
       },
     );

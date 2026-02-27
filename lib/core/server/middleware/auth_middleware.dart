@@ -9,13 +9,10 @@ Middleware authMiddleware(AppDatabase db) {
   
   return (Handler handler) {
     return (Request request) async {
-      // Skip auth สำหรับ path บางตัว
-      final skipPaths = [
-        '/api/auth/login',
-        '/api/health',
-      ];
+      final path = request.url.path;
       
-      if (skipPaths.any((path) => request.url.path.startsWith(path))) {
+      // ✅ Skip ทั้ง /api/auth และ /api/health
+      if (path.startsWith('api/auth') || path.startsWith('api/health')) {
         return handler(request);
       }
       
