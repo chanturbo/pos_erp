@@ -1,6 +1,5 @@
 import 'package:drift/drift.dart';
-import 'package:pos_erp/core/database/tables/user_tables.dart';
-
+import 'converters.dart';
 // ========================================
 // PRODUCT GROUPS
 // ========================================

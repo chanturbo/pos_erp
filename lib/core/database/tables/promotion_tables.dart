@@ -1,9 +1,8 @@
-import 'dart:convert';
-
 import 'package:drift/drift.dart';
 import 'customer_tables.dart';
 import 'sales_tables.dart';
 import 'user_tables.dart';
+import 'converters.dart';
 
 // ========================================
 // PROMOTIONS
@@ -96,21 +95,4 @@ class Coupons extends Table {
   List<Set<Column>> get uniqueKeys => [
     {couponCode},
   ];
-}
-
-// JSON Converter (ถ้ายังไม่มี)
-class JsonConverter extends TypeConverter<Map<String, dynamic>, String> {
-  const JsonConverter();
-  
-  @override
-  Map<String, dynamic> fromSql(String fromDb) {
-    return Map<String, dynamic>.from(
-      const JsonCodec().decode(fromDb) as Map
-    );
-  }
-  
-  @override
-  String toSql(Map<String, dynamic> value) {
-    return const JsonCodec().encode(value);
-  }
 }

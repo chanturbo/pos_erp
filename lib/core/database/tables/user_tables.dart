@@ -1,7 +1,6 @@
-import 'dart:convert';
-
 import 'package:drift/drift.dart';
 import 'company_tables.dart';
+import 'converters.dart'; 
 
 // ========================================
 // ROLES
@@ -42,21 +41,4 @@ class Users extends Table {
   List<Set<Column>> get uniqueKeys => [
     {username},
   ];
-}
-
-// JSON Converter สำหรับ permissions
-class JsonConverter extends TypeConverter<Map<String, dynamic>, String> {
-  const JsonConverter();
-  
-  @override
-  Map<String, dynamic> fromSql(String fromDb) {
-    return Map<String, dynamic>.from(
-      const JsonCodec().decode(fromDb) as Map
-    );
-  }
-  
-  @override
-  String toSql(Map<String, dynamic> value) {
-    return const JsonCodec().encode(value);
-  }
 }
