@@ -1,0 +1,207 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
+
+class HomePage extends ConsumerWidget {
+  const HomePage({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authProvider);
+    final user = authState.user;
+    
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('หน้าหลัก'),
+        automaticallyImplyLeading: false,  // ✅ ซ่อนปุ่มย้อนกลับ
+        actions: [
+          // User info
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Center(
+              child: Text(
+                user?.fullName ?? '',
+                style: const TextStyle(fontSize: 14),
+              ),
+            ),
+          ),
+          
+          // Logout button
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'ออกจากระบบ',
+            onPressed: () async {
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('ออกจากระบบ'),
+                  content: const Text('คุณต้องการออกจากระบบใช่หรือไม่?'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('ยกเลิก'),
+                    ),
+                    ElevatedButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text('ออกจากระบบ'),
+                    ),
+                  ],
+                ),
+              );
+              
+              if (confirm == true) {
+                await ref.read(authProvider.notifier).logout();
+                if (context.mounted) {
+                  // ✅ ใช้ pushNamedAndRemoveUntil เพื่อล้าง stack
+                  Navigator.of(context).pushNamedAndRemoveUntil(
+                    '/login',
+                    (route) => false,
+                  );
+                }
+              }
+            },
+          ),
+        ],
+      ),
+      body: Center(
+        child: SingleChildScrollView(  // ✅ เพิ่ม ScrollView แก้ Overflow
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.check_circle,
+                size: 100,
+                color: Colors.green,
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'เข้าสู่ระบบสำเร็จ!',
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'ยินดีต้อนรับ ${user?.fullName ?? ''}',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Username: ${user?.username ?? ''}',
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: Colors.grey,
+                ),
+              ),
+              const SizedBox(height: 32),
+              
+              // Grid Menu (ตัวอย่าง)
+              ConstrainedBox(  // ✅ จำกัดขนาด
+                constraints: const BoxConstraints(maxWidth: 800),
+                child: GridView.count(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),  // ✅ ปิด scroll ใน grid
+                  crossAxisCount: 3,
+                  mainAxisSpacing: 16,
+                  crossAxisSpacing: 16,
+                  children: [
+                    _buildMenuCard(
+                      context,
+                      icon: Icons.shopping_cart,
+                      title: 'การขาย',
+                      color: Colors.blue,
+                      onTap: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('เร็วๆ นี้...')),
+                        );
+                      },
+                    ),
+                    _buildMenuCard(
+                      context,
+                      icon: Icons.inventory,
+                      title: 'สินค้า',
+                      color: Colors.orange,
+                      onTap: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('เร็วๆ นี้...')),
+                        );
+                      },
+                    ),
+                    _buildMenuCard(
+                      context,
+                      icon: Icons.warehouse,
+                      title: 'คลังสินค้า',
+                      color: Colors.green,
+                      onTap: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('เร็วๆ นี้...')),
+                        );
+                      },
+                    ),
+                    _buildMenuCard(
+                      context,
+                      icon: Icons.people,
+                      title: 'ลูกค้า',
+                      color: Colors.purple,
+                      onTap: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('เร็วๆ นี้...')),
+                        );
+                      },
+                    ),
+                    _buildMenuCard(
+                      context,
+                      icon: Icons.shopping_bag,
+                      title: 'ซื้อสินค้า',
+                      color: Colors.red,
+                      onTap: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('เร็วๆ นี้...')),
+                        );
+                      },
+                    ),
+                    _buildMenuCard(
+                      context,
+                      icon: Icons.assessment,
+                      title: 'รายงาน',
+                      color: Colors.teal,
+                      onTap: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('เร็วๆ นี้...')),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildMenuCard(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Card(
+      elevation: 4,
+      child: InkWell(
+        onTap: onTap,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 48, color: color),
+            const SizedBox(height: 8),
+            Text(
+              title,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
