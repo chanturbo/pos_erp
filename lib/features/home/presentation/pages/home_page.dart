@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../products/presentation/pages/product_list_page.dart';  // ✅ เพิ่ม
 
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
@@ -13,7 +14,7 @@ class HomePage extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('หน้าหลัก'),
-        automaticallyImplyLeading: false,  // ✅ ซ่อนปุ่มย้อนกลับ
+        automaticallyImplyLeading: false,
         actions: [
           // User info
           Padding(
@@ -52,7 +53,6 @@ class HomePage extends ConsumerWidget {
               if (confirm == true) {
                 await ref.read(authProvider.notifier).logout();
                 if (context.mounted) {
-                  // ✅ ใช้ pushNamedAndRemoveUntil เพื่อล้าง stack
                   Navigator.of(context).pushNamedAndRemoveUntil(
                     '/login',
                     (route) => false,
@@ -64,7 +64,7 @@ class HomePage extends ConsumerWidget {
         ],
       ),
       body: Center(
-        child: SingleChildScrollView(  // ✅ เพิ่ม ScrollView แก้ Overflow
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -93,12 +93,12 @@ class HomePage extends ConsumerWidget {
               ),
               const SizedBox(height: 32),
               
-              // Grid Menu (ตัวอย่าง)
-              ConstrainedBox(  // ✅ จำกัดขนาด
+              // Grid Menu
+              ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 800),
                 child: GridView.count(
                   shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),  // ✅ ปิด scroll ใน grid
+                  physics: const NeverScrollableScrollPhysics(),
                   crossAxisCount: 3,
                   mainAxisSpacing: 16,
                   crossAxisSpacing: 16,
@@ -114,14 +114,15 @@ class HomePage extends ConsumerWidget {
                         );
                       },
                     ),
-                    _buildMenuCard(
+                    _buildMenuCard(  // ✅ แก้ไข
                       context,
                       icon: Icons.inventory,
                       title: 'สินค้า',
                       color: Colors.orange,
                       onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('เร็วๆ นี้...')),
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const ProductListPage()),
                         );
                       },
                     ),
