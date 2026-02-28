@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../products/presentation/pages/product_list_page.dart';
-import '../../../customers/presentation/pages/customer_list_page.dart';  // ✅ เพิ่ม
+import '../../../customers/presentation/pages/customer_list_page.dart'; // ✅ เพิ่ม
+import '../../../testing/test_page.dart'; // ✅ เพิ่มบรรทัดนี้
 
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
@@ -11,12 +12,25 @@ class HomePage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authProvider);
     final user = authState.user;
-    
+
     return Scaffold(
+      // ✅ เพิ่มปุ่มในหน้า Home (ในส่วน AppBar actions)
       appBar: AppBar(
         title: const Text('หน้าหลัก'),
         automaticallyImplyLeading: false,
         actions: [
+          // ✅ เพิ่มปุ่มทดสอบ
+          IconButton(
+            icon: const Icon(Icons.science),
+            tooltip: 'ทดสอบระบบ',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const TestPage()),
+              );
+            },
+          ),
+
           // User info
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -27,7 +41,7 @@ class HomePage extends ConsumerWidget {
               ),
             ),
           ),
-          
+
           // Logout button
           IconButton(
             icon: const Icon(Icons.logout),
@@ -50,14 +64,13 @@ class HomePage extends ConsumerWidget {
                   ],
                 ),
               );
-              
+
               if (confirm == true) {
                 await ref.read(authProvider.notifier).logout();
                 if (context.mounted) {
-                  Navigator.of(context).pushNamedAndRemoveUntil(
-                    '/login',
-                    (route) => false,
-                  );
+                  Navigator.of(
+                    context,
+                  ).pushNamedAndRemoveUntil('/login', (route) => false);
                 }
               }
             },
@@ -70,11 +83,7 @@ class HomePage extends ConsumerWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(
-                Icons.check_circle,
-                size: 100,
-                color: Colors.green,
-              ),
+              const Icon(Icons.check_circle, size: 100, color: Colors.green),
               const SizedBox(height: 24),
               Text(
                 'เข้าสู่ระบบสำเร็จ!',
@@ -88,12 +97,12 @@ class HomePage extends ConsumerWidget {
               const SizedBox(height: 8),
               Text(
                 'Username: ${user?.username ?? ''}',
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Colors.grey,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyLarge?.copyWith(color: Colors.grey),
               ),
               const SizedBox(height: 32),
-              
+
               // Grid Menu
               ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 800),
@@ -123,7 +132,9 @@ class HomePage extends ConsumerWidget {
                       onTap: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (_) => const ProductListPage()),
+                          MaterialPageRoute(
+                            builder: (_) => const ProductListPage(),
+                          ),
                         );
                       },
                     ),
@@ -138,7 +149,8 @@ class HomePage extends ConsumerWidget {
                         );
                       },
                     ),
-                    _buildMenuCard(  // ✅ แก้ไข
+                    _buildMenuCard(
+                      // ✅ แก้ไข
                       context,
                       icon: Icons.people,
                       title: 'ลูกค้า',
@@ -146,7 +158,9 @@ class HomePage extends ConsumerWidget {
                       onTap: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (_) => const CustomerListPage()),
+                          MaterialPageRoute(
+                            builder: (_) => const CustomerListPage(),
+                          ),
                         );
                       },
                     ),
@@ -181,7 +195,7 @@ class HomePage extends ConsumerWidget {
       ),
     );
   }
-  
+
   Widget _buildMenuCard(
     BuildContext context, {
     required IconData icon,

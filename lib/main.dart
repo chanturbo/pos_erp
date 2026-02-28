@@ -9,6 +9,7 @@ import 'routes/app_router.dart';
 import 'core/database/app_database.dart';
 import 'core/server/api_server.dart';
 import 'core/utils/crypto_utils.dart';
+import 'core/database/seed_data.dart';  // ✅ เพิ่ม
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,7 +18,7 @@ void main() async {
   await AppModeConfig.initialize();
   
   // เริ่ม Server อัตโนมัติ
-  _startServerInBackground();
+  await _startServerInBackground();
   
   runApp(
     const ProviderScope(
@@ -28,16 +29,20 @@ void main() async {
 
 // Global server instance
 ApiServer? _serverInstance;
+AppDatabase? _dbInstance;  // ✅ เพิ่ม
 
 /// เริ่ม Server ใน Background
-void _startServerInBackground() async {
+Future<void> _startServerInBackground() async {
   try {
-    final db = AppDatabase();
+    _dbInstance = AppDatabase();  // ✅ เก็บ instance
     
     // สร้าง User ทดสอบ (ถ้ายังไม่มี)
-    await _createDefaultUser(db);
+    await _createDefaultUser(_dbInstance!);
     
-    _serverInstance = ApiServer(db);
+    // ✅ Seed ข้อมูลทดสอบ
+    await _seedInitialData(_dbInstance!);
+    
+    _serverInstance = ApiServer(_dbInstance!);
     await _serverInstance!.start(port: 8080);
     debugPrint('✅ API Server started at http://127.0.0.1:8080');
   } catch (e) {
@@ -81,6 +86,17 @@ Future<void> _createDefaultUser(AppDatabase db) async {
   }
 }
 
+// ✅ เพิ่มฟังก์ชันนี้
+Future<void> _seedInitialData(AppDatabase db) async {
+  try {
+    final seeder = SeedData(db);
+    await seeder.seedAll();
+    debugPrint('✅ Initial data seeded');
+  } catch (e) {
+    debugPrint('⚠️ Seed data error: $e');
+  }
+}
+
 class MyApp extends ConsumerWidget {
   const MyApp({super.key});
 
@@ -104,7 +120,6 @@ class MyApp extends ConsumerWidget {
               : AppRouter.login,
           
           onGenerateRoute: AppRouter.generateRoute,
-          // ✅ ลบ builder ออก
         );
       },
     );
