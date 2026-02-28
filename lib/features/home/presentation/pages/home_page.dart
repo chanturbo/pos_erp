@@ -4,6 +4,7 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../products/presentation/pages/product_list_page.dart';
 import '../../../customers/presentation/pages/customer_list_page.dart'; // ✅ เพิ่ม
 import '../../../testing/test_page.dart'; // ✅ เพิ่มบรรทัดนี้
+import '../../../sales/presentation/pages/pos_page.dart'; // ✅ เพิ่ม
 
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
@@ -119,8 +120,10 @@ class HomePage extends ConsumerWidget {
                       title: 'การขาย',
                       color: Colors.blue,
                       onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('เร็วๆ นี้...')),
+                        Navigator.push(
+                          // ✅ แก้ไข
+                          context,
+                          MaterialPageRoute(builder: (_) => const PosPage()),
                         );
                       },
                     ),
