@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
-import '../../../products/presentation/pages/product_list_page.dart';  // ✅ เพิ่ม
+import '../../../products/presentation/pages/product_list_page.dart';
+import '../../../customers/presentation/pages/customer_list_page.dart';  // ✅ เพิ่ม
 
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
@@ -114,7 +115,7 @@ class HomePage extends ConsumerWidget {
                         );
                       },
                     ),
-                    _buildMenuCard(  // ✅ แก้ไข
+                    _buildMenuCard(
                       context,
                       icon: Icons.inventory,
                       title: 'สินค้า',
@@ -137,14 +138,15 @@ class HomePage extends ConsumerWidget {
                         );
                       },
                     ),
-                    _buildMenuCard(
+                    _buildMenuCard(  // ✅ แก้ไข
                       context,
                       icon: Icons.people,
                       title: 'ลูกค้า',
                       color: Colors.purple,
                       onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('เร็วๆ นี้...')),
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const CustomerListPage()),
                         );
                       },
                     ),

@@ -4,7 +4,8 @@ import 'package:shelf/shelf_io.dart' as io;
 import 'package:shelf_router/shelf_router.dart';
 import '../database/app_database.dart';
 import 'routes/auth_routes.dart';
-import 'routes/product_routes.dart';  // ✅ เพิ่มบรรทัดนี้
+import 'routes/product_routes.dart';
+import 'routes/customer_routes.dart';  // ✅ เพิ่มบรรทัดนี้
 import 'middleware/auth_middleware.dart';
 
 class ApiServer {
@@ -26,8 +27,11 @@ class ApiServer {
       // Auth routes
       router.mount('/api/auth', AuthRoutes(db).router.call);
       
-      // ✅ เพิ่ม Product routes
+      // Product routes
       router.mount('/api/products', ProductRoutes(db).router.call);
+      
+      // ✅ เพิ่ม Customer routes
+      router.mount('/api/customers', CustomerRoutes(db).router.call);
       
       // Pipeline
       final handler = Pipeline()
