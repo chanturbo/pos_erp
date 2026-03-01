@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/cart_provider.dart';
 import '../../data/models/cart_item_model.dart';
+import '../pages/payment_page.dart';
 
 class CartPanel extends ConsumerWidget {
   const CartPanel({super.key});
@@ -9,13 +10,11 @@ class CartPanel extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final cartState = ref.watch(cartProvider);
-    
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.grey[100],
-        border: Border(
-          left: BorderSide(color: Colors.grey[300]!),
-        ),
+        border: Border(left: BorderSide(color: Colors.grey[300]!)),
       ),
       child: Column(
         children: [
@@ -24,19 +23,14 @@ class CartPanel extends ConsumerWidget {
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Colors.white,
-              border: Border(
-                bottom: BorderSide(color: Colors.grey[300]!),
-              ),
+              border: Border(bottom: BorderSide(color: Colors.grey[300]!)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
                   'รายการสินค้า',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 if (cartState.items.isNotEmpty)
                   TextButton.icon(
@@ -45,14 +39,12 @@ class CartPanel extends ConsumerWidget {
                     },
                     icon: const Icon(Icons.delete_outline, size: 18),
                     label: const Text('ล้าง'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: Colors.red,
-                    ),
+                    style: TextButton.styleFrom(foregroundColor: Colors.red),
                   ),
               ],
             ),
           ),
-          
+
           // Cart Items
           Expanded(
             child: cartState.items.isEmpty
@@ -82,30 +74,29 @@ class CartPanel extends ConsumerWidget {
                     },
                   ),
           ),
-          
+
           // Summary
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Colors.white,
-              border: Border(
-                top: BorderSide(color: Colors.grey[300]!),
-              ),
+              border: Border(top: BorderSide(color: Colors.grey[300]!)),
             ),
             child: Column(
               children: [
                 _buildSummaryRow('รวม', cartState.subtotal),
                 if (cartState.totalDiscount > 0) ...[
                   const SizedBox(height: 8),
-                  _buildSummaryRow('ส่วนลด', -cartState.totalDiscount, isDiscount: true),
+                  _buildSummaryRow(
+                    'ส่วนลด',
+                    -cartState.totalDiscount,
+                    isDiscount: true,
+                  ),
                 ],
                 const Divider(),
-                _buildSummaryRow(
-                  'ยอดชำระ',
-                  cartState.total,
-                  isTotal: true,
-                ),
+                _buildSummaryRow('ยอดชำระ', cartState.total, isTotal: true),
                 const SizedBox(height: 16),
+                // ... ในส่วน ปุ่มชำระเงิน
                 SizedBox(
                   width: double.infinity,
                   height: 50,
@@ -113,9 +104,12 @@ class CartPanel extends ConsumerWidget {
                     onPressed: cartState.items.isEmpty
                         ? null
                         : () {
-                            // TODO: ไปหน้าชำระเงิน
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('เร็วๆ นี้...')),
+                            Navigator.push(
+                              // ✅ แก้ไข
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const PaymentPage(),
+                              ),
                             );
                           },
                     child: const Text(
@@ -131,8 +125,12 @@ class CartPanel extends ConsumerWidget {
       ),
     );
   }
-  
-  Widget _buildCartItem(BuildContext context, WidgetRef ref, CartItemModel item) {
+
+  Widget _buildCartItem(
+    BuildContext context,
+    WidgetRef ref,
+    CartItemModel item,
+  ) {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: Padding(
@@ -148,16 +146,11 @@ class CartPanel extends ConsumerWidget {
                     children: [
                       Text(
                         item.productName,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                       Text(
                         '฿${item.price.toStringAsFixed(2)}',
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 12,
-                        ),
+                        style: TextStyle(color: Colors.grey[600], fontSize: 12),
                       ),
                     ],
                   ),
@@ -180,16 +173,18 @@ class CartPanel extends ConsumerWidget {
                   children: [
                     IconButton(
                       onPressed: () {
-                        ref.read(cartProvider.notifier).updateQuantity(
-                          item.productId,
-                          item.quantity - 1,
-                        );
+                        ref
+                            .read(cartProvider.notifier)
+                            .updateQuantity(item.productId, item.quantity - 1);
                       },
                       icon: const Icon(Icons.remove_circle_outline),
                       iconSize: 24,
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         border: Border.all(color: Colors.grey[300]!),
                         borderRadius: BorderRadius.circular(4),
@@ -204,17 +199,16 @@ class CartPanel extends ConsumerWidget {
                     ),
                     IconButton(
                       onPressed: () {
-                        ref.read(cartProvider.notifier).updateQuantity(
-                          item.productId,
-                          item.quantity + 1,
-                        );
+                        ref
+                            .read(cartProvider.notifier)
+                            .updateQuantity(item.productId, item.quantity + 1);
                       },
                       icon: const Icon(Icons.add_circle_outline),
                       iconSize: 24,
                     ),
                   ],
                 ),
-                
+
                 // ราคารวม
                 Text(
                   '฿${item.amount.toStringAsFixed(2)}',
@@ -231,8 +225,13 @@ class CartPanel extends ConsumerWidget {
       ),
     );
   }
-  
-  Widget _buildSummaryRow(String label, double amount, {bool isDiscount = false, bool isTotal = false}) {
+
+  Widget _buildSummaryRow(
+    String label,
+    double amount, {
+    bool isDiscount = false,
+    bool isTotal = false,
+  }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -248,7 +247,9 @@ class CartPanel extends ConsumerWidget {
           style: TextStyle(
             fontSize: isTotal ? 22 : 14,
             fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
-            color: isDiscount ? Colors.red : (isTotal ? Colors.blue : Colors.black),
+            color: isDiscount
+                ? Colors.red
+                : (isTotal ? Colors.blue : Colors.black),
           ),
         ),
       ],

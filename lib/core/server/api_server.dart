@@ -7,6 +7,7 @@ import 'routes/auth_routes.dart';
 import 'routes/product_routes.dart';
 import 'routes/customer_routes.dart';  // ✅ เพิ่มบรรทัดนี้
 import 'middleware/auth_middleware.dart';
+import 'routes/sales_routes.dart';
 
 class ApiServer {
   final AppDatabase db;
@@ -33,6 +34,7 @@ class ApiServer {
       // ✅ เพิ่ม Customer routes
       router.mount('/api/customers', CustomerRoutes(db).router.call);
       
+      router.mount('/api/sales', SalesRoutes(db).router.call);
       // Pipeline
       final handler = Pipeline()
           .addMiddleware(logRequests())

@@ -5,6 +5,7 @@ import '../../../products/presentation/pages/product_list_page.dart';
 import '../../../customers/presentation/pages/customer_list_page.dart'; // ✅ เพิ่ม
 import '../../../testing/test_page.dart'; // ✅ เพิ่มบรรทัดนี้
 import '../../../sales/presentation/pages/pos_page.dart'; // ✅ เพิ่ม
+import '../../../sales/presentation/pages/sales_history_page.dart';
 
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
@@ -121,7 +122,6 @@ class HomePage extends ConsumerWidget {
                       color: Colors.blue,
                       onTap: () {
                         Navigator.push(
-                          // ✅ แก้ไข
                           context,
                           MaterialPageRoute(builder: (_) => const PosPage()),
                         );
@@ -141,6 +141,21 @@ class HomePage extends ConsumerWidget {
                         );
                       },
                     ),
+                    // ✅ เพิ่มเมนูนี้
+                    _buildMenuCard(
+                      context,
+                      icon: Icons.receipt_long,
+                      title: 'รายการขาย',
+                      color: Colors.indigo,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const SalesHistoryPage(),
+                          ),
+                        );
+                      },
+                    ),
                     _buildMenuCard(
                       context,
                       icon: Icons.warehouse,
@@ -153,7 +168,6 @@ class HomePage extends ConsumerWidget {
                       },
                     ),
                     _buildMenuCard(
-                      // ✅ แก้ไข
                       context,
                       icon: Icons.people,
                       title: 'ลูกค้า',
@@ -172,17 +186,6 @@ class HomePage extends ConsumerWidget {
                       icon: Icons.shopping_bag,
                       title: 'ซื้อสินค้า',
                       color: Colors.red,
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('เร็วๆ นี้...')),
-                        );
-                      },
-                    ),
-                    _buildMenuCard(
-                      context,
-                      icon: Icons.assessment,
-                      title: 'รายงาน',
-                      color: Colors.teal,
                       onTap: () {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('เร็วๆ นี้...')),
