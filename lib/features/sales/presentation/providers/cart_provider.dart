@@ -1,6 +1,68 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/cart_item_model.dart';
 
+// Hold Order Model
+class HoldOrder {
+  final String id;
+  final String name;
+  final List<CartItemModel> items;
+  final String? customerId;
+  final String? customerName;
+  final double discountPercent;
+  final double discountAmount;
+  final DateTime createdAt;
+  
+  HoldOrder({
+    required this.id,
+    required this.name,
+    required this.items,
+    this.customerId,
+    this.customerName,
+    this.discountPercent = 0,
+    this.discountAmount = 0,
+    required this.createdAt,
+  });
+  
+  double get total {
+    final subtotal = items.fold(0.0, (sum, item) => sum + item.amount);
+    final discount = (subtotal * discountPercent / 100) + discountAmount;
+    return subtotal - discount;
+  }
+}
+
+// ✅ Hold Orders State
+class HoldOrdersState {
+  final List<HoldOrder> orders;
+  
+  HoldOrdersState({required this.orders});
+  
+  HoldOrdersState copyWith({List<HoldOrder>? orders}) {
+    return HoldOrdersState(orders: orders ?? this.orders);
+  }
+}
+
+// ✅ Hold Orders Provider (เปลี่ยนเป็น NotifierProvider)
+final holdOrdersProvider = NotifierProvider<HoldOrdersNotifier, HoldOrdersState>(() {
+  return HoldOrdersNotifier();
+});
+
+class HoldOrdersNotifier extends Notifier<HoldOrdersState> {
+  @override
+  HoldOrdersState build() {
+    return HoldOrdersState(orders: []);
+  }
+  
+  void addOrder(HoldOrder order) {
+    state = state.copyWith(orders: [...state.orders, order]);
+  }
+  
+  void removeOrder(String orderId) {
+    state = state.copyWith(
+      orders: state.orders.where((o) => o.id != orderId).toList(),
+    );
+  }
+}
+
 // Cart State
 class CartState {
   final List<CartItemModel> items;
@@ -136,7 +198,7 @@ class CartNotifier extends Notifier<CartState> {
   }
   
   /// ตั้งค่าลูกค้า
-  void setCustomer(String customerId, String customerName) {
+  void setCustomer(String? customerId, String? customerName) {
     state = state.copyWith(
       customerId: customerId,
       customerName: customerName,
@@ -149,6 +211,40 @@ class CartNotifier extends Notifier<CartState> {
       discountPercent: percent ?? state.discountPercent,
       discountAmount: amount ?? state.discountAmount,
     );
+  }
+  
+  /// Hold Order (พักบิล)
+  void hold(String name) {
+    if (state.items.isEmpty) return;
+    
+    final newOrder = HoldOrder(
+      id: 'HOLD${DateTime.now().millisecondsSinceEpoch}',
+      name: name,
+      items: List.from(state.items),
+      customerId: state.customerId,
+      customerName: state.customerName,
+      discountPercent: state.discountPercent,
+      discountAmount: state.discountAmount,
+      createdAt: DateTime.now(),
+    );
+    
+    // ✅ เพิ่ม Order ใน Hold Orders
+    ref.read(holdOrdersProvider.notifier).addOrder(newOrder);
+    clear();
+  }
+  
+  /// Recall Order (เรียกบิลคืน)
+  void recall(HoldOrder order) {
+    state = CartState(
+      items: List.from(order.items),
+      customerId: order.customerId,
+      customerName: order.customerName,
+      discountPercent: order.discountPercent,
+      discountAmount: order.discountAmount,
+    );
+    
+    // ✅ ลบ Order จาก Hold Orders
+    ref.read(holdOrdersProvider.notifier).removeOrder(order.id);
   }
   
   /// ล้างตะกร้า
