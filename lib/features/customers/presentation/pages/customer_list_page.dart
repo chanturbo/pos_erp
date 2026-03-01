@@ -3,11 +3,25 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/customer_provider.dart';
 import 'customer_form_page.dart';
 
-class CustomerListPage extends ConsumerWidget {
+class CustomerListPage extends ConsumerStatefulWidget {  // ✅ เปลี่ยนเป็น StatefulWidget
   const CustomerListPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CustomerListPage> createState() => _CustomerListPageState();
+}
+
+class _CustomerListPageState extends ConsumerState<CustomerListPage> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final customerState = ref.watch(customerListProvider);
     
     return Scaffold(
@@ -23,7 +37,45 @@ class CustomerListPage extends ConsumerWidget {
           ),
         ],
       ),
-      body: _buildBody(context, ref, customerState),
+      body: Column(
+        children: [
+          // ✅ เพิ่ม Search Bar
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'ค้นหาลูกค้า...',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() {
+                            _searchQuery = '';
+                          });
+                        },
+                      )
+                    : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value;
+                });
+              },
+            ),
+          ),
+          
+          // Customer List
+          Expanded(
+            child: _buildBody(context, ref, customerState),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
           await Navigator.push(
@@ -61,14 +113,22 @@ class CustomerListPage extends ConsumerWidget {
       );
     }
     
-    if (state.customers.isEmpty) {
+    // ✅ กรองลูกค้าตามการค้นหา
+    final filteredCustomers = state.customers.where((customer) {
+      if (_searchQuery.isEmpty) return true;
+      return customer.customerName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+             customer.customerCode.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+             (customer.phone?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? false);
+    }).toList();
+    
+    if (filteredCustomers.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.people_outline, size: 80, color: Colors.grey),
+            const Icon(Icons.search_off, size: 80, color: Colors.grey),
             const SizedBox(height: 16),
-            const Text('ยังไม่มีลูกค้า'),
+            Text(_searchQuery.isEmpty ? 'ยังไม่มีลูกค้า' : 'ไม่พบลูกค้า'),
             const SizedBox(height: 16),
             ElevatedButton.icon(
               onPressed: () async {
@@ -86,86 +146,11 @@ class CustomerListPage extends ConsumerWidget {
     }
     
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: state.customers.length,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      itemCount: filteredCustomers.length,
       itemBuilder: (context, index) {
-        final customer = state.customers[index];
-        return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: Colors.purple,
-              child: Text(
-                customer.customerName.substring(0, 1),
-                style: const TextStyle(color: Colors.white),
-              ),
-            ),
-            title: Text(customer.customerName),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('รหัส: ${customer.customerCode}'),
-                if (customer.phone != null)
-                  Text('โทร: ${customer.phone}'),
-                if (customer.memberNo != null)
-                  Text('สมาชิก: ${customer.memberNo} | คะแนน: ${customer.points}'),
-              ],
-            ),
-            isThreeLine: true,
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.edit, color: Colors.blue),
-                  onPressed: () async {
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => CustomerFormPage(customer: customer),
-                      ),
-                    );
-                  },
-                ),
-                IconButton(
-                  icon: const Icon(Icons.delete, color: Colors.red),
-                  onPressed: () async {
-                    final confirm = await showDialog<bool>(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text('ยืนยันการลบ'),
-                        content: Text('ต้องการลบลูกค้า ${customer.customerName} ใช่หรือไม่?'),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context, false),
-                            child: const Text('ยกเลิก'),
-                          ),
-                          ElevatedButton(
-                            onPressed: () => Navigator.pop(context, true),
-                            child: const Text('ลบ'),
-                          ),
-                        ],
-                      ),
-                    );
-                    
-                    if (confirm == true) {
-                      final success = await ref
-                          .read(customerListProvider.notifier)
-                          .deleteCustomer(customer.customerId);
-                      
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(success ? 'ลบลูกค้าสำเร็จ' : 'ลบลูกค้าไม่สำเร็จ'),
-                          ),
-                        );
-                      }
-                    }
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
+        final customer = filteredCustomers[index];
+        // ... โค้ดเดิม (Card ของลูกค้า)
       },
     );
   }

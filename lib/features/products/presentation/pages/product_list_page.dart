@@ -3,12 +3,26 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/product_provider.dart';
 import 'product_form_page.dart';
 
-class ProductListPage extends ConsumerWidget {
+class ProductListPage extends ConsumerStatefulWidget {
   const ProductListPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final productState = ref.watch(productListProvider);
+  ConsumerState<ProductListPage> createState() => _ProductListPageState();
+}
+
+class _ProductListPageState extends ConsumerState<ProductListPage> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final productState = ref.watch(productListProvider);  // ✅ นี่คือ ProductListState
     
     return Scaffold(
       appBar: AppBar(
@@ -23,7 +37,45 @@ class ProductListPage extends ConsumerWidget {
           ),
         ],
       ),
-      body: _buildBody(context, ref, productState),
+      body: Column(
+        children: [
+          // Search Bar
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'ค้นหาสินค้า...',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() {
+                            _searchQuery = '';
+                          });
+                        },
+                      )
+                    : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value;
+                });
+              },
+            ),
+          ),
+          
+          // Product List
+          Expanded(
+            child: _buildBody(context, ref, productState),  // ✅ สร้าง method แยก
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
           await Navigator.push(
@@ -36,11 +88,14 @@ class ProductListPage extends ConsumerWidget {
     );
   }
   
+  // ✅ สร้าง method สำหรับแสดง body
   Widget _buildBody(BuildContext context, WidgetRef ref, ProductListState state) {
+    // Loading
     if (state.isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
     
+    // Error
     if (state.error != null) {
       return Center(
         child: Column(
@@ -61,14 +116,22 @@ class ProductListPage extends ConsumerWidget {
       );
     }
     
-    if (state.products.isEmpty) {
+    // กรองสินค้าตามการค้นหา
+    final filteredProducts = state.products.where((product) {
+      if (_searchQuery.isEmpty) return true;
+      return product.productName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+             product.productCode.toLowerCase().contains(_searchQuery.toLowerCase());
+    }).toList();
+    
+    // Empty state
+    if (filteredProducts.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.inventory_2_outlined, size: 80, color: Colors.grey),
+            const Icon(Icons.search_off, size: 80, color: Colors.grey),
             const SizedBox(height: 16),
-            const Text('ยังไม่มีสินค้า'),
+            Text(_searchQuery.isEmpty ? 'ยังไม่มีสินค้า' : 'ไม่พบสินค้า'),
             const SizedBox(height: 16),
             ElevatedButton.icon(
               onPressed: () async {
@@ -85,11 +148,12 @@ class ProductListPage extends ConsumerWidget {
       );
     }
     
+    // Product List
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: state.products.length,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      itemCount: filteredProducts.length,
       itemBuilder: (context, index) {
-        final product = state.products[index];
+        final product = filteredProducts[index];
         return Card(
           margin: const EdgeInsets.only(bottom: 12),
           child: ListTile(

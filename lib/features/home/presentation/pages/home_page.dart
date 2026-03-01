@@ -6,6 +6,7 @@ import '../../../customers/presentation/pages/customer_list_page.dart'; // ✅ �
 import '../../../testing/test_page.dart'; // ✅ เพิ่มบรรทัดนี้
 import '../../../sales/presentation/pages/pos_page.dart'; // ✅ เพิ่ม
 import '../../../sales/presentation/pages/sales_history_page.dart';
+import '../../../dashboard/presentation/pages/dashboard_page.dart'; // ✅ เพิ่ม
 
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
@@ -115,6 +116,20 @@ class HomePage extends ConsumerWidget {
                   mainAxisSpacing: 16,
                   crossAxisSpacing: 16,
                   children: [
+                    _buildMenuCard(
+                      context,
+                      icon: Icons.dashboard,
+                      title: 'Dashboard',
+                      color: Colors.indigo,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const DashboardPage(),
+                          ),
+                        );
+                      },
+                    ),
                     _buildMenuCard(
                       context,
                       icon: Icons.shopping_cart,
