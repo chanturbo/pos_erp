@@ -8,6 +8,7 @@ import 'routes/product_routes.dart';
 import 'routes/customer_routes.dart';  // ✅ เพิ่มบรรทัดนี้
 import 'middleware/auth_middleware.dart';
 import 'routes/sales_routes.dart';
+import 'routes/stock_routes.dart';  // ✅ เพิ่มบรรทัดนี้
 
 class ApiServer {
   final AppDatabase db;
@@ -34,6 +35,9 @@ class ApiServer {
       // ✅ เพิ่ม Customer routes
       router.mount('/api/customers', CustomerRoutes(db).router.call);
       
+      // ... ในส่วน start() method
+      router.mount('/api/stock', StockRoutes(db).router.call);  // ✅ เพิ่มบรรทัดนี้
+
       router.mount('/api/sales', SalesRoutes(db).router.call);
       // Pipeline
       final handler = Pipeline()
