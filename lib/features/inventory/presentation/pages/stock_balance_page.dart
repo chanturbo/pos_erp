@@ -4,6 +4,8 @@ import '../providers/stock_provider.dart';
 import '../widgets/stock_in_dialog.dart';
 import '../widgets/stock_out_dialog.dart';
 import '../widgets/stock_adjust_dialog.dart';
+import '../widgets/stock_transfer_dialog.dart'; // ✅ เพิ่ม
+import 'stock_movement_history_page.dart'; // ✅ เพิ่ม
 
 class StockBalancePage extends ConsumerStatefulWidget {
   const StockBalancePage({super.key});
@@ -15,7 +17,7 @@ class StockBalancePage extends ConsumerStatefulWidget {
 class _StockBalancePageState extends ConsumerState<StockBalancePage> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-  
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -25,11 +27,24 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
   @override
   Widget build(BuildContext context) {
     final stockState = ref.watch(stockBalanceProvider);
-    
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('สต๊อกคงเหลือ'),
         actions: [
+          // ✅ เพิ่มปุ่มดูประวัติ
+          IconButton(
+            icon: const Icon(Icons.history),
+            tooltip: 'ประวัติการเคลื่อนไหว',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const StockMovementHistoryPage(),
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () {
@@ -70,21 +85,23 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
               },
             ),
           ),
-          
+
           // Stock List
-          Expanded(
-            child: _buildBody(context, ref, stockState),
-          ),
+          Expanded(child: _buildBody(context, ref, stockState)),
         ],
       ),
     );
   }
-  
-  Widget _buildBody(BuildContext context, WidgetRef ref, StockBalanceState state) {
+
+  Widget _buildBody(
+    BuildContext context,
+    WidgetRef ref,
+    StockBalanceState state,
+  ) {
     if (state.isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
-    
+
     if (state.error != null) {
       return Center(
         child: Column(
@@ -104,14 +121,16 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
         ),
       );
     }
-    
+
     // กรองสต๊อกตามการค้นหา
     final filteredStocks = state.stocks.where((stock) {
       if (_searchQuery.isEmpty) return true;
-      return stock.productName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-             stock.productCode.toLowerCase().contains(_searchQuery.toLowerCase());
+      return stock.productName.toLowerCase().contains(
+            _searchQuery.toLowerCase(),
+          ) ||
+          stock.productCode.toLowerCase().contains(_searchQuery.toLowerCase());
     }).toList();
-    
+
     if (filteredStocks.isEmpty) {
       return const Center(
         child: Column(
@@ -124,14 +143,14 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
         ),
       );
     }
-    
+
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       itemCount: filteredStocks.length,
       itemBuilder: (context, index) {
         final stock = filteredStocks[index];
         final isLowStock = stock.balance < 10; // ✅ Low stock alert
-        
+
         return Card(
           margin: const EdgeInsets.only(bottom: 12),
           child: ListTile(
@@ -165,10 +184,7 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
                 if (isLowStock)
                   const Text(
                     'สต๊อกต่ำ!',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.red,
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.red),
                   ),
               ],
             ),
@@ -180,7 +196,7 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
       },
     );
   }
-  
+
   void _showStockActions(BuildContext context, stock) {
     showModalBottomSheet(
       context: context,
@@ -206,6 +222,18 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
               showDialog(
                 context: context,
                 builder: (_) => StockOutDialog(stock: stock),
+              );
+            },
+          ),
+          // ✅ เพิ่มปุ่มโอนย้าย
+          ListTile(
+            leading: const Icon(Icons.swap_horiz, color: Colors.purple),
+            title: const Text('โอนย้ายสินค้า'),
+            onTap: () {
+              Navigator.pop(context);
+              showDialog(
+                context: context,
+                builder: (_) => StockTransferDialog(stock: stock),
               );
             },
           ),

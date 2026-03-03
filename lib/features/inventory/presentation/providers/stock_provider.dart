@@ -9,13 +9,13 @@ class StockBalanceState {
   final List<StockBalanceModel> stocks;
   final bool isLoading;
   final String? error;
-  
+
   StockBalanceState({
     required this.stocks,
     required this.isLoading,
     this.error,
   });
-  
+
   StockBalanceState copyWith({
     List<StockBalanceModel>? stocks,
     bool? isLoading,
@@ -30,46 +30,40 @@ class StockBalanceState {
 }
 
 // Stock Balance Provider
-final stockBalanceProvider = NotifierProvider<StockBalanceNotifier, StockBalanceState>(() {
-  return StockBalanceNotifier();
-});
+final stockBalanceProvider =
+    NotifierProvider<StockBalanceNotifier, StockBalanceState>(() {
+      return StockBalanceNotifier();
+    });
 
 class StockBalanceNotifier extends Notifier<StockBalanceState> {
   @override
   StockBalanceState build() {
     loadStockBalance();
-    return StockBalanceState(
-      stocks: [],
-      isLoading: true,
-    );
+    return StockBalanceState(stocks: [], isLoading: true);
   }
-  
+
   /// โหลดสต๊อกคงเหลือ
   Future<void> loadStockBalance() async {
     state = state.copyWith(isLoading: true, error: null);
-    
+
     try {
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.get('/api/stock/balance');
-      
+
       if (response.statusCode == 200) {
         final data = response.data['data'] as List;
-        final stocks = data.map((json) => StockBalanceModel.fromJson(json)).toList();
+        final stocks = data
+            .map((json) => StockBalanceModel.fromJson(json))
+            .toList();
         state = state.copyWith(stocks: stocks, isLoading: false);
       } else {
-        state = state.copyWith(
-          isLoading: false,
-          error: 'โหลดข้อมูลไม่สำเร็จ',
-        );
+        state = state.copyWith(isLoading: false, error: 'โหลดข้อมูลไม่สำเร็จ');
       }
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: 'เกิดข้อผิดพลาด: $e',
-      );
+      state = state.copyWith(isLoading: false, error: 'เกิดข้อผิดพลาด: $e');
     }
   }
-  
+
   /// รับสินค้าเข้า
   Future<bool> stockIn({
     required String productId,
@@ -80,14 +74,17 @@ class StockBalanceNotifier extends Notifier<StockBalanceState> {
   }) async {
     try {
       final apiClient = ref.read(apiClientProvider);
-      final response = await apiClient.post('/api/stock/in', data: {
-        'product_id': productId,
-        'warehouse_id': warehouseId,
-        'quantity': quantity,
-        'reference_no': referenceNo,
-        'remark': remark,
-      });
-      
+      final response = await apiClient.post(
+        '/api/stock/in',
+        data: {
+          'product_id': productId,
+          'warehouse_id': warehouseId,
+          'quantity': quantity,
+          'reference_no': referenceNo,
+          'remark': remark,
+        },
+      );
+
       if (response.statusCode == 200) {
         await loadStockBalance(); // Reload
         return true;
@@ -97,7 +94,7 @@ class StockBalanceNotifier extends Notifier<StockBalanceState> {
       return false;
     }
   }
-  
+
   /// เบิกสินค้าออก
   Future<Map<String, dynamic>> stockOut({
     required String productId,
@@ -108,25 +105,31 @@ class StockBalanceNotifier extends Notifier<StockBalanceState> {
   }) async {
     try {
       final apiClient = ref.read(apiClientProvider);
-      final response = await apiClient.post('/api/stock/out', data: {
-        'product_id': productId,
-        'warehouse_id': warehouseId,
-        'quantity': quantity,
-        'reference_no': referenceNo,
-        'remark': remark,
-      });
-      
+      final response = await apiClient.post(
+        '/api/stock/out',
+        data: {
+          'product_id': productId,
+          'warehouse_id': warehouseId,
+          'quantity': quantity,
+          'reference_no': referenceNo,
+          'remark': remark,
+        },
+      );
+
       if (response.statusCode == 200) {
         await loadStockBalance(); // Reload
         return {'success': true, 'message': response.data['message']};
       } else {
-        return {'success': false, 'message': response.data['message'] ?? 'เบิกสินค้าไม่สำเร็จ'};
+        return {
+          'success': false,
+          'message': response.data['message'] ?? 'เบิกสินค้าไม่สำเร็จ',
+        };
       }
     } catch (e) {
       return {'success': false, 'message': 'เกิดข้อผิดพลาด: $e'};
     }
   }
-  
+
   /// ปรับสต๊อก
   Future<bool> adjustStock({
     required String productId,
@@ -137,14 +140,48 @@ class StockBalanceNotifier extends Notifier<StockBalanceState> {
   }) async {
     try {
       final apiClient = ref.read(apiClientProvider);
-      final response = await apiClient.post('/api/stock/adjust', data: {
-        'product_id': productId,
-        'warehouse_id': warehouseId,
-        'new_balance': newBalance,
-        'reference_no': referenceNo,
-        'remark': remark,
-      });
-      
+      final response = await apiClient.post(
+        '/api/stock/adjust',
+        data: {
+          'product_id': productId,
+          'warehouse_id': warehouseId,
+          'new_balance': newBalance,
+          'reference_no': referenceNo,
+          'remark': remark,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        await loadStockBalance(); // Reload
+        return true;
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// โอนย้ายสินค้า
+  Future<bool> transferStock({
+    required String productId,
+    required String fromWarehouseId,
+    required String toWarehouseId,
+    required double quantity,
+    String? remark,
+  }) async {
+    try {
+      final apiClient = ref.read(apiClientProvider);
+      final response = await apiClient.post(
+        '/api/stock/transfer',
+        data: {
+          'product_id': productId,
+          'from_warehouse_id': fromWarehouseId,
+          'to_warehouse_id': toWarehouseId,
+          'quantity': quantity,
+          'remark': remark,
+        },
+      );
+
       if (response.statusCode == 200) {
         await loadStockBalance(); // Reload
         return true;
