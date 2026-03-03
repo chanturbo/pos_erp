@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/customer_provider.dart';
 import 'customer_form_page.dart';
 
-class CustomerListPage extends ConsumerStatefulWidget {  // ✅ เปลี่ยนเป็น StatefulWidget
+class CustomerListPage extends ConsumerStatefulWidget {
   const CustomerListPage({super.key});
 
   @override
@@ -39,7 +39,7 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
       ),
       body: Column(
         children: [
-          // ✅ เพิ่ม Search Bar
+          // Search Bar
           Padding(
             padding: const EdgeInsets.all(16),
             child: TextField(
@@ -113,7 +113,7 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
       );
     }
     
-    // ✅ กรองลูกค้าตามการค้นหา
+    // กรองลูกค้าตามการค้นหา
     final filteredCustomers = state.customers.where((customer) {
       if (_searchQuery.isEmpty) return true;
       return customer.customerName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
@@ -150,7 +150,94 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
       itemCount: filteredCustomers.length,
       itemBuilder: (context, index) {
         final customer = filteredCustomers[index];
-        // ... โค้ดเดิม (Card ของลูกค้า)
+        return Card(
+          margin: const EdgeInsets.only(bottom: 12),
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundColor: Colors.teal,
+              child: Text(
+                customer.customerName.substring(0, 1).toUpperCase(),
+                style: const TextStyle(color: Colors.white),
+              ),
+            ),
+            title: Text(
+              customer.customerName,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('รหัส: ${customer.customerCode}'),
+                if (customer.phone != null)
+                  Text('โทร: ${customer.phone}'),
+                if (customer.creditLimit != null && customer.creditLimit! > 0)
+                  Text(
+                    'วงเงินเครดิต: ฿${customer.creditLimit!.toStringAsFixed(2)}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.blue[700],
+                    ),
+                  ),
+              ],
+            ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.edit, color: Colors.blue),
+                  onPressed: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => CustomerFormPage(customer: customer),
+                      ),
+                    );
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete, color: Colors.red),
+                  onPressed: () async {
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('ยืนยันการลบ'),
+                        content: Text('ต้องการลบลูกค้า ${customer.customerName} ใช่หรือไม่?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: const Text('ยกเลิก'),
+                          ),
+                          ElevatedButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red,
+                            ),
+                            child: const Text('ลบ'),
+                          ),
+                        ],
+                      ),
+                    );
+                    
+                    if (confirm == true) {
+                      final success = await ref
+                          .read(customerListProvider.notifier)
+                          .deleteCustomer(customer.customerId);
+                      
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(success ? 'ลบลูกค้าสำเร็จ' : 'ลบลูกค้าไม่สำเร็จ'),
+                            backgroundColor: success ? Colors.green : Colors.red,
+                          ),
+                        );
+                      }
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
       },
     );
   }
