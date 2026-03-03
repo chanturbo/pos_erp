@@ -14838,12 +14838,35 @@ class $StockMovementsTable extends StockMovements
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _referenceNoMeta = const VerificationMeta(
+    'referenceNo',
+  );
+  @override
+  late final GeneratedColumn<String> referenceNo = GeneratedColumn<String>(
+    'reference_no',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
   @override
   late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
     'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
     aliasedName,
     false,
     type: DriftSqlType.dateTime,
@@ -14864,7 +14887,9 @@ class $StockMovementsTable extends StockMovements
     referenceId,
     userId,
     remark,
+    referenceNo,
     createdAt,
+    updatedAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -14981,10 +15006,25 @@ class $StockMovementsTable extends StockMovements
         remark.isAcceptableOrUnknown(data['remark']!, _remarkMeta),
       );
     }
+    if (data.containsKey('reference_no')) {
+      context.handle(
+        _referenceNoMeta,
+        referenceNo.isAcceptableOrUnknown(
+          data['reference_no']!,
+          _referenceNoMeta,
+        ),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
         createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
       );
     }
     return context;
@@ -15048,9 +15088,17 @@ class $StockMovementsTable extends StockMovements
         DriftSqlType.string,
         data['${effectivePrefix}remark'],
       ),
+      referenceNo: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}reference_no'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
       )!,
     );
   }
@@ -15074,7 +15122,9 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
   final String? referenceId;
   final String userId;
   final String? remark;
+  final String? referenceNo;
   final DateTime createdAt;
+  final DateTime updatedAt;
   const StockMovement({
     required this.movementId,
     required this.movementNo,
@@ -15088,7 +15138,9 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
     this.referenceId,
     required this.userId,
     this.remark,
+    this.referenceNo,
     required this.createdAt,
+    required this.updatedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -15111,7 +15163,11 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
     if (!nullToAbsent || remark != null) {
       map['remark'] = Variable<String>(remark);
     }
+    if (!nullToAbsent || referenceNo != null) {
+      map['reference_no'] = Variable<String>(referenceNo);
+    }
     map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
   }
 
@@ -15135,7 +15191,11 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
       remark: remark == null && nullToAbsent
           ? const Value.absent()
           : Value(remark),
+      referenceNo: referenceNo == null && nullToAbsent
+          ? const Value.absent()
+          : Value(referenceNo),
       createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
     );
   }
 
@@ -15157,7 +15217,9 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
       referenceId: serializer.fromJson<String?>(json['referenceId']),
       userId: serializer.fromJson<String>(json['userId']),
       remark: serializer.fromJson<String?>(json['remark']),
+      referenceNo: serializer.fromJson<String?>(json['referenceNo']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
   }
   @override
@@ -15176,7 +15238,9 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
       'referenceId': serializer.toJson<String?>(referenceId),
       'userId': serializer.toJson<String>(userId),
       'remark': serializer.toJson<String?>(remark),
+      'referenceNo': serializer.toJson<String?>(referenceNo),
       'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
   }
 
@@ -15193,7 +15257,9 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
     Value<String?> referenceId = const Value.absent(),
     String? userId,
     Value<String?> remark = const Value.absent(),
+    Value<String?> referenceNo = const Value.absent(),
     DateTime? createdAt,
+    DateTime? updatedAt,
   }) => StockMovement(
     movementId: movementId ?? this.movementId,
     movementNo: movementNo ?? this.movementNo,
@@ -15209,7 +15275,9 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
     referenceId: referenceId.present ? referenceId.value : this.referenceId,
     userId: userId ?? this.userId,
     remark: remark.present ? remark.value : this.remark,
+    referenceNo: referenceNo.present ? referenceNo.value : this.referenceNo,
     createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
   );
   StockMovement copyWithCompanion(StockMovementsCompanion data) {
     return StockMovement(
@@ -15239,7 +15307,11 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
           : this.referenceId,
       userId: data.userId.present ? data.userId.value : this.userId,
       remark: data.remark.present ? data.remark.value : this.remark,
+      referenceNo: data.referenceNo.present
+          ? data.referenceNo.value
+          : this.referenceNo,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
 
@@ -15258,7 +15330,9 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
           ..write('referenceId: $referenceId, ')
           ..write('userId: $userId, ')
           ..write('remark: $remark, ')
-          ..write('createdAt: $createdAt')
+          ..write('referenceNo: $referenceNo, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
   }
@@ -15277,7 +15351,9 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
     referenceId,
     userId,
     remark,
+    referenceNo,
     createdAt,
+    updatedAt,
   );
   @override
   bool operator ==(Object other) =>
@@ -15295,7 +15371,9 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
           other.referenceId == this.referenceId &&
           other.userId == this.userId &&
           other.remark == this.remark &&
-          other.createdAt == this.createdAt);
+          other.referenceNo == this.referenceNo &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
 }
 
 class StockMovementsCompanion extends UpdateCompanion<StockMovement> {
@@ -15311,7 +15389,9 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovement> {
   final Value<String?> referenceId;
   final Value<String> userId;
   final Value<String?> remark;
+  final Value<String?> referenceNo;
   final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
   final Value<int> rowid;
   const StockMovementsCompanion({
     this.movementId = const Value.absent(),
@@ -15326,7 +15406,9 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovement> {
     this.referenceId = const Value.absent(),
     this.userId = const Value.absent(),
     this.remark = const Value.absent(),
+    this.referenceNo = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   StockMovementsCompanion.insert({
@@ -15342,7 +15424,9 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovement> {
     this.referenceId = const Value.absent(),
     required String userId,
     this.remark = const Value.absent(),
+    this.referenceNo = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : movementId = Value(movementId),
        movementNo = Value(movementNo),
@@ -15365,7 +15449,9 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovement> {
     Expression<String>? referenceId,
     Expression<String>? userId,
     Expression<String>? remark,
+    Expression<String>? referenceNo,
     Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -15381,7 +15467,9 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovement> {
       if (referenceId != null) 'reference_id': referenceId,
       if (userId != null) 'user_id': userId,
       if (remark != null) 'remark': remark,
+      if (referenceNo != null) 'reference_no': referenceNo,
       if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -15399,7 +15487,9 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovement> {
     Value<String?>? referenceId,
     Value<String>? userId,
     Value<String?>? remark,
+    Value<String?>? referenceNo,
     Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
     Value<int>? rowid,
   }) {
     return StockMovementsCompanion(
@@ -15415,7 +15505,9 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovement> {
       referenceId: referenceId ?? this.referenceId,
       userId: userId ?? this.userId,
       remark: remark ?? this.remark,
+      referenceNo: referenceNo ?? this.referenceNo,
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -15459,8 +15551,14 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovement> {
     if (remark.present) {
       map['remark'] = Variable<String>(remark.value);
     }
+    if (referenceNo.present) {
+      map['reference_no'] = Variable<String>(referenceNo.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
@@ -15483,7 +15581,9 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovement> {
           ..write('referenceId: $referenceId, ')
           ..write('userId: $userId, ')
           ..write('remark: $remark, ')
+          ..write('referenceNo: $referenceNo, ')
           ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -38877,7 +38977,9 @@ typedef $$StockMovementsTableCreateCompanionBuilder =
       Value<String?> referenceId,
       required String userId,
       Value<String?> remark,
+      Value<String?> referenceNo,
       Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
       Value<int> rowid,
     });
 typedef $$StockMovementsTableUpdateCompanionBuilder =
@@ -38894,7 +38996,9 @@ typedef $$StockMovementsTableUpdateCompanionBuilder =
       Value<String?> referenceId,
       Value<String> userId,
       Value<String?> remark,
+      Value<String?> referenceNo,
       Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
       Value<int> rowid,
     });
 
@@ -39023,8 +39127,18 @@ class $$StockMovementsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get referenceNo => $composableBuilder(
+    column: $table.referenceNo,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -39152,8 +39266,18 @@ class $$StockMovementsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get referenceNo => $composableBuilder(
+    column: $table.referenceNo,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -39275,8 +39399,16 @@ class $$StockMovementsTableAnnotationComposer
   GeneratedColumn<String> get remark =>
       $composableBuilder(column: $table.remark, builder: (column) => column);
 
+  GeneratedColumn<String> get referenceNo => $composableBuilder(
+    column: $table.referenceNo,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 
   $$ProductsTableAnnotationComposer get productId {
     final $$ProductsTableAnnotationComposer composer = $composerBuilder(
@@ -39394,7 +39526,9 @@ class $$StockMovementsTableTableManager
                 Value<String?> referenceId = const Value.absent(),
                 Value<String> userId = const Value.absent(),
                 Value<String?> remark = const Value.absent(),
+                Value<String?> referenceNo = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => StockMovementsCompanion(
                 movementId: movementId,
@@ -39409,7 +39543,9 @@ class $$StockMovementsTableTableManager
                 referenceId: referenceId,
                 userId: userId,
                 remark: remark,
+                referenceNo: referenceNo,
                 createdAt: createdAt,
+                updatedAt: updatedAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -39426,7 +39562,9 @@ class $$StockMovementsTableTableManager
                 Value<String?> referenceId = const Value.absent(),
                 required String userId,
                 Value<String?> remark = const Value.absent(),
+                Value<String?> referenceNo = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => StockMovementsCompanion.insert(
                 movementId: movementId,
@@ -39441,7 +39579,9 @@ class $$StockMovementsTableTableManager
                 referenceId: referenceId,
                 userId: userId,
                 remark: remark,
+                referenceNo: referenceNo,
                 createdAt: createdAt,
+                updatedAt: updatedAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
