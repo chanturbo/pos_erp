@@ -6,6 +6,7 @@ import '../widgets/stock_out_dialog.dart';
 import '../widgets/stock_adjust_dialog.dart';
 import '../widgets/stock_transfer_dialog.dart'; // ✅ เพิ่ม
 import 'stock_movement_history_page.dart'; // ✅ เพิ่ม
+import '../../../settings/presentation/pages/settings_page.dart'; // ✅ เพิ่ม
 
 class StockBalancePage extends ConsumerStatefulWidget {
   const StockBalancePage({super.key});
@@ -144,12 +145,16 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
       );
     }
 
+    final settings = ref.watch(settingsProvider); // ✅ เพิ่ม
+
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       itemCount: filteredStocks.length,
       itemBuilder: (context, index) {
         final stock = filteredStocks[index];
-        final isLowStock = stock.balance < 10; // ✅ Low stock alert
+        final isLowStock =
+            settings.enableLowStockAlert && // ✅ เช็ค settings
+            stock.balance < settings.lowStockThreshold;
 
         return Card(
           margin: const EdgeInsets.only(bottom: 12),

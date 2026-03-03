@@ -5,6 +5,7 @@ import '../../../../core/client/api_client.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/models/sales_summary_model.dart';
 import 'sales_chart_page.dart'; // ✅ เพิ่ม
+import '../../../../core/utils/csv_export.dart';
 
 // Sales Summary Provider
 final salesSummaryProvider = FutureProvider<SalesSummaryModel>((ref) async {
@@ -71,6 +72,12 @@ class ReportsPage extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('รายงาน'),
         actions: [
+          // ✅ เพิ่มปุ่ม Export
+          IconButton(
+            icon: const Icon(Icons.file_download),
+            tooltip: 'Export รายงาน',
+            onPressed: () => _exportReport(context, ref),
+          ),
           // ✅ เพิ่มปุ่มดูกราฟ
           IconButton(
             icon: const Icon(Icons.bar_chart),
@@ -310,5 +317,58 @@ class ReportsPage extends ConsumerWidget {
       default:
         return Colors.blue;
     }
+  }
+
+  // ✅ เพิ่ม method
+  Future<void> _exportReport(BuildContext context, WidgetRef ref) async {
+    final summaryAsync = ref.read(salesSummaryProvider);
+    final topProductsAsync = ref.read(topProductsProvider);
+
+    summaryAsync.whenData((summary) async {
+      topProductsAsync.whenData((products) async {
+        final headers = ['รายการ', 'ค่า'];
+        final rows = [
+          ['ยอดขายรวม', '฿${summary.totalSales.toStringAsFixed(2)}'],
+          ['จำนวนออเดอร์', '${summary.totalOrders}'],
+          ['ยอดเฉลี่ย/ออเดอร์', '฿${summary.avgOrderValue.toStringAsFixed(2)}'],
+          ['ส่วนลดรวม', '฿${summary.totalDiscount.toStringAsFixed(2)}'],
+          [''],
+          ['สินค้าขายดี Top 5', ''],
+          ...products.map(
+            (p) => [
+              p.productName,
+              '฿${p.totalSales.toStringAsFixed(2)} (${p.totalQuantity.toStringAsFixed(0)} ชิ้น)',
+            ],
+          ),
+        ];
+
+        final filepath = await CsvExport.exportToCsv(
+          filename: 'sales_report',
+          headers: headers,
+          rows: rows,
+        );
+
+        if (filepath != null && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Export สำเร็จ: $filepath'),
+              action: SnackBarAction(
+                label: 'เปิด',
+                onPressed: () {
+                  // TODO: Open file
+                },
+              ),
+            ),
+          );
+        } else if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Export ไม่สำเร็จ'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      });
+    });
   }
 }
