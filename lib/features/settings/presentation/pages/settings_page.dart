@@ -47,6 +47,7 @@ class SettingsState {
   }
 }
 
+
 // ✅ Settings Notifier (Riverpod 2.0+ style)
 class SettingsNotifier extends Notifier<SettingsState> {
   @override

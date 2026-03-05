@@ -5,11 +5,12 @@ import '../providers/stock_provider.dart';
 
 class StockTransferDialog extends ConsumerStatefulWidget {
   final StockBalanceModel stock;
-  
+
   const StockTransferDialog({super.key, required this.stock});
 
   @override
-  ConsumerState<StockTransferDialog> createState() => _StockTransferDialogState();
+  ConsumerState<StockTransferDialog> createState() =>
+      _StockTransferDialogState();
 }
 
 class _StockTransferDialogState extends ConsumerState<StockTransferDialog> {
@@ -18,13 +19,13 @@ class _StockTransferDialogState extends ConsumerState<StockTransferDialog> {
   final _remarkController = TextEditingController();
   String? _toWarehouseId;
   bool _isLoading = false;
-  
+
   // TODO: ควรดึงจาก API
   final List<Map<String, String>> warehouses = [
     {'id': 'WH001', 'name': 'คลังสาขาหลัก'},
     {'id': 'WH002', 'name': 'คลังสาขาสยาม'},
   ];
-  
+
   @override
   void dispose() {
     _quantityController.dispose();
@@ -37,7 +38,7 @@ class _StockTransferDialogState extends ConsumerState<StockTransferDialog> {
     final availableWarehouses = warehouses
         .where((w) => w['id'] != widget.stock.warehouseId)
         .toList();
-    
+
     return Dialog(
       child: Container(
         width: 500,
@@ -78,7 +79,7 @@ class _StockTransferDialogState extends ConsumerState<StockTransferDialog> {
                 ],
               ),
               const Divider(height: 32),
-              
+
               // From Warehouse
               Container(
                 padding: const EdgeInsets.all(12),
@@ -107,7 +108,8 @@ class _StockTransferDialogState extends ConsumerState<StockTransferDialog> {
                 ),
               ),
               const SizedBox(height: 16),
-              
+
+              // To Warehouse
               // To Warehouse
               DropdownButtonFormField<String>(
                 decoration: const InputDecoration(
@@ -115,7 +117,8 @@ class _StockTransferDialogState extends ConsumerState<StockTransferDialog> {
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.warehouse),
                 ),
-                value: _toWarehouseId,
+                // ✅ เปลี่ยนจาก value เป็น initialValue
+                initialValue: _toWarehouseId,
                 items: availableWarehouses.map((w) {
                   return DropdownMenuItem(
                     value: w['id'],
@@ -135,7 +138,7 @@ class _StockTransferDialogState extends ConsumerState<StockTransferDialog> {
                 },
               ),
               const SizedBox(height: 16),
-              
+
               // Quantity
               TextFormField(
                 controller: _quantityController,
@@ -161,7 +164,7 @@ class _StockTransferDialogState extends ConsumerState<StockTransferDialog> {
                 autofocus: true,
               ),
               const SizedBox(height: 16),
-              
+
               // Remark
               TextFormField(
                 controller: _remarkController,
@@ -172,13 +175,15 @@ class _StockTransferDialogState extends ConsumerState<StockTransferDialog> {
                 maxLines: 2,
               ),
               const SizedBox(height: 24),
-              
+
               // Buttons
               Row(
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: _isLoading ? null : () => Navigator.pop(context),
+                      onPressed: _isLoading
+                          ? null
+                          : () => Navigator.pop(context),
                       child: const Text('ยกเลิก'),
                     ),
                   ),
@@ -209,34 +214,36 @@ class _StockTransferDialogState extends ConsumerState<StockTransferDialog> {
       ),
     );
   }
-  
+
   Future<void> _handleSubmit() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
-    
+
     setState(() {
       _isLoading = true;
     });
-    
+
     final quantity = double.parse(_quantityController.text);
     final remark = _remarkController.text.trim();
-    
-    final success = await ref.read(stockBalanceProvider.notifier).transferStock(
-      productId: widget.stock.productId,
-      fromWarehouseId: widget.stock.warehouseId,
-      toWarehouseId: _toWarehouseId!,
-      quantity: quantity,
-      remark: remark.isEmpty ? null : remark,
-    );
-    
+
+    final success = await ref
+        .read(stockBalanceProvider.notifier)
+        .transferStock(
+          productId: widget.stock.productId,
+          fromWarehouseId: widget.stock.warehouseId,
+          toWarehouseId: _toWarehouseId!,
+          quantity: quantity,
+          remark: remark.isEmpty ? null : remark,
+        );
+
     if (mounted) {
       setState(() {
         _isLoading = false;
       });
-      
+
       Navigator.pop(context);
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(success ? 'โอนย้ายสินค้าสำเร็จ' : 'เกิดข้อผิดพลาด'),

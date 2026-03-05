@@ -24,7 +24,11 @@ class SalesRoutes {
   /// GET /api/sales - รายการขายทั้งหมด
   Future<Response> _getSalesOrdersHandler(Request request) async {
     try {
+      print('📡 GET /api/sales');
+
       final orders = await db.select(db.salesOrders).get();
+
+      print('✅ Found ${orders.length} orders');
 
       return Response.ok(
         jsonEncode({
@@ -35,8 +39,12 @@ class SalesRoutes {
                   'order_id': o.orderId,
                   'order_no': o.orderNo,
                   'order_date': o.orderDate.toIso8601String(),
+                  'customer_id': o.customerId,
                   'customer_name': o.customerName,
                   'total_amount': o.totalAmount,
+                  'discount_amount': o.discountAmount,
+                  'net_amount': o.totalAmount,
+                  'payment_type': o.paymentType,
                   'status': o.status,
                 },
               )
@@ -45,6 +53,8 @@ class SalesRoutes {
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
+      print('❌ GET /api/sales error: $e');
+
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': 'เกิดข้อผิดพลาด: $e'}),
       );
@@ -54,6 +64,8 @@ class SalesRoutes {
   /// GET /api/sales/:id - ดึงใบขาย 1 รายการ
   Future<Response> _getSalesOrderHandler(Request request, String id) async {
     try {
+      print('📡 GET /api/sales/$id');
+
       final order = await (db.select(
         db.salesOrders,
       )..where((t) => t.orderId.equals(id))).getSingleOrNull();
@@ -88,6 +100,8 @@ class SalesRoutes {
             'items': items
                 .map(
                   (i) => {
+                    'item_id': '${i.orderId}_${i.lineNo}',
+                    'order_id': i.orderId,
                     'product_id': i.productId,
                     'product_code': i.productCode,
                     'product_name': i.productName,
@@ -102,6 +116,8 @@ class SalesRoutes {
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
+      print('❌ GET /api/sales/$id error: $e');
+
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': 'เกิดข้อผิดพลาด: $e'}),
       );
@@ -111,8 +127,23 @@ class SalesRoutes {
   /// POST /api/sales - สร้างใบขายใหม่
   Future<Response> _createSalesOrderHandler(Request request) async {
     try {
+      print('📡 POST /api/sales');
+
       final payload = await request.readAsString();
+      print('📦 Payload: $payload');
+
       final data = jsonDecode(payload) as Map<String, dynamic>;
+      print('✅ Parsed data: $data');
+
+      // ✅ ตรวจสอบข้อมูลที่จำเป็น
+      if (data['items'] == null || (data['items'] as List).isEmpty) {
+        print('❌ Error: No items in order');
+        return Response(
+          400,
+          body: jsonEncode({'success': false, 'message': 'ไม่มีรายการสินค้า'}),
+          headers: {'Content-Type': 'application/json'},
+        );
+      }
 
       // Generate Order ID & No
       final orderId = 'SO${DateTime.now().millisecondsSinceEpoch}';
@@ -121,21 +152,39 @@ class SalesRoutes {
 
       final warehouseId = data['warehouse_id'] as String? ?? 'WH001';
 
-      // ✅ เช็คสต๊อกก่อนขาย
+      print('🆔 Generated order: $orderNo');
+
+      // เช็คสต๊อกก่อนขาย
       final items = data['items'] as List;
       for (var item in items) {
         final productId = item['product_id'] as String;
         final quantity = (item['quantity'] as num).toDouble();
+
+        print('🔍 Checking stock for $productId: $quantity');
 
         // เช็คว่าสินค้ามีการควบคุมสต๊อกหรือไม่
         final product = await (db.select(
           db.products,
         )..where((t) => t.productId.equals(productId))).getSingleOrNull();
 
-        if (product != null && product.isStockControl) {
+        if (product == null) {
+          print('❌ Product not found: $productId');
+          return Response(
+            400,
+            body: jsonEncode({
+              'success': false,
+              'message': 'ไม่พบสินค้า $productId',
+            }),
+            headers: {'Content-Type': 'application/json'},
+          );
+        }
+
+        if (product.isStockControl) {
           final currentStock = await _getCurrentStock(productId, warehouseId);
+          print('📊 Current stock: $currentStock');
 
           if (!product.allowNegativeStock && currentStock < quantity) {
+            print('❌ Insufficient stock');
             return Response(
               400,
               body: jsonEncode({
@@ -150,6 +199,8 @@ class SalesRoutes {
       }
 
       // สร้าง Order
+      print('💾 Creating order...');
+
       final orderCompanion = SalesOrdersCompanion(
         orderId: Value(orderId),
         orderNo: Value(orderNo),
@@ -176,8 +227,11 @@ class SalesRoutes {
       );
 
       await db.into(db.salesOrders).insert(orderCompanion);
+      print('✅ Order created');
 
       // สร้าง Order Items และตัดสต๊อก
+      print('💾 Creating order items...');
+
       for (var i = 0; i < items.length; i++) {
         final item = items[i] as Map<String, dynamic>;
         final itemId = '${orderId}_${i + 1}';
@@ -207,7 +261,7 @@ class SalesRoutes {
 
         await db.into(db.salesOrderItems).insert(itemCompanion);
 
-        // ✅ ตัดสต๊อกอัตโนมัติ (ถ้ามีการควบคุมสต๊อก)
+        // ตัดสต๊อกอัตโนมัติ
         final product = await (db.select(
           db.products,
         )..where((t) => t.productId.equals(productId))).getSingleOrNull();
@@ -218,10 +272,14 @@ class SalesRoutes {
               .insert(
                 StockMovementsCompanion(
                   movementId: Value('${orderId}_${i + 1}'),
+                  movementNo: Value(orderNo), // ✅ เพิ่ม
                   movementDate: Value(DateTime.now()),
                   movementType: const Value('SALE'),
                   productId: Value(productId),
                   warehouseId: Value(warehouseId),
+                  userId: Value(
+                    data['user_id'] as String? ?? 'USR001',
+                  ), // ✅ เพิ่ม
                   quantity: Value(-quantity),
                   referenceNo: Value(orderNo),
                   remark: const Value('ขายสินค้า'),
@@ -229,6 +287,8 @@ class SalesRoutes {
               );
         }
       }
+
+      print('✅ Created order: $orderNo');
 
       return Response.ok(
         jsonEncode({
@@ -238,14 +298,17 @@ class SalesRoutes {
         }),
         headers: {'Content-Type': 'application/json'},
       );
-    } catch (e) {
+    } catch (e, stack) {
+      print('❌ POST /api/sales error: $e');
+      print('Stack trace: $stack');
+
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': 'เกิดข้อผิดพลาด: $e'}),
       );
     }
   }
 
-  // ✅ เพิ่ม Helper Function
+  /// Helper: คำนวณสต๊อกปัจจุบัน
   Future<double> _getCurrentStock(String productId, String warehouseId) async {
     final result = await db
         .customSelect(

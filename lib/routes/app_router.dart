@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import '../features/auth/presentation/pages/login_page.dart';
-import '../features/home/presentation/pages/home_page.dart';
-import '../features/sales/presentation/pages/pos_page.dart'; // ✅ เพิ่ม
+import '../features/home/presentation/pages/home_page.dart'; // ✅ แก้ไข import
+import '../features/sales/presentation/pages/pos_page.dart';
 
 class AppRouter {
   static const String login = '/login';
   static const String home = '/home';
-  static const String pos = '/pos'; // ✅ เพิ่ม
+  static const String pos = '/pos';
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -14,9 +14,9 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => const LoginPage());
 
       case home:
-        return MaterialPageRoute(builder: (_) => const HomePage());
+        return MaterialPageRoute(builder: (_) => const HomePage()); // ✅ ใช้ HomePage
 
-      case pos: // ✅ เพิ่ม
+      case pos:
         return MaterialPageRoute(builder: (_) => const PosPage());
 
       default:

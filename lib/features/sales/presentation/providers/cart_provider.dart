@@ -1,104 +1,83 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../data/models/cart_item_model.dart';
 
-// Hold Order Model
-class HoldOrder {
-  final String id;
-  final String name;
-  final List<CartItemModel> items;
-  final String? customerId;
-  final String? customerName;
-  final double discountPercent;
-  final double discountAmount;
-  final DateTime createdAt;
+// Cart Item Model
+class CartItem {
+  final String productId;
+  final String productCode;
+  final String productName;
+  final String unit;
+  final double quantity;
+  final double unitPrice;
+  final double amount;
   
-  HoldOrder({
-    required this.id,
-    required this.name,
-    required this.items,
-    this.customerId,
-    this.customerName,
-    this.discountPercent = 0,
-    this.discountAmount = 0,
-    required this.createdAt,
+  CartItem({
+    required this.productId,
+    required this.productCode,
+    required this.productName,
+    required this.unit,
+    required this.quantity,
+    required this.unitPrice,
+    required this.amount,
   });
   
-  double get total {
-    final subtotal = items.fold(0.0, (sum, item) => sum + item.amount);
-    final discount = (subtotal * discountPercent / 100) + discountAmount;
-    return subtotal - discount;
-  }
-}
-
-// ✅ Hold Orders State
-class HoldOrdersState {
-  final List<HoldOrder> orders;
-  
-  HoldOrdersState({required this.orders});
-  
-  HoldOrdersState copyWith({List<HoldOrder>? orders}) {
-    return HoldOrdersState(orders: orders ?? this.orders);
-  }
-}
-
-// ✅ Hold Orders Provider (เปลี่ยนเป็น NotifierProvider)
-final holdOrdersProvider = NotifierProvider<HoldOrdersNotifier, HoldOrdersState>(() {
-  return HoldOrdersNotifier();
-});
-
-class HoldOrdersNotifier extends Notifier<HoldOrdersState> {
-  @override
-  HoldOrdersState build() {
-    return HoldOrdersState(orders: []);
-  }
-  
-  void addOrder(HoldOrder order) {
-    state = state.copyWith(orders: [...state.orders, order]);
-  }
-  
-  void removeOrder(String orderId) {
-    state = state.copyWith(
-      orders: state.orders.where((o) => o.id != orderId).toList(),
+  CartItem copyWith({
+    double? quantity,
+    double? amount,
+  }) {
+    return CartItem(
+      productId: productId,
+      productCode: productCode,
+      productName: productName,
+      unit: unit,
+      quantity: quantity ?? this.quantity,
+      unitPrice: unitPrice,
+      amount: amount ?? this.amount,
     );
   }
 }
 
 // Cart State
 class CartState {
-  final List<CartItemModel> items;
+  final List<CartItem> items;
   final String? customerId;
   final String? customerName;
   final double discountPercent;
   final double discountAmount;
   
   CartState({
-    required this.items,
-    this.customerId,
-    this.customerName,
+    this.items = const [],
+    this.customerId = 'WALK_IN',        // ✅ Default
+    this.customerName = 'ลูกค้าทั่วไป',  // ✅ Default
     this.discountPercent = 0,
     this.discountAmount = 0,
   });
   
-  // คำนวณยอดรวม
+  // Calculated values
   double get subtotal => items.fold(0, (sum, item) => sum + item.amount);
   
-  double get totalDiscount => (subtotal * discountPercent / 100) + discountAmount;
+  double get totalDiscount {
+    if (discountPercent > 0) {
+      return subtotal * discountPercent / 100;
+    }
+    return discountAmount;
+  }
   
   double get total => subtotal - totalDiscount;
   
-  int get itemCount => items.fold(0, (sum, item) => sum + item.quantity.toInt());
+  int get itemCount => items.length;
   
   CartState copyWith({
-    List<CartItemModel>? items,
+    List<CartItem>? items,
     String? customerId,
     String? customerName,
     double? discountPercent,
     double? discountAmount,
+    bool clearCustomer = false,
   }) {
     return CartState(
       items: items ?? this.items,
-      customerId: customerId ?? this.customerId,
-      customerName: customerName ?? this.customerName,
+      customerId: clearCustomer ? 'WALK_IN' : (customerId ?? this.customerId),
+      customerName: clearCustomer ? 'ลูกค้าทั่วไป' : (customerName ?? this.customerName),
       discountPercent: discountPercent ?? this.discountPercent,
       discountAmount: discountAmount ?? this.discountAmount,
     );
@@ -113,87 +92,90 @@ final cartProvider = NotifierProvider<CartNotifier, CartState>(() {
 class CartNotifier extends Notifier<CartState> {
   @override
   CartState build() {
-    return CartState(items: []);
+    return CartState();
   }
   
-  /// เพิ่มสินค้าลงตะกร้า
+  /// เพิ่มสินค้าในตะกร้า
   void addItem({
     required String productId,
     required String productCode,
     required String productName,
     required String unit,
-    required double price,
+    required double unitPrice,
     double quantity = 1,
   }) {
-    final items = List<CartItemModel>.from(state.items);
-    
-    // ตรวจสอบว่ามีสินค้านี้แล้วหรือไม่
+    final items = List<CartItem>.from(state.items);
     final existingIndex = items.indexWhere((item) => item.productId == productId);
     
-    if (existingIndex != -1) {
-      // มีแล้ว เพิ่มจำนวน
-      items[existingIndex] = items[existingIndex].copyWith(
-        quantity: items[existingIndex].quantity + quantity,
+    if (existingIndex >= 0) {
+      // เพิ่มจำนวน
+      final existing = items[existingIndex];
+      final newQuantity = existing.quantity + quantity;
+      final newAmount = newQuantity * unitPrice;
+      
+      items[existingIndex] = existing.copyWith(
+        quantity: newQuantity,
+        amount: newAmount,
       );
     } else {
-      // ยังไม่มี เพิ่มใหม่
-      items.add(CartItemModel(
+      // เพิ่มรายการใหม่
+      items.add(CartItem(
         productId: productId,
         productCode: productCode,
         productName: productName,
         unit: unit,
-        price: price,
         quantity: quantity,
+        unitPrice: unitPrice,
+        amount: quantity * unitPrice,
       ));
     }
     
     state = state.copyWith(items: items);
   }
   
-  /// ลบสินค้าออกจากตะกร้า
+  /// เพิ่มจำนวน
+  void increaseQuantity(String productId) {
+    final items = List<CartItem>.from(state.items);
+    final index = items.indexWhere((item) => item.productId == productId);
+    
+    if (index >= 0) {
+      final item = items[index];
+      final newQuantity = item.quantity + 1;
+      final newAmount = newQuantity * item.unitPrice;
+      
+      items[index] = item.copyWith(
+        quantity: newQuantity,
+        amount: newAmount,
+      );
+      
+      state = state.copyWith(items: items);
+    }
+  }
+  
+  /// ลดจำนวน
+  void decreaseQuantity(String productId) {
+    final items = List<CartItem>.from(state.items);
+    final index = items.indexWhere((item) => item.productId == productId);
+    
+    if (index >= 0) {
+      final item = items[index];
+      if (item.quantity > 1) {
+        final newQuantity = item.quantity - 1;
+        final newAmount = newQuantity * item.unitPrice;
+        
+        items[index] = item.copyWith(
+          quantity: newQuantity,
+          amount: newAmount,
+        );
+        
+        state = state.copyWith(items: items);
+      }
+    }
+  }
+  
+  /// ลบสินค้า
   void removeItem(String productId) {
     final items = state.items.where((item) => item.productId != productId).toList();
-    state = state.copyWith(items: items);
-  }
-  
-  /// เปลี่ยนจำนวนสินค้า
-  void updateQuantity(String productId, double quantity) {
-    if (quantity <= 0) {
-      removeItem(productId);
-      return;
-    }
-    
-    final items = state.items.map((item) {
-      if (item.productId == productId) {
-        return item.copyWith(quantity: quantity);
-      }
-      return item;
-    }).toList();
-    
-    state = state.copyWith(items: items);
-  }
-  
-  /// เปลี่ยนส่วนลดของสินค้า
-  void updateItemDiscount(String productId, double discount) {
-    final items = state.items.map((item) {
-      if (item.productId == productId) {
-        return item.copyWith(discount: discount);
-      }
-      return item;
-    }).toList();
-    
-    state = state.copyWith(items: items);
-  }
-  
-  /// เพิ่มหมายเหตุ
-  void updateItemNote(String productId, String note) {
-    final items = state.items.map((item) {
-      if (item.productId == productId) {
-        return item.copyWith(note: note);
-      }
-      return item;
-    }).toList();
-    
     state = state.copyWith(items: items);
   }
   
@@ -205,50 +187,86 @@ class CartNotifier extends Notifier<CartState> {
     );
   }
   
-  /// ตั้งค่าส่วนลดทั้งบิล
+  /// ตั้งค่าส่วนลด
   void setDiscount({double? percent, double? amount}) {
     state = state.copyWith(
-      discountPercent: percent ?? state.discountPercent,
-      discountAmount: amount ?? state.discountAmount,
+      discountPercent: percent ?? 0,
+      discountAmount: amount ?? 0,
     );
   }
   
-  /// Hold Order (พักบิล)
+  /// เคลียร์ตะกร้า
+  void clear() {
+    state = CartState(); // ✅ Reset เป็น default (มีลูกค้าทั่วไป)
+  }
+  
+  /// พักบิล
   void hold(String name) {
-    if (state.items.isEmpty) return;
-    
-    final newOrder = HoldOrder(
-      id: 'HOLD${DateTime.now().millisecondsSinceEpoch}',
-      name: name,
-      items: List.from(state.items),
-      customerId: state.customerId,
-      customerName: state.customerName,
-      discountPercent: state.discountPercent,
-      discountAmount: state.discountAmount,
-      createdAt: DateTime.now(),
-    );
-    
-    // ✅ เพิ่ม Order ใน Hold Orders
-    ref.read(holdOrdersProvider.notifier).addOrder(newOrder);
+    ref.read(holdOrdersProvider.notifier).addOrder(name, state);
     clear();
   }
+}
+
+// Hold Order Model
+class HoldOrder {
+  final String name;
+  final CartState cartState;
+  final DateTime timestamp;
   
-  /// Recall Order (เรียกบิลคืน)
-  void recall(HoldOrder order) {
-    state = CartState(
-      items: List.from(order.items),
-      customerId: order.customerId,
-      customerName: order.customerName,
-      discountPercent: order.discountPercent,
-      discountAmount: order.discountAmount,
-    );
-    
-    // ✅ ลบ Order จาก Hold Orders
-    ref.read(holdOrdersProvider.notifier).removeOrder(order.id);
+  HoldOrder({
+    required this.name,
+    required this.cartState,
+    required this.timestamp,
+  });
+}
+
+// Hold Orders State
+class HoldOrdersState {
+  final List<HoldOrder> orders;
+  
+  HoldOrdersState({this.orders = const []});
+  
+  HoldOrdersState copyWith({List<HoldOrder>? orders}) {
+    return HoldOrdersState(orders: orders ?? this.orders);
+  }
+}
+
+// Hold Orders Provider
+final holdOrdersProvider = NotifierProvider<HoldOrdersNotifier, HoldOrdersState>(() {
+  return HoldOrdersNotifier();
+});
+
+class HoldOrdersNotifier extends Notifier<HoldOrdersState> {
+  @override
+  HoldOrdersState build() {
+    return HoldOrdersState();
   }
   
-  /// ล้างตะกร้า
-  void clear() {
-    state = CartState(items: []);
+  void addOrder(String name, CartState cartState) {
+    final orders = List<HoldOrder>.from(state.orders);
+    orders.add(HoldOrder(
+      name: name,
+      cartState: cartState,
+      timestamp: DateTime.now(),
+    ));
+    state = state.copyWith(orders: orders);
+  }
+  
+  void removeOrder(int index) {
+    final orders = List<HoldOrder>.from(state.orders);
+    orders.removeAt(index);
+    state = state.copyWith(orders: orders);
+  }
+  
+  void recallOrder(int index) {
+    if (index >= 0 && index < state.orders.length) {
+      final order = state.orders[index];
+      
+      // Restore cart
+      ref.read(cartProvider.notifier).state = order.cartState;
+      
+      // Remove from hold
+      removeOrder(index);
+    }
   }
 }

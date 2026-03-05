@@ -9,7 +9,7 @@ import 'routes/app_router.dart';
 import 'core/database/app_database.dart';
 import 'core/server/api_server.dart';
 import 'core/utils/crypto_utils.dart';
-import 'core/database/seed_data.dart';  // ✅ เพิ่ม
+import 'core/database/seed_data.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,24 +29,27 @@ void main() async {
 
 // Global server instance
 ApiServer? _serverInstance;
-AppDatabase? _dbInstance;  // ✅ เพิ่ม
+AppDatabase? _dbInstance;
 
 /// เริ่ม Server ใน Background
 Future<void> _startServerInBackground() async {
   try {
-    _dbInstance = AppDatabase();  // ✅ เก็บ instance
+    print('🔧 Initializing database...');
+    _dbInstance = AppDatabase();
     
-    // สร้าง User ทดสอบ (ถ้ายังไม่มี)
+    print('👤 Creating default user...');
     await _createDefaultUser(_dbInstance!);
     
-    // ✅ Seed ข้อมูลทดสอบ
+    print('🌱 Seeding initial data...');
     await _seedInitialData(_dbInstance!);
     
+    print('🚀 Starting API server...');
     _serverInstance = ApiServer(_dbInstance!);
     await _serverInstance!.start(port: 8080);
-    debugPrint('✅ API Server started at http://127.0.0.1:8080');
+    
+    print('✅ API Server started at http://127.0.0.1:8080');
   } catch (e) {
-    debugPrint('❌ Failed to start server: $e');
+    print('❌ Failed to start server: $e');
   }
 }
 
@@ -56,7 +59,7 @@ Future<void> _createDefaultUser(AppDatabase db) async {
     // เช็คว่ามี User แล้วหรือยัง
     final users = await db.select(db.users).get();
     if (users.isNotEmpty) {
-      debugPrint('✅ Users already exist');
+      print('✅ Users already exist');
       return;
     }
     
@@ -67,6 +70,7 @@ Future<void> _createDefaultUser(AppDatabase db) async {
         roleName: 'Administrator',
         permissions: {'sales': {'create': true}},
       ),
+      mode: InsertMode.insertOrIgnore,
     );
     
     // สร้าง User
@@ -78,22 +82,23 @@ Future<void> _createDefaultUser(AppDatabase db) async {
         fullName: 'ผู้ดูแลระบบ',
         roleId: const Value('ROLE001'),
       ),
+      mode: InsertMode.insertOrIgnore,
     );
     
-    debugPrint('✅ Default user created (admin/admin123)');
+    print('✅ Default user created (admin/admin123)');
   } catch (e) {
-    debugPrint('⚠️ Create default user error: $e');
+    print('⚠️ Create default user error: $e');
   }
 }
 
-// ✅ เพิ่มฟังก์ชันนี้
+/// Seed ข้อมูลเริ่มต้น
 Future<void> _seedInitialData(AppDatabase db) async {
   try {
-    final seeder = SeedData(db);
-    await seeder.seedAll();
-    debugPrint('✅ Initial data seeded');
+    // ✅ เรียกแบบ static method
+    await SeedData.seedAll(db);
+    print('✅ Initial data seeded');
   } catch (e) {
-    debugPrint('⚠️ Seed data error: $e');
+    print('⚠️ Seed data error: $e');
   }
 }
 

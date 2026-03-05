@@ -34,7 +34,7 @@ class TestPage extends ConsumerWidget {
                 context,
                 icon: Icons.delete_forever,
                 title: 'ลบข้อมูลทั้งหมด',
-                subtitle: 'ระวัง! จะลบข้อมูลทั้งหมด',
+                subtitle: 'ระวัง! จะลบข้อมูลทั้งหมด (เก็บ Users)',
                 color: Colors.red,
                 onTap: () async {
                   await _clearData(context);
@@ -151,7 +151,6 @@ class TestPage extends ConsumerWidget {
     
     try {
       final db = AppDatabase();
-      final seeder = SeedData(db);
       
       if (context.mounted) {
         showDialog(
@@ -163,7 +162,8 @@ class TestPage extends ConsumerWidget {
         );
       }
       
-      await seeder.seedAll();
+      // ✅ เรียกแบบ static method
+      await SeedData.seedAll(db);
       
       if (context.mounted) {
         Navigator.pop(context); // Close loading
@@ -192,7 +192,7 @@ class TestPage extends ConsumerWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('⚠️ คำเตือน'),
-        content: const Text('ต้องการลบข้อมูลทั้งหมดใช่หรือไม่?\nการกระทำนี้ไม่สามารถย้อนกลับได้!'),
+        content: const Text('ต้องการลบข้อมูลทั้งหมดใช่หรือไม่?\n(จะเก็บ Users ไว้)'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -201,7 +201,7 @@ class TestPage extends ConsumerWidget {
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('ลบทั้งหมด'),
+            child: const Text('ลบข้อมูล'),
           ),
         ],
       ),
@@ -211,7 +211,6 @@ class TestPage extends ConsumerWidget {
     
     try {
       final db = AppDatabase();
-      final seeder = SeedData(db);
       
       if (context.mounted) {
         showDialog(
@@ -223,18 +222,46 @@ class TestPage extends ConsumerWidget {
         );
       }
       
-      await seeder.clearAll();
+      // ✅ ลบข้อมูลทีละตาราง (เรียงลำดับตาม foreign key)
+      print('🗑️ Deleting stock movements...');
+      await db.delete(db.stockMovements).go();
+      
+      print('🗑️ Deleting sales order items...');
+      await db.delete(db.salesOrderItems).go();
+      
+      print('🗑️ Deleting sales orders...');
+      await db.delete(db.salesOrders).go();
+      
+      print('🗑️ Deleting products...');
+      await db.delete(db.products).go();
+      
+      print('🗑️ Deleting product groups...');
+      await db.delete(db.productGroups).go();
+      
+      print('🗑️ Deleting customers...');
+      await db.delete(db.customers).go();
+      
+      print('🗑️ Deleting warehouses...');
+      await db.delete(db.warehouses).go();
+      
+      print('🗑️ Deleting branches...');
+      await db.delete(db.branches).go();
+      
+      // ✅ ไม่ลบ users และ roles เพื่อให้ยัง login ได้
+      print('✅ Data cleared (kept users & roles)');
       
       if (context.mounted) {
         Navigator.pop(context); // Close loading
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('✅ ลบข้อมูลทั้งหมดสำเร็จ'),
+            content: Text('✅ ลบข้อมูลสำเร็จ (เก็บ Users ไว้)'),
             backgroundColor: Colors.orange,
           ),
         );
       }
     } catch (e) {
+      print('❌ Clear data error: $e');
+      
       if (context.mounted) {
         Navigator.pop(context); // Close loading
         ScaffoldMessenger.of(context).showSnackBar(

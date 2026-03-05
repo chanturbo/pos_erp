@@ -20,9 +20,14 @@ class ApiClient {
     ));
   }
   
-  /// Set token
+  // ✅ เพิ่ม method นี้ถ้ายังไม่มี
   void setToken(String? token) {
     _token = token;
+    if (token != null) {
+      _dio.options.headers['Authorization'] = 'Bearer $token';
+    } else {
+      _dio.options.headers.remove('Authorization');
+    }
   }
   
   /// Get with auth

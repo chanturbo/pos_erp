@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/client/api_client.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/cart_provider.dart';
 
@@ -16,7 +15,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
   final TextEditingController _receivedController = TextEditingController();
   double _receivedAmount = 0;
   bool _isProcessing = false;
-  
+
   @override
   void initState() {
     super.initState();
@@ -25,26 +24,24 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
     _receivedAmount = cartState.total;
     _receivedController.text = cartState.total.toStringAsFixed(2);
   }
-  
+
   @override
   void dispose() {
     _receivedController.dispose();
     super.dispose();
   }
-  
+
   double get _change {
     final cartState = ref.read(cartProvider);
     return _receivedAmount - cartState.total;
   }
-  
+
   @override
   Widget build(BuildContext context) {
     final cartState = ref.watch(cartProvider);
-    
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('ชำระเงิน'),
-      ),
+      appBar: AppBar(title: const Text('ชำระเงิน')),
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -79,17 +76,14 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  
+
                   // วิธีชำระเงิน
                   const Text(
                     'วิธีชำระเงิน',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 16),
-                  
+
                   SegmentedButton<String>(
                     segments: const [
                       ButtonSegment(
@@ -116,7 +110,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                     },
                   ),
                   const SizedBox(height: 24),
-                  
+
                   // จำนวนเงินที่รับ (สำหรับเงินสด)
                   if (_paymentType == 'CASH') ...[
                     const Text(
@@ -127,7 +121,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    
+
                     TextField(
                       controller: _receivedController,
                       keyboardType: TextInputType.number,
@@ -144,28 +138,29 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                       },
                     ),
                     const SizedBox(height: 16),
-                    
+
                     // ปุ่มจำนวนเงินด่วน
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
-                      children: [
-                        cartState.total,
-                        100, 200, 500, 1000,
-                      ].map((amount) {
+                      children: [cartState.total, 100, 200, 500, 1000].map((
+                        amount,
+                      ) {
                         return ActionChip(
                           label: Text('฿${amount.toStringAsFixed(0)}'),
                           onPressed: () {
                             setState(() {
                               _receivedAmount = amount.toDouble();
-                              _receivedController.text = amount.toStringAsFixed(2);
+                              _receivedController.text = amount.toStringAsFixed(
+                                2,
+                              );
                             });
                           },
                         );
                       }).toList(),
                     ),
                     const SizedBox(height: 24),
-                    
+
                     // เงินทอน
                     Card(
                       color: _change >= 0 ? Colors.green[50] : Colors.red[50],
@@ -191,14 +186,16 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                       ),
                     ),
                   ],
-                  
+
                   const SizedBox(height: 32),
-                  
+
                   // ปุ่มชำระเงิน
                   SizedBox(
                     height: 60,
                     child: ElevatedButton(
-                      onPressed: (_paymentType == 'CASH' && _change < 0) || _isProcessing
+                      onPressed:
+                          (_paymentType == 'CASH' && _change < 0) ||
+                              _isProcessing
                           ? null
                           : _handlePayment,
                       child: _isProcessing
@@ -224,17 +221,17 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
       ),
     );
   }
-  
+
   Future<void> _handlePayment() async {
     setState(() {
       _isProcessing = true;
     });
-    
+
     try {
       final cartState = ref.read(cartProvider);
       final authState = ref.read(authProvider);
       final apiClient = ref.read(apiClientProvider);
-      
+
       // เตรียมข้อมูล Order
       final orderData = {
         'customer_id': cartState.customerId,
@@ -248,28 +245,44 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
         'vat_amount': 0.0,
         'total_amount': cartState.total,
         'payment_type': _paymentType,
-        'paid_amount': _paymentType == 'CASH' ? _receivedAmount : cartState.total,
+        'paid_amount': _paymentType == 'CASH'
+            ? _receivedAmount
+            : cartState.total,
         'change_amount': _paymentType == 'CASH' ? _change : 0.0,
-        'items': cartState.items.map((item) => {
-          'product_id': item.productId,
-          'product_code': item.productCode,
-          'product_name': item.productName,
-          'unit': item.unit,
-          'quantity': item.quantity,
-          'unit_price': item.price,
-          'discount_percent': 0.0,
-          'discount_amount': item.discount,
-          'amount': item.amount,
-        }).toList(),
+        'items': cartState.items
+            .map(
+              (item) => {
+                'product_id': item.productId,
+                'product_code': item.productCode,
+                'product_name': item.productName,
+                'unit': item.unit,
+                'quantity': item.quantity,
+                'unit_price': item.unitPrice, // ✅ เปลี่ยนจาก price
+                'discount_percent': 0.0,
+                'discount_amount': 0.0, // ✅ เปลี่ยนจาก discount
+                'amount': item.amount,
+              },
+            )
+            .toList(),
       };
-      
+
+      print('📦 Sending order data: $orderData'); // Debug
+      print(
+        '   Customer: ${orderData['customer_name']} (${orderData['customer_id']})',
+      );
+      print('   Total: ${orderData['total_amount']}');
+      print('   Items: ${orderData['items']}');
+      print('   Full data: ${orderData}');
+     
       // บันทึก Order
       final response = await apiClient.post('/api/sales', data: orderData);
-      
+
+      print('✅ Response: ${response.statusCode}'); // Debug
+
       if (response.statusCode == 200) {
         // ล้างตะกร้า
         ref.read(cartProvider.notifier).clear();
-        
+
         if (mounted) {
           // แสดง Success Dialog
           await showDialog(
@@ -303,11 +316,13 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                 ),
                 ElevatedButton(
                   onPressed: () {
-                    // TODO: พิมพ์ใบเสร็จ
+                    // TODO: พิมพ์ใบเสร็จในอนาคต
                     Navigator.pop(context);
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('พิมพ์ใบเสร็จ (เร็วๆ นี้...)')),
+                      const SnackBar(
+                        content: Text('ฟีเจอร์พิมพ์ใบเสร็จกำลังพัฒนา'),
+                      ),
                     );
                   },
                   child: const Text('พิมพ์ใบเสร็จ'),
@@ -317,9 +332,11 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
           );
         }
       } else {
-        throw Exception('Save order failed');
+        throw Exception('Save order failed: ${response.statusCode}');
       }
     } catch (e) {
+      print('❌ Payment error: $e'); // Debug
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

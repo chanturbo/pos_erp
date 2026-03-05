@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/client/api_client.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/models/product_model.dart';
 
@@ -27,76 +28,78 @@ class ProductListState {
   }
 }
 
-// Product List Provider
-final productListProvider = NotifierProvider<ProductListNotifier, ProductListState>(() {
+// ✅ Product List Provider - ใช้ AsyncNotifierProvider แทน
+final productListProvider = AsyncNotifierProvider<ProductListNotifier, List<ProductModel>>(() {
   return ProductListNotifier();
 });
 
-class ProductListNotifier extends Notifier<ProductListState> {
+class ProductListNotifier extends AsyncNotifier<List<ProductModel>> {
   @override
-  ProductListState build() {
-    // โหลดข้อมูลเมื่อสร้าง
-    loadProducts();
-    return ProductListState(
-      products: [],
-      isLoading: true,
-    );
+  Future<List<ProductModel>> build() async {
+    // ✅ โหลดข้อมูลทันทีเมื่อ build
+    return await loadProducts();
   }
   
   /// โหลดรายการสินค้า
-  Future<void> loadProducts() async {
-    state = state.copyWith(isLoading: true, error: null);
-    
+  Future<List<ProductModel>> loadProducts() async {
     try {
+      print('📡 Loading products...');
+      
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.get('/api/products');
       
       if (response.statusCode == 200) {
         final data = response.data['data'] as List;
         final products = data.map((json) => ProductModel.fromJson(json)).toList();
-        state = state.copyWith(products: products, isLoading: false);
+        
+        print('✅ Loaded ${products.length} products');
+        
+        return products;
       } else {
-        state = state.copyWith(
-          isLoading: false,
-          error: 'โหลดข้อมูลไม่สำเร็จ',
-        );
+        throw Exception('Failed to load products: ${response.statusCode}');
       }
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: 'เกิดข้อผิดพลาด: $e',
-      );
+      print('❌ Error loading products: $e');
+      throw Exception('เกิดข้อผิดพลาด: $e');
     }
   }
   
-  /// สร้างสินค้าใหม่
-  Future<bool> createProduct(Map<String, dynamic> data) async {
+  /// Refresh - เรียกใช้เมื่อต้องการ reload
+  Future<void> refresh() async {
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() => loadProducts());
+  }
+  
+  /// เพิ่มสินค้า
+  Future<bool> addProduct(Map<String, dynamic> productData) async {
     try {
       final apiClient = ref.read(apiClientProvider);
-      final response = await apiClient.post('/api/products', data: data);
+      final response = await apiClient.post('/api/products', data: productData);
       
-      if (response.statusCode == 200) {
-        await loadProducts(); // Reload
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        await refresh(); // Reload
         return true;
       }
       return false;
     } catch (e) {
+      print('❌ Error adding product: $e');
       return false;
     }
   }
   
   /// แก้ไขสินค้า
-  Future<bool> updateProduct(String productId, Map<String, dynamic> data) async {
+  Future<bool> updateProduct(String productId, Map<String, dynamic> productData) async {
     try {
       final apiClient = ref.read(apiClientProvider);
-      final response = await apiClient.put('/api/products/$productId', data: data);
+      final response = await apiClient.put('/api/products/$productId', data: productData);
       
       if (response.statusCode == 200) {
-        await loadProducts(); // Reload
+        await refresh(); // Reload
         return true;
       }
       return false;
     } catch (e) {
+      print('❌ Error updating product: $e');
       return false;
     }
   }
@@ -108,11 +111,12 @@ class ProductListNotifier extends Notifier<ProductListState> {
       final response = await apiClient.delete('/api/products/$productId');
       
       if (response.statusCode == 200) {
-        await loadProducts(); // Reload
+        await refresh(); // Reload
         return true;
       }
       return false;
     } catch (e) {
+      print('❌ Error deleting product: $e');
       return false;
     }
   }

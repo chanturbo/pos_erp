@@ -19,7 +19,7 @@ class PosPage extends ConsumerStatefulWidget {
 class _PosPageState extends ConsumerState<PosPage> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-
+  
   @override
   void dispose() {
     _searchController.dispose();
@@ -28,83 +28,134 @@ class _PosPageState extends ConsumerState<PosPage> {
 
   @override
   Widget build(BuildContext context) {
-    final productState = ref.watch(productListProvider);
-    final cartState = ref.watch(cartProvider);    
-    final holdOrdersState = ref.watch(holdOrdersProvider); // ✅ แก้ไข
-    final orders = holdOrdersState.orders; // ✅ แก้ไข
-    // กรองสินค้าตามการค้นหา
-    final filteredProducts = productState.products.where((product) {
-      if (_searchQuery.isEmpty) return true;
-      return product.productName.toLowerCase().contains(
-            _searchQuery.toLowerCase(),
-          ) ||
-          product.productCode.toLowerCase().contains(
-            _searchQuery.toLowerCase(),
-          ) ||
-          (product.barcode?.toLowerCase().contains(
-                _searchQuery.toLowerCase(),
-              ) ??
-              false);
-    }).toList();
-
+    final productAsync = ref.watch(productListProvider);
+    final cartState = ref.watch(cartProvider);
+    final holdOrdersState = ref.watch(holdOrdersProvider);
+    
     return Scaffold(
       appBar: AppBar(
-        title: const Text('POS - จุดขาย'),
+        title: Row(
+          children: [
+            const Text('จุดขาย'),
+            const SizedBox(width: 16),
+            
+            // ✅ แสดงลูกค้าทั่วไปหรือลูกค้าที่เลือก
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: cartState.customerId != null && cartState.customerId != 'WALK_IN'
+                      ? Colors.blue[100]  // ลูกค้าที่เลือก
+                      : Colors.grey[200], // ลูกค้าทั่วไป
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: cartState.customerId != null && cartState.customerId != 'WALK_IN'
+                        ? Colors.blue 
+                        : Colors.grey,
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.person,
+                      size: 16,
+                      color: cartState.customerId != null && cartState.customerId != 'WALK_IN'
+                          ? Colors.blue 
+                          : Colors.grey[700],
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        cartState.customerName ?? 'ลูกค้าทั่วไป', // ✅ แสดง "ลูกค้าทั่วไป" ถ้าไม่มี
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: cartState.customerId != null && cartState.customerId != 'WALK_IN'
+                              ? Colors.blue 
+                              : Colors.grey[700],
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    // ✅ แสดงปุ่ม X เฉพาะเมื่อเลือกลูกค้า (ไม่ใช่ลูกค้าทั่วไป)
+                    if (cartState.customerId != null && cartState.customerId != 'WALK_IN') ...[
+                      const SizedBox(width: 4),
+                      InkWell(
+                        onTap: () {
+                          // ✅ กลับไปเป็นลูกค้าทั่วไป
+                          ref.read(cartProvider.notifier).setCustomer('WALK_IN', 'ลูกค้าทั่วไป');
+                        },
+                        child: const Icon(Icons.close, size: 16, color: Colors.blue),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            
+            const SizedBox(width: 16),
+            
+            // จำนวนสินค้าในตะกร้า
+            if (cartState.itemCount > 0)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.red,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${cartState.itemCount}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+          ],
+        ),
         actions: [
-          // ✅ Customer Button
+          // Customer Button
           IconButton(
             icon: const Icon(Icons.person_add),
             tooltip: 'เลือกลูกค้า',
             onPressed: () async {
-              final customer = await showDialog<CustomerModel?>(
+              final result = await showDialog<CustomerModel?>(
                 context: context,
-                builder: (context) => CustomerSelectorDialog(
-                  currentCustomer: cartState.customerId != null
-                      ? CustomerModel(
-                          customerId: cartState.customerId!,
-                          customerCode: '',
-                          customerName: cartState.customerName!,
-                        )
-                      : null,
-                ),
+                builder: (context) => const CustomerSelectorDialog(),
               );
-
-              if (customer != null) {
-                ref
-                    .read(cartProvider.notifier)
-                    .setCustomer(customer.customerId, customer.customerName);
-              } else if (customer == null && context.mounted) {
-                // Clear customer
-                ref.read(cartProvider.notifier).setCustomer(null, null);
+              
+              if (result != null) {
+                // เลือกลูกค้า
+                ref.read(cartProvider.notifier).setCustomer(
+                  result.customerId,
+                  result.customerName,
+                );
               }
             },
           ),
-
-          // ✅ Discount Button
+          
+          // Discount Button
           IconButton(
             icon: const Icon(Icons.discount),
             tooltip: 'ส่วนลด',
             onPressed: () async {
               final result = await showDialog<Map<String, double>>(
                 context: context,
-                builder: (context) => DiscountDialog(
-                  currentPercent: cartState.discountPercent,
-                  currentAmount: cartState.discountAmount,
-                ),
+                builder: (context) => const DiscountDialog(),
               );
-
+              
               if (result != null) {
-                ref
-                    .read(cartProvider.notifier)
-                    .setDiscount(
-                      percent: result['percent'],
-                      amount: result['amount'],
-                    );
+                ref.read(cartProvider.notifier).setDiscount(
+                  percent: result['percent'],
+                  amount: result['amount'],
+                );
               }
             },
           ),
-
-          // ✅ Hold Orders Button
+          
+          // Hold Orders Button
           Stack(
             children: [
               IconButton(
@@ -117,7 +168,7 @@ class _PosPageState extends ConsumerState<PosPage> {
                   );
                 },
               ),
-              if (orders.isNotEmpty)
+              if (holdOrdersState.orders.isNotEmpty)
                 Positioned(
                   right: 8,
                   top: 8,
@@ -132,7 +183,7 @@ class _PosPageState extends ConsumerState<PosPage> {
                       minHeight: 16,
                     ),
                     child: Text(
-                      '${orders.length}',
+                      '${holdOrdersState.orders.length}',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 10,
@@ -144,173 +195,179 @@ class _PosPageState extends ConsumerState<PosPage> {
                 ),
             ],
           ),
-
-          // จำนวนสินค้าในตะกร้า
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.red,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  '${cartState.itemCount}',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-          ),
         ],
       ),
-      body: Row(
+      body: Column(
         children: [
-          // ซ้าย: Product Grid (60%)
-          Expanded(
-            flex: 60,
-            child: Column(
+          // Search Bar & Hold Button
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
               children: [
-                // Search Bar
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  color: Colors.grey[100],
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _searchController,
-                          decoration: InputDecoration(
-                            hintText: 'ค้นหาสินค้า (ชื่อ, รหัส, บาร์โค้ด)',
-                            prefixIcon: const Icon(Icons.search),
-                            suffixIcon: _searchQuery.isNotEmpty
-                                ? IconButton(
-                                    icon: const Icon(Icons.clear),
-                                    onPressed: () {
-                                      _searchController.clear();
-                                      setState(() {
-                                        _searchQuery = '';
-                                      });
-                                    },
-                                  )
-                                : null,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide.none,
-                            ),
-                            filled: true,
-                            fillColor: Colors.white,
-                          ),
-                          onChanged: (value) {
-                            setState(() {
-                              _searchQuery = value;
-                            });
-                          },
-                        ),
-                      ),
-
-                      // ✅ Hold Button
-                      const SizedBox(width: 8),
-                      ElevatedButton.icon(
-                        onPressed: cartState.items.isEmpty
-                            ? null
-                            : () async {
-                                final name = await showDialog<String>(
-                                  context: context,
-                                  builder: (context) => _HoldOrderNameDialog(),
-                                );
-
-                                if (name != null && name.isNotEmpty) {
-                                  ref.read(cartProvider.notifier).hold(name);
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('พักบิล: $name')),
-                                    );
-                                  }
-                                }
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: 'ค้นหาสินค้า...',
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: _searchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() {
+                                  _searchQuery = '';
+                                });
                               },
-                        icon: const Icon(Icons.pause_circle),
-                        label: const Text('พักบิล'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.orange,
-                          foregroundColor: Colors.white,
-                        ),
+                            )
+                          : null,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                    ],
+                    ),
+                    onChanged: (value) {
+                      setState(() {
+                        _searchQuery = value;
+                      });
+                    },
                   ),
                 ),
-
-                // ✅ Customer Info Banner
-                if (cartState.customerName != null)
-                  Container(
-                    width: double.infinity,
+                const SizedBox(width: 12),
+                ElevatedButton.icon(
+                  onPressed: cartState.items.isEmpty
+                      ? null
+                      : () async {
+                          final result = await showDialog<String>(
+                            context: context,
+                            builder: (context) => _HoldOrderNameDialog(),
+                          );
+                          
+                          if (result != null && result.isNotEmpty) {
+                            ref.read(cartProvider.notifier).hold(result);
+                            
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('พักบิล: $result')),
+                              );
+                            }
+                          }
+                        },
+                  icon: const Icon(Icons.save),
+                  label: const Text('พักบิล'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange,
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    color: Colors.blue[50],
-                    child: Row(
-                      children: [
-                        const Icon(Icons.person, color: Colors.blue),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'ลูกค้า: ${cartState.customerName}',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.blue,
-                            ),
-                          ),
-                        ),
-                        TextButton.icon(
-                          onPressed: () {
-                            ref
-                                .read(cartProvider.notifier)
-                                .setCustomer(null, null);
-                          },
-                          icon: const Icon(Icons.close, size: 16),
-                          label: const Text('ลบ'),
-                        ),
-                      ],
+                      horizontal: 20,
+                      vertical: 16,
                     ),
                   ),
-
-                // Product Grid
-                Expanded(
-                  child: productState.isLoading
-                      ? const Center(child: CircularProgressIndicator())
-                      : ProductGrid(products: filteredProducts),
                 ),
               ],
             ),
           ),
-
-          // ขวา: Cart Panel (40%)
-          const Expanded(flex: 40, child: CartPanel()),
+          
+          // Main Content
+          Expanded(
+            child: Row(
+              children: [
+                // Product Grid (60%)
+                Expanded(
+                  flex: 60,
+                  child: productAsync.when(
+                    data: (products) {
+                      // กรองสินค้า
+                      final filteredProducts = products.where((product) {
+                        if (_searchQuery.isEmpty) return true;
+                        return product.productName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+                               product.productCode.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+                               (product.barcode?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? false);
+                      }).toList();
+                      
+                      if (filteredProducts.isEmpty) {
+                        return Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.inventory_2_outlined, size: 80, color: Colors.grey),
+                              const SizedBox(height: 16),
+                              Text(_searchQuery.isEmpty ? 'ไม่มีสินค้า' : 'ไม่พบสินค้า'),
+                              const SizedBox(height: 16),
+                              ElevatedButton.icon(
+                                onPressed: () {
+                                  ref.read(productListProvider.notifier).refresh();
+                                },
+                                icon: const Icon(Icons.refresh),
+                                label: const Text('รีเฟรช'),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+                      
+                      return ProductGrid(products: filteredProducts);
+                    },
+                    loading: () => const Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          CircularProgressIndicator(),
+                          SizedBox(height: 16),
+                          Text('กำลังโหลดสินค้า...'),
+                        ],
+                      ),
+                    ),
+                    error: (error, stack) => Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.error_outline, size: 80, color: Colors.red),
+                          const SizedBox(height: 16),
+                          Text('เกิดข้อผิดพลาด: $error'),
+                          const SizedBox(height: 16),
+                          ElevatedButton.icon(
+                            onPressed: () {
+                              ref.read(productListProvider.notifier).refresh();
+                            },
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('ลองใหม่'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                
+                // Cart Panel (40%)
+                const Expanded(
+                  flex: 40,
+                  child: CartPanel(),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-// ✅ Dialog สำหรับตั้งชื่อบิลที่พัก
+// Hold Order Name Dialog
 class _HoldOrderNameDialog extends StatefulWidget {
   @override
   State<_HoldOrderNameDialog> createState() => _HoldOrderNameDialogState();
 }
 
 class _HoldOrderNameDialogState extends State<_HoldOrderNameDialog> {
-  final _controller = TextEditingController(
-    text:
-        'บิล ${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')}',
-  );
-
+  late TextEditingController _controller;
+  
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    final defaultName = 'บิล ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+    _controller = TextEditingController(text: defaultName);
+  }
+  
   @override
   void dispose() {
     _controller.dispose();
@@ -328,7 +385,6 @@ class _HoldOrderNameDialogState extends State<_HoldOrderNameDialog> {
           border: OutlineInputBorder(),
         ),
         autofocus: true,
-        onSubmitted: (value) => Navigator.pop(context, value),
       ),
       actions: [
         TextButton(

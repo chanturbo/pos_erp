@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/cart_provider.dart';
-import '../../data/models/cart_item_model.dart';
 import '../pages/payment_page.dart';
 
 class CartPanel extends ConsumerWidget {
@@ -96,7 +95,8 @@ class CartPanel extends ConsumerWidget {
                 const Divider(),
                 _buildSummaryRow('ยอดชำระ', cartState.total, isTotal: true),
                 const SizedBox(height: 16),
-                // ... ในส่วน ปุ่มชำระเงิน
+                
+                // ปุ่มชำระเงิน
                 SizedBox(
                   width: double.infinity,
                   height: 50,
@@ -105,7 +105,6 @@ class CartPanel extends ConsumerWidget {
                         ? null
                         : () {
                             Navigator.push(
-                              // ✅ แก้ไข
                               context,
                               MaterialPageRoute(
                                 builder: (_) => const PaymentPage(),
@@ -129,7 +128,7 @@ class CartPanel extends ConsumerWidget {
   Widget _buildCartItem(
     BuildContext context,
     WidgetRef ref,
-    CartItemModel item,
+    CartItem item, // ✅ เปลี่ยนจาก CartItemModel เป็น CartItem
   ) {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -149,7 +148,7 @@ class CartPanel extends ConsumerWidget {
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                       Text(
-                        '฿${item.price.toStringAsFixed(2)}',
+                        '฿${item.unitPrice.toStringAsFixed(2)}', // ✅ เปลี่ยนจาก price เป็น unitPrice
                         style: TextStyle(color: Colors.grey[600], fontSize: 12),
                       ),
                     ],
@@ -173,9 +172,8 @@ class CartPanel extends ConsumerWidget {
                   children: [
                     IconButton(
                       onPressed: () {
-                        ref
-                            .read(cartProvider.notifier)
-                            .updateQuantity(item.productId, item.quantity - 1);
+                        // ✅ ใช้ decreaseQuantity แทน updateQuantity
+                        ref.read(cartProvider.notifier).decreaseQuantity(item.productId);
                       },
                       icon: const Icon(Icons.remove_circle_outline),
                       iconSize: 24,
@@ -190,7 +188,7 @@ class CartPanel extends ConsumerWidget {
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
-                        '${item.quantity.toStringAsFixed(0)}',
+                        item.quantity.toStringAsFixed(0), // ✅ ลบ string interpolation
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -199,9 +197,8 @@ class CartPanel extends ConsumerWidget {
                     ),
                     IconButton(
                       onPressed: () {
-                        ref
-                            .read(cartProvider.notifier)
-                            .updateQuantity(item.productId, item.quantity + 1);
+                        // ✅ ใช้ increaseQuantity แทน updateQuantity
+                        ref.read(cartProvider.notifier).increaseQuantity(item.productId);
                       },
                       icon: const Icon(Icons.add_circle_outline),
                       iconSize: 24,

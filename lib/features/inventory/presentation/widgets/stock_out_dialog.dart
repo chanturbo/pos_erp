@@ -5,7 +5,7 @@ import '../providers/stock_provider.dart';
 
 class StockOutDialog extends ConsumerStatefulWidget {
   final StockBalanceModel stock;
-  
+
   const StockOutDialog({super.key, required this.stock});
 
   @override
@@ -18,7 +18,7 @@ class _StockOutDialogState extends ConsumerState<StockOutDialog> {
   final _referenceController = TextEditingController();
   final _remarkController = TextEditingController();
   bool _isLoading = false;
-  
+
   @override
   void dispose() {
     _quantityController.dispose();
@@ -42,7 +42,11 @@ class _StockOutDialogState extends ConsumerState<StockOutDialog> {
               // Header
               Row(
                 children: [
-                  const Icon(Icons.remove_circle, color: Colors.orange, size: 32),
+                  const Icon(
+                    Icons.remove_circle,
+                    color: Colors.orange,
+                    size: 32,
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -69,7 +73,7 @@ class _StockOutDialogState extends ConsumerState<StockOutDialog> {
                 ],
               ),
               const Divider(height: 32),
-              
+
               // Current Stock
               Container(
                 padding: const EdgeInsets.all(12),
@@ -93,7 +97,7 @@ class _StockOutDialogState extends ConsumerState<StockOutDialog> {
                 ),
               ),
               const SizedBox(height: 24),
-              
+
               // Quantity
               TextFormField(
                 controller: _quantityController,
@@ -119,7 +123,7 @@ class _StockOutDialogState extends ConsumerState<StockOutDialog> {
                 autofocus: true,
               ),
               const SizedBox(height: 16),
-              
+
               // Reference No
               TextFormField(
                 controller: _referenceController,
@@ -130,7 +134,7 @@ class _StockOutDialogState extends ConsumerState<StockOutDialog> {
                 ),
               ),
               const SizedBox(height: 16),
-              
+
               // Remark
               TextFormField(
                 controller: _remarkController,
@@ -141,13 +145,15 @@ class _StockOutDialogState extends ConsumerState<StockOutDialog> {
                 maxLines: 2,
               ),
               const SizedBox(height: 24),
-              
+
               // Buttons
               Row(
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: _isLoading ? null : () => Navigator.pop(context),
+                      onPressed: _isLoading
+                          ? null
+                          : () => Navigator.pop(context),
                       child: const Text('ยกเลิก'),
                     ),
                   ),
@@ -178,39 +184,42 @@ class _StockOutDialogState extends ConsumerState<StockOutDialog> {
       ),
     );
   }
-  
+
   Future<void> _handleSubmit() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
-    
+
     setState(() {
       _isLoading = true;
     });
-    
+
     final quantity = double.parse(_quantityController.text);
     final reference = _referenceController.text.trim();
     final remark = _remarkController.text.trim();
-    
-    final result = await ref.read(stockBalanceProvider.notifier).stockOut(
-      productId: widget.stock.productId,
-      warehouseId: widget.stock.warehouseId,
-      quantity: quantity,
-      referenceNo: reference.isEmpty ? null : reference,
-      remark: remark.isEmpty ? null : remark,
-    );
-    
+
+    // ✅ stockOut return bool แล้ว
+    final success = await ref
+        .read(stockBalanceProvider.notifier)
+        .stockOut(
+          productId: widget.stock.productId,
+          warehouseId: widget.stock.warehouseId,
+          quantity: quantity,
+          referenceNo: reference.isEmpty ? null : reference,
+          remark: remark.isEmpty ? null : remark,
+        );
+
     if (mounted) {
       setState(() {
         _isLoading = false;
       });
-      
+
       Navigator.pop(context);
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(result['message'] ?? 'เสร็จสิ้น'),
-          backgroundColor: result['success'] ? Colors.green : Colors.red,
+          content: Text(success ? 'เบิกสินค้าสำเร็จ' : 'เกิดข้อผิดพลาด'),
+          backgroundColor: success ? Colors.green : Colors.red,
         ),
       );
     }

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../data/models/product_model.dart';
 import '../providers/product_provider.dart';
+import '../../data/models/product_model.dart';
 
 class ProductFormPage extends ConsumerStatefulWidget {
   final ProductModel? product;
@@ -14,17 +14,16 @@ class ProductFormPage extends ConsumerStatefulWidget {
 
 class _ProductFormPageState extends ConsumerState<ProductFormPage> {
   final _formKey = GlobalKey<FormState>();
-  late TextEditingController _productCodeController;
-  late TextEditingController _productNameController;
+  late TextEditingController _codeController;
+  late TextEditingController _nameController;
   late TextEditingController _barcodeController;
-  late TextEditingController _baseUnitController;
-  late TextEditingController _priceLevel1Controller;
-  late TextEditingController _priceLevel2Controller;
-  late TextEditingController _priceLevel3Controller;
-  late TextEditingController _priceLevel4Controller;
-  late TextEditingController _priceLevel5Controller;
-  late TextEditingController _standardCostController;
-  
+  late TextEditingController _unitController;
+  late TextEditingController _price1Controller;
+  late TextEditingController _price2Controller;
+  late TextEditingController _price3Controller;
+  late TextEditingController _price4Controller;
+  late TextEditingController _price5Controller;
+  late TextEditingController _costController;
   bool _isStockControl = true;
   bool _allowNegativeStock = false;
   bool _isLoading = false;
@@ -32,113 +31,38 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
   @override
   void initState() {
     super.initState();
+    _codeController = TextEditingController(text: widget.product?.productCode ?? '');
+    _nameController = TextEditingController(text: widget.product?.productName ?? '');
+    _barcodeController = TextEditingController(text: widget.product?.barcode ?? '');
+    _unitController = TextEditingController(text: widget.product?.baseUnit ?? 'ชิ้น');
+    _price1Controller = TextEditingController(text: widget.product?.priceLevel1.toString() ?? '0');
+    _price2Controller = TextEditingController(text: widget.product?.priceLevel2.toString() ?? '0');
+    _price3Controller = TextEditingController(text: widget.product?.priceLevel3.toString() ?? '0');
+    _price4Controller = TextEditingController(text: widget.product?.priceLevel4.toString() ?? '0');
+    _price5Controller = TextEditingController(text: widget.product?.priceLevel5.toString() ?? '0');
+    _costController = TextEditingController(text: widget.product?.standardCost.toString() ?? '0');
     
-    final product = widget.product;
-    _productCodeController = TextEditingController(text: product?.productCode ?? '');
-    _productNameController = TextEditingController(text: product?.productName ?? '');
-    _barcodeController = TextEditingController(text: product?.barcode ?? '');
-    _baseUnitController = TextEditingController(text: product?.baseUnit ?? 'ชิ้น');
-    _priceLevel1Controller = TextEditingController(
-      text: product?.priceLevel1.toString() ?? '0',
-    );
-    _priceLevel2Controller = TextEditingController(
-      text: product?.priceLevel2.toString() ?? '0',
-    );
-    _priceLevel3Controller = TextEditingController(
-      text: product?.priceLevel3.toString() ?? '0',
-    );
-    _priceLevel4Controller = TextEditingController(
-      text: product?.priceLevel4.toString() ?? '0',
-    );
-    _priceLevel5Controller = TextEditingController(
-      text: product?.priceLevel5.toString() ?? '0',
-    );
-    _standardCostController = TextEditingController(
-      text: product?.standardCost.toString() ?? '0',
-    );
-    
-    _isStockControl = product?.isStockControl ?? true;
-    _allowNegativeStock = product?.allowNegativeStock ?? false;
+    if (widget.product != null) {
+      _isStockControl = widget.product!.isStockControl;
+      _allowNegativeStock = widget.product!.allowNegativeStock;
+    }
   }
   
   @override
   void dispose() {
-    _productCodeController.dispose();
-    _productNameController.dispose();
+    _codeController.dispose();
+    _nameController.dispose();
     _barcodeController.dispose();
-    _baseUnitController.dispose();
-    _priceLevel1Controller.dispose();
-    _priceLevel2Controller.dispose();
-    _priceLevel3Controller.dispose();
-    _priceLevel4Controller.dispose();
-    _priceLevel5Controller.dispose();
-    _standardCostController.dispose();
+    _unitController.dispose();
+    _price1Controller.dispose();
+    _price2Controller.dispose();
+    _price3Controller.dispose();
+    _price4Controller.dispose();
+    _price5Controller.dispose();
+    _costController.dispose();
     super.dispose();
   }
-  
-  Future<void> _handleSave() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-    
-    setState(() {
-      _isLoading = true;
-    });
-    
-    final data = {
-      'product_code': _productCodeController.text.trim(),
-      'product_name': _productNameController.text.trim(),
-      'barcode': _barcodeController.text.trim().isEmpty 
-          ? null 
-          : _barcodeController.text.trim(),
-      'base_unit': _baseUnitController.text.trim(),
-      'price_level1': double.tryParse(_priceLevel1Controller.text) ?? 0,
-      'price_level2': double.tryParse(_priceLevel2Controller.text) ?? 0,
-      'price_level3': double.tryParse(_priceLevel3Controller.text) ?? 0,
-      'price_level4': double.tryParse(_priceLevel4Controller.text) ?? 0,
-      'price_level5': double.tryParse(_priceLevel5Controller.text) ?? 0,
-      'standard_cost': double.tryParse(_standardCostController.text) ?? 0,
-      'is_stock_control': _isStockControl,
-      'allow_negative_stock': _allowNegativeStock,
-    };
-    
-    bool success;
-    if (widget.product == null) {
-      // Create
-      success = await ref.read(productListProvider.notifier).createProduct(data);
-    } else {
-      // Update
-      success = await ref.read(productListProvider.notifier).updateProduct(
-        widget.product!.productId,
-        data,
-      );
-    }
-    
-    setState(() {
-      _isLoading = false;
-    });
-    
-    if (mounted) {
-      if (success) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(widget.product == null 
-                ? 'เพิ่มสินค้าสำเร็จ' 
-                : 'แก้ไขสินค้าสำเร็จ'),
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('เกิดข้อผิดพลาด กรุณาลองใหม่'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-  
+
   @override
   Widget build(BuildContext context) {
     final isEdit = widget.product != null;
@@ -152,13 +76,12 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            // รหัสสินค้า
+            // Product Code
             TextFormField(
-              controller: _productCodeController,
+              controller: _codeController,
               decoration: const InputDecoration(
                 labelText: 'รหัสสินค้า *',
                 border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.qr_code),
               ),
               validator: (value) {
                 if (value == null || value.isEmpty) {
@@ -166,17 +89,15 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                 }
                 return null;
               },
-              enabled: !_isLoading,
             ),
             const SizedBox(height: 16),
             
-            // ชื่อสินค้า
+            // Product Name
             TextFormField(
-              controller: _productNameController,
+              controller: _nameController,
               decoration: const InputDecoration(
                 labelText: 'ชื่อสินค้า *',
                 border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.inventory_2),
               ),
               validator: (value) {
                 if (value == null || value.isEmpty) {
@@ -184,7 +105,6 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                 }
                 return null;
               },
-              enabled: !_isLoading,
             ),
             const SizedBox(height: 16),
             
@@ -192,36 +112,32 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
             TextFormField(
               controller: _barcodeController,
               decoration: const InputDecoration(
-                labelText: 'Barcode',
+                labelText: 'บาร์โค้ด',
                 border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.barcode_reader),
               ),
-              enabled: !_isLoading,
             ),
             const SizedBox(height: 16),
             
-            // หน่วยนับ
+            // Unit
             TextFormField(
-              controller: _baseUnitController,
+              controller: _unitController,
               decoration: const InputDecoration(
-                labelText: 'หน่วยนับ *',
+                labelText: 'หน่วย *',
                 border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.scale),
               ),
               validator: (value) {
                 if (value == null || value.isEmpty) {
-                  return 'กรุณากรอกหน่วยนับ';
+                  return 'กรุณากรอกหน่วย';
                 }
                 return null;
               },
-              enabled: !_isLoading,
             ),
             const SizedBox(height: 24),
             
-            // ราคาขาย
-            Text(
+            // Price Section
+            const Text(
               'ราคาขาย',
-              style: Theme.of(context).textTheme.titleLarge,
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             
@@ -229,9 +145,9 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
               children: [
                 Expanded(
                   child: TextFormField(
-                    controller: _priceLevel1Controller,
+                    controller: _price1Controller,
                     decoration: const InputDecoration(
-                      labelText: 'ราคา 1 *',
+                      labelText: 'ราคา Level 1 *',
                       border: OutlineInputBorder(),
                       prefixText: '฿',
                     ),
@@ -240,25 +156,20 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                       if (value == null || value.isEmpty) {
                         return 'กรุณากรอกราคา';
                       }
-                      if (double.tryParse(value) == null) {
-                        return 'กรุณากรอกตัวเลข';
-                      }
                       return null;
                     },
-                    enabled: !_isLoading,
                   ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
                   child: TextFormField(
-                    controller: _priceLevel2Controller,
+                    controller: _price2Controller,
                     decoration: const InputDecoration(
-                      labelText: 'ราคา 2',
+                      labelText: 'ราคา Level 2',
                       border: OutlineInputBorder(),
                       prefixText: '฿',
                     ),
                     keyboardType: TextInputType.number,
-                    enabled: !_isLoading,
                   ),
                 ),
               ],
@@ -269,118 +180,167 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
               children: [
                 Expanded(
                   child: TextFormField(
-                    controller: _priceLevel3Controller,
+                    controller: _price3Controller,
                     decoration: const InputDecoration(
-                      labelText: 'ราคา 3',
+                      labelText: 'ราคา Level 3',
                       border: OutlineInputBorder(),
                       prefixText: '฿',
                     ),
                     keyboardType: TextInputType.number,
-                    enabled: !_isLoading,
                   ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
                   child: TextFormField(
-                    controller: _priceLevel4Controller,
+                    controller: _price4Controller,
                     decoration: const InputDecoration(
-                      labelText: 'ราคา 4',
+                      labelText: 'ราคา Level 4',
                       border: OutlineInputBorder(),
                       prefixText: '฿',
                     ),
                     keyboardType: TextInputType.number,
-                    enabled: !_isLoading,
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 16),
             
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _priceLevel5Controller,
-                    decoration: const InputDecoration(
-                      labelText: 'ราคา 5',
-                      border: OutlineInputBorder(),
-                      prefixText: '฿',
-                    ),
-                    keyboardType: TextInputType.number,
-                    enabled: !_isLoading,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: TextFormField(
-                    controller: _standardCostController,
-                    decoration: const InputDecoration(
-                      labelText: 'ต้นทุน',
-                      border: OutlineInputBorder(),
-                      prefixText: '฿',
-                    ),
-                    keyboardType: TextInputType.number,
-                    enabled: !_isLoading,
-                  ),
-                ),
-              ],
+            TextFormField(
+              controller: _price5Controller,
+              decoration: const InputDecoration(
+                labelText: 'ราคา Level 5',
+                border: OutlineInputBorder(),
+                prefixText: '฿',
+              ),
+              keyboardType: TextInputType.number,
             ),
             const SizedBox(height: 24),
             
-            // ตัวเลือก
-            Text(
-              'ตัวเลือก',
-              style: Theme.of(context).textTheme.titleLarge,
+            // Cost
+            TextFormField(
+              controller: _costController,
+              decoration: const InputDecoration(
+                labelText: 'ต้นทุนมาตรฐาน',
+                border: OutlineInputBorder(),
+                prefixText: '฿',
+              ),
+              keyboardType: TextInputType.number,
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 24),
             
+            // Stock Control
             SwitchListTile(
               title: const Text('ควบคุมสต๊อก'),
-              subtitle: const Text('เปิดเพื่อให้ระบบตัดสต๊อกสินค้าอัตโนมัติ'),
+              subtitle: const Text('ติดตามการเคลื่อนไหวสต๊อก'),
               value: _isStockControl,
-              onChanged: _isLoading ? null : (value) {
+              onChanged: (value) {
                 setState(() {
                   _isStockControl = value;
                 });
               },
             ),
             
-            SwitchListTile(
-              title: const Text('อนุญาตให้สต๊อกติดลบ'),
-              subtitle: const Text('เปิดเพื่อให้ขายได้แม้สต๊อกไม่พอ'),
-              value: _allowNegativeStock,
-              onChanged: _isLoading ? null : (value) {
-                setState(() {
-                  _allowNegativeStock = value;
-                });
-              },
-            ),
-            
-            const SizedBox(height: 32),
-            
-            // ปุ่มบันทึก
-            SizedBox(
-              height: 50,
-              child: ElevatedButton(
-                onPressed: _isLoading ? null : _handleSave,
-                child: _isLoading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : Text(
-                        isEdit ? 'บันทึก' : 'เพิ่มสินค้า',
-                        style: const TextStyle(fontSize: 16),
-                      ),
+            if (_isStockControl)
+              SwitchListTile(
+                title: const Text('อนุญาตให้ติดลบ'),
+                subtitle: const Text('สามารถขายเมื่อสต๊อกไม่พอ'),
+                value: _allowNegativeStock,
+                onChanged: (value) {
+                  setState(() {
+                    _allowNegativeStock = value;
+                  });
+                },
               ),
+            
+            const SizedBox(height: 24),
+            
+            // Buttons
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _isLoading ? null : () => Navigator.pop(context),
+                    child: const Text('ยกเลิก'),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _handleSubmit,
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(isEdit ? 'บันทึก' : 'เพิ่มสินค้า'),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
       ),
     );
+  }
+  
+  Future<void> _handleSubmit() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+    
+    setState(() {
+      _isLoading = true;
+    });
+    
+    final productData = {
+      'product_code': _codeController.text,
+      'product_name': _nameController.text,
+      'barcode': _barcodeController.text.isEmpty ? null : _barcodeController.text,
+      'base_unit': _unitController.text,
+      'price_level_1': double.parse(_price1Controller.text),
+      'price_level_2': double.parse(_price2Controller.text.isEmpty ? '0' : _price2Controller.text),
+      'price_level_3': double.parse(_price3Controller.text.isEmpty ? '0' : _price3Controller.text),
+      'price_level_4': double.parse(_price4Controller.text.isEmpty ? '0' : _price4Controller.text),
+      'price_level_5': double.parse(_price5Controller.text.isEmpty ? '0' : _price5Controller.text),
+      'standard_cost': double.parse(_costController.text.isEmpty ? '0' : _costController.text),
+      'is_stock_control': _isStockControl,
+      'allow_negative_stock': _allowNegativeStock,
+    };
+    
+    bool success;
+    if (widget.product != null) {
+      // ✅ Update
+      success = await ref.read(productListProvider.notifier).updateProduct(
+        widget.product!.productId,
+        productData,
+      );
+    } else {
+      // ✅ Add - เปลี่ยนจาก createProduct เป็น addProduct
+      success = await ref.read(productListProvider.notifier).addProduct(productData);
+    }
+    
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
+      
+      if (success) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(widget.product != null ? 'แก้ไขสินค้าสำเร็จ' : 'เพิ่มสินค้าสำเร็จ'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('เกิดข้อผิดพลาด'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 }

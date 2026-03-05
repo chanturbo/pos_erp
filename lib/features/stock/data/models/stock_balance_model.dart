@@ -41,7 +41,7 @@ class StockBalanceModel {
     };
   }
   
-  // ✅ เพิ่ม copyWith method
+  // สำหรับรวมยอดสต๊อก
   StockBalanceModel copyWith({
     String? productId,
     String? productCode,

@@ -50,7 +50,7 @@ class ProductGrid extends ConsumerWidget {
             productCode: product.productCode,
             productName: product.productName,
             unit: product.baseUnit,
-            price: product.priceLevel1,
+            unitPrice: product.priceLevel1, // ✅ เปลี่ยนจาก price เป็น unitPrice
           );
           
           // แสดง Snackbar

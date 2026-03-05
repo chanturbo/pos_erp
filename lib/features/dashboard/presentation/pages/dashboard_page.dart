@@ -11,8 +11,8 @@ class DashboardPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final dashboardAsync = ref.watch(dashboardProvider);
-    
+    final dashboardAsync = ref.watch(dashboardProvider); // ✅ AsyncValue
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Dashboard'),
@@ -20,7 +20,7 @@ class DashboardPage extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () {
-              ref.invalidate(dashboardProvider);
+              ref.read(dashboardProvider.notifier).refresh(); // ✅ เปลี่ยน
             },
           ),
         ],
@@ -37,7 +37,9 @@ class DashboardPage extends ConsumerWidget {
               Text('เกิดข้อผิดพลาด: $error'),
               const SizedBox(height: 16),
               ElevatedButton(
-                onPressed: () => ref.invalidate(dashboardProvider),
+                onPressed: () {
+                  ref.read(dashboardProvider.notifier).refresh();
+                },
                 child: const Text('ลองใหม่'),
               ),
             ],
@@ -46,7 +48,9 @@ class DashboardPage extends ConsumerWidget {
       ),
     );
   }
-  
+
+  // ✅ method _buildDashboard ยังคงเหมือนเดิม
+
   Widget _buildDashboard(BuildContext context, DashboardStats stats) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -56,22 +60,19 @@ class DashboardPage extends ConsumerWidget {
           // Welcome
           Text(
             'ภาพรวมระบบ',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 16),
-          
+
           // Today Stats
           const Text(
             'วันนี้',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
-          
+
           GridView.count(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -95,17 +96,14 @@ class DashboardPage extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 24),
-          
+
           // Overall Stats
           const Text(
             'ภาพรวมทั้งหมด',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
-          
+
           GridView.count(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -165,17 +163,14 @@ class DashboardPage extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 24),
-          
+
           // Quick Actions
           const Text(
             'เมนูด่วน',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
-          
+
           Wrap(
             spacing: 8,
             runSpacing: 8,

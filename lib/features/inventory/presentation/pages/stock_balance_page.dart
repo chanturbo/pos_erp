@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pos_erp/features/settings/presentation/pages/settings_page.dart';
 import '../providers/stock_provider.dart';
 import '../widgets/stock_in_dialog.dart';
 import '../widgets/stock_out_dialog.dart';
 import '../widgets/stock_adjust_dialog.dart';
-import '../widgets/stock_transfer_dialog.dart'; // ✅ เพิ่ม
-import 'stock_movement_history_page.dart'; // ✅ เพิ่ม
-import '../../../settings/presentation/pages/settings_page.dart'; // ✅ เพิ่ม
+import '../widgets/stock_transfer_dialog.dart';
+import 'stock_movement_history_page.dart';
+import '../../data/models/stock_balance_model.dart';
 
 class StockBalancePage extends ConsumerStatefulWidget {
   const StockBalancePage({super.key});
@@ -18,6 +19,7 @@ class StockBalancePage extends ConsumerStatefulWidget {
 class _StockBalancePageState extends ConsumerState<StockBalancePage> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  String _selectedWarehouse = 'WH001'; // ✅ เพิ่ม
 
   @override
   void dispose() {
@@ -27,13 +29,13 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
 
   @override
   Widget build(BuildContext context) {
-    final stockState = ref.watch(stockBalanceProvider);
+    final stockAsync = ref.watch(stockBalanceProvider);
+    final settings = ref.watch(settingsProvider);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('สต๊อกคงเหลือ'),
         actions: [
-          // ✅ เพิ่มปุ่มดูประวัติ
           IconButton(
             icon: const Icon(Icons.history),
             tooltip: 'ประวัติการเคลื่อนไหว',
@@ -49,156 +51,224 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () {
-              ref.read(stockBalanceProvider.notifier).loadStockBalance();
+              ref.read(stockBalanceProvider.notifier).refresh();
             },
           ),
         ],
       ),
       body: Column(
         children: [
-          // Search Bar
+          // ✅ เพิ่มตัวเลือกคลัง
           Padding(
             padding: const EdgeInsets.all(16),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'ค้นหาสินค้า...',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() {
-                            _searchQuery = '';
-                          });
-                        },
-                      )
-                    : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: 'ค้นหาสินค้า...',
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: _searchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() {
+                                  _searchQuery = '';
+                                });
+                              },
+                            )
+                          : null,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    onChanged: (value) {
+                      setState(() {
+                        _searchQuery = value;
+                      });
+                    },
+                  ),
                 ),
-              ),
-              onChanged: (value) {
-                setState(() {
-                  _searchQuery = value;
-                });
-              },
+                const SizedBox(width: 12),
+                // ✅ Dropdown เลือกคลัง
+                DropdownButton<String>(
+                  value: _selectedWarehouse,
+                  items: const [
+                    DropdownMenuItem(value: 'ALL', child: Text('ทุกคลัง')),
+                    DropdownMenuItem(value: 'WH001', child: Text('คลังหลัก')),
+                    DropdownMenuItem(value: 'WH002', child: Text('คลังสยาม')),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedWarehouse = value!;
+                    });
+                    // TODO: Refresh with selected warehouse
+                  },
+                ),
+              ],
             ),
           ),
 
           // Stock List
-          Expanded(child: _buildBody(context, ref, stockState)),
-        ],
-      ),
-    );
-  }
+          Expanded(
+            child: stockAsync.when(
+              data: (stocks) {
+                // ✅ กรองตามคลังที่เลือก
+                var filteredStocks = stocks.where((stock) {
+                  // กรองตามคลัง
+                  if (_selectedWarehouse != 'ALL' &&
+                      stock.warehouseId != _selectedWarehouse) {
+                    return false;
+                  }
 
-  Widget _buildBody(
-    BuildContext context,
-    WidgetRef ref,
-    StockBalanceState state,
-  ) {
-    if (state.isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
+                  // กรองตามการค้นหา
+                  if (_searchQuery.isEmpty) return true;
+                  return stock.productName.toLowerCase().contains(
+                        _searchQuery.toLowerCase(),
+                      ) ||
+                      stock.productCode.toLowerCase().contains(
+                        _searchQuery.toLowerCase(),
+                      );
+                }).toList();
 
-    if (state.error != null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline, size: 80, color: Colors.red),
-            const SizedBox(height: 16),
-            Text('เกิดข้อผิดพลาด: ${state.error}'),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () {
-                ref.read(stockBalanceProvider.notifier).loadStockBalance();
+                // ✅ รวมยอดถ้าเลือก "ทุกคลัง"
+                if (_selectedWarehouse == 'ALL') {
+                  final Map<String, StockBalanceModel> combined = {};
+
+                  for (var stock in filteredStocks) {
+                    if (combined.containsKey(stock.productId)) {
+                      // รวมยอด
+                      final existing = combined[stock.productId]!;
+                      combined[stock.productId] = StockBalanceModel(
+                        productId: existing.productId,
+                        productCode: existing.productCode,
+                        productName: existing.productName,
+                        baseUnit: existing.baseUnit,
+                        warehouseId: 'ALL',
+                        warehouseName: 'ทุกคลัง',
+                        balance: existing.balance + stock.balance,
+                      );
+                    } else {
+                      combined[stock.productId] = stock;
+                    }
+                  }
+
+                  filteredStocks = combined.values.toList();
+                }
+
+                if (filteredStocks.isEmpty) {
+                  return const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.inventory_2_outlined,
+                          size: 80,
+                          color: Colors.grey,
+                        ),
+                        SizedBox(height: 16),
+                        Text('ไม่พบข้อมูลสต๊อก'),
+                      ],
+                    ),
+                  );
+                }
+
+                return ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: filteredStocks.length,
+                  itemBuilder: (context, index) {
+                    final stock = filteredStocks[index];
+                    final isLowStock =
+                        settings.enableLowStockAlert &&
+                        stock.balance < settings.lowStockThreshold;
+
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: isLowStock
+                              ? Colors.red
+                              : Colors.green,
+                          child: Icon(
+                            isLowStock ? Icons.warning : Icons.inventory,
+                            color: Colors.white,
+                          ),
+                        ),
+                        title: Text(stock.productName),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('รหัส: ${stock.productCode}'),
+                            Text('คลัง: ${stock.warehouseName}'),
+                          ],
+                        ),
+                        trailing: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              '${stock.balance.toStringAsFixed(0)} ${stock.baseUnit}',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: isLowStock ? Colors.red : Colors.green,
+                              ),
+                            ),
+                            if (isLowStock)
+                              const Text(
+                                'สต๊อกต่ำ!',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.red,
+                                ),
+                              ),
+                          ],
+                        ),
+                        onTap: () {
+                          _showStockActions(context, stock);
+                        },
+                      ),
+                    );
+                  },
+                );
               },
-              child: const Text('ลองใหม่'),
-            ),
-          ],
-        ),
-      );
-    }
-
-    // กรองสต๊อกตามการค้นหา
-    final filteredStocks = state.stocks.where((stock) {
-      if (_searchQuery.isEmpty) return true;
-      return stock.productName.toLowerCase().contains(
-            _searchQuery.toLowerCase(),
-          ) ||
-          stock.productCode.toLowerCase().contains(_searchQuery.toLowerCase());
-    }).toList();
-
-    if (filteredStocks.isEmpty) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.inventory_2_outlined, size: 80, color: Colors.grey),
-            SizedBox(height: 16),
-            Text('ไม่พบข้อมูลสต๊อก'),
-          ],
-        ),
-      );
-    }
-
-    final settings = ref.watch(settingsProvider); // ✅ เพิ่ม
-
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      itemCount: filteredStocks.length,
-      itemBuilder: (context, index) {
-        final stock = filteredStocks[index];
-        final isLowStock =
-            settings.enableLowStockAlert && // ✅ เช็ค settings
-            stock.balance < settings.lowStockThreshold;
-
-        return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: isLowStock ? Colors.red : Colors.green,
-              child: Icon(
-                isLowStock ? Icons.warning : Icons.inventory,
-                color: Colors.white,
+              loading: () => const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    Text('กำลังโหลดสต๊อก...'),
+                  ],
+                ),
+              ),
+              error: (error, stack) => Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.error_outline,
+                      size: 80,
+                      color: Colors.red,
+                    ),
+                    const SizedBox(height: 16),
+                    Text('เกิดข้อผิดพลาด: $error'),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () {
+                        ref.read(stockBalanceProvider.notifier).refresh();
+                      },
+                      child: const Text('ลองใหม่'),
+                    ),
+                  ],
+                ),
               ),
             ),
-            title: Text(stock.productName),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('รหัส: ${stock.productCode}'),
-                Text('คลัง: ${stock.warehouseName}'),
-              ],
-            ),
-            trailing: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  '${stock.balance.toStringAsFixed(0)} ${stock.baseUnit}',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: isLowStock ? Colors.red : Colors.green,
-                  ),
-                ),
-                if (isLowStock)
-                  const Text(
-                    'สต๊อกต่ำ!',
-                    style: TextStyle(fontSize: 12, color: Colors.red),
-                  ),
-              ],
-            ),
-            onTap: () {
-              _showStockActions(context, stock);
-            },
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 
@@ -230,7 +300,6 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
               );
             },
           ),
-          // ✅ เพิ่มปุ่มโอนย้าย
           ListTile(
             leading: const Icon(Icons.swap_horiz, color: Colors.purple),
             title: const Text('โอนย้ายสินค้า'),

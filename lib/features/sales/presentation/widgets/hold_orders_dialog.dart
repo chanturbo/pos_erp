@@ -8,9 +8,9 @@ class HoldOrdersDialog extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final holdOrdersState = ref.watch(holdOrdersProvider);  // ✅ แก้ไข
-    final orders = holdOrdersState.orders;  // ✅ แก้ไข
-    
+    final holdOrdersState = ref.watch(holdOrdersProvider);
+    final orders = holdOrdersState.orders;
+
     return Dialog(
       child: Container(
         width: 700,
@@ -23,7 +23,7 @@ class HoldOrdersDialog extends ConsumerWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'บิลที่พัก (${orders.length})',  // ✅ แก้ไข
+                  'บิลที่พัก (${orders.length})',
                   style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -36,7 +36,7 @@ class HoldOrdersDialog extends ConsumerWidget {
               ],
             ),
             const Divider(),
-            
+
             // Hold Orders List
             Expanded(
               child: orders.isEmpty
@@ -54,6 +54,8 @@ class HoldOrdersDialog extends ConsumerWidget {
                       itemCount: orders.length,
                       itemBuilder: (context, index) {
                         final order = orders[index];
+                        final cart = order.cartState; // ✅ ดึง cartState
+
                         return Card(
                           margin: const EdgeInsets.only(bottom: 12),
                           child: ListTile(
@@ -63,16 +65,22 @@ class HoldOrdersDialog extends ConsumerWidget {
                             ),
                             title: Text(
                               order.name,
-                              style: const TextStyle(fontWeight: FontWeight.bold),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('${order.items.length} รายการ'),
-                                if (order.customerName != null)
-                                  Text('ลูกค้า: ${order.customerName}'),
                                 Text(
-                                  'เวลา: ${DateFormat('HH:mm').format(order.createdAt)}',
+                                  '${cart.items.length} รายการ',
+                                ), // ✅ ใช้ cart.items
+                                if (cart.customerName != null)
+                                  Text(
+                                    'ลูกค้า: ${cart.customerName}',
+                                  ), // ✅ ใช้ cart.customerName
+                                Text(
+                                  'เวลา: ${DateFormat('HH:mm').format(order.timestamp)}', // ✅ ใช้ timestamp
                                   style: TextStyle(
                                     fontSize: 12,
                                     color: Colors.grey[600],
@@ -80,28 +88,90 @@ class HoldOrdersDialog extends ConsumerWidget {
                                 ),
                               ],
                             ),
-                            trailing: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.end,
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                Text(
-                                  '฿${order.total.toStringAsFixed(2)}',
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.blue,
+                                Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      '฿${cart.total.toStringAsFixed(2)}', // ✅ ใช้ cart.total
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.blue,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(width: 8),
+                                // ปุ่มลบ
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.delete_outline,
+                                    size: 20,
                                   ),
+                                  color: Colors.red,
+                                  onPressed: () async {
+                                    final confirm = await showDialog<bool>(
+                                      context: context,
+                                      builder: (context) => AlertDialog(
+                                        title: const Text('ยืนยันการลบ'),
+                                        content: Text(
+                                          'ต้องการลบบิล ${order.name} ใช่หรือไม่?',
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () =>
+                                                Navigator.pop(context, false),
+                                            child: const Text('ยกเลิก'),
+                                          ),
+                                          ElevatedButton(
+                                            onPressed: () =>
+                                                Navigator.pop(context, true),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: Colors.red,
+                                            ),
+                                            child: const Text('ลบ'),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+
+                                    if (confirm == true) {
+                                      ref
+                                          .read(holdOrdersProvider.notifier)
+                                          .removeOrder(index);
+
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              'ลบ ${order.name} แล้ว',
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    }
+                                  },
                                 ),
                               ],
                             ),
                             onTap: () {
-                              // Recall order
-                              ref.read(cartProvider.notifier).recall(order);
+                              // ✅ เรียกกลับบิล - ใช้ recallOrder
+                              ref
+                                  .read(holdOrdersProvider.notifier)
+                                  .recallOrder(index);
                               Navigator.pop(context);
-                              
+
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: Text('เรียก ${order.name} กลับมาแล้ว'),
+                                  content: Text(
+                                    'เรียก ${order.name} กลับมาแล้ว',
+                                  ),
                                 ),
                               );
                             },

@@ -36,13 +36,14 @@ class SalesOrderModel {
       orderDate: DateTime.parse(json['order_date'] as String),
       customerId: json['customer_id'] as String?,
       customerName: json['customer_name'] as String?,
-      subtotal: (json['subtotal'] as num).toDouble(),
-      discountAmount: (json['discount_amount'] as num).toDouble(),
+      // ✅ ใช้ default value ถ้าไม่มี
+      subtotal: (json['subtotal'] as num?)?.toDouble() ?? (json['total_amount'] as num).toDouble(),
+      discountAmount: (json['discount_amount'] as num?)?.toDouble() ?? 0.0,
       totalAmount: (json['total_amount'] as num).toDouble(),
-      paymentType: json['payment_type'] as String,
-      paidAmount: (json['paid_amount'] as num).toDouble(),
-      changeAmount: (json['change_amount'] as num).toDouble(),
-      status: json['status'] as String,
+      paymentType: json['payment_type'] as String? ?? 'CASH',
+      paidAmount: (json['paid_amount'] as num?)?.toDouble() ?? (json['total_amount'] as num).toDouble(),
+      changeAmount: (json['change_amount'] as num?)?.toDouble() ?? 0.0,
+      status: json['status'] as String? ?? 'COMPLETED',
       items: json['items'] != null
           ? (json['items'] as List)
               .map((item) => SalesOrderItemModel.fromJson(item))
@@ -50,9 +51,29 @@ class SalesOrderModel {
           : null,
     );
   }
+  
+  Map<String, dynamic> toJson() {
+    return {
+      'order_id': orderId,
+      'order_no': orderNo,
+      'order_date': orderDate.toIso8601String(),
+      'customer_id': customerId,
+      'customer_name': customerName,
+      'subtotal': subtotal,
+      'discount_amount': discountAmount,
+      'total_amount': totalAmount,
+      'payment_type': paymentType,
+      'paid_amount': paidAmount,
+      'change_amount': changeAmount,
+      'status': status,
+      'items': items?.map((item) => item.toJson()).toList(),
+    };
+  }
 }
 
 class SalesOrderItemModel {
+  final String itemId;
+  final String orderId;
   final String productId;
   final String productCode;
   final String productName;
@@ -61,6 +82,8 @@ class SalesOrderItemModel {
   final double amount;
   
   SalesOrderItemModel({
+    required this.itemId,
+    required this.orderId,
     required this.productId,
     required this.productCode,
     required this.productName,
@@ -71,6 +94,8 @@ class SalesOrderItemModel {
   
   factory SalesOrderItemModel.fromJson(Map<String, dynamic> json) {
     return SalesOrderItemModel(
+      itemId: json['item_id'] as String? ?? '',
+      orderId: json['order_id'] as String? ?? '',
       productId: json['product_id'] as String,
       productCode: json['product_code'] as String,
       productName: json['product_name'] as String,
@@ -78,5 +103,18 @@ class SalesOrderItemModel {
       unitPrice: (json['unit_price'] as num).toDouble(),
       amount: (json['amount'] as num).toDouble(),
     );
+  }
+  
+  Map<String, dynamic> toJson() {
+    return {
+      'item_id': itemId,
+      'order_id': orderId,
+      'product_id': productId,
+      'product_code': productCode,
+      'product_name': productName,
+      'quantity': quantity,
+      'unit_price': unitPrice,
+      'amount': amount,
+    };
   }
 }

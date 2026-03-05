@@ -24,15 +24,7 @@ class _CustomerSelectorDialogState extends ConsumerState<CustomerSelectorDialog>
 
   @override
   Widget build(BuildContext context) {
-    final customerState = ref.watch(customerListProvider);
-    
-    // กรองลูกค้าตามการค้นหา
-    final filteredCustomers = customerState.customers.where((customer) {
-      if (_searchQuery.isEmpty) return true;
-      return customer.customerName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-             customer.customerCode.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-             (customer.phone?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? false);
-    }).toList();
+    final customerAsync = ref.watch(customerListProvider);
     
     return Dialog(
       child: Container(
@@ -57,6 +49,33 @@ class _CustomerSelectorDialogState extends ConsumerState<CustomerSelectorDialog>
                   onPressed: () => Navigator.pop(context),
                 ),
               ],
+            ),
+            const Divider(),
+            
+            // ✅ ปุ่มลูกค้าทั่วไป
+            Card(
+              color: Colors.blue[50],
+              margin: const EdgeInsets.only(bottom: 8),
+              child: ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: Colors.blue,
+                  child: Icon(Icons.person_outline, color: Colors.white),
+                ),
+                title: const Text(
+                  'ลูกค้าทั่วไป',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: const Text('ขายแบบไม่ระบุลูกค้า'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  // ✅ ส่งค่า Walk-in customer
+                  Navigator.pop(context, CustomerModel(
+                    customerId: 'WALK_IN',
+                    customerCode: 'WALK-IN',
+                    customerName: 'ลูกค้าทั่วไป',
+                  ));
+                },
+              ),
             ),
             const Divider(),
             
@@ -91,69 +110,110 @@ class _CustomerSelectorDialogState extends ConsumerState<CustomerSelectorDialog>
             
             // Customer List
             Expanded(
-              child: customerState.isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : filteredCustomers.isEmpty
-                      ? const Center(child: Text('ไม่พบลูกค้า'))
-                      : ListView.builder(
-                          itemCount: filteredCustomers.length,
-                          itemBuilder: (context, index) {
-                            final customer = filteredCustomers[index];
-                            final isSelected = widget.currentCustomer?.customerId == customer.customerId;
-                            
-                            return Card(
-                              color: isSelected ? Colors.blue[50] : null,
-                              child: ListTile(
-                                leading: CircleAvatar(
-                                  backgroundColor: isSelected ? Colors.blue : Colors.purple,
-                                  child: Text(
-                                    customer.customerName.substring(0, 1),
-                                    style: const TextStyle(color: Colors.white),
-                                  ),
-                                ),
-                                title: Text(customer.customerName),
-                                subtitle: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text('รหัส: ${customer.customerCode}'),
-                                    if (customer.phone != null)
-                                      Text('โทร: ${customer.phone}'),
-                                  ],
-                                ),
-                                trailing: isSelected
-                                    ? const Icon(Icons.check_circle, color: Colors.blue)
-                                    : null,
-                                onTap: () {
-                                  Navigator.pop(context, customer);
-                                },
-                              ),
-                            );
+              child: customerAsync.when(
+                data: (customers) {
+                  // ✅ กรอง WALK_IN ออก (แสดงแยกด้านบนแล้ว)
+                  final filteredCustomers = customers.where((customer) {
+                    if (customer.customerId == 'WALK_IN') return false; // Skip
+                    if (_searchQuery.isEmpty) return true;
+                    return customer.customerName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+                           customer.customerCode.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+                           (customer.phone?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? false);
+                  }).toList();
+                  
+                  if (filteredCustomers.isEmpty) {
+                    return const Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.search_off, size: 60, color: Colors.grey),
+                          SizedBox(height: 16),
+                          Text('ไม่พบลูกค้า'),
+                        ],
+                      ),
+                    );
+                  }
+                  
+                  return ListView.builder(
+                    itemCount: filteredCustomers.length,
+                    itemBuilder: (context, index) {
+                      final customer = filteredCustomers[index];
+                      final isSelected = widget.currentCustomer?.customerId == customer.customerId;
+                      
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        color: isSelected ? Colors.blue[50] : null,
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: isSelected ? Colors.blue : Colors.purple,
+                            child: Text(
+                              customer.customerName.substring(0, 1).toUpperCase(),
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                          ),
+                          title: Text(
+                            customer.customerName,
+                            style: TextStyle(
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            ),
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('รหัส: ${customer.customerCode}'),
+                              if (customer.phone != null)
+                                Text('โทร: ${customer.phone}'),
+                            ],
+                          ),
+                          trailing: isSelected
+                              ? const Icon(Icons.check_circle, color: Colors.blue)
+                              : const Icon(Icons.chevron_right),
+                          onTap: () {
+                            Navigator.pop(context, customer);
                           },
                         ),
+                      );
+                    },
+                  );
+                },
+                loading: () => const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 16),
+                      Text('กำลังโหลดลูกค้า...'),
+                    ],
+                  ),
+                ),
+                error: (error, stack) => Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.error_outline, size: 60, color: Colors.red),
+                      const SizedBox(height: 16),
+                      Text('เกิดข้อผิดพลาด: $error'),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: () {
+                          ref.read(customerListProvider.notifier).refresh();
+                        },
+                        child: const Text('ลองใหม่'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
             
             // Actions
             const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () {
-                      Navigator.pop(context, null); // Clear customer
-                    },
-                    child: const Text('ล้างลูกค้า'),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                    },
-                    child: const Text('ยกเลิก'),
-                  ),
-                ),
-              ],
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 45),
+              ),
+              child: const Text('ปิด'),
             ),
           ],
         ),

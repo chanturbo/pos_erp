@@ -13,17 +13,16 @@ class ProductListPage extends ConsumerStatefulWidget {
 class _ProductListPageState extends ConsumerState<ProductListPage> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-  
+
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
   }
 
-  @override
   Widget build(BuildContext context) {
-    final productState = ref.watch(productListProvider);  // ✅ นี่คือ ProductListState
-    
+    final productAsync = ref.watch(productListProvider); // ✅ เปลี่ยน
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('จัดการสินค้า'),
@@ -32,7 +31,7 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
             icon: const Icon(Icons.refresh),
             tooltip: 'รีเฟรช',
             onPressed: () {
-              ref.read(productListProvider.notifier).loadProducts();
+              ref.read(productListProvider.notifier).refresh(); // ✅ เปลี่ยน
             },
           ),
         ],
@@ -69,10 +68,160 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
               },
             ),
           ),
-          
+
           // Product List
           Expanded(
-            child: _buildBody(context, ref, productState),  // ✅ สร้าง method แยก
+            child: productAsync.when(
+              data: (products) {
+                // กรองสินค้า
+                final filteredProducts = products.where((product) {
+                  if (_searchQuery.isEmpty) return true;
+                  return product.productName.toLowerCase().contains(
+                        _searchQuery.toLowerCase(),
+                      ) ||
+                      product.productCode.toLowerCase().contains(
+                        _searchQuery.toLowerCase(),
+                      );
+                }).toList();
+
+                if (filteredProducts.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.search_off,
+                          size: 80,
+                          color: Colors.grey,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          _searchQuery.isEmpty
+                              ? 'ยังไม่มีสินค้า'
+                              : 'ไม่พบสินค้า',
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton.icon(
+                          onPressed: () async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const ProductFormPage(),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.add),
+                          label: const Text('เพิ่มสินค้า'),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                return ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: filteredProducts.length,
+                  itemBuilder: (context, index) {
+                    final product = filteredProducts[index];
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          child: Text(product.productCode.substring(0, 2)),
+                        ),
+                        title: Text(product.productName),
+                        subtitle: Text(
+                          'รหัส: ${product.productCode} | ราคา: ฿${product.priceLevel1.toStringAsFixed(2)}',
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit, color: Colors.blue),
+                              onPressed: () async {
+                                await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        ProductFormPage(product: product),
+                                  ),
+                                );
+                              },
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete, color: Colors.red),
+                              onPressed: () async {
+                                final confirm = await showDialog<bool>(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    title: const Text('ยืนยันการลบ'),
+                                    content: Text(
+                                      'ต้องการลบสินค้า ${product.productName} ใช่หรือไม่?',
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(context, false),
+                                        child: const Text('ยกเลิก'),
+                                      ),
+                                      ElevatedButton(
+                                        onPressed: () =>
+                                            Navigator.pop(context, true),
+                                        child: const Text('ลบ'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+
+                                if (confirm == true) {
+                                  final success = await ref
+                                      .read(productListProvider.notifier)
+                                      .deleteProduct(product.productId);
+
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          success
+                                              ? 'ลบสินค้าสำเร็จ'
+                                              : 'ลบสินค้าไม่สำเร็จ',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (error, stack) => Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.error_outline,
+                      size: 80,
+                      color: Colors.red,
+                    ),
+                    const SizedBox(height: 16),
+                    Text('เกิดข้อผิดพลาด: $error'),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () {
+                        ref.read(productListProvider.notifier).refresh();
+                      },
+                      child: const Text('ลองใหม่'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
         ],
       ),
@@ -85,140 +234,6 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
         },
         child: const Icon(Icons.add),
       ),
-    );
-  }
-  
-  // ✅ สร้าง method สำหรับแสดง body
-  Widget _buildBody(BuildContext context, WidgetRef ref, ProductListState state) {
-    // Loading
-    if (state.isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    
-    // Error
-    if (state.error != null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline, size: 80, color: Colors.red),
-            const SizedBox(height: 16),
-            Text('เกิดข้อผิดพลาด: ${state.error}'),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () {
-                ref.read(productListProvider.notifier).loadProducts();
-              },
-              child: const Text('ลองใหม่'),
-            ),
-          ],
-        ),
-      );
-    }
-    
-    // กรองสินค้าตามการค้นหา
-    final filteredProducts = state.products.where((product) {
-      if (_searchQuery.isEmpty) return true;
-      return product.productName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-             product.productCode.toLowerCase().contains(_searchQuery.toLowerCase());
-    }).toList();
-    
-    // Empty state
-    if (filteredProducts.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.search_off, size: 80, color: Colors.grey),
-            const SizedBox(height: 16),
-            Text(_searchQuery.isEmpty ? 'ยังไม่มีสินค้า' : 'ไม่พบสินค้า'),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const ProductFormPage()),
-                );
-              },
-              icon: const Icon(Icons.add),
-              label: const Text('เพิ่มสินค้า'),
-            ),
-          ],
-        ),
-      );
-    }
-    
-    // Product List
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      itemCount: filteredProducts.length,
-      itemBuilder: (context, index) {
-        final product = filteredProducts[index];
-        return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          child: ListTile(
-            leading: CircleAvatar(
-              child: Text(product.productCode.substring(0, 2)),
-            ),
-            title: Text(product.productName),
-            subtitle: Text(
-              'รหัส: ${product.productCode} | ราคา: ฿${product.priceLevel1.toStringAsFixed(2)}',
-            ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.edit, color: Colors.blue),
-                  onPressed: () async {
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => ProductFormPage(product: product),
-                      ),
-                    );
-                  },
-                ),
-                IconButton(
-                  icon: const Icon(Icons.delete, color: Colors.red),
-                  onPressed: () async {
-                    final confirm = await showDialog<bool>(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text('ยืนยันการลบ'),
-                        content: Text('ต้องการลบสินค้า ${product.productName} ใช่หรือไม่?'),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context, false),
-                            child: const Text('ยกเลิก'),
-                          ),
-                          ElevatedButton(
-                            onPressed: () => Navigator.pop(context, true),
-                            child: const Text('ลบ'),
-                          ),
-                        ],
-                      ),
-                    );
-                    
-                    if (confirm == true) {
-                      final success = await ref
-                          .read(productListProvider.notifier)
-                          .deleteProduct(product.productId);
-                      
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(success ? 'ลบสินค้าสำเร็จ' : 'ลบสินค้าไม่สำเร็จ'),
-                          ),
-                        );
-                      }
-                    }
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-      },
     );
   }
 }

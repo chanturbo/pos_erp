@@ -3,51 +3,23 @@ import '../../../../core/client/api_client.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/models/sales_order_model.dart';
 
-// Sales History State
-class SalesHistoryState {
-  final List<SalesOrderModel> orders;
-  final bool isLoading;
-  final String? error;
-  
-  SalesHistoryState({
-    required this.orders,
-    required this.isLoading,
-    this.error,
-  });
-  
-  SalesHistoryState copyWith({
-    List<SalesOrderModel>? orders,
-    bool? isLoading,
-    String? error,
-  }) {
-    return SalesHistoryState(
-      orders: orders ?? this.orders,
-      isLoading: isLoading ?? this.isLoading,
-      error: error ?? this.error,
-    );
-  }
-}
-
-// Sales History Provider
-final salesHistoryProvider = NotifierProvider<SalesHistoryNotifier, SalesHistoryState>(() {
+// ✅ Sales History Provider - ใช้ AsyncNotifierProvider
+final salesHistoryProvider = AsyncNotifierProvider<SalesHistoryNotifier, List<SalesOrderModel>>(() {
   return SalesHistoryNotifier();
 });
 
-class SalesHistoryNotifier extends Notifier<SalesHistoryState> {
+class SalesHistoryNotifier extends AsyncNotifier<List<SalesOrderModel>> {
   @override
-  SalesHistoryState build() {
-    loadOrders();
-    return SalesHistoryState(
-      orders: [],
-      isLoading: true,
-    );
+  Future<List<SalesOrderModel>> build() async {
+    // ✅ โหลดข้อมูลทันทีเมื่อ build
+    return await loadOrders();
   }
   
   /// โหลดรายการขาย
-  Future<void> loadOrders() async {
-    state = state.copyWith(isLoading: true, error: null);
-    
+  Future<List<SalesOrderModel>> loadOrders() async {
     try {
+      print('📡 Loading sales orders...');
+      
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.get('/api/sales');
       
@@ -58,19 +30,22 @@ class SalesHistoryNotifier extends Notifier<SalesHistoryState> {
         // เรียงตามวันที่ล่าสุด
         orders.sort((a, b) => b.orderDate.compareTo(a.orderDate));
         
-        state = state.copyWith(orders: orders, isLoading: false);
+        print('✅ Loaded ${orders.length} orders');
+        
+        return orders;
       } else {
-        state = state.copyWith(
-          isLoading: false,
-          error: 'โหลดข้อมูลไม่สำเร็จ',
-        );
+        throw Exception('Failed to load orders: ${response.statusCode}');
       }
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: 'เกิดข้อผิดพลาด: $e',
-      );
+      print('❌ Error loading orders: $e');
+      throw Exception('เกิดข้อผิดพลาด: $e');
     }
+  }
+  
+  /// Refresh
+  Future<void> refresh() async {
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() => loadOrders());
   }
   
   /// ดึงรายละเอียดใบขาย
@@ -84,6 +59,7 @@ class SalesHistoryNotifier extends Notifier<SalesHistoryState> {
       }
       return null;
     } catch (e) {
+      print('❌ Error getting order details: $e');
       return null;
     }
   }

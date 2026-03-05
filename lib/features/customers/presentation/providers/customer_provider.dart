@@ -1,72 +1,48 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/client/api_client.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/models/customer_model.dart';
 
-// Customer List State
-class CustomerListState {
-  final List<CustomerModel> customers;
-  final bool isLoading;
-  final String? error;
-  
-  CustomerListState({
-    required this.customers,
-    required this.isLoading,
-    this.error,
-  });
-  
-  CustomerListState copyWith({
-    List<CustomerModel>? customers,
-    bool? isLoading,
-    String? error,
-  }) {
-    return CustomerListState(
-      customers: customers ?? this.customers,
-      isLoading: isLoading ?? this.isLoading,
-      error: error ?? this.error,
-    );
-  }
-}
-
-// Customer List Provider
-final customerListProvider = NotifierProvider<CustomerListNotifier, CustomerListState>(() {
+// ✅ Customer List Provider - ใช้ AsyncNotifierProvider
+final customerListProvider = AsyncNotifierProvider<CustomerListNotifier, List<CustomerModel>>(() {
   return CustomerListNotifier();
 });
 
-class CustomerListNotifier extends Notifier<CustomerListState> {
+class CustomerListNotifier extends AsyncNotifier<List<CustomerModel>> {
   @override
-  CustomerListState build() {
-    // โหลดข้อมูลเมื่อสร้าง
-    loadCustomers();
-    return CustomerListState(
-      customers: [],
-      isLoading: true,
-    );
+  Future<List<CustomerModel>> build() async {
+    // ✅ โหลดข้อมูลทันทีเมื่อ build
+    return await loadCustomers();
   }
   
   /// โหลดรายการลูกค้า
-  Future<void> loadCustomers() async {
-    state = state.copyWith(isLoading: true, error: null);
-    
+  Future<List<CustomerModel>> loadCustomers() async {
     try {
+      print('📡 Loading customers...');
+      
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.get('/api/customers');
       
       if (response.statusCode == 200) {
         final data = response.data['data'] as List;
         final customers = data.map((json) => CustomerModel.fromJson(json)).toList();
-        state = state.copyWith(customers: customers, isLoading: false);
+        
+        print('✅ Loaded ${customers.length} customers');
+        
+        return customers;
       } else {
-        state = state.copyWith(
-          isLoading: false,
-          error: 'โหลดข้อมูลไม่สำเร็จ',
-        );
+        throw Exception('Failed to load customers: ${response.statusCode}');
       }
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: 'เกิดข้อผิดพลาด: $e',
-      );
+      print('❌ Error loading customers: $e');
+      throw Exception('เกิดข้อผิดพลาด: $e');
     }
+  }
+  
+  /// Refresh
+  Future<void> refresh() async {
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() => loadCustomers());
   }
   
   /// สร้างลูกค้าใหม่
@@ -75,12 +51,13 @@ class CustomerListNotifier extends Notifier<CustomerListState> {
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.post('/api/customers', data: data);
       
-      if (response.statusCode == 200) {
-        await loadCustomers(); // Reload
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        await refresh();
         return true;
       }
       return false;
     } catch (e) {
+      print('❌ Error creating customer: $e');
       return false;
     }
   }
@@ -92,11 +69,12 @@ class CustomerListNotifier extends Notifier<CustomerListState> {
       final response = await apiClient.put('/api/customers/$customerId', data: data);
       
       if (response.statusCode == 200) {
-        await loadCustomers(); // Reload
+        await refresh();
         return true;
       }
       return false;
     } catch (e) {
+      print('❌ Error updating customer: $e');
       return false;
     }
   }
@@ -108,11 +86,12 @@ class CustomerListNotifier extends Notifier<CustomerListState> {
       final response = await apiClient.delete('/api/customers/$customerId');
       
       if (response.statusCode == 200) {
-        await loadCustomers(); // Reload
+        await refresh();
         return true;
       }
       return false;
     } catch (e) {
+      print('❌ Error deleting customer: $e');
       return false;
     }
   }
