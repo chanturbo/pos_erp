@@ -1,3 +1,5 @@
+// ignore_for_file: avoid_print
+
 import 'package:drift/drift.dart';
 import '../database/app_database.dart';
 import '../utils/crypto_utils.dart';
