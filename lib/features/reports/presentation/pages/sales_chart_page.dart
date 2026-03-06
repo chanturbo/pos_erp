@@ -10,10 +10,10 @@ import '../../data/models/sales_summary_model.dart';
 // Daily Sales Provider
 final dailySalesProvider = FutureProvider<List<DailySalesModel>>((ref) async {
   final apiClient = ref.read(apiClientProvider);
-  
+
   try {
     final response = await apiClient.get('/api/reports/sales-daily?days=7');
-    
+
     if (response.statusCode == 200) {
       final data = response.data['data'] as List;
       return data.map((json) => DailySalesModel.fromJson(json)).toList();
@@ -30,7 +30,7 @@ class SalesChartPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dailySalesAsync = ref.watch(dailySalesProvider);
-    
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('กราฟยอดขาย'),
@@ -50,7 +50,7 @@ class SalesChartPage extends ConsumerWidget {
       ),
     );
   }
-  
+
   Widget _buildChart(List<DailySalesModel> sales) {
     if (sales.isEmpty) {
       return const Center(
@@ -64,10 +64,10 @@ class SalesChartPage extends ConsumerWidget {
         ),
       );
     }
-    
+
     // เรียงข้อมูลตามวันที่
     sales.sort((a, b) => a.date.compareTo(b.date));
-    
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -75,13 +75,10 @@ class SalesChartPage extends ConsumerWidget {
         children: [
           const Text(
             'ยอดขาย 7 วันล่าสุด',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 24),
-          
+
           // Line Chart
           SizedBox(
             height: 300,
@@ -105,8 +102,11 @@ class SalesChartPage extends ConsumerWidget {
                     sideTitles: SideTitles(
                       showTitles: true,
                       getTitlesWidget: (value, meta) {
-                        if (value.toInt() >= 0 && value.toInt() < sales.length) {
-                          final date = DateTime.parse(sales[value.toInt()].date);
+                        if (value.toInt() >= 0 &&
+                            value.toInt() < sales.length) {
+                          final date = DateTime.parse(
+                            sales[value.toInt()].date,
+                          );
                           return Text(
                             DateFormat('dd/MM').format(date),
                             style: const TextStyle(fontSize: 10),
@@ -127,10 +127,7 @@ class SalesChartPage extends ConsumerWidget {
                 lineBarsData: [
                   LineChartBarData(
                     spots: sales.asMap().entries.map((entry) {
-                      return FlSpot(
-                        entry.key.toDouble(),
-                        entry.value.sales,
-                      );
+                      return FlSpot(entry.key.toDouble(), entry.value.sales);
                     }).toList(),
                     isCurved: true,
                     color: Colors.blue,
@@ -138,7 +135,7 @@ class SalesChartPage extends ConsumerWidget {
                     dotData: const FlDotData(show: true),
                     belowBarData: BarAreaData(
                       show: true,
-                      color: Colors.blue.withOpacity(0.3),
+                      color: Colors.blue.withValues(alpha: 0.3),
                     ),
                   ),
                 ],
@@ -146,17 +143,14 @@ class SalesChartPage extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 32),
-          
+
           // Data Table
           const Text(
             'ตารางข้อมูล',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 16),
-          
+
           ...sales.reversed.map((sale) {
             final date = DateTime.parse(sale.date);
             return Card(

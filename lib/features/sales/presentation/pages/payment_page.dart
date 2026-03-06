@@ -274,7 +274,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
       );
       print('   Total: ${orderData['total_amount']}');
       print('   Items: ${orderData['items']}');
-      print('   Full data: ${orderData}');
+      print('   Full data: $orderData');
      
       // บันทึก Order
       final response = await apiClient.post('/api/sales', data: orderData);

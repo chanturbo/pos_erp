@@ -6,12 +6,16 @@ import 'package:pos_erp/core/database/app_database.dart';
 class SeedData {
   /// Seed All Data
   static Future<void> seedAll(AppDatabase db) async {
+    print('🌱 Starting seed data...');
     await seedBranches(db);
     await seedWarehouses(db);
     await seedUsers(db);
     await seedCustomers(db);
+    await seedSuppliers(db); // ✅ เพิ่ม
     await seedProductGroups(db);
     await seedProducts(db);
+
+    print('✅ Seed data completed');
   }
 
   /// Seed Branches
@@ -384,5 +388,69 @@ class SeedData {
         // Stock exists
       }
     }
+  }
+
+  /// Seed Suppliers
+  static Future<void> seedSuppliers(AppDatabase db) async {
+    print('🌱 Seeding suppliers...');
+
+    // ✅ ลบข้อมูลเดิมทิ้งก่อน
+    try {
+      await db.delete(db.suppliers).go();
+      print('   🗑️ Cleared existing suppliers');
+    } catch (e) {
+      print('   ⚠️ Could not clear suppliers: $e');
+    }
+
+    final suppliers = [
+      SuppliersCompanion.insert(
+        supplierId: 'SUP001',
+        supplierCode: 'SUP-001',
+        supplierName: 'บริษัท ซัพพลายเออร์ A จำกัด',
+        contactPerson: const Value('คุณสมชาย'),
+        phone: const Value('02-111-2222'),
+        email: const Value('contact@supplier-a.com'),
+        address: const Value('123 ถนนพระราม 4 กรุงเทพฯ'),
+        taxId: const Value('0105566001234'),
+        creditTerm: const Value(30),
+        creditLimit: const Value(100000.0),
+      ),
+      SuppliersCompanion.insert(
+        supplierId: 'SUP002',
+        supplierCode: 'SUP-002',
+        supplierName: 'บริษัท ซัพพลายเออร์ B จำกัด',
+        contactPerson: const Value('คุณสมหญิง'),
+        phone: const Value('02-222-3333'),
+        email: const Value('info@supplier-b.com'),
+        address: const Value('456 ถนนสุขุมวิท กรุงเทพฯ'),
+        taxId: const Value('0105566005678'),
+        creditTerm: const Value(45),
+        creditLimit: const Value(200000.0),
+      ),
+      SuppliersCompanion.insert(
+        supplierId: 'SUP003',
+        supplierCode: 'SUP-003',
+        supplierName: 'ร้านค้าส่ง C',
+        contactPerson: const Value('คุณสมศักดิ์'),
+        phone: const Value('081-444-5555'),
+        email: const Value('sales@wholesale-c.com'),
+        creditTerm: const Value(7),
+        creditLimit: const Value(50000.0),
+      ),
+    ];
+
+    int inserted = 0;
+    for (var supplier in suppliers) {
+      try {
+        await db.into(db.suppliers).insert(supplier);
+        inserted++;
+        print('   ✅ Inserted: ${supplier.supplierId.value}');
+      } catch (e) {
+        print('   ❌ Failed to insert ${supplier.supplierId.value}: $e');
+      }
+    }
+
+    final count = await db.select(db.suppliers).get();
+    print('✅ Seeded $inserted suppliers (total in DB: ${count.length})');
   }
 }

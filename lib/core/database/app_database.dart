@@ -1,3 +1,5 @@
+// ignore_for_file: avoid_print
+
 import 'dart:io';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
@@ -5,7 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 
 // Import ทุก Table ที่สร้างไว้
-import 'tables/converters.dart';        // ✅ เพิ่มบรรทัดนี้
+import 'tables/converters.dart';
 import 'tables/company_tables.dart';
 import 'tables/user_tables.dart';
 import 'tables/product_tables.dart';
@@ -53,7 +55,7 @@ part 'app_database.g.dart';
   // Customers & Suppliers
   CustomerGroups,
   Customers,
-  Suppliers,
+  Suppliers, // ✅ ตรวจสอบว่ามีบรรทัดนี้อยู่แล้ว
   
   // Sales
   SalesOrders,
@@ -94,6 +96,7 @@ class AppDatabase extends _$AppDatabase {
   @override
   int get schemaVersion => 1;
 
+  @override
   MigrationStrategy get migration {
     return MigrationStrategy(
       onCreate: (Migrator m) async {
@@ -111,7 +114,9 @@ LazyDatabase _openConnection() {
   return LazyDatabase(() async {
     final dbFolder = await getApplicationDocumentsDirectory();
     final file = File(p.join(dbFolder.path, 'pos_erp.db'));
-    
+    // ✅ เพิ่มบรรทัดนี้
+    //print('📁 Database path: ${file.path}');
+
     return NativeDatabase.createInBackground(file);
   });
 }

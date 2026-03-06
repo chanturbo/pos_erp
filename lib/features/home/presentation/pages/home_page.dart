@@ -2,15 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../products/presentation/pages/product_list_page.dart';
-import '../../../customers/presentation/pages/customer_list_page.dart'; // ✅ เพิ่ม
-import '../../../testing/test_page.dart'; // ✅ เพิ่มบรรทัดนี้
-import '../../../sales/presentation/pages/pos_page.dart'; // ✅ เพิ่ม
+import '../../../customers/presentation/pages/customer_list_page.dart';
+import '../../../suppliers/presentation/pages/supplier_list_page.dart'; // ✅ เพิ่ม
+import '../../../testing/test_page.dart';
+import '../../../sales/presentation/pages/pos_page.dart';
 import '../../../sales/presentation/pages/sales_history_page.dart';
-import '../../../dashboard/presentation/pages/dashboard_page.dart'; // ✅ เพิ่ม
-import '../../../inventory/presentation/pages/stock_balance_page.dart'; // ✅ เพิ่ม
-import '../../../reports/presentation/pages/reports_page.dart'; // ✅ เพิ่ม
-import '../../../../core/shortcuts/keyboard_shortcuts.dart'; // ✅ เพิ่ม
-import '../../../settings/presentation/pages/settings_page.dart'; // ✅ เพิ่ม
+import '../../../dashboard/presentation/pages/dashboard_page.dart';
+import '../../../inventory/presentation/pages/stock_balance_page.dart';
+import '../../../reports/presentation/pages/reports_page.dart';
+import '../../../../core/shortcuts/keyboard_shortcuts.dart';
+import '../../../settings/presentation/pages/settings_page.dart';
 
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
@@ -21,7 +22,6 @@ class HomePage extends ConsumerWidget {
     final user = authState.user;
 
     return KeyboardShortcuts(
-      // ✅ เพิ่ม wrapper
       onPosShortcut: () {
         Navigator.push(
           context,
@@ -65,12 +65,11 @@ class HomePage extends ConsumerWidget {
         );
       },
       child: Scaffold(
-        // ✅ เพิ่มปุ่มในหน้า Home (ในส่วน AppBar actions)
         appBar: AppBar(
           title: const Text('หน้าหลัก'),
           automaticallyImplyLeading: false,
           actions: [
-            // ✅ เพิ่มปุ่ม Settings
+            // Settings button
             IconButton(
               icon: const Icon(Icons.settings),
               tooltip: 'ตั้งค่า',
@@ -81,7 +80,7 @@ class HomePage extends ConsumerWidget {
                 );
               },
             ),
-            // ✅ เพิ่มปุ่มทดสอบ
+            // Test button
             IconButton(
               icon: const Icon(Icons.science),
               tooltip: 'ทดสอบระบบ',
@@ -130,9 +129,10 @@ class HomePage extends ConsumerWidget {
                 if (confirm == true) {
                   await ref.read(authProvider.notifier).logout();
                   if (context.mounted) {
-                    Navigator.of(
-                      context,
-                    ).pushNamedAndRemoveUntil('/login', (route) => false);
+                    Navigator.of(context).pushNamedAndRemoveUntil(
+                      '/login',
+                      (route) => false,
+                    );
                   }
                 }
               },
@@ -159,15 +159,15 @@ class HomePage extends ConsumerWidget {
                 const SizedBox(height: 8),
                 Text(
                   'Username: ${user?.username ?? ''}',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyLarge?.copyWith(color: Colors.grey),
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: Colors.grey,
+                      ),
                 ),
                 const SizedBox(height: 32),
 
                 // Grid Menu
                 ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 800),
+                  constraints: const BoxConstraints(maxWidth: 900), // ✅ เพิ่มความกว้าง
                   child: GridView.count(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
@@ -215,7 +215,6 @@ class HomePage extends ConsumerWidget {
                           );
                         },
                       ),
-                      // ✅ เพิ่มเมนูนี้
                       _buildMenuCard(
                         context,
                         icon: Icons.receipt_long,
@@ -237,7 +236,6 @@ class HomePage extends ConsumerWidget {
                         color: Colors.green,
                         onTap: () {
                           Navigator.push(
-                            // ✅ แก้ไข
                             context,
                             MaterialPageRoute(
                               builder: (_) => const StockBalancePage(),
@@ -255,6 +253,21 @@ class HomePage extends ConsumerWidget {
                             context,
                             MaterialPageRoute(
                               builder: (_) => const CustomerListPage(),
+                            ),
+                          );
+                        },
+                      ),
+                      // ✅ เพิ่มเมนู Suppliers
+                      _buildMenuCard(
+                        context,
+                        icon: Icons.business,
+                        title: 'ซัพพลายเออร์',
+                        color: Colors.cyan,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const SupplierListPage(),
                             ),
                           );
                         },
@@ -277,7 +290,6 @@ class HomePage extends ConsumerWidget {
                         color: Colors.teal,
                         onTap: () {
                           Navigator.push(
-                            // ✅ แก้ไข
                             context,
                             MaterialPageRoute(
                               builder: (_) => const ReportsPage(),
@@ -314,7 +326,11 @@ class HomePage extends ConsumerWidget {
             const SizedBox(height: 8),
             Text(
               title,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
             ),
           ],
         ),

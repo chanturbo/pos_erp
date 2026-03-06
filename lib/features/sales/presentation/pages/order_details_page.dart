@@ -295,10 +295,14 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
       builder: (context) => Dialog(
         child: Container(
           width: 400,
+          constraints: const BoxConstraints(
+            maxHeight: 700, // ✅ เพิ่ม constraint
+          ),
           padding: const EdgeInsets.all(16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Header - ไม่ scroll
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -316,17 +320,31 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
                 ],
               ),
               const Divider(),
-              ReceiptWidget(order: _order!),
+              
+              // Content - มี scroll ✅
+              Expanded(
+                child: SingleChildScrollView(
+                  child: ReceiptWidget(order: _order!),
+                ),
+              ),
+              
+              // Action - ไม่ scroll
               const SizedBox(height: 16),
-              ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('พิมพ์ใบเสร็จ (เร็วๆ นี้...)')),
-                  );
-                },
-                icon: const Icon(Icons.print),
-                label: const Text('พิมพ์'),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('พิมพ์ใบเสร็จ (เร็วๆ นี้...)')),
+                    );
+                  },
+                  icon: const Icon(Icons.print),
+                  label: const Text('พิมพ์'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                ),
               ),
             ],
           ),

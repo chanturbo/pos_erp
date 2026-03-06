@@ -19,7 +19,8 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
     _searchController.dispose();
     super.dispose();
   }
-
+  
+  @override
   Widget build(BuildContext context) {
     final productAsync = ref.watch(productListProvider); // ✅ เปลี่ยน
 

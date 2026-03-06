@@ -9240,7 +9240,6 @@ class $SuppliersTable extends Suppliers
     'supplier_code',
     aliasedName,
     false,
-    additionalChecks: GeneratedColumn.checkTextLength(maxTextLength: 50),
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
@@ -9252,9 +9251,37 @@ class $SuppliersTable extends Suppliers
     'supplier_name',
     aliasedName,
     false,
-    additionalChecks: GeneratedColumn.checkTextLength(maxTextLength: 300),
     type: DriftSqlType.string,
     requiredDuringInsert: true,
+  );
+  static const VerificationMeta _contactPersonMeta = const VerificationMeta(
+    'contactPerson',
+  );
+  @override
+  late final GeneratedColumn<String> contactPerson = GeneratedColumn<String>(
+    'contact_person',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _phoneMeta = const VerificationMeta('phone');
+  @override
+  late final GeneratedColumn<String> phone = GeneratedColumn<String>(
+    'phone',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _emailMeta = const VerificationMeta('email');
+  @override
+  late final GeneratedColumn<String> email = GeneratedColumn<String>(
+    'email',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
   );
   static const VerificationMeta _addressMeta = const VerificationMeta(
     'address',
@@ -9267,45 +9294,48 @@ class $SuppliersTable extends Suppliers
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
-  static const VerificationMeta _phoneMeta = const VerificationMeta('phone');
-  @override
-  late final GeneratedColumn<String> phone = GeneratedColumn<String>(
-    'phone',
-    aliasedName,
-    true,
-    additionalChecks: GeneratedColumn.checkTextLength(maxTextLength: 50),
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-  );
-  static const VerificationMeta _emailMeta = const VerificationMeta('email');
-  @override
-  late final GeneratedColumn<String> email = GeneratedColumn<String>(
-    'email',
-    aliasedName,
-    true,
-    additionalChecks: GeneratedColumn.checkTextLength(maxTextLength: 100),
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-  );
   static const VerificationMeta _taxIdMeta = const VerificationMeta('taxId');
   @override
   late final GeneratedColumn<String> taxId = GeneratedColumn<String>(
     'tax_id',
     aliasedName,
     true,
-    additionalChecks: GeneratedColumn.checkTextLength(maxTextLength: 20),
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
-  static const VerificationMeta _creditDaysMeta = const VerificationMeta(
-    'creditDays',
+  static const VerificationMeta _creditTermMeta = const VerificationMeta(
+    'creditTerm',
   );
   @override
-  late final GeneratedColumn<int> creditDays = GeneratedColumn<int>(
-    'credit_days',
+  late final GeneratedColumn<int> creditTerm = GeneratedColumn<int>(
+    'credit_term',
     aliasedName,
     false,
     type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(30),
+  );
+  static const VerificationMeta _creditLimitMeta = const VerificationMeta(
+    'creditLimit',
+  );
+  @override
+  late final GeneratedColumn<double> creditLimit = GeneratedColumn<double>(
+    'credit_limit',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _currentBalanceMeta = const VerificationMeta(
+    'currentBalance',
+  );
+  @override
+  late final GeneratedColumn<double> currentBalance = GeneratedColumn<double>(
+    'current_balance',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
@@ -9353,11 +9383,14 @@ class $SuppliersTable extends Suppliers
     supplierId,
     supplierCode,
     supplierName,
-    address,
+    contactPerson,
     phone,
     email,
+    address,
     taxId,
-    creditDays,
+    creditTerm,
+    creditLimit,
+    currentBalance,
     isActive,
     createdAt,
     updatedAt,
@@ -9404,10 +9437,13 @@ class $SuppliersTable extends Suppliers
     } else if (isInserting) {
       context.missing(_supplierNameMeta);
     }
-    if (data.containsKey('address')) {
+    if (data.containsKey('contact_person')) {
       context.handle(
-        _addressMeta,
-        address.isAcceptableOrUnknown(data['address']!, _addressMeta),
+        _contactPersonMeta,
+        contactPerson.isAcceptableOrUnknown(
+          data['contact_person']!,
+          _contactPersonMeta,
+        ),
       );
     }
     if (data.containsKey('phone')) {
@@ -9422,16 +9458,40 @@ class $SuppliersTable extends Suppliers
         email.isAcceptableOrUnknown(data['email']!, _emailMeta),
       );
     }
+    if (data.containsKey('address')) {
+      context.handle(
+        _addressMeta,
+        address.isAcceptableOrUnknown(data['address']!, _addressMeta),
+      );
+    }
     if (data.containsKey('tax_id')) {
       context.handle(
         _taxIdMeta,
         taxId.isAcceptableOrUnknown(data['tax_id']!, _taxIdMeta),
       );
     }
-    if (data.containsKey('credit_days')) {
+    if (data.containsKey('credit_term')) {
       context.handle(
-        _creditDaysMeta,
-        creditDays.isAcceptableOrUnknown(data['credit_days']!, _creditDaysMeta),
+        _creditTermMeta,
+        creditTerm.isAcceptableOrUnknown(data['credit_term']!, _creditTermMeta),
+      );
+    }
+    if (data.containsKey('credit_limit')) {
+      context.handle(
+        _creditLimitMeta,
+        creditLimit.isAcceptableOrUnknown(
+          data['credit_limit']!,
+          _creditLimitMeta,
+        ),
+      );
+    }
+    if (data.containsKey('current_balance')) {
+      context.handle(
+        _currentBalanceMeta,
+        currentBalance.isAcceptableOrUnknown(
+          data['current_balance']!,
+          _currentBalanceMeta,
+        ),
       );
     }
     if (data.containsKey('is_active')) {
@@ -9477,9 +9537,9 @@ class $SuppliersTable extends Suppliers
         DriftSqlType.string,
         data['${effectivePrefix}supplier_name'],
       )!,
-      address: attachedDatabase.typeMapping.read(
+      contactPerson: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
-        data['${effectivePrefix}address'],
+        data['${effectivePrefix}contact_person'],
       ),
       phone: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
@@ -9489,13 +9549,25 @@ class $SuppliersTable extends Suppliers
         DriftSqlType.string,
         data['${effectivePrefix}email'],
       ),
+      address: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}address'],
+      ),
       taxId: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}tax_id'],
       ),
-      creditDays: attachedDatabase.typeMapping.read(
+      creditTerm: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
-        data['${effectivePrefix}credit_days'],
+        data['${effectivePrefix}credit_term'],
+      )!,
+      creditLimit: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}credit_limit'],
+      )!,
+      currentBalance: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}current_balance'],
       )!,
       isActive: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
@@ -9522,11 +9594,14 @@ class Supplier extends DataClass implements Insertable<Supplier> {
   final String supplierId;
   final String supplierCode;
   final String supplierName;
-  final String? address;
+  final String? contactPerson;
   final String? phone;
   final String? email;
+  final String? address;
   final String? taxId;
-  final int creditDays;
+  final int creditTerm;
+  final double creditLimit;
+  final double currentBalance;
   final bool isActive;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -9534,11 +9609,14 @@ class Supplier extends DataClass implements Insertable<Supplier> {
     required this.supplierId,
     required this.supplierCode,
     required this.supplierName,
-    this.address,
+    this.contactPerson,
     this.phone,
     this.email,
+    this.address,
     this.taxId,
-    required this.creditDays,
+    required this.creditTerm,
+    required this.creditLimit,
+    required this.currentBalance,
     required this.isActive,
     required this.createdAt,
     required this.updatedAt,
@@ -9549,8 +9627,8 @@ class Supplier extends DataClass implements Insertable<Supplier> {
     map['supplier_id'] = Variable<String>(supplierId);
     map['supplier_code'] = Variable<String>(supplierCode);
     map['supplier_name'] = Variable<String>(supplierName);
-    if (!nullToAbsent || address != null) {
-      map['address'] = Variable<String>(address);
+    if (!nullToAbsent || contactPerson != null) {
+      map['contact_person'] = Variable<String>(contactPerson);
     }
     if (!nullToAbsent || phone != null) {
       map['phone'] = Variable<String>(phone);
@@ -9558,10 +9636,15 @@ class Supplier extends DataClass implements Insertable<Supplier> {
     if (!nullToAbsent || email != null) {
       map['email'] = Variable<String>(email);
     }
+    if (!nullToAbsent || address != null) {
+      map['address'] = Variable<String>(address);
+    }
     if (!nullToAbsent || taxId != null) {
       map['tax_id'] = Variable<String>(taxId);
     }
-    map['credit_days'] = Variable<int>(creditDays);
+    map['credit_term'] = Variable<int>(creditTerm);
+    map['credit_limit'] = Variable<double>(creditLimit);
+    map['current_balance'] = Variable<double>(currentBalance);
     map['is_active'] = Variable<bool>(isActive);
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
@@ -9573,19 +9656,24 @@ class Supplier extends DataClass implements Insertable<Supplier> {
       supplierId: Value(supplierId),
       supplierCode: Value(supplierCode),
       supplierName: Value(supplierName),
-      address: address == null && nullToAbsent
+      contactPerson: contactPerson == null && nullToAbsent
           ? const Value.absent()
-          : Value(address),
+          : Value(contactPerson),
       phone: phone == null && nullToAbsent
           ? const Value.absent()
           : Value(phone),
       email: email == null && nullToAbsent
           ? const Value.absent()
           : Value(email),
+      address: address == null && nullToAbsent
+          ? const Value.absent()
+          : Value(address),
       taxId: taxId == null && nullToAbsent
           ? const Value.absent()
           : Value(taxId),
-      creditDays: Value(creditDays),
+      creditTerm: Value(creditTerm),
+      creditLimit: Value(creditLimit),
+      currentBalance: Value(currentBalance),
       isActive: Value(isActive),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
@@ -9601,11 +9689,14 @@ class Supplier extends DataClass implements Insertable<Supplier> {
       supplierId: serializer.fromJson<String>(json['supplierId']),
       supplierCode: serializer.fromJson<String>(json['supplierCode']),
       supplierName: serializer.fromJson<String>(json['supplierName']),
-      address: serializer.fromJson<String?>(json['address']),
+      contactPerson: serializer.fromJson<String?>(json['contactPerson']),
       phone: serializer.fromJson<String?>(json['phone']),
       email: serializer.fromJson<String?>(json['email']),
+      address: serializer.fromJson<String?>(json['address']),
       taxId: serializer.fromJson<String?>(json['taxId']),
-      creditDays: serializer.fromJson<int>(json['creditDays']),
+      creditTerm: serializer.fromJson<int>(json['creditTerm']),
+      creditLimit: serializer.fromJson<double>(json['creditLimit']),
+      currentBalance: serializer.fromJson<double>(json['currentBalance']),
       isActive: serializer.fromJson<bool>(json['isActive']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
@@ -9618,11 +9709,14 @@ class Supplier extends DataClass implements Insertable<Supplier> {
       'supplierId': serializer.toJson<String>(supplierId),
       'supplierCode': serializer.toJson<String>(supplierCode),
       'supplierName': serializer.toJson<String>(supplierName),
-      'address': serializer.toJson<String?>(address),
+      'contactPerson': serializer.toJson<String?>(contactPerson),
       'phone': serializer.toJson<String?>(phone),
       'email': serializer.toJson<String?>(email),
+      'address': serializer.toJson<String?>(address),
       'taxId': serializer.toJson<String?>(taxId),
-      'creditDays': serializer.toJson<int>(creditDays),
+      'creditTerm': serializer.toJson<int>(creditTerm),
+      'creditLimit': serializer.toJson<double>(creditLimit),
+      'currentBalance': serializer.toJson<double>(currentBalance),
       'isActive': serializer.toJson<bool>(isActive),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
@@ -9633,11 +9727,14 @@ class Supplier extends DataClass implements Insertable<Supplier> {
     String? supplierId,
     String? supplierCode,
     String? supplierName,
-    Value<String?> address = const Value.absent(),
+    Value<String?> contactPerson = const Value.absent(),
     Value<String?> phone = const Value.absent(),
     Value<String?> email = const Value.absent(),
+    Value<String?> address = const Value.absent(),
     Value<String?> taxId = const Value.absent(),
-    int? creditDays,
+    int? creditTerm,
+    double? creditLimit,
+    double? currentBalance,
     bool? isActive,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -9645,11 +9742,16 @@ class Supplier extends DataClass implements Insertable<Supplier> {
     supplierId: supplierId ?? this.supplierId,
     supplierCode: supplierCode ?? this.supplierCode,
     supplierName: supplierName ?? this.supplierName,
-    address: address.present ? address.value : this.address,
+    contactPerson: contactPerson.present
+        ? contactPerson.value
+        : this.contactPerson,
     phone: phone.present ? phone.value : this.phone,
     email: email.present ? email.value : this.email,
+    address: address.present ? address.value : this.address,
     taxId: taxId.present ? taxId.value : this.taxId,
-    creditDays: creditDays ?? this.creditDays,
+    creditTerm: creditTerm ?? this.creditTerm,
+    creditLimit: creditLimit ?? this.creditLimit,
+    currentBalance: currentBalance ?? this.currentBalance,
     isActive: isActive ?? this.isActive,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
@@ -9665,13 +9767,22 @@ class Supplier extends DataClass implements Insertable<Supplier> {
       supplierName: data.supplierName.present
           ? data.supplierName.value
           : this.supplierName,
-      address: data.address.present ? data.address.value : this.address,
+      contactPerson: data.contactPerson.present
+          ? data.contactPerson.value
+          : this.contactPerson,
       phone: data.phone.present ? data.phone.value : this.phone,
       email: data.email.present ? data.email.value : this.email,
+      address: data.address.present ? data.address.value : this.address,
       taxId: data.taxId.present ? data.taxId.value : this.taxId,
-      creditDays: data.creditDays.present
-          ? data.creditDays.value
-          : this.creditDays,
+      creditTerm: data.creditTerm.present
+          ? data.creditTerm.value
+          : this.creditTerm,
+      creditLimit: data.creditLimit.present
+          ? data.creditLimit.value
+          : this.creditLimit,
+      currentBalance: data.currentBalance.present
+          ? data.currentBalance.value
+          : this.currentBalance,
       isActive: data.isActive.present ? data.isActive.value : this.isActive,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
@@ -9684,11 +9795,14 @@ class Supplier extends DataClass implements Insertable<Supplier> {
           ..write('supplierId: $supplierId, ')
           ..write('supplierCode: $supplierCode, ')
           ..write('supplierName: $supplierName, ')
-          ..write('address: $address, ')
+          ..write('contactPerson: $contactPerson, ')
           ..write('phone: $phone, ')
           ..write('email: $email, ')
+          ..write('address: $address, ')
           ..write('taxId: $taxId, ')
-          ..write('creditDays: $creditDays, ')
+          ..write('creditTerm: $creditTerm, ')
+          ..write('creditLimit: $creditLimit, ')
+          ..write('currentBalance: $currentBalance, ')
           ..write('isActive: $isActive, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
@@ -9701,11 +9815,14 @@ class Supplier extends DataClass implements Insertable<Supplier> {
     supplierId,
     supplierCode,
     supplierName,
-    address,
+    contactPerson,
     phone,
     email,
+    address,
     taxId,
-    creditDays,
+    creditTerm,
+    creditLimit,
+    currentBalance,
     isActive,
     createdAt,
     updatedAt,
@@ -9717,11 +9834,14 @@ class Supplier extends DataClass implements Insertable<Supplier> {
           other.supplierId == this.supplierId &&
           other.supplierCode == this.supplierCode &&
           other.supplierName == this.supplierName &&
-          other.address == this.address &&
+          other.contactPerson == this.contactPerson &&
           other.phone == this.phone &&
           other.email == this.email &&
+          other.address == this.address &&
           other.taxId == this.taxId &&
-          other.creditDays == this.creditDays &&
+          other.creditTerm == this.creditTerm &&
+          other.creditLimit == this.creditLimit &&
+          other.currentBalance == this.currentBalance &&
           other.isActive == this.isActive &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
@@ -9731,11 +9851,14 @@ class SuppliersCompanion extends UpdateCompanion<Supplier> {
   final Value<String> supplierId;
   final Value<String> supplierCode;
   final Value<String> supplierName;
-  final Value<String?> address;
+  final Value<String?> contactPerson;
   final Value<String?> phone;
   final Value<String?> email;
+  final Value<String?> address;
   final Value<String?> taxId;
-  final Value<int> creditDays;
+  final Value<int> creditTerm;
+  final Value<double> creditLimit;
+  final Value<double> currentBalance;
   final Value<bool> isActive;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
@@ -9744,11 +9867,14 @@ class SuppliersCompanion extends UpdateCompanion<Supplier> {
     this.supplierId = const Value.absent(),
     this.supplierCode = const Value.absent(),
     this.supplierName = const Value.absent(),
-    this.address = const Value.absent(),
+    this.contactPerson = const Value.absent(),
     this.phone = const Value.absent(),
     this.email = const Value.absent(),
+    this.address = const Value.absent(),
     this.taxId = const Value.absent(),
-    this.creditDays = const Value.absent(),
+    this.creditTerm = const Value.absent(),
+    this.creditLimit = const Value.absent(),
+    this.currentBalance = const Value.absent(),
     this.isActive = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -9758,11 +9884,14 @@ class SuppliersCompanion extends UpdateCompanion<Supplier> {
     required String supplierId,
     required String supplierCode,
     required String supplierName,
-    this.address = const Value.absent(),
+    this.contactPerson = const Value.absent(),
     this.phone = const Value.absent(),
     this.email = const Value.absent(),
+    this.address = const Value.absent(),
     this.taxId = const Value.absent(),
-    this.creditDays = const Value.absent(),
+    this.creditTerm = const Value.absent(),
+    this.creditLimit = const Value.absent(),
+    this.currentBalance = const Value.absent(),
     this.isActive = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -9774,11 +9903,14 @@ class SuppliersCompanion extends UpdateCompanion<Supplier> {
     Expression<String>? supplierId,
     Expression<String>? supplierCode,
     Expression<String>? supplierName,
-    Expression<String>? address,
+    Expression<String>? contactPerson,
     Expression<String>? phone,
     Expression<String>? email,
+    Expression<String>? address,
     Expression<String>? taxId,
-    Expression<int>? creditDays,
+    Expression<int>? creditTerm,
+    Expression<double>? creditLimit,
+    Expression<double>? currentBalance,
     Expression<bool>? isActive,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
@@ -9788,11 +9920,14 @@ class SuppliersCompanion extends UpdateCompanion<Supplier> {
       if (supplierId != null) 'supplier_id': supplierId,
       if (supplierCode != null) 'supplier_code': supplierCode,
       if (supplierName != null) 'supplier_name': supplierName,
-      if (address != null) 'address': address,
+      if (contactPerson != null) 'contact_person': contactPerson,
       if (phone != null) 'phone': phone,
       if (email != null) 'email': email,
+      if (address != null) 'address': address,
       if (taxId != null) 'tax_id': taxId,
-      if (creditDays != null) 'credit_days': creditDays,
+      if (creditTerm != null) 'credit_term': creditTerm,
+      if (creditLimit != null) 'credit_limit': creditLimit,
+      if (currentBalance != null) 'current_balance': currentBalance,
       if (isActive != null) 'is_active': isActive,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -9804,11 +9939,14 @@ class SuppliersCompanion extends UpdateCompanion<Supplier> {
     Value<String>? supplierId,
     Value<String>? supplierCode,
     Value<String>? supplierName,
-    Value<String?>? address,
+    Value<String?>? contactPerson,
     Value<String?>? phone,
     Value<String?>? email,
+    Value<String?>? address,
     Value<String?>? taxId,
-    Value<int>? creditDays,
+    Value<int>? creditTerm,
+    Value<double>? creditLimit,
+    Value<double>? currentBalance,
     Value<bool>? isActive,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
@@ -9818,11 +9956,14 @@ class SuppliersCompanion extends UpdateCompanion<Supplier> {
       supplierId: supplierId ?? this.supplierId,
       supplierCode: supplierCode ?? this.supplierCode,
       supplierName: supplierName ?? this.supplierName,
-      address: address ?? this.address,
+      contactPerson: contactPerson ?? this.contactPerson,
       phone: phone ?? this.phone,
       email: email ?? this.email,
+      address: address ?? this.address,
       taxId: taxId ?? this.taxId,
-      creditDays: creditDays ?? this.creditDays,
+      creditTerm: creditTerm ?? this.creditTerm,
+      creditLimit: creditLimit ?? this.creditLimit,
+      currentBalance: currentBalance ?? this.currentBalance,
       isActive: isActive ?? this.isActive,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -9842,8 +9983,8 @@ class SuppliersCompanion extends UpdateCompanion<Supplier> {
     if (supplierName.present) {
       map['supplier_name'] = Variable<String>(supplierName.value);
     }
-    if (address.present) {
-      map['address'] = Variable<String>(address.value);
+    if (contactPerson.present) {
+      map['contact_person'] = Variable<String>(contactPerson.value);
     }
     if (phone.present) {
       map['phone'] = Variable<String>(phone.value);
@@ -9851,11 +9992,20 @@ class SuppliersCompanion extends UpdateCompanion<Supplier> {
     if (email.present) {
       map['email'] = Variable<String>(email.value);
     }
+    if (address.present) {
+      map['address'] = Variable<String>(address.value);
+    }
     if (taxId.present) {
       map['tax_id'] = Variable<String>(taxId.value);
     }
-    if (creditDays.present) {
-      map['credit_days'] = Variable<int>(creditDays.value);
+    if (creditTerm.present) {
+      map['credit_term'] = Variable<int>(creditTerm.value);
+    }
+    if (creditLimit.present) {
+      map['credit_limit'] = Variable<double>(creditLimit.value);
+    }
+    if (currentBalance.present) {
+      map['current_balance'] = Variable<double>(currentBalance.value);
     }
     if (isActive.present) {
       map['is_active'] = Variable<bool>(isActive.value);
@@ -9878,11 +10028,14 @@ class SuppliersCompanion extends UpdateCompanion<Supplier> {
           ..write('supplierId: $supplierId, ')
           ..write('supplierCode: $supplierCode, ')
           ..write('supplierName: $supplierName, ')
-          ..write('address: $address, ')
+          ..write('contactPerson: $contactPerson, ')
           ..write('phone: $phone, ')
           ..write('email: $email, ')
+          ..write('address: $address, ')
           ..write('taxId: $taxId, ')
-          ..write('creditDays: $creditDays, ')
+          ..write('creditTerm: $creditTerm, ')
+          ..write('creditLimit: $creditLimit, ')
+          ..write('currentBalance: $currentBalance, ')
           ..write('isActive: $isActive, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -34147,11 +34300,14 @@ typedef $$SuppliersTableCreateCompanionBuilder =
       required String supplierId,
       required String supplierCode,
       required String supplierName,
-      Value<String?> address,
+      Value<String?> contactPerson,
       Value<String?> phone,
       Value<String?> email,
+      Value<String?> address,
       Value<String?> taxId,
-      Value<int> creditDays,
+      Value<int> creditTerm,
+      Value<double> creditLimit,
+      Value<double> currentBalance,
       Value<bool> isActive,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
@@ -34162,11 +34318,14 @@ typedef $$SuppliersTableUpdateCompanionBuilder =
       Value<String> supplierId,
       Value<String> supplierCode,
       Value<String> supplierName,
-      Value<String?> address,
+      Value<String?> contactPerson,
       Value<String?> phone,
       Value<String?> email,
+      Value<String?> address,
       Value<String?> taxId,
-      Value<int> creditDays,
+      Value<int> creditTerm,
+      Value<double> creditLimit,
+      Value<double> currentBalance,
       Value<bool> isActive,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
@@ -34269,8 +34428,8 @@ class $$SuppliersTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get address => $composableBuilder(
-    column: $table.address,
+  ColumnFilters<String> get contactPerson => $composableBuilder(
+    column: $table.contactPerson,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -34284,13 +34443,28 @@ class $$SuppliersTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get address => $composableBuilder(
+    column: $table.address,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get taxId => $composableBuilder(
     column: $table.taxId,
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<int> get creditDays => $composableBuilder(
-    column: $table.creditDays,
+  ColumnFilters<int> get creditTerm => $composableBuilder(
+    column: $table.creditTerm,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get creditLimit => $composableBuilder(
+    column: $table.creditLimit,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get currentBalance => $composableBuilder(
+    column: $table.currentBalance,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -34409,8 +34583,8 @@ class $$SuppliersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get address => $composableBuilder(
-    column: $table.address,
+  ColumnOrderings<String> get contactPerson => $composableBuilder(
+    column: $table.contactPerson,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -34424,13 +34598,28 @@ class $$SuppliersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get address => $composableBuilder(
+    column: $table.address,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get taxId => $composableBuilder(
     column: $table.taxId,
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<int> get creditDays => $composableBuilder(
-    column: $table.creditDays,
+  ColumnOrderings<int> get creditTerm => $composableBuilder(
+    column: $table.creditTerm,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get creditLimit => $composableBuilder(
+    column: $table.creditLimit,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get currentBalance => $composableBuilder(
+    column: $table.currentBalance,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -34474,8 +34663,10 @@ class $$SuppliersTableAnnotationComposer
     builder: (column) => column,
   );
 
-  GeneratedColumn<String> get address =>
-      $composableBuilder(column: $table.address, builder: (column) => column);
+  GeneratedColumn<String> get contactPerson => $composableBuilder(
+    column: $table.contactPerson,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<String> get phone =>
       $composableBuilder(column: $table.phone, builder: (column) => column);
@@ -34483,11 +34674,24 @@ class $$SuppliersTableAnnotationComposer
   GeneratedColumn<String> get email =>
       $composableBuilder(column: $table.email, builder: (column) => column);
 
+  GeneratedColumn<String> get address =>
+      $composableBuilder(column: $table.address, builder: (column) => column);
+
   GeneratedColumn<String> get taxId =>
       $composableBuilder(column: $table.taxId, builder: (column) => column);
 
-  GeneratedColumn<int> get creditDays => $composableBuilder(
-    column: $table.creditDays,
+  GeneratedColumn<int> get creditTerm => $composableBuilder(
+    column: $table.creditTerm,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get creditLimit => $composableBuilder(
+    column: $table.creditLimit,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get currentBalance => $composableBuilder(
+    column: $table.currentBalance,
     builder: (column) => column,
   );
 
@@ -34611,11 +34815,14 @@ class $$SuppliersTableTableManager
                 Value<String> supplierId = const Value.absent(),
                 Value<String> supplierCode = const Value.absent(),
                 Value<String> supplierName = const Value.absent(),
-                Value<String?> address = const Value.absent(),
+                Value<String?> contactPerson = const Value.absent(),
                 Value<String?> phone = const Value.absent(),
                 Value<String?> email = const Value.absent(),
+                Value<String?> address = const Value.absent(),
                 Value<String?> taxId = const Value.absent(),
-                Value<int> creditDays = const Value.absent(),
+                Value<int> creditTerm = const Value.absent(),
+                Value<double> creditLimit = const Value.absent(),
+                Value<double> currentBalance = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
@@ -34624,11 +34831,14 @@ class $$SuppliersTableTableManager
                 supplierId: supplierId,
                 supplierCode: supplierCode,
                 supplierName: supplierName,
-                address: address,
+                contactPerson: contactPerson,
                 phone: phone,
                 email: email,
+                address: address,
                 taxId: taxId,
-                creditDays: creditDays,
+                creditTerm: creditTerm,
+                creditLimit: creditLimit,
+                currentBalance: currentBalance,
                 isActive: isActive,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -34639,11 +34849,14 @@ class $$SuppliersTableTableManager
                 required String supplierId,
                 required String supplierCode,
                 required String supplierName,
-                Value<String?> address = const Value.absent(),
+                Value<String?> contactPerson = const Value.absent(),
                 Value<String?> phone = const Value.absent(),
                 Value<String?> email = const Value.absent(),
+                Value<String?> address = const Value.absent(),
                 Value<String?> taxId = const Value.absent(),
-                Value<int> creditDays = const Value.absent(),
+                Value<int> creditTerm = const Value.absent(),
+                Value<double> creditLimit = const Value.absent(),
+                Value<double> currentBalance = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
@@ -34652,11 +34865,14 @@ class $$SuppliersTableTableManager
                 supplierId: supplierId,
                 supplierCode: supplierCode,
                 supplierName: supplierName,
-                address: address,
+                contactPerson: contactPerson,
                 phone: phone,
                 email: email,
+                address: address,
                 taxId: taxId,
-                creditDays: creditDays,
+                creditTerm: creditTerm,
+                creditLimit: creditLimit,
+                currentBalance: currentBalance,
                 isActive: isActive,
                 createdAt: createdAt,
                 updatedAt: updatedAt,

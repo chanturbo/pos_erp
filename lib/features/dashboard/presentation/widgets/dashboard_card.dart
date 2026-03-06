@@ -6,7 +6,7 @@ class DashboardCard extends StatelessWidget {
   final IconData icon;
   final Color color;
   final VoidCallback? onTap;
-  
+
   const DashboardCard({
     super.key,
     required this.title,
@@ -31,7 +31,7 @@ class DashboardCard extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   CircleAvatar(
-                    backgroundColor: color.withOpacity(0.2),
+                    backgroundColor: color.withValues(alpha: 0.2),
                     child: Icon(icon, color: color),
                   ),
                   if (onTap != null)
@@ -41,10 +41,7 @@ class DashboardCard extends StatelessWidget {
               const SizedBox(height: 16),
               Text(
                 title,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[600],
-                ),
+                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
               ),
               const SizedBox(height: 8),
               Text(

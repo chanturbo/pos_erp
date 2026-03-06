@@ -148,10 +148,9 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
                             Text('รหัส: ${customer.customerCode}'),
                             if (customer.phone != null)
                               Text('โทร: ${customer.phone}'),
-                            if (customer.creditLimit != null &&
-                                customer.creditLimit! > 0)
+                            if (customer.creditLimit > 0)
                               Text(
-                                'วงเงินเครดิต: ฿${customer.creditLimit!.toStringAsFixed(2)}',
+                                'วงเงินเครดิต: ฿${customer.creditLimit.toStringAsFixed(2)}',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: Colors.blue[700],
