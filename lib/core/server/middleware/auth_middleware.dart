@@ -18,6 +18,7 @@ Middleware authMiddleware(AppDatabase db) {
         'api/auth',      // Login, Register
         'api/health',    // Health check
         'api/suppliers', // ✅ เพิ่ม - Suppliers (ชั่วคราวสำหรับ development)
+        'api/purchases', // ✅ เพิ่ม - Purchases (ชั่วคราวสำหรับ development)
       ];
       
       // ตรวจสอบว่าเป็น public path หรือไม่

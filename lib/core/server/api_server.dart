@@ -1,6 +1,7 @@
 // ignore_for_file: avoid_print
 
 import 'dart:io';
+import 'package:pos_erp/core/server/routes/purchase_routes.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as io;
 import 'package:shelf_router/shelf_router.dart';
@@ -65,6 +66,10 @@ class ApiServer {
       router.mount('/api/reports', ReportRoutes(db).router.call);
       print('   ✅ /api/reports');
 
+      // ✅ เพิ่ม Purchase routes
+      router.mount('/api/purchases', PurchaseRoutes(db).router.call);
+      print('   ✅ /api/purchases');
+      
       print('🔧 Routes configured successfully');
 
       // ==================== PIPELINE ====================
