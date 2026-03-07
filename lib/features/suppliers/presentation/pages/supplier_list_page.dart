@@ -192,6 +192,7 @@ class _SupplierListPageState extends ConsumerState<SupplierListPage> {
             if (supplier.contactPerson != null)
               Text('ติดต่อ: ${supplier.contactPerson}'),
             if (supplier.phone != null) Text('โทร: ${supplier.phone}'),
+            if (supplier.lineId != null) Text('Line: ${supplier.lineId}'),
             Row(
               children: [
                 Text('เครดิต: ${supplier.creditTerm} วัน'),
@@ -282,6 +283,7 @@ class _SupplierListPageState extends ConsumerState<SupplierListPage> {
               _buildDetailRow('ผู้ติดต่อ', supplier.contactPerson ?? '-'),
               _buildDetailRow('โทรศัพท์', supplier.phone ?? '-'),
               _buildDetailRow('อีเมล', supplier.email ?? '-'),
+              _buildDetailRow('Line ID', supplier.lineId ?? '-'),
               _buildDetailRow('ที่อยู่', supplier.address ?? '-'),
               _buildDetailRow('เลขผู้เสียภาษี', supplier.taxId ?? '-'),
               _buildDetailRow('เครดิต', '${supplier.creditTerm} วัน'),

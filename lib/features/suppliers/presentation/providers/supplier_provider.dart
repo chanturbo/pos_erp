@@ -1,21 +1,21 @@
 // ignore_for_file: avoid_print
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/client/api_client.dart';
 import '../../data/models/supplier_model.dart';
+import '../../../../core/client/api_client.dart';
 
-// Supplier Provider
-final supplierListProvider = AsyncNotifierProvider<SupplierListNotifier, List<SupplierModel>>(() {
-  return SupplierListNotifier();
-});
+/// Provider สำหรับจัดการ Supplier List
+final supplierListProvider = AsyncNotifierProvider<SupplierNotifier, List<SupplierModel>>(
+  SupplierNotifier.new,
+);
 
-class SupplierListNotifier extends AsyncNotifier<List<SupplierModel>> {
+class SupplierNotifier extends AsyncNotifier<List<SupplierModel>> {
   @override
   Future<List<SupplierModel>> build() async {
-    return await loadSuppliers();
+    return loadSuppliers();
   }
 
-  /// โหลดรายการซัพพลายเออร์
+  /// โหลดรายการ Suppliers
   Future<List<SupplierModel>> loadSuppliers() async {
     try {
       print('📡 Loading suppliers...');
@@ -23,19 +23,21 @@ class SupplierListNotifier extends AsyncNotifier<List<SupplierModel>> {
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.get('/api/suppliers');
 
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 && response.data != null) {
         final data = response.data['data'] as List;
-        final suppliers = data.map((json) => SupplierModel.fromJson(json)).toList();
+        final suppliers = data
+            .map((json) => SupplierModel.fromJson(json as Map<String, dynamic>))
+            .toList();
 
         print('✅ Loaded ${suppliers.length} suppliers');
-
         return suppliers;
-      } else {
-        throw Exception('Failed to load suppliers: ${response.statusCode}');
       }
+
+      print('⚠️ No suppliers data');
+      return [];
     } catch (e) {
       print('❌ Error loading suppliers: $e');
-      throw Exception('เกิดข้อผิดพลาด: $e');
+      return [];
     }
   }
 
@@ -45,7 +47,7 @@ class SupplierListNotifier extends AsyncNotifier<List<SupplierModel>> {
     state = await AsyncValue.guard(() => loadSuppliers());
   }
 
-  /// สร้างซัพพลายเอร์ใหม่
+  /// สร้างซัพพลายเออร์ใหม่
   Future<bool> createSupplier(SupplierModel supplier) async {
     try {
       print('📝 Creating supplier: ${supplier.supplierName}');
@@ -57,7 +59,7 @@ class SupplierListNotifier extends AsyncNotifier<List<SupplierModel>> {
       );
 
       if (response.statusCode == 200) {
-        print('✅ Supplier created');
+        print('✅ Supplier created successfully');
         await refresh();
         return true;
       }
@@ -68,7 +70,7 @@ class SupplierListNotifier extends AsyncNotifier<List<SupplierModel>> {
     }
   }
 
-  /// อัพเดทซัพพลายเอร์
+  /// แก้ไขซัพพลายเออร์
   Future<bool> updateSupplier(SupplierModel supplier) async {
     try {
       print('📝 Updating supplier: ${supplier.supplierName}');
@@ -80,7 +82,7 @@ class SupplierListNotifier extends AsyncNotifier<List<SupplierModel>> {
       );
 
       if (response.statusCode == 200) {
-        print('✅ Supplier updated');
+        print('✅ Supplier updated successfully');
         await refresh();
         return true;
       }
@@ -91,7 +93,7 @@ class SupplierListNotifier extends AsyncNotifier<List<SupplierModel>> {
     }
   }
 
-  /// ลบซัพพลายเอร์
+  /// ลบซัพพลายเออร์
   Future<bool> deleteSupplier(String supplierId) async {
     try {
       print('🗑️ Deleting supplier: $supplierId');
@@ -100,7 +102,7 @@ class SupplierListNotifier extends AsyncNotifier<List<SupplierModel>> {
       final response = await apiClient.delete('/api/suppliers/$supplierId');
 
       if (response.statusCode == 200) {
-        print('✅ Supplier deleted');
+        print('✅ Supplier deleted successfully');
         await refresh();
         return true;
       }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pos_erp/features/settings/presentation/pages/settings_page.dart';
+
+import '../../../settings/presentation/pages/settings_page.dart';
 import '../providers/stock_provider.dart';
 import '../widgets/stock_in_dialog.dart';
 import '../widgets/stock_out_dialog.dart';

@@ -67,7 +67,6 @@ part 'app_database.g.dart';
     PurchaseOrderItems,
     GoodsReceipts, // ✅ เพิ่ม
     GoodsReceiptItems, // ✅ เพิ่ม
-    
     // Stock Movement
     StockMovements,
 
@@ -83,6 +82,7 @@ part 'app_database.g.dart';
 
     // AP
     ApInvoices,
+    ApInvoiceItems,
     ApPayments,
     ApPaymentAllocations,
 

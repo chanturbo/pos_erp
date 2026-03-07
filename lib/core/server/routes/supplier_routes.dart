@@ -18,7 +18,6 @@ class SupplierRoutes {
     
     final router = Router();
 
-    // ✅ ใช้ / แทน /suppliers เพราะ mount ที่ /api/suppliers แล้ว
     router.get('/', _getSuppliersHandler);
     router.get('/<id>', _getSupplierHandler);
     router.post('/', _createSupplierHandler);
@@ -49,10 +48,12 @@ class SupplierRoutes {
             'contact_person': s.contactPerson,
             'phone': s.phone,
             'email': s.email,
+            'line_id': s.lineId,
             'address': s.address,
             'tax_id': s.taxId,
             'credit_term': s.creditTerm,
             'credit_limit': s.creditLimit,
+            'current_balance': s.currentBalance,
             'is_active': s.isActive,
             'created_at': s.createdAt.toIso8601String(),
             'updated_at': s.updatedAt.toIso8601String(),
@@ -97,10 +98,12 @@ class SupplierRoutes {
         'contact_person': supplier.contactPerson,
         'phone': supplier.phone,
         'email': supplier.email,
+        'line_id': supplier.lineId,
         'address': supplier.address,
         'tax_id': supplier.taxId,
         'credit_term': supplier.creditTerm,
         'credit_limit': supplier.creditLimit,
+        'current_balance': supplier.currentBalance,
         'is_active': supplier.isActive,
         'created_at': supplier.createdAt.toIso8601String(),
         'updated_at': supplier.updatedAt.toIso8601String(),
@@ -127,7 +130,6 @@ class SupplierRoutes {
       final payload = await request.readAsString();
       final data = jsonDecode(payload) as Map<String, dynamic>;
 
-      // Generate ID
       final supplierId = 'SUP${DateTime.now().millisecondsSinceEpoch}';
 
       final companion = SuppliersCompanion(
@@ -137,10 +139,12 @@ class SupplierRoutes {
         contactPerson: Value(data['contact_person'] as String?),
         phone: Value(data['phone'] as String?),
         email: Value(data['email'] as String?),
+        lineId: Value(data['line_id'] as String?),
         address: Value(data['address'] as String?),
         taxId: Value(data['tax_id'] as String?),
         creditTerm: Value(data['credit_term'] as int? ?? 30),
         creditLimit: Value((data['credit_limit'] as num?)?.toDouble() ?? 0),
+        currentBalance: Value((data['current_balance'] as num?)?.toDouble() ?? 0),
         isActive: Value(data['is_active'] as bool? ?? true),
       );
 
@@ -179,10 +183,12 @@ class SupplierRoutes {
         contactPerson: Value(data['contact_person'] as String?),
         phone: Value(data['phone'] as String?),
         email: Value(data['email'] as String?),
+        lineId: Value(data['line_id'] as String?),
         address: Value(data['address'] as String?),
         taxId: Value(data['tax_id'] as String?),
         creditTerm: Value(data['credit_term'] as int? ?? 30),
         creditLimit: Value((data['credit_limit'] as num?)?.toDouble() ?? 0),
+        currentBalance: Value((data['current_balance'] as num?)?.toDouble() ?? 0),
         isActive: Value(data['is_active'] as bool? ?? true),
         updatedAt: Value(DateTime.now()),
       );

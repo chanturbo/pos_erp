@@ -1,8 +1,7 @@
 // ignore_for_file: avoid_print
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pos_erp/core/client/api_client.dart';
-
+import '../../../../core/client/api_client.dart';
 
 // Dashboard Stats Model
 class DashboardStats {
@@ -12,7 +11,7 @@ class DashboardStats {
   final int totalCustomers;
   final double todaySales;
   final int todayOrders;
-  
+
   DashboardStats({
     required this.totalOrders,
     required this.totalSales,
@@ -24,9 +23,10 @@ class DashboardStats {
 }
 
 // ✅ Dashboard Provider - ใช้ AsyncNotifierProvider
-final dashboardProvider = AsyncNotifierProvider<DashboardNotifier, DashboardStats>(() {
-  return DashboardNotifier();
-});
+final dashboardProvider =
+    AsyncNotifierProvider<DashboardNotifier, DashboardStats>(() {
+      return DashboardNotifier();
+    });
 
 class DashboardNotifier extends AsyncNotifier<DashboardStats> {
   @override
@@ -34,34 +34,34 @@ class DashboardNotifier extends AsyncNotifier<DashboardStats> {
     // ✅ โหลดข้อมูลทันทีเมื่อ build
     return await loadStats();
   }
-  
+
   /// โหลดสถิติ Dashboard
   Future<DashboardStats> loadStats() async {
     try {
       print('📡 Loading dashboard stats...');
-      
+
       final apiClient = ref.read(apiClientProvider);
-      
+
       // ดึงข้อมูลจาก API
       final salesResponse = await apiClient.get('/api/sales');
       final productsResponse = await apiClient.get('/api/products');
       final customersResponse = await apiClient.get('/api/customers');
-      
+
       final orders = salesResponse.data['data'] as List;
       final products = productsResponse.data['data'] as List;
       final customers = customersResponse.data['data'] as List;
-      
+
       // คำนวณยอดขาย
       double totalSales = 0;
       double todaySales = 0;
       int todayOrders = 0;
-      
+
       final today = DateTime.now();
-      
+
       for (var order in orders) {
         final amount = (order['total_amount'] as num).toDouble();
         totalSales += amount;
-        
+
         final orderDate = DateTime.parse(order['order_date']);
         if (orderDate.year == today.year &&
             orderDate.month == today.month &&
@@ -70,7 +70,7 @@ class DashboardNotifier extends AsyncNotifier<DashboardStats> {
           todayOrders++;
         }
       }
-      
+
       final stats = DashboardStats(
         totalOrders: orders.length,
         totalSales: totalSales,
@@ -79,13 +79,13 @@ class DashboardNotifier extends AsyncNotifier<DashboardStats> {
         todaySales: todaySales,
         todayOrders: todayOrders,
       );
-      
+
       print('✅ Dashboard stats loaded');
-      
+
       return stats;
     } catch (e) {
       print('❌ Error loading dashboard stats: $e');
-      
+
       // Return default stats if error
       return DashboardStats(
         totalOrders: 0,
@@ -97,7 +97,7 @@ class DashboardNotifier extends AsyncNotifier<DashboardStats> {
       );
     }
   }
-  
+
   /// Refresh
   Future<void> refresh() async {
     state = const AsyncValue.loading();

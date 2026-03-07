@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../products/presentation/pages/product_list_page.dart';
 import '../../../customers/presentation/pages/customer_list_page.dart';
-import '../../../suppliers/presentation/pages/supplier_list_page.dart'; // ✅ เพิ่ม
+import '../../../suppliers/presentation/pages/supplier_list_page.dart';
+import '../../../purchases/presentation/pages/purchase_order_list_page.dart';
+import '../../../purchases/presentation/pages/goods_receipt_list_page.dart';
 import '../../../testing/test_page.dart';
 import '../../../sales/presentation/pages/pos_page.dart';
 import '../../../sales/presentation/pages/sales_history_page.dart';
@@ -25,43 +27,43 @@ class HomePage extends ConsumerWidget {
       onPosShortcut: () {
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const PosPage()),
+          MaterialPageRoute(builder: (context) => const PosPage()),
         );
       },
       onProductShortcut: () {
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const ProductListPage()),
+          MaterialPageRoute(builder: (context) => const ProductListPage()),
         );
       },
       onCustomerShortcut: () {
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const CustomerListPage()),
+          MaterialPageRoute(builder: (context) => const CustomerListPage()),
         );
       },
       onSalesHistoryShortcut: () {
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const SalesHistoryPage()),
+          MaterialPageRoute(builder: (context) => const SalesHistoryPage()),
         );
       },
       onDashboardShortcut: () {
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const DashboardPage()),
+          MaterialPageRoute(builder: (context) => const DashboardPage()),
         );
       },
       onInventoryShortcut: () {
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const StockBalancePage()),
+          MaterialPageRoute(builder: (context) => const StockBalancePage()),
         );
       },
       onReportsShortcut: () {
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const ReportsPage()),
+          MaterialPageRoute(builder: (context) => const ReportsPage()),
         );
       },
       child: Scaffold(
@@ -76,7 +78,7 @@ class HomePage extends ConsumerWidget {
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const SettingsPage()),
+                  MaterialPageRoute(builder: (context) => const SettingsPage()),
                 );
               },
             ),
@@ -87,7 +89,7 @@ class HomePage extends ConsumerWidget {
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const TestPage()),
+                  MaterialPageRoute(builder: (context) => const TestPage()),
                 );
               },
             ),
@@ -167,14 +169,15 @@ class HomePage extends ConsumerWidget {
 
                 // Grid Menu
                 ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 900), // ✅ เพิ่มความกว้าง
+                  constraints: const BoxConstraints(maxWidth: 1100),
                   child: GridView.count(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    crossAxisCount: 3,
+                    crossAxisCount: 4,
                     mainAxisSpacing: 16,
                     crossAxisSpacing: 16,
                     children: [
+                      // Row 1
                       _buildMenuCard(
                         context,
                         icon: Icons.dashboard,
@@ -184,7 +187,7 @@ class HomePage extends ConsumerWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => const DashboardPage(),
+                              builder: (context) => const DashboardPage(),
                             ),
                           );
                         },
@@ -197,7 +200,7 @@ class HomePage extends ConsumerWidget {
                         onTap: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (_) => const PosPage()),
+                            MaterialPageRoute(builder: (context) => const PosPage()),
                           );
                         },
                       ),
@@ -210,7 +213,7 @@ class HomePage extends ConsumerWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => const ProductListPage(),
+                              builder: (context) => const ProductListPage(),
                             ),
                           );
                         },
@@ -224,11 +227,13 @@ class HomePage extends ConsumerWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => const SalesHistoryPage(),
+                              builder: (context) => const SalesHistoryPage(),
                             ),
                           );
                         },
                       ),
+                      
+                      // Row 2
                       _buildMenuCard(
                         context,
                         icon: Icons.warehouse,
@@ -238,7 +243,7 @@ class HomePage extends ConsumerWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => const StockBalancePage(),
+                              builder: (context) => const StockBalancePage(),
                             ),
                           );
                         },
@@ -252,12 +257,11 @@ class HomePage extends ConsumerWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => const CustomerListPage(),
+                              builder: (context) => const CustomerListPage(),
                             ),
                           );
                         },
                       ),
-                      // ✅ เพิ่มเมนู Suppliers
                       _buildMenuCard(
                         context,
                         icon: Icons.business,
@@ -267,7 +271,7 @@ class HomePage extends ConsumerWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => const SupplierListPage(),
+                              builder: (context) => const SupplierListPage(),
                             ),
                           );
                         },
@@ -278,8 +282,27 @@ class HomePage extends ConsumerWidget {
                         title: 'ซื้อสินค้า',
                         color: Colors.red,
                         onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('เร็วๆ นี้...')),
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const PurchaseOrderListPage(),
+                            ),
+                          );
+                        },
+                      ),
+                      
+                      // Row 3
+                      _buildMenuCard(
+                        context,
+                        icon: Icons.inventory_2,
+                        title: 'รับสินค้า',
+                        color: Colors.deepOrange,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const GoodsReceiptListPage(),
+                            ),
                           );
                         },
                       ),
@@ -292,7 +315,7 @@ class HomePage extends ConsumerWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => const ReportsPage(),
+                              builder: (context) => const ReportsPage(),
                             ),
                           );
                         },

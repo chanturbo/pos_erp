@@ -9,8 +9,7 @@ class SupplierFormDialog extends ConsumerStatefulWidget {
   const SupplierFormDialog({super.key, this.supplier});
 
   @override
-  ConsumerState<SupplierFormDialog> createState() =>
-      _SupplierFormDialogState();
+  ConsumerState<SupplierFormDialog> createState() => _SupplierFormDialogState();
 }
 
 class _SupplierFormDialogState extends ConsumerState<SupplierFormDialog> {
@@ -20,6 +19,7 @@ class _SupplierFormDialogState extends ConsumerState<SupplierFormDialog> {
   final _contactController = TextEditingController();
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
+  final _lineIdController = TextEditingController(); // ✅ เพิ่มบรรทัดนี้
   final _addressController = TextEditingController();
   final _taxIdController = TextEditingController();
   final _creditTermController = TextEditingController();
@@ -38,6 +38,8 @@ class _SupplierFormDialogState extends ConsumerState<SupplierFormDialog> {
       _contactController.text = widget.supplier!.contactPerson ?? '';
       _phoneController.text = widget.supplier!.phone ?? '';
       _emailController.text = widget.supplier!.email ?? '';
+      _lineIdController.text =
+          widget.supplier!.lineId ?? ''; // ✅ เพิ่มบรรทัดนี้
       _addressController.text = widget.supplier!.address ?? '';
       _taxIdController.text = widget.supplier!.taxId ?? '';
       _creditTermController.text = widget.supplier!.creditTerm.toString();
@@ -57,6 +59,7 @@ class _SupplierFormDialogState extends ConsumerState<SupplierFormDialog> {
     _contactController.dispose();
     _phoneController.dispose();
     _emailController.dispose();
+    _lineIdController.dispose(); // ✅ เพิ่มบรรทัดนี้
     _addressController.dispose();
     _taxIdController.dispose();
     _creditTermController.dispose();
@@ -170,6 +173,18 @@ class _SupplierFormDialogState extends ConsumerState<SupplierFormDialog> {
                       ),
                     ),
                   ],
+                ),
+                const SizedBox(height: 16),
+
+                // Line ID
+                TextFormField(
+                  controller: _lineIdController,
+                  decoration: const InputDecoration(
+                    labelText: 'Line ID',
+                    border: OutlineInputBorder(),
+                    hintText: 'เช่น @shopname',
+                    prefixIcon: Icon(Icons.chat),
+                  ),
                 ),
                 const SizedBox(height: 16),
 
@@ -311,6 +326,12 @@ class _SupplierFormDialogState extends ConsumerState<SupplierFormDialog> {
       email: _emailController.text.trim().isEmpty
           ? null
           : _emailController.text.trim(),
+      lineId:
+          _lineIdController.text
+              .trim()
+              .isEmpty // ✅ เพิ่มบรรทัดนี้
+          ? null
+          : _lineIdController.text.trim(),
       address: _addressController.text.trim().isEmpty
           ? null
           : _addressController.text.trim(),
@@ -319,6 +340,7 @@ class _SupplierFormDialogState extends ConsumerState<SupplierFormDialog> {
           : _taxIdController.text.trim(),
       creditTerm: int.tryParse(_creditTermController.text) ?? 30,
       creditLimit: double.tryParse(_creditLimitController.text) ?? 0,
+      currentBalance: widget.supplier?.currentBalance ?? 0,
       isActive: _isActive,
       createdAt: widget.supplier?.createdAt ?? DateTime.now(),
       updatedAt: DateTime.now(),
@@ -327,12 +349,14 @@ class _SupplierFormDialogState extends ConsumerState<SupplierFormDialog> {
     bool success;
     if (widget.supplier == null) {
       // Create
-      success =
-          await ref.read(supplierListProvider.notifier).createSupplier(supplier);
+      success = await ref
+          .read(supplierListProvider.notifier)
+          .createSupplier(supplier);
     } else {
       // Update
-      success =
-          await ref.read(supplierListProvider.notifier).updateSupplier(supplier);
+      success = await ref
+          .read(supplierListProvider.notifier)
+          .updateSupplier(supplier);
     }
 
     if (mounted) {
@@ -344,11 +368,13 @@ class _SupplierFormDialogState extends ConsumerState<SupplierFormDialog> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(success
-              ? widget.supplier == null
-                  ? 'เพิ่มซัพพลายเออร์สำเร็จ'
-                  : 'อัพเดทซัพพลายเออร์สำเร็จ'
-              : 'เกิดข้อผิดพลาด'),
+          content: Text(
+            success
+                ? widget.supplier == null
+                      ? 'เพิ่มซัพพลายเออร์สำเร็จ'
+                      : 'อัพเดทซัพพลายเออร์สำเร็จ'
+                : 'เกิดข้อผิดพลาด',
+          ),
           backgroundColor: success ? Colors.green : Colors.red,
         ),
       );

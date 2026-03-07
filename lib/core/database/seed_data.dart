@@ -1,7 +1,7 @@
 // ignore_for_file: avoid_print
 
 import 'package:drift/drift.dart';
-import 'package:pos_erp/core/database/app_database.dart';
+import 'app_database.dart';
 
 class SeedData {
   /// Seed All Data
@@ -410,10 +410,12 @@ class SeedData {
         contactPerson: const Value('คุณสมชาย'),
         phone: const Value('02-111-2222'),
         email: const Value('contact@supplier-a.com'),
+        lineId: const Value('@supplierA'),  // ✅ เพิ่มบรรทัดนี้
         address: const Value('123 ถนนพระราม 4 กรุงเทพฯ'),
         taxId: const Value('0105566001234'),
         creditTerm: const Value(30),
         creditLimit: const Value(100000.0),
+        currentBalance: const Value(0.0),
       ),
       SuppliersCompanion.insert(
         supplierId: 'SUP002',
@@ -422,10 +424,12 @@ class SeedData {
         contactPerson: const Value('คุณสมหญิง'),
         phone: const Value('02-222-3333'),
         email: const Value('info@supplier-b.com'),
+        lineId: const Value('@supplierB'),  // ✅ เพิ่มบรรทัดนี้
         address: const Value('456 ถนนสุขุมวิท กรุงเทพฯ'),
         taxId: const Value('0105566005678'),
         creditTerm: const Value(45),
         creditLimit: const Value(200000.0),
+        currentBalance: const Value(0.0),
       ),
       SuppliersCompanion.insert(
         supplierId: 'SUP003',
@@ -434,8 +438,10 @@ class SeedData {
         contactPerson: const Value('คุณสมศักดิ์'),
         phone: const Value('081-444-5555'),
         email: const Value('sales@wholesale-c.com'),
+        lineId: const Value('@supplierC'),  // ✅ เพิ่มบรรทัดนี้
         creditTerm: const Value(7),
         creditLimit: const Value(50000.0),
+        currentBalance: const Value(0.0),
       ),
     ];
 

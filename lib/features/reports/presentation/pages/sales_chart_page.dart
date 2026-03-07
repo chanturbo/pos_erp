@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
-import 'package:pos_erp/core/client/api_client.dart';
+import '../../../../core/client/api_client.dart';
 import '../../data/models/sales_summary_model.dart';
 
 // Daily Sales Provider

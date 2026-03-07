@@ -1,19 +1,22 @@
 // ignore_for_file: avoid_print
 
 import 'dart:io';
-import 'package:pos_erp/core/server/routes/goods_receipt_routes.dart';
-import 'package:pos_erp/core/server/routes/purchase_routes.dart';
+
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as io;
 import 'package:shelf_router/shelf_router.dart';
 import '../database/app_database.dart';
 import 'routes/auth_routes.dart';
+import 'routes/goods_receipt_routes.dart';
 import 'routes/product_routes.dart';
 import 'routes/customer_routes.dart';
+import 'routes/purchase_routes.dart';
 import 'routes/sales_routes.dart';
 import 'routes/stock_routes.dart';
 import 'routes/report_routes.dart';
 import 'routes/supplier_routes.dart';
+import 'routes/ap_invoice_routes.dart';
+import 'routes/ap_payment_routes.dart';
 import 'middleware/auth_middleware.dart';
 
 class ApiServer {
@@ -53,7 +56,7 @@ class ApiServer {
 
       // Supplier routes
       router.mount('/api/suppliers', SupplierRoutes(db).router.call);
-      print('   ✅ /api/suppliers'); // ✅ ต้องเห็นบรรทัดนี้
+      print('   ✅ /api/suppliers');
 
       // Stock routes
       router.mount('/api/stock', StockRoutes(db).router.call);
@@ -67,13 +70,21 @@ class ApiServer {
       router.mount('/api/reports', ReportRoutes(db).router.call);
       print('   ✅ /api/reports');
 
-      // ✅ เพิ่ม Purchase routes
+      // Purchase routes
       router.mount('/api/purchases', PurchaseRoutes(db).router.call);
       print('   ✅ /api/purchases');
       
-    // ✅ เพิ่ม Goods Receipt routes
-    router.mount('/api/goods-receipts', GoodsReceiptRoutes(db).router.call);
-    print('   ✅ /api/goods-receipts');
+      // Goods Receipt routes
+      router.mount('/api/goods-receipts', GoodsReceiptRoutes(db).router.call);
+      print('   ✅ /api/goods-receipts');
+
+      // AP Invoice routes
+      router.mount('/api/ap-invoices', ApInvoiceRoutes(db).router.call);
+      print('   ✅ /api/ap-invoices');
+
+      // AP Payment routes
+      router.mount('/api/ap-payments', ApPaymentRoutes(db).router.call);
+      print('   ✅ /api/ap-payments');
           
       print('🔧 Routes configured successfully');
 

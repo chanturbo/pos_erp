@@ -1,7 +1,7 @@
 // ignore_for_file: avoid_print
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pos_erp/core/client/api_client.dart';
+import '../../../../core/client/api_client.dart';
 import '../../data/models/stock_balance_model.dart';
 
 // Stock Balance Provider
