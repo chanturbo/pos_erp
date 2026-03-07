@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../ap/presentation/pages/ap_payment_list_page.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../products/presentation/pages/product_list_page.dart';
 import '../../../customers/presentation/pages/customer_list_page.dart';
 import '../../../suppliers/presentation/pages/supplier_list_page.dart';
 import '../../../purchases/presentation/pages/purchase_order_list_page.dart';
 import '../../../purchases/presentation/pages/goods_receipt_list_page.dart';
+import '../../../ap/presentation/pages/ap_invoice_list_page.dart';
 import '../../../testing/test_page.dart';
 import '../../../sales/presentation/pages/pos_page.dart';
 import '../../../sales/presentation/pages/sales_history_page.dart';
@@ -131,10 +133,9 @@ class HomePage extends ConsumerWidget {
                 if (confirm == true) {
                   await ref.read(authProvider.notifier).logout();
                   if (context.mounted) {
-                    Navigator.of(context).pushNamedAndRemoveUntil(
-                      '/login',
-                      (route) => false,
-                    );
+                    Navigator.of(
+                      context,
+                    ).pushNamedAndRemoveUntil('/login', (route) => false);
                   }
                 }
               },
@@ -161,9 +162,9 @@ class HomePage extends ConsumerWidget {
                 const SizedBox(height: 8),
                 Text(
                   'Username: ${user?.username ?? ''}',
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: Colors.grey,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyLarge?.copyWith(color: Colors.grey),
                 ),
                 const SizedBox(height: 32),
 
@@ -200,7 +201,9 @@ class HomePage extends ConsumerWidget {
                         onTap: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (context) => const PosPage()),
+                            MaterialPageRoute(
+                              builder: (context) => const PosPage(),
+                            ),
                           );
                         },
                       ),
@@ -232,7 +235,7 @@ class HomePage extends ConsumerWidget {
                           );
                         },
                       ),
-                      
+
                       // Row 2
                       _buildMenuCard(
                         context,
@@ -285,12 +288,13 @@ class HomePage extends ConsumerWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => const PurchaseOrderListPage(),
+                              builder: (context) =>
+                                  const PurchaseOrderListPage(),
                             ),
                           );
                         },
                       ),
-                      
+
                       // Row 3
                       _buildMenuCard(
                         context,
@@ -301,7 +305,36 @@ class HomePage extends ConsumerWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => const GoodsReceiptListPage(),
+                              builder: (context) =>
+                                  const GoodsReceiptListPage(),
+                            ),
+                          );
+                        },
+                      ),
+                      _buildMenuCard(
+                        context,
+                        icon: Icons.receipt,
+                        title: 'ใบแจ้งหนี้ AP',
+                        color: Colors.brown,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const ApInvoiceListPage(),
+                            ),
+                          );
+                        },
+                      ),
+                      _buildMenuCard(
+                        context,
+                        icon: Icons.payments,
+                        title: 'จ่ายเงิน AP',
+                        color: Colors.teal,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const ApPaymentListPage(),
                             ),
                           );
                         },
@@ -310,7 +343,7 @@ class HomePage extends ConsumerWidget {
                         context,
                         icon: Icons.assessment,
                         title: 'รายงาน',
-                        color: Colors.teal,
+                        color: Colors.pink,
                         onTap: () {
                           Navigator.push(
                             context,
@@ -349,10 +382,7 @@ class HomePage extends ConsumerWidget {
             const SizedBox(height: 8),
             Text(
               title,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
             ),
           ],
