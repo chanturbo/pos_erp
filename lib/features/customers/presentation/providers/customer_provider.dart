@@ -1,7 +1,7 @@
 // ignore_for_file: avoid_print
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../auth/presentation/providers/auth_provider.dart';
+import 'package:pos_erp/core/client/api_client.dart';
 import '../../data/models/customer_model.dart';
 
 // ✅ Customer List Provider - ใช้ AsyncNotifierProvider

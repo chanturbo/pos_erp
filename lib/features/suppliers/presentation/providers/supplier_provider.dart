@@ -4,11 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/client/api_client.dart';
 import '../../data/models/supplier_model.dart';
 
-// API Client Provider
-final apiClientProvider = Provider<ApiClient>((ref) {
-  return ApiClient(baseUrl: 'http://127.0.0.1:8080');
-});
-
 // Supplier Provider
 final supplierListProvider = AsyncNotifierProvider<SupplierListNotifier, List<SupplierModel>>(() {
   return SupplierListNotifier();

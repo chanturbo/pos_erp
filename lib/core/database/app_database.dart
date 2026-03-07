@@ -25,71 +25,74 @@ import 'tables/system_tables.dart';
 
 part 'app_database.g.dart';
 
-@DriftDatabase(tables: [
-  // Company & Branch
-  Companies,
-  Branches,
-  
-  // Users & Roles
-  Users,
-  Roles,
-  
-  // Products
-  ProductGroups,
-  Products,
-  
-  // Stock
-  Warehouses,
-  StockBalances,
-  SerialNumbers,
-  
-  // Modifiers (ร้านอาหาร)
-  ModifierGroups,
-  Modifiers,
-  ProductModifiers,
-  
-  // Tables (ร้านอาหาร)
-  Zones,
-  DiningTables,
-  
-  // Customers & Suppliers
-  CustomerGroups,
-  Customers,
-  Suppliers, // ✅ ตรวจสอบว่ามีบรรทัดนี้อยู่แล้ว
-  
-  // Sales
-  SalesOrders,
-  SalesOrderItems,
-  OrderItemModifiers,
-  
-  // Purchase
-  PurchaseOrders,
-  PurchaseOrderItems,
-  
-  // Stock Movement
-  StockMovements,
-  
-  // Promotions
-  Promotions,
-  PromotionUsages,
-  Coupons,
-  
-  // AR
-  ArInvoices,
-  ArReceipts,
-  ArReceiptAllocations,
-  
-  // AP
-  ApInvoices,
-  ApPayments,
-  ApPaymentAllocations,
-  
-  // System
-  Devices,
-  ActiveSessions,
-  SyncQueues,
-  AuditLogs,
-])
+@DriftDatabase(
+  tables: [
+    // Company & Branch
+    Companies,
+    Branches,
+
+    // Users & Roles
+    Users,
+    Roles,
+
+    // Products
+    ProductGroups,
+    Products,
+
+    // Stock
+    Warehouses,
+    StockBalances,
+    SerialNumbers,
+
+    // Modifiers (ร้านอาหาร)
+    ModifierGroups,
+    Modifiers,
+    ProductModifiers,
+
+    // Tables (ร้านอาหาร)
+    Zones,
+    DiningTables,
+
+    // Customers & Suppliers
+    CustomerGroups,
+    Customers,
+    Suppliers, // ✅ ตรวจสอบว่ามีบรรทัดนี้อยู่แล้ว
+    // Sales
+    SalesOrders,
+    SalesOrderItems,
+    OrderItemModifiers,
+
+    // Purchase
+    PurchaseOrders,
+    PurchaseOrderItems,
+    GoodsReceipts, // ✅ เพิ่ม
+    GoodsReceiptItems, // ✅ เพิ่ม
+    
+    // Stock Movement
+    StockMovements,
+
+    // Promotions
+    Promotions,
+    PromotionUsages,
+    Coupons,
+
+    // AR
+    ArInvoices,
+    ArReceipts,
+    ArReceiptAllocations,
+
+    // AP
+    ApInvoices,
+    ApPayments,
+    ApPaymentAllocations,
+
+    // System
+    Devices,
+    ActiveSessions,
+    SyncQueues,
+    AuditLogs,
+  ],
+)
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 

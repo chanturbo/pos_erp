@@ -2,7 +2,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../auth/presentation/providers/auth_provider.dart';
+import 'package:pos_erp/core/client/api_client.dart';
+import 'package:pos_erp/features/auth/presentation/providers/auth_provider.dart';
 import '../providers/cart_provider.dart';
 
 class PaymentPage extends ConsumerStatefulWidget {

@@ -6,11 +6,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/client/api_client.dart';
 import '../../data/models/user_model.dart';
 
-// API Client Provider
-final apiClientProvider = Provider<ApiClient>((ref) {
-  return ApiClient(baseUrl: 'http://127.0.0.1:8080');
-});
-
 // Auth State
 class AuthState {
   final bool isAuthenticated;
