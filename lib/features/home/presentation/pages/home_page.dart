@@ -4,6 +4,7 @@ import '../../../ap/presentation/pages/ap_payment_list_page.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../products/presentation/pages/product_list_page.dart';
 import '../../../customers/presentation/pages/customer_list_page.dart';
+import '../../../purchases/presentation/pages/purchase_return_list_page.dart';
 import '../../../suppliers/presentation/pages/supplier_list_page.dart';
 import '../../../purchases/presentation/pages/purchase_order_list_page.dart';
 import '../../../purchases/presentation/pages/goods_receipt_list_page.dart';
@@ -313,6 +314,21 @@ class HomePage extends ConsumerWidget {
                       ),
                       _buildMenuCard(
                         context,
+                        icon: Icons.assignment_return,
+                        title: 'คืนสินค้า',
+                        color: Colors.amber,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  const PurchaseReturnListPage(),
+                            ),
+                          );
+                        },
+                      ),
+                      _buildMenuCard(
+                        context,
                         icon: Icons.receipt,
                         title: 'ใบแจ้งหนี้ AP',
                         color: Colors.brown,
@@ -339,6 +355,8 @@ class HomePage extends ConsumerWidget {
                           );
                         },
                       ),
+
+                      // Row 4
                       _buildMenuCard(
                         context,
                         icon: Icons.assessment,

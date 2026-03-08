@@ -22,6 +22,7 @@ Middleware authMiddleware(AppDatabase db) {
         'api/goods-receipts', // ✅ เพิ่ม
         'api/ap-invoices', // ✅ เพิ่ม
         'api/ap-payments', // ✅ เพิ่ม
+        'api/purchase-returns', // ✅ เพิ่มบรรทัดนี้
       ];
 
       // ตรวจสอบว่าเป็น public path หรือไม่

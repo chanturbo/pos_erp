@@ -10,6 +10,7 @@ import 'routes/auth_routes.dart';
 import 'routes/goods_receipt_routes.dart';
 import 'routes/product_routes.dart';
 import 'routes/customer_routes.dart';
+import 'routes/purchase_return_routes.dart';
 import 'routes/purchase_routes.dart';
 import 'routes/sales_routes.dart';
 import 'routes/stock_routes.dart';
@@ -85,7 +86,11 @@ class ApiServer {
       // AP Payment routes
       router.mount('/api/ap-payments', ApPaymentRoutes(db).router.call);
       print('   ✅ /api/ap-payments');
-          
+
+      // Purchase Return routes
+      router.mount('/api/purchase-returns', PurchaseReturnRoutes(db).router.call);
+      print('   ✅ /api/purchase-returns');
+                
       print('🔧 Routes configured successfully');
 
       // ==================== PIPELINE ====================
