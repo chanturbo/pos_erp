@@ -38,7 +38,9 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
   void initState() {
     super.initState();
     final timestamp = DateTime.now().millisecondsSinceEpoch;
-    _paymentNoController = TextEditingController(text: 'APPAY${timestamp.toString().substring(8)}');
+    _paymentNoController = TextEditingController(
+      text: 'APPAY${timestamp.toString().substring(8)}',
+    );
     _referenceNoController = TextEditingController();
     _bankNameController = TextEditingController();
     _remarkController = TextEditingController();
@@ -146,7 +148,7 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
                 labelText: 'วิธีจ่าย',
                 prefixIcon: Icon(Icons.payment),
               ),
-              value: _paymentMethod,
+              initialValue: _paymentMethod,
               items: const [
                 DropdownMenuItem(value: 'CASH', child: Text('เงินสด')),
                 DropdownMenuItem(value: 'TRANSFER', child: Text('โอนเงิน')),
@@ -242,7 +244,11 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
                   padding: const EdgeInsets.all(32),
                   child: Column(
                     children: [
-                      Icon(Icons.info_outline, size: 64, color: Colors.grey[400]),
+                      Icon(
+                        Icons.info_outline,
+                        size: 64,
+                        color: Colors.grey[400],
+                      ),
                       const SizedBox(height: 16),
                       Text(
                         'กรุณาเลือกซัพพลายเออร์ก่อน',
@@ -265,7 +271,11 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
                   padding: const EdgeInsets.all(32),
                   child: Column(
                     children: [
-                      Icon(Icons.check_circle, size: 64, color: Colors.green[400]),
+                      Icon(
+                        Icons.check_circle,
+                        size: 64,
+                        color: Colors.green[400],
+                      ),
                       const SizedBox(height: 16),
                       Text(
                         'ไม่มีใบแจ้งหนี้ค้างชำระ',
@@ -276,7 +286,9 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
                 ),
               )
             else
-              ..._unpaidInvoices.map((invoice) => _buildInvoiceAllocationRow(invoice)),
+              ..._unpaidInvoices.map(
+                (invoice) => _buildInvoiceAllocationRow(invoice),
+              ),
           ],
         ),
       ),
@@ -316,14 +328,20 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
                 ),
                 if (invoice.isOverdue)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.red.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
                       'เลยกำหนด',
-                      style: TextStyle(fontSize: 11, color: Colors.red.shade700),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.red.shade700,
+                      ),
                     ),
                   ),
               ],
@@ -336,11 +354,18 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('ยอดคงเหลือ', style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+                      Text(
+                        'ยอดคงเหลือ',
+                        style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                      ),
                       const SizedBox(height: 2),
                       Text(
                         '฿${invoice.remainingAmount.toStringAsFixed(2)}',
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.orange),
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.orange,
+                        ),
                       ),
                     ],
                   ),
@@ -353,7 +378,10 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
                       labelText: 'จำนวนเงินที่จ่าย',
                       prefixText: '฿',
                       border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
                     ),
                     keyboardType: TextInputType.number,
                     onChanged: (value) {
@@ -371,7 +399,9 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
                 const SizedBox(width: 8),
                 TextButton(
                   onPressed: () {
-                    controller.text = invoice.remainingAmount.toStringAsFixed(2);
+                    controller.text = invoice.remainingAmount.toStringAsFixed(
+                      2,
+                    );
                     setState(() {
                       _allocations[invoice.invoiceId] = invoice.remainingAmount;
                     });
@@ -387,7 +417,10 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
   }
 
   Widget _buildSummaryCard() {
-    final totalAmount = _allocations.values.fold<double>(0, (sum, amount) => sum + amount);
+    final totalAmount = _allocations.values.fold<double>(
+      0,
+      (sum, amount) => sum + amount,
+    );
 
     return Card(
       color: Colors.green.withValues(alpha: 0.1),
@@ -401,7 +434,10 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
                 const Text('จำนวนใบแจ้งหนี้', style: TextStyle(fontSize: 14)),
                 Text(
                   '${_allocations.length} ใบ',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
@@ -409,7 +445,10 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('ยอดรวมที่จ่าย', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                const Text(
+                  'ยอดรวมที่จ่าย',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
                 Text(
                   '฿${totalAmount.toStringAsFixed(2)}',
                   style: const TextStyle(
@@ -537,7 +576,9 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
       _isLoadingInvoices = true;
     });
 
-    final invoices = await ref.read(apInvoiceListProvider.notifier).getUnpaidInvoices(_supplierId!);
+    final invoices = await ref
+        .read(apInvoiceListProvider.notifier)
+        .getUnpaidInvoices(_supplierId!);
 
     setState(() {
       _unpaidInvoices = invoices;
@@ -581,7 +622,9 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
 
     // ตรวจสอบว่าจัดสรรเกินจำนวนที่ค้างหรือไม่
     for (var entry in _allocations.entries) {
-      final invoice = _unpaidInvoices.firstWhere((inv) => inv.invoiceId == entry.key);
+      final invoice = _unpaidInvoices.firstWhere(
+        (inv) => inv.invoiceId == entry.key,
+      );
       if (entry.value > invoice.remainingAmount) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -598,7 +641,10 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
     });
 
     final authState = ref.read(authProvider);
-    final totalAmount = _allocations.values.fold<double>(0, (sum, amount) => sum + amount);
+    final totalAmount = _allocations.values.fold<double>(
+      0,
+      (sum, amount) => sum + amount,
+    );
 
     final allocations = _allocations.entries.map((entry) {
       return ApPaymentAllocationModel(
@@ -618,20 +664,30 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
       supplierName: _supplierName!,
       totalAmount: totalAmount,
       paymentMethod: _paymentMethod,
-      bankName: _bankNameController.text.trim().isEmpty ? null : _bankNameController.text.trim(),
-      transferRef: _paymentMethod == 'TRANSFER' && _referenceNoController.text.trim().isNotEmpty
+      bankName: _bankNameController.text.trim().isEmpty
+          ? null
+          : _bankNameController.text.trim(),
+      transferRef:
+          _paymentMethod == 'TRANSFER' &&
+              _referenceNoController.text.trim().isNotEmpty
           ? _referenceNoController.text.trim()
           : null,
-      chequeNo: _paymentMethod == 'CHEQUE' && _referenceNoController.text.trim().isNotEmpty
+      chequeNo:
+          _paymentMethod == 'CHEQUE' &&
+              _referenceNoController.text.trim().isNotEmpty
           ? _referenceNoController.text.trim()
           : null,
       userId: authState.user!.userId,
-      remark: _remarkController.text.trim().isEmpty ? null : _remarkController.text.trim(),
+      remark: _remarkController.text.trim().isEmpty
+          ? null
+          : _remarkController.text.trim(),
       createdAt: DateTime.now(),
       allocations: allocations,
     );
 
-    final success = await ref.read(apPaymentListProvider.notifier).createPayment(payment);
+    final success = await ref
+        .read(apPaymentListProvider.notifier)
+        .createPayment(payment);
 
     setState(() {
       _isLoading = false;
@@ -677,7 +733,9 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
               SizedBox(height: 8),
-              Text('บันทึกการจ่ายเงินให้ซัพพลายเออร์และจัดสรรเงินให้กับใบแจ้งหนี้'),
+              Text(
+                'บันทึกการจ่ายเงินให้ซัพพลายเออร์และจัดสรรเงินให้กับใบแจ้งหนี้',
+              ),
               SizedBox(height: 16),
               Text(
                 'จัดสรรอัตโนมัติ',
@@ -691,7 +749,9 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
               SizedBox(height: 8),
-              Text('ระบบจะอัพเดทสถานะใบแจ้งหนี้และยอดค้างชำระของซัพพลายเออร์อัตโนมัติ'),
+              Text(
+                'ระบบจะอัพเดทสถานะใบแจ้งหนี้และยอดค้างชำระของซัพพลายเออร์อัตโนมัติ',
+              ),
             ],
           ),
         ),

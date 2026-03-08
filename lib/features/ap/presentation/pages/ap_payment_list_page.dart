@@ -205,7 +205,10 @@ class _ApPaymentListPageState extends ConsumerState<ApPaymentListPage> {
                       Expanded(
                         child: Text(
                           payment.remark!,
-                          style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[700],
+                          ),
                         ),
                       ),
                     ],
@@ -247,7 +250,11 @@ class _ApPaymentListPageState extends ConsumerState<ApPaymentListPage> {
     }
 
     return Chip(
-      avatar: Icon(icon, size: 16, color: HSLColor.fromColor(color).withLightness(0.3).toColor()),
+      avatar: Icon(
+        icon,
+        size: 16,
+        color: HSLColor.fromColor(color).withLightness(0.3).toColor(),
+      ),
       label: Text(label, style: const TextStyle(fontSize: 12)),
       backgroundColor: color.withValues(alpha: 0.2),
       labelStyle: TextStyle(
@@ -297,16 +304,16 @@ class _ApPaymentListPageState extends ConsumerState<ApPaymentListPage> {
   Future<void> _createNewPayment() async {
     await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => const ApPaymentFormPage(),
-      ),
+      MaterialPageRoute(builder: (context) => const ApPaymentFormPage()),
     );
     ref.read(apPaymentListProvider.notifier).refresh();
   }
 
   Future<void> _viewPaymentDetails(ApPaymentModel payment) async {
     // โหลดรายละเอียดพร้อม allocations
-    final paymentDetails = await ref.read(apPaymentListProvider.notifier).getPaymentDetails(payment.paymentId);
+    final paymentDetails = await ref
+        .read(apPaymentListProvider.notifier)
+        .getPaymentDetails(payment.paymentId);
 
     if (!mounted) return;
 
@@ -322,15 +329,29 @@ class _ApPaymentListPageState extends ConsumerState<ApPaymentListPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildDetailRow('ซัพพลายเออร์', payment.supplierName),
-                _buildDetailRow('วันที่จ่าย', DateFormat('dd/MM/yyyy').format(payment.paymentDate)),
-                _buildDetailRow('วิธีจ่าย', _getPaymentMethodLabel(payment.paymentMethod)),
-                if (payment.bankName != null) _buildDetailRow('ธนาคาร', payment.bankName!),
-                if (payment.transferRef != null) _buildDetailRow('เลขที่อ้างอิง', payment.transferRef!),
-                if (payment.chequeNo != null) _buildDetailRow('เลขที่เช็ค', payment.chequeNo!),
-                _buildDetailRow('ยอดจ่าย', '฿${payment.totalAmount.toStringAsFixed(2)}'),
-                if (payment.remark != null) _buildDetailRow('หมายเหตุ', payment.remark!),
-                
-                if (paymentDetails?.allocations != null && paymentDetails!.allocations!.isNotEmpty) ...[
+                _buildDetailRow(
+                  'วันที่จ่าย',
+                  DateFormat('dd/MM/yyyy').format(payment.paymentDate),
+                ),
+                _buildDetailRow(
+                  'วิธีจ่าย',
+                  _getPaymentMethodLabel(payment.paymentMethod),
+                ),
+                if (payment.bankName != null)
+                  _buildDetailRow('ธนาคาร', payment.bankName!),
+                if (payment.transferRef != null)
+                  _buildDetailRow('เลขที่อ้างอิง', payment.transferRef!),
+                if (payment.chequeNo != null)
+                  _buildDetailRow('เลขที่เช็ค', payment.chequeNo!),
+                _buildDetailRow(
+                  'ยอดจ่าย',
+                  '฿${payment.totalAmount.toStringAsFixed(2)}',
+                ),
+                if (payment.remark != null)
+                  _buildDetailRow('หมายเหตุ', payment.remark!),
+
+                if (paymentDetails?.allocations != null &&
+                    paymentDetails!.allocations!.isNotEmpty) ...[
                   const Divider(height: 24),
                   const Text(
                     'การจัดสรรเงิน',
@@ -359,7 +380,10 @@ class _ApPaymentListPageState extends ConsumerState<ApPaymentListPage> {
                             ),
                             Text(
                               '฿${alloc.allocatedAmount.toStringAsFixed(2)}',
-                              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green,
+                              ),
                             ),
                           ],
                         ),
@@ -391,7 +415,9 @@ class _ApPaymentListPageState extends ConsumerState<ApPaymentListPage> {
                       ),
                       ElevatedButton(
                         onPressed: () => Navigator.pop(context, true),
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                        ),
                         child: const Text('ลบ'),
                       ),
                     ],
@@ -399,27 +425,22 @@ class _ApPaymentListPageState extends ConsumerState<ApPaymentListPage> {
                 );
 
                 if (confirm == true && mounted) {
-                  final success = await ref.read(apPaymentListProvider.notifier).deletePayment(payment.paymentId);
-                  
-                  if (mounted) {
-                    Navigator.pop(context); // ปิด dialog
-                    
-                    if (success) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('ลบการจ่ายเงินสำเร็จ'),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('ลบไม่สำเร็จ'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
-                    }
-                  }
+                  final success = await ref
+                      .read(apPaymentListProvider.notifier)
+                      .deletePayment(payment.paymentId);
+
+                  if (!context.mounted) return;
+
+                  Navigator.pop(context);
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        success ? 'ลบการจ่ายเงินสำเร็จ' : 'ลบไม่สำเร็จ',
+                      ),
+                      backgroundColor: success ? Colors.green : Colors.red,
+                    ),
+                  );
                 }
               },
               style: ElevatedButton.styleFrom(backgroundColor: Colors.red),

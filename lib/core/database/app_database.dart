@@ -9,6 +9,7 @@ import 'package:path/path.dart' as p;
 // Import ทุก Table ที่สร้างไว้
 import 'tables/converters.dart';
 import 'tables/company_tables.dart';
+import 'tables/purchase_return_tables.dart';
 import 'tables/user_tables.dart';
 import 'tables/product_tables.dart';
 import 'tables/stock_tables.dart';
@@ -62,11 +63,16 @@ part 'app_database.g.dart';
     SalesOrderItems,
     OrderItemModifiers,
 
-    // Purchase
+    // 
     PurchaseOrders,
     PurchaseOrderItems,
     GoodsReceipts, // ✅ เพิ่ม
     GoodsReceiptItems, // ✅ เพิ่ม
+
+    // Purchase Returns
+    PurchaseReturns,
+    PurchaseReturnItems,
+
     // Stock Movement
     StockMovements,
 

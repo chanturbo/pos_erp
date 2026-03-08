@@ -944,6 +944,8 @@ class _GoodsReceiptFormPageState extends ConsumerState<GoodsReceiptFormPage> {
         );
 
         if (selected != null) {
+          if (!mounted) return;
+
           setState(() {
             _supplierId = selected['id'];
             _supplierName = selected['name'];
