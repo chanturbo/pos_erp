@@ -186,24 +186,191 @@ lib/
 
 ## 🎯 Roadmap
 
-### Phase 1 ✅ (Completed)
-- [x] Project Setup
-- [x] Database Design
-- [x] Authentication
-- [x] Master Data (Products, Customers)
-- [x] POS System
-- [x] Inventory Management
-- [x] Reports & Analytics
+# POS-ERP System
 
-### Phase 2 (Future)
-- [ ] Multi-branch Sync
-- [ ] Barcode Scanner Integration
-- [ ] Receipt Printer Integration
-- [ ] Online Backup
-- [ ] Mobile App
-- [ ] Accounting Module
-- [ ] Purchase Orders
-- [ ] Supplier Management
+ระบบ Point of Sale และ ERP สำหรับธุรกิจค้าปลีก พัฒนาด้วย Flutter Desktop (macOS/Windows)  
+**Tech Stack:** Flutter • Drift ORM • SQLite • Shelf API Server • Riverpod
+
+---
+
+## 🗺️ Roadmap & Progress
+
+### ✅ Phase 1: Core System — เสร็จแล้ว
+
+| รายการ | สถานะ |
+|---|---|
+| Authentication (Login/Logout) | ✅ |
+| Database Setup (Drift + SQLite) | ✅ |
+| API Server (Shelf) | ✅ |
+| Product Management | ✅ |
+| Customer Management | ✅ |
+| Sales (POS) | ✅ |
+| Sales History | ✅ |
+| Stock Balance | ✅ |
+| Inventory Management | ✅ |
+
+---
+
+### ✅ Phase 2 — Week 1: Procurement — เสร็จแล้ว
+
+| รายการ | สถานะ |
+|---|---|
+| Supplier Management | ✅ |
+| Purchase Order (PO) | ✅ |
+| Goods Receipt (GR) | ✅ |
+| Stock Movement Integration | ✅ |
+
+---
+
+### ✅ Phase 2 — Week 2: Supplier & AP (Day 26–30) — เสร็จแล้ว
+
+**Day 26–27: Supplier Improvement**
+
+| รายการ | สถานะ |
+|---|---|
+| Supplier Form Page (Create/Edit) | ✅ |
+| Supplier Details Page | ✅ |
+| Supplier Credit Limit Tracking | ✅ |
+| Supplier Performance Tracking | ✅ |
+
+**Day 28–30: Accounts Payable (AP)**
+
+| รายการ | สถานะ |
+|---|---|
+| AP Invoice — Database Schema | ✅ |
+| AP Invoice — API Routes | ✅ |
+| AP Invoice — List Page | ✅ |
+| AP Invoice — Form Page | ✅ |
+| AP Invoice — Link กับ PO/GR | ✅ |
+| AP Payment — Payment Recording | ✅ |
+| AP Payment — Payment Allocation | ✅ |
+| AP Payment — Payment History | ✅ |
+
+---
+
+### ✅ Phase 2 — Week 3: Returns & Adjustments (Day 31–35) — เสร็จแล้ว
+
+**Day 31–32: Purchase Return**
+
+| รายการ | สถานะ |
+|---|---|
+| Purchase Return — Database Schema | ✅ |
+| Purchase Return — API Routes | ✅ |
+| Purchase Return — List Page | ✅ |
+| Purchase Return — Form Page (Select from GR) | ✅ |
+| Purchase Return — Stock Adjustment | ✅ |
+
+**Day 33–35: Stock Adjustment**
+
+| รายการ | สถานะ |
+|---|---|
+| Adjust Stock — เพิ่ม/ลดทีละรายการ | ✅ |
+| Stock Take — ตรวจนับสต๊อกทั้งคลัง + Variance | ✅ |
+| Stock Transfer — โอนย้ายระหว่างคลัง | ✅ |
+| Variance Report — รายงานผลต่าง | ✅ |
+
+---
+
+### 🔲 Phase 2 — Week 4: Accounts Receivable (Day 36–40) — ถัดไป
+
+**Day 36–38: AR Invoice**
+
+| รายการ | สถานะ |
+|---|---|
+| AR Invoice — Database Schema | 🔲 |
+| AR Invoice — API Routes | 🔲 |
+| AR Invoice — List Page | 🔲 |
+| AR Invoice — Form Page | 🔲 |
+| AR Invoice — Link กับ Sales Order | 🔲 |
+
+**Day 39–40: AR Receipt**
+
+| รายการ | สถานะ |
+|---|---|
+| AR Receipt — Payment Recording | 🔲 |
+| AR Receipt — Payment Allocation | 🔲 |
+| AR Receipt — Receipt Printing | 🔲 |
+| AR Receipt — Payment History | 🔲 |
+
+---
+
+### 🔲 Phase 3: Advanced Features (Week 5–8)
+
+**Week 5: Promotions & Discounts**
+- 🔲 Buy 1 Get 1
+- 🔲 Discount by Amount/Percentage
+- 🔲 Time-based Promotions
+- 🔲 Coupon System
+- 🔲 Member/Loyalty Program
+
+**Week 6: Reporting**
+- 🔲 Sales Reports (Daily Summary, Product Performance, By Category, By Period)
+- 🔲 Purchase Reports (Summary, Supplier Performance, By Category)
+- 🔲 Inventory Reports (Stock Movement, Low Stock Alert, Stock Aging, Expiry Alert)
+- 🔲 Financial Reports (P&L, Cash Flow, AR/AP Aging)
+
+**Week 7: Multi-Branch & Sync**
+- 🔲 Branch Management
+- 🔲 Stock Transfer Between Branches
+- 🔲 Data Synchronization
+- 🔲 Master-Client Architecture
+- 🔲 Offline Mode
+
+**Week 8: Restaurant Features**
+- 🔲 Table Management
+- 🔲 Order Queue
+- 🔲 Kitchen Display System (KDS)
+- 🔲 Modifiers (เพิ่มเติม/ลด/ไม่ใส่)
+- 🔲 Split Bill
+
+---
+
+### 🔲 Phase 4: Polish & Optimization (Week 9–10)
+
+**Week 9: UI/UX**
+- 🔲 Dark Mode
+- 🔲 Responsive Design
+- 🔲 Accessibility
+- 🔲 Animation & Transitions
+- 🔲 Loading States / Error Handling
+
+**Week 10: Performance & Testing**
+- 🔲 Performance Optimization
+- 🔲 Unit / Integration / E2E Tests
+- 🔲 Load Testing
+- 🔲 Bug Fixes
+
+---
+
+### 🔲 Phase 5: Mobile & Deployment (Week 11–12)
+
+**Week 11: Mobile App**
+- 🔲 Android App
+- 🔲 iOS App
+- 🔲 Mobile-specific UI
+- 🔲 QR Code / Barcode Scanner
+- 🔲 Mobile Printing
+
+**Week 12: Deployment**
+- 🔲 Production Setup
+- 🔲 Cloud Deployment (Optional)
+- 🔲 Database Migration
+- 🔲 User Training / Documentation
+- 🔲 Maintenance Plan
+
+---
+
+## 📊 Progress Summary
+
+```
+Phase 1  ████████████████████  100%  ✅ เสร็จแล้ว
+Phase 2  ████████████████░░░░   75%  🔄 Week 4 ยังเหลือ
+Phase 3  ░░░░░░░░░░░░░░░░░░░░    0%  🔲 ยังไม่เริ่ม
+Phase 4  ░░░░░░░░░░░░░░░░░░░░    0%  🔲 ยังไม่เริ่ม
+Phase 5  ░░░░░░░░░░░░░░░░░░░░    0%  🔲 ยังไม่เริ่ม
+```
+
+**ปัจจุบัน:** Phase 2 Week 3 เสร็จสมบูรณ์ → กำลังจะเริ่ม **Week 4: AR Invoice & AR Receipt**
 
 ## 🤝 Contributing
 

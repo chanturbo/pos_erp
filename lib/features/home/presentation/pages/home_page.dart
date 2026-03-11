@@ -14,6 +14,7 @@ import '../../../sales/presentation/pages/pos_page.dart';
 import '../../../sales/presentation/pages/sales_history_page.dart';
 import '../../../dashboard/presentation/pages/dashboard_page.dart';
 import '../../../inventory/presentation/pages/stock_balance_page.dart';
+import '../../../inventory/presentation/pages/stock_adjustment_page.dart'; // 🆕
 import '../../../reports/presentation/pages/reports_page.dart';
 import '../../../../core/shortcuts/keyboard_shortcuts.dart';
 import '../../../settings/presentation/pages/settings_page.dart';
@@ -179,7 +180,7 @@ class HomePage extends ConsumerWidget {
                     mainAxisSpacing: 16,
                     crossAxisSpacing: 16,
                     children: [
-                      // Row 1
+                      // Row 1: ขาย
                       _buildMenuCard(
                         context,
                         icon: Icons.dashboard,
@@ -237,7 +238,7 @@ class HomePage extends ConsumerWidget {
                         },
                       ),
 
-                      // Row 2
+                      // Row 2: คลัง  ← เพิ่ม ปรับสต๊อก ถัดจาก คลังสินค้า
                       _buildMenuCard(
                         context,
                         icon: Icons.warehouse,
@@ -248,6 +249,22 @@ class HomePage extends ConsumerWidget {
                             context,
                             MaterialPageRoute(
                               builder: (context) => const StockBalancePage(),
+                            ),
+                          );
+                        },
+                      ),
+                      // 🆕 ปรับสต๊อก
+                      _buildMenuCard(
+                        context,
+                        icon: Icons.tune,
+                        title: 'ปรับสต๊อก',
+                        color: Colors.deepPurple,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  const StockAdjustmentPage(),
                             ),
                           );
                         },
@@ -280,6 +297,8 @@ class HomePage extends ConsumerWidget {
                           );
                         },
                       ),
+
+                      // Row 3: จัดซื้อ  ← ลูกค้า/ซัพพลายเออร์ เลื่อนมาจาก Row 2
                       _buildMenuCard(
                         context,
                         icon: Icons.shopping_bag,
@@ -295,8 +314,6 @@ class HomePage extends ConsumerWidget {
                           );
                         },
                       ),
-
-                      // Row 3
                       _buildMenuCard(
                         context,
                         icon: Icons.inventory_2,
@@ -341,6 +358,8 @@ class HomePage extends ConsumerWidget {
                           );
                         },
                       ),
+
+                      // Row 4: บัญชี
                       _buildMenuCard(
                         context,
                         icon: Icons.payments,
@@ -355,8 +374,6 @@ class HomePage extends ConsumerWidget {
                           );
                         },
                       ),
-
-                      // Row 4
                       _buildMenuCard(
                         context,
                         icon: Icons.assessment,
