@@ -126,7 +126,7 @@ class _PromotionListPageState extends ConsumerState<PromotionListPage> {
       child: FilterChip(
         label: Text(label),
         selected: selected,
-        selectedColor: (color ?? Colors.orange).withOpacity(0.2),
+        selectedColor: (color ?? Colors.orange).withValues(alpha:0.2),
         checkmarkColor: color ?? Colors.orange,
         onSelected: (_) => setState(() => _filter = value),
       ),
@@ -229,7 +229,7 @@ class _PromotionListPageState extends ConsumerState<PromotionListPage> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.12),
+                      color: statusColor.withValues(alpha:0.12),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Row(
@@ -395,7 +395,7 @@ class _PromotionListPageState extends ConsumerState<PromotionListPage> {
       width: 44,
       height: 44,
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha:0.12),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Icon(icon, color: color, size: 22),

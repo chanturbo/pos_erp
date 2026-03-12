@@ -248,7 +248,7 @@ class _PromotionFormPageState extends ConsumerState<PromotionFormPage> {
                   child: Container(
                     decoration: BoxDecoration(
                       color: selected
-                          ? color.withOpacity(0.15)
+                          ? color.withValues(alpha:0.15)
                           : Colors.grey[100],
                       border: Border.all(
                           color: selected ? color : Colors.grey[300]!,
@@ -638,7 +638,7 @@ class _PromotionFormPageState extends ConsumerState<PromotionFormPage> {
               subtitle:
                   const Text('โปรโมชั่นนี้จะถูกใช้งานในระบบ'),
               value: _isActive,
-              activeColor: Colors.orange,
+              activeThumbColor: Colors.orange,
               onChanged: (v) => setState(() => _isActive = v),
               contentPadding: EdgeInsets.zero,
             ),
@@ -647,7 +647,7 @@ class _PromotionFormPageState extends ConsumerState<PromotionFormPage> {
               subtitle: const Text(
                   'เมื่อ Exclusive — โปรโมชั่นอื่นจะไม่ถูกรวมด้วย'),
               value: _isExclusive,
-              activeColor: Colors.orange,
+              activeThumbColor: Colors.orange,
               onChanged: (v) => setState(() => _isExclusive = v),
               contentPadding: EdgeInsets.zero,
             ),

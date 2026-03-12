@@ -155,6 +155,7 @@ class CouponNotifier extends AsyncNotifier<List<CouponModel>> {
         'promotion_id': promotionId,
         'count': count,
         if (expiresAt != null) 'expires_at': expiresAt.toIso8601String(),
+        // ignore: use_null_aware_elements
         if (customCode != null) 'coupon_code': customCode,
       });
       if (res.statusCode == 200) {
