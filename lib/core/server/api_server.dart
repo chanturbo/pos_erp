@@ -12,6 +12,7 @@ import 'routes/auth_routes.dart';
 import 'routes/goods_receipt_routes.dart';
 import 'routes/product_routes.dart';
 import 'routes/customer_routes.dart';
+import 'routes/promotion_routes.dart';
 import 'routes/purchase_return_routes.dart';
 import 'routes/purchase_routes.dart';
 import 'routes/sales_routes.dart';
@@ -100,7 +101,11 @@ class ApiServer {
       // AR Receipt routes ✅ Day 39-40
       router.mount('/api/ar-receipts', ArReceiptRoutes(db).router.call);
       print('   ✅ /api/ar-receipts');
-                      
+
+      // Promotion & Coupon routes ✅ Day 41-45
+      router.mount('/api/promotions', PromotionRoutes(db).router.call);
+      print('   ✅ /api/promotions');
+      
       print('🔧 Routes configured successfully');
 
       // ==================== PIPELINE ====================

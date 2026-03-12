@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:drift/drift.dart' hide Column;
+import 'package:intl/date_symbol_data_local.dart';
 import 'core/config/app_mode.dart';
 import 'shared/theme/app_theme.dart';
 import 'features/auth/presentation/providers/auth_provider.dart';
@@ -15,7 +16,7 @@ import 'core/database/seed_data.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+  await initializeDateFormatting('th_TH'); // ✅ เพิ่ม
   // Initialize App Mode
   await AppModeConfig.initialize();
   

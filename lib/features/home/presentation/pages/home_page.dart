@@ -9,6 +9,9 @@ import '../../../suppliers/presentation/pages/supplier_list_page.dart';
 import '../../../purchases/presentation/pages/purchase_order_list_page.dart';
 import '../../../purchases/presentation/pages/goods_receipt_list_page.dart';
 import '../../../ap/presentation/pages/ap_invoice_list_page.dart';
+import '../../../ar/presentation/pages/ar_invoice_list_page.dart';        // ✅ Day 36-38
+import '../../../ar/presentation/pages/ar_receipt_list_page.dart';        // ✅ Day 39-40
+import '../../../promotions/presentation/pages/promotion_list_page.dart'; // ✅ Day 41-45
 import '../../../testing/test_page.dart';
 import '../../../sales/presentation/pages/pos_page.dart';
 import '../../../sales/presentation/pages/sales_history_page.dart';
@@ -186,56 +189,28 @@ class HomePage extends ConsumerWidget {
                         icon: Icons.dashboard,
                         title: 'Dashboard',
                         color: Colors.indigo,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const DashboardPage(),
-                            ),
-                          );
-                        },
+                        onTap: () => _push(context, const DashboardPage()),
                       ),
                       _buildMenuCard(
                         context,
                         icon: Icons.shopping_cart,
                         title: 'การขาย',
                         color: Colors.blue,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const PosPage(),
-                            ),
-                          );
-                        },
+                        onTap: () => _push(context, const PosPage()),
                       ),
                       _buildMenuCard(
                         context,
                         icon: Icons.inventory,
                         title: 'สินค้า',
                         color: Colors.orange,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const ProductListPage(),
-                            ),
-                          );
-                        },
+                        onTap: () => _push(context, const ProductListPage()),
                       ),
                       _buildMenuCard(
                         context,
                         icon: Icons.receipt_long,
                         title: 'รายการขาย',
                         color: Colors.indigo,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const SalesHistoryPage(),
-                            ),
-                          );
-                        },
+                        onTap: () => _push(context, const SalesHistoryPage()),
                       ),
 
                       // Row 2: คลัง  ← เพิ่ม ปรับสต๊อก ถัดจาก คลังสินค้า
@@ -244,14 +219,7 @@ class HomePage extends ConsumerWidget {
                         icon: Icons.warehouse,
                         title: 'คลังสินค้า',
                         color: Colors.green,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const StockBalancePage(),
-                            ),
-                          );
-                        },
+                        onTap: () => _push(context, const StockBalancePage()),
                       ),
                       // 🆕 ปรับสต๊อก
                       _buildMenuCard(
@@ -259,43 +227,22 @@ class HomePage extends ConsumerWidget {
                         icon: Icons.tune,
                         title: 'ปรับสต๊อก',
                         color: Colors.deepPurple,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  const StockAdjustmentPage(),
-                            ),
-                          );
-                        },
+                        onTap: () =>
+                            _push(context, const StockAdjustmentPage()),
                       ),
                       _buildMenuCard(
                         context,
                         icon: Icons.people,
                         title: 'ลูกค้า',
                         color: Colors.purple,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const CustomerListPage(),
-                            ),
-                          );
-                        },
+                        onTap: () => _push(context, const CustomerListPage()),
                       ),
                       _buildMenuCard(
                         context,
                         icon: Icons.business,
                         title: 'ซัพพลายเออร์',
                         color: Colors.cyan,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const SupplierListPage(),
-                            ),
-                          );
-                        },
+                        onTap: () => _push(context, const SupplierListPage()),
                       ),
 
                       // Row 3: จัดซื้อ  ← ลูกค้า/ซัพพลายเออร์ เลื่อนมาจาก Row 2
@@ -304,59 +251,31 @@ class HomePage extends ConsumerWidget {
                         icon: Icons.shopping_bag,
                         title: 'ซื้อสินค้า',
                         color: Colors.red,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  const PurchaseOrderListPage(),
-                            ),
-                          );
-                        },
+                        onTap: () =>
+                            _push(context, const PurchaseOrderListPage()),
                       ),
                       _buildMenuCard(
                         context,
                         icon: Icons.inventory_2,
                         title: 'รับสินค้า',
                         color: Colors.deepOrange,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  const GoodsReceiptListPage(),
-                            ),
-                          );
-                        },
+                        onTap: () =>
+                            _push(context, const GoodsReceiptListPage()),
                       ),
                       _buildMenuCard(
                         context,
                         icon: Icons.assignment_return,
                         title: 'คืนสินค้า',
                         color: Colors.amber,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  const PurchaseReturnListPage(),
-                            ),
-                          );
-                        },
+                        onTap: () =>
+                            _push(context, const PurchaseReturnListPage()),
                       ),
                       _buildMenuCard(
                         context,
                         icon: Icons.receipt,
                         title: 'ใบแจ้งหนี้ AP',
                         color: Colors.brown,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const ApInvoiceListPage(),
-                            ),
-                          );
-                        },
+                        onTap: () => _push(context, const ApInvoiceListPage()),
                       ),
 
                       // Row 4: บัญชี
@@ -365,28 +284,40 @@ class HomePage extends ConsumerWidget {
                         icon: Icons.payments,
                         title: 'จ่ายเงิน AP',
                         color: Colors.teal,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const ApPaymentListPage(),
-                            ),
-                          );
-                        },
+                        onTap: () => _push(context, const ApPaymentListPage()),
+                      ),
+                      // ✅ Day 36-38
+                      _buildMenuCard(
+                        context,
+                        icon: Icons.request_page,
+                        title: 'ใบแจ้งหนี้ AR',
+                        color: Colors.teal.shade700,
+                        onTap: () => _push(context, const ArInvoiceListPage()),
+                      ),
+                      // ✅ Day 39-40
+                      _buildMenuCard(
+                        context,
+                        icon: Icons.price_check,
+                        title: 'รับเงิน AR',
+                        color: Colors.green.shade700,
+                        onTap: () => _push(context, const ArReceiptListPage()),
                       ),
                       _buildMenuCard(
                         context,
                         icon: Icons.assessment,
                         title: 'รายงาน',
                         color: Colors.pink,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const ReportsPage(),
-                            ),
-                          );
-                        },
+                        onTap: () => _push(context, const ReportsPage()),
+                      ),
+
+                      // ─── Row 5: โปรโมชั่น ────────────────────────────────
+                      // ✅ Day 41-45
+                      _buildMenuCard(
+                        context,
+                        icon: Icons.local_offer,
+                        title: 'โปรโมชั่น',
+                        color: Colors.orange.shade700,
+                        onTap: () => _push(context, const PromotionListPage()),
                       ),
                     ],
                   ),
@@ -396,6 +327,13 @@ class HomePage extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+
+  void _push(BuildContext context, Widget page) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => page),
     );
   }
 
