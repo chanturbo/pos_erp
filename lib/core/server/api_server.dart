@@ -6,6 +6,8 @@ import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as io;
 import 'package:shelf_router/shelf_router.dart';
 import '../database/app_database.dart';
+import 'routes/ar_invoice_routes.dart';
+import 'routes/ar_receipt_routes.dart';
 import 'routes/auth_routes.dart';
 import 'routes/goods_receipt_routes.dart';
 import 'routes/product_routes.dart';
@@ -90,7 +92,15 @@ class ApiServer {
       // Purchase Return routes
       router.mount('/api/purchase-returns', PurchaseReturnRoutes(db).router.call);
       print('   ✅ /api/purchase-returns');
-                
+
+      // AR Invoice routes ✅ Day 36-38
+      router.mount('/api/ar-invoices', ArInvoiceRoutes(db).router.call);
+      print('   ✅ /api/ar-invoices');
+
+      // AR Receipt routes ✅ Day 39-40
+      router.mount('/api/ar-receipts', ArReceiptRoutes(db).router.call);
+      print('   ✅ /api/ar-receipts');
+                      
       print('🔧 Routes configured successfully');
 
       // ==================== PIPELINE ====================

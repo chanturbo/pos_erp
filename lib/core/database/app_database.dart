@@ -83,6 +83,7 @@ part 'app_database.g.dart';
 
     // AR
     ArInvoices,
+    ArInvoiceItems,    // ✅ เพิ่มใหม่
     ArReceipts,
     ArReceiptAllocations,
 

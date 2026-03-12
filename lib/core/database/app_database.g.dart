@@ -21722,6 +21722,15 @@ class $ArInvoicesTable extends ArInvoices
     requiredDuringInsert: false,
     defaultValue: const Constant('UNPAID'),
   );
+  static const VerificationMeta _remarkMeta = const VerificationMeta('remark');
+  @override
+  late final GeneratedColumn<String> remark = GeneratedColumn<String>(
+    'remark',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -21759,6 +21768,7 @@ class $ArInvoicesTable extends ArInvoices
     referenceType,
     referenceId,
     status,
+    remark,
     createdAt,
     updatedAt,
   ];
@@ -21867,6 +21877,12 @@ class $ArInvoicesTable extends ArInvoices
         status.isAcceptableOrUnknown(data['status']!, _statusMeta),
       );
     }
+    if (data.containsKey('remark')) {
+      context.handle(
+        _remarkMeta,
+        remark.isAcceptableOrUnknown(data['remark']!, _remarkMeta),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -21936,6 +21952,10 @@ class $ArInvoicesTable extends ArInvoices
         DriftSqlType.string,
         data['${effectivePrefix}status'],
       )!,
+      remark: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}remark'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -21965,6 +21985,7 @@ class ArInvoice extends DataClass implements Insertable<ArInvoice> {
   final String? referenceType;
   final String? referenceId;
   final String status;
+  final String? remark;
   final DateTime createdAt;
   final DateTime updatedAt;
   const ArInvoice({
@@ -21979,6 +22000,7 @@ class ArInvoice extends DataClass implements Insertable<ArInvoice> {
     this.referenceType,
     this.referenceId,
     required this.status,
+    this.remark,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -22002,6 +22024,9 @@ class ArInvoice extends DataClass implements Insertable<ArInvoice> {
       map['reference_id'] = Variable<String>(referenceId);
     }
     map['status'] = Variable<String>(status);
+    if (!nullToAbsent || remark != null) {
+      map['remark'] = Variable<String>(remark);
+    }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
@@ -22026,6 +22051,9 @@ class ArInvoice extends DataClass implements Insertable<ArInvoice> {
           ? const Value.absent()
           : Value(referenceId),
       status: Value(status),
+      remark: remark == null && nullToAbsent
+          ? const Value.absent()
+          : Value(remark),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -22048,6 +22076,7 @@ class ArInvoice extends DataClass implements Insertable<ArInvoice> {
       referenceType: serializer.fromJson<String?>(json['referenceType']),
       referenceId: serializer.fromJson<String?>(json['referenceId']),
       status: serializer.fromJson<String>(json['status']),
+      remark: serializer.fromJson<String?>(json['remark']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -22067,6 +22096,7 @@ class ArInvoice extends DataClass implements Insertable<ArInvoice> {
       'referenceType': serializer.toJson<String?>(referenceType),
       'referenceId': serializer.toJson<String?>(referenceId),
       'status': serializer.toJson<String>(status),
+      'remark': serializer.toJson<String?>(remark),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -22084,6 +22114,7 @@ class ArInvoice extends DataClass implements Insertable<ArInvoice> {
     Value<String?> referenceType = const Value.absent(),
     Value<String?> referenceId = const Value.absent(),
     String? status,
+    Value<String?> remark = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
   }) => ArInvoice(
@@ -22100,6 +22131,7 @@ class ArInvoice extends DataClass implements Insertable<ArInvoice> {
         : this.referenceType,
     referenceId: referenceId.present ? referenceId.value : this.referenceId,
     status: status ?? this.status,
+    remark: remark.present ? remark.value : this.remark,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -22130,6 +22162,7 @@ class ArInvoice extends DataClass implements Insertable<ArInvoice> {
           ? data.referenceId.value
           : this.referenceId,
       status: data.status.present ? data.status.value : this.status,
+      remark: data.remark.present ? data.remark.value : this.remark,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -22149,6 +22182,7 @@ class ArInvoice extends DataClass implements Insertable<ArInvoice> {
           ..write('referenceType: $referenceType, ')
           ..write('referenceId: $referenceId, ')
           ..write('status: $status, ')
+          ..write('remark: $remark, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -22168,6 +22202,7 @@ class ArInvoice extends DataClass implements Insertable<ArInvoice> {
     referenceType,
     referenceId,
     status,
+    remark,
     createdAt,
     updatedAt,
   );
@@ -22186,6 +22221,7 @@ class ArInvoice extends DataClass implements Insertable<ArInvoice> {
           other.referenceType == this.referenceType &&
           other.referenceId == this.referenceId &&
           other.status == this.status &&
+          other.remark == this.remark &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -22202,6 +22238,7 @@ class ArInvoicesCompanion extends UpdateCompanion<ArInvoice> {
   final Value<String?> referenceType;
   final Value<String?> referenceId;
   final Value<String> status;
+  final Value<String?> remark;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
@@ -22217,6 +22254,7 @@ class ArInvoicesCompanion extends UpdateCompanion<ArInvoice> {
     this.referenceType = const Value.absent(),
     this.referenceId = const Value.absent(),
     this.status = const Value.absent(),
+    this.remark = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -22233,6 +22271,7 @@ class ArInvoicesCompanion extends UpdateCompanion<ArInvoice> {
     this.referenceType = const Value.absent(),
     this.referenceId = const Value.absent(),
     this.status = const Value.absent(),
+    this.remark = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -22254,6 +22293,7 @@ class ArInvoicesCompanion extends UpdateCompanion<ArInvoice> {
     Expression<String>? referenceType,
     Expression<String>? referenceId,
     Expression<String>? status,
+    Expression<String>? remark,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
@@ -22270,6 +22310,7 @@ class ArInvoicesCompanion extends UpdateCompanion<ArInvoice> {
       if (referenceType != null) 'reference_type': referenceType,
       if (referenceId != null) 'reference_id': referenceId,
       if (status != null) 'status': status,
+      if (remark != null) 'remark': remark,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
@@ -22288,6 +22329,7 @@ class ArInvoicesCompanion extends UpdateCompanion<ArInvoice> {
     Value<String?>? referenceType,
     Value<String?>? referenceId,
     Value<String>? status,
+    Value<String?>? remark,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
@@ -22304,6 +22346,7 @@ class ArInvoicesCompanion extends UpdateCompanion<ArInvoice> {
       referenceType: referenceType ?? this.referenceType,
       referenceId: referenceId ?? this.referenceId,
       status: status ?? this.status,
+      remark: remark ?? this.remark,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
@@ -22346,6 +22389,9 @@ class ArInvoicesCompanion extends UpdateCompanion<ArInvoice> {
     if (status.present) {
       map['status'] = Variable<String>(status.value);
     }
+    if (remark.present) {
+      map['remark'] = Variable<String>(remark.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -22372,8 +22418,731 @@ class ArInvoicesCompanion extends UpdateCompanion<ArInvoice> {
           ..write('referenceType: $referenceType, ')
           ..write('referenceId: $referenceId, ')
           ..write('status: $status, ')
+          ..write('remark: $remark, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $ArInvoiceItemsTable extends ArInvoiceItems
+    with TableInfo<$ArInvoiceItemsTable, ArInvoiceItem> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ArInvoiceItemsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _itemIdMeta = const VerificationMeta('itemId');
+  @override
+  late final GeneratedColumn<String> itemId = GeneratedColumn<String>(
+    'item_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _invoiceIdMeta = const VerificationMeta(
+    'invoiceId',
+  );
+  @override
+  late final GeneratedColumn<String> invoiceId = GeneratedColumn<String>(
+    'invoice_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES ar_invoices (invoice_id)',
+    ),
+  );
+  static const VerificationMeta _lineNoMeta = const VerificationMeta('lineNo');
+  @override
+  late final GeneratedColumn<int> lineNo = GeneratedColumn<int>(
+    'line_no',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _productIdMeta = const VerificationMeta(
+    'productId',
+  );
+  @override
+  late final GeneratedColumn<String> productId = GeneratedColumn<String>(
+    'product_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES products (product_id)',
+    ),
+  );
+  static const VerificationMeta _productCodeMeta = const VerificationMeta(
+    'productCode',
+  );
+  @override
+  late final GeneratedColumn<String> productCode = GeneratedColumn<String>(
+    'product_code',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(maxTextLength: 50),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _productNameMeta = const VerificationMeta(
+    'productName',
+  );
+  @override
+  late final GeneratedColumn<String> productName = GeneratedColumn<String>(
+    'product_name',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(maxTextLength: 300),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _unitMeta = const VerificationMeta('unit');
+  @override
+  late final GeneratedColumn<String> unit = GeneratedColumn<String>(
+    'unit',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(maxTextLength: 20),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _quantityMeta = const VerificationMeta(
+    'quantity',
+  );
+  @override
+  late final GeneratedColumn<double> quantity = GeneratedColumn<double>(
+    'quantity',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _unitPriceMeta = const VerificationMeta(
+    'unitPrice',
+  );
+  @override
+  late final GeneratedColumn<double> unitPrice = GeneratedColumn<double>(
+    'unit_price',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _discountAmountMeta = const VerificationMeta(
+    'discountAmount',
+  );
+  @override
+  late final GeneratedColumn<double> discountAmount = GeneratedColumn<double>(
+    'discount_amount',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _amountMeta = const VerificationMeta('amount');
+  @override
+  late final GeneratedColumn<double> amount = GeneratedColumn<double>(
+    'amount',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _remarkMeta = const VerificationMeta('remark');
+  @override
+  late final GeneratedColumn<String> remark = GeneratedColumn<String>(
+    'remark',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    itemId,
+    invoiceId,
+    lineNo,
+    productId,
+    productCode,
+    productName,
+    unit,
+    quantity,
+    unitPrice,
+    discountAmount,
+    amount,
+    remark,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'ar_invoice_items';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ArInvoiceItem> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('item_id')) {
+      context.handle(
+        _itemIdMeta,
+        itemId.isAcceptableOrUnknown(data['item_id']!, _itemIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_itemIdMeta);
+    }
+    if (data.containsKey('invoice_id')) {
+      context.handle(
+        _invoiceIdMeta,
+        invoiceId.isAcceptableOrUnknown(data['invoice_id']!, _invoiceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_invoiceIdMeta);
+    }
+    if (data.containsKey('line_no')) {
+      context.handle(
+        _lineNoMeta,
+        lineNo.isAcceptableOrUnknown(data['line_no']!, _lineNoMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_lineNoMeta);
+    }
+    if (data.containsKey('product_id')) {
+      context.handle(
+        _productIdMeta,
+        productId.isAcceptableOrUnknown(data['product_id']!, _productIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_productIdMeta);
+    }
+    if (data.containsKey('product_code')) {
+      context.handle(
+        _productCodeMeta,
+        productCode.isAcceptableOrUnknown(
+          data['product_code']!,
+          _productCodeMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_productCodeMeta);
+    }
+    if (data.containsKey('product_name')) {
+      context.handle(
+        _productNameMeta,
+        productName.isAcceptableOrUnknown(
+          data['product_name']!,
+          _productNameMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_productNameMeta);
+    }
+    if (data.containsKey('unit')) {
+      context.handle(
+        _unitMeta,
+        unit.isAcceptableOrUnknown(data['unit']!, _unitMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_unitMeta);
+    }
+    if (data.containsKey('quantity')) {
+      context.handle(
+        _quantityMeta,
+        quantity.isAcceptableOrUnknown(data['quantity']!, _quantityMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_quantityMeta);
+    }
+    if (data.containsKey('unit_price')) {
+      context.handle(
+        _unitPriceMeta,
+        unitPrice.isAcceptableOrUnknown(data['unit_price']!, _unitPriceMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_unitPriceMeta);
+    }
+    if (data.containsKey('discount_amount')) {
+      context.handle(
+        _discountAmountMeta,
+        discountAmount.isAcceptableOrUnknown(
+          data['discount_amount']!,
+          _discountAmountMeta,
+        ),
+      );
+    }
+    if (data.containsKey('amount')) {
+      context.handle(
+        _amountMeta,
+        amount.isAcceptableOrUnknown(data['amount']!, _amountMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_amountMeta);
+    }
+    if (data.containsKey('remark')) {
+      context.handle(
+        _remarkMeta,
+        remark.isAcceptableOrUnknown(data['remark']!, _remarkMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {itemId};
+  @override
+  ArInvoiceItem map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ArInvoiceItem(
+      itemId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}item_id'],
+      )!,
+      invoiceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}invoice_id'],
+      )!,
+      lineNo: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}line_no'],
+      )!,
+      productId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}product_id'],
+      )!,
+      productCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}product_code'],
+      )!,
+      productName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}product_name'],
+      )!,
+      unit: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}unit'],
+      )!,
+      quantity: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}quantity'],
+      )!,
+      unitPrice: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}unit_price'],
+      )!,
+      discountAmount: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}discount_amount'],
+      )!,
+      amount: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}amount'],
+      )!,
+      remark: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}remark'],
+      ),
+    );
+  }
+
+  @override
+  $ArInvoiceItemsTable createAlias(String alias) {
+    return $ArInvoiceItemsTable(attachedDatabase, alias);
+  }
+}
+
+class ArInvoiceItem extends DataClass implements Insertable<ArInvoiceItem> {
+  final String itemId;
+  final String invoiceId;
+  final int lineNo;
+  final String productId;
+  final String productCode;
+  final String productName;
+  final String unit;
+  final double quantity;
+  final double unitPrice;
+  final double discountAmount;
+  final double amount;
+  final String? remark;
+  const ArInvoiceItem({
+    required this.itemId,
+    required this.invoiceId,
+    required this.lineNo,
+    required this.productId,
+    required this.productCode,
+    required this.productName,
+    required this.unit,
+    required this.quantity,
+    required this.unitPrice,
+    required this.discountAmount,
+    required this.amount,
+    this.remark,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['item_id'] = Variable<String>(itemId);
+    map['invoice_id'] = Variable<String>(invoiceId);
+    map['line_no'] = Variable<int>(lineNo);
+    map['product_id'] = Variable<String>(productId);
+    map['product_code'] = Variable<String>(productCode);
+    map['product_name'] = Variable<String>(productName);
+    map['unit'] = Variable<String>(unit);
+    map['quantity'] = Variable<double>(quantity);
+    map['unit_price'] = Variable<double>(unitPrice);
+    map['discount_amount'] = Variable<double>(discountAmount);
+    map['amount'] = Variable<double>(amount);
+    if (!nullToAbsent || remark != null) {
+      map['remark'] = Variable<String>(remark);
+    }
+    return map;
+  }
+
+  ArInvoiceItemsCompanion toCompanion(bool nullToAbsent) {
+    return ArInvoiceItemsCompanion(
+      itemId: Value(itemId),
+      invoiceId: Value(invoiceId),
+      lineNo: Value(lineNo),
+      productId: Value(productId),
+      productCode: Value(productCode),
+      productName: Value(productName),
+      unit: Value(unit),
+      quantity: Value(quantity),
+      unitPrice: Value(unitPrice),
+      discountAmount: Value(discountAmount),
+      amount: Value(amount),
+      remark: remark == null && nullToAbsent
+          ? const Value.absent()
+          : Value(remark),
+    );
+  }
+
+  factory ArInvoiceItem.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ArInvoiceItem(
+      itemId: serializer.fromJson<String>(json['itemId']),
+      invoiceId: serializer.fromJson<String>(json['invoiceId']),
+      lineNo: serializer.fromJson<int>(json['lineNo']),
+      productId: serializer.fromJson<String>(json['productId']),
+      productCode: serializer.fromJson<String>(json['productCode']),
+      productName: serializer.fromJson<String>(json['productName']),
+      unit: serializer.fromJson<String>(json['unit']),
+      quantity: serializer.fromJson<double>(json['quantity']),
+      unitPrice: serializer.fromJson<double>(json['unitPrice']),
+      discountAmount: serializer.fromJson<double>(json['discountAmount']),
+      amount: serializer.fromJson<double>(json['amount']),
+      remark: serializer.fromJson<String?>(json['remark']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'itemId': serializer.toJson<String>(itemId),
+      'invoiceId': serializer.toJson<String>(invoiceId),
+      'lineNo': serializer.toJson<int>(lineNo),
+      'productId': serializer.toJson<String>(productId),
+      'productCode': serializer.toJson<String>(productCode),
+      'productName': serializer.toJson<String>(productName),
+      'unit': serializer.toJson<String>(unit),
+      'quantity': serializer.toJson<double>(quantity),
+      'unitPrice': serializer.toJson<double>(unitPrice),
+      'discountAmount': serializer.toJson<double>(discountAmount),
+      'amount': serializer.toJson<double>(amount),
+      'remark': serializer.toJson<String?>(remark),
+    };
+  }
+
+  ArInvoiceItem copyWith({
+    String? itemId,
+    String? invoiceId,
+    int? lineNo,
+    String? productId,
+    String? productCode,
+    String? productName,
+    String? unit,
+    double? quantity,
+    double? unitPrice,
+    double? discountAmount,
+    double? amount,
+    Value<String?> remark = const Value.absent(),
+  }) => ArInvoiceItem(
+    itemId: itemId ?? this.itemId,
+    invoiceId: invoiceId ?? this.invoiceId,
+    lineNo: lineNo ?? this.lineNo,
+    productId: productId ?? this.productId,
+    productCode: productCode ?? this.productCode,
+    productName: productName ?? this.productName,
+    unit: unit ?? this.unit,
+    quantity: quantity ?? this.quantity,
+    unitPrice: unitPrice ?? this.unitPrice,
+    discountAmount: discountAmount ?? this.discountAmount,
+    amount: amount ?? this.amount,
+    remark: remark.present ? remark.value : this.remark,
+  );
+  ArInvoiceItem copyWithCompanion(ArInvoiceItemsCompanion data) {
+    return ArInvoiceItem(
+      itemId: data.itemId.present ? data.itemId.value : this.itemId,
+      invoiceId: data.invoiceId.present ? data.invoiceId.value : this.invoiceId,
+      lineNo: data.lineNo.present ? data.lineNo.value : this.lineNo,
+      productId: data.productId.present ? data.productId.value : this.productId,
+      productCode: data.productCode.present
+          ? data.productCode.value
+          : this.productCode,
+      productName: data.productName.present
+          ? data.productName.value
+          : this.productName,
+      unit: data.unit.present ? data.unit.value : this.unit,
+      quantity: data.quantity.present ? data.quantity.value : this.quantity,
+      unitPrice: data.unitPrice.present ? data.unitPrice.value : this.unitPrice,
+      discountAmount: data.discountAmount.present
+          ? data.discountAmount.value
+          : this.discountAmount,
+      amount: data.amount.present ? data.amount.value : this.amount,
+      remark: data.remark.present ? data.remark.value : this.remark,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ArInvoiceItem(')
+          ..write('itemId: $itemId, ')
+          ..write('invoiceId: $invoiceId, ')
+          ..write('lineNo: $lineNo, ')
+          ..write('productId: $productId, ')
+          ..write('productCode: $productCode, ')
+          ..write('productName: $productName, ')
+          ..write('unit: $unit, ')
+          ..write('quantity: $quantity, ')
+          ..write('unitPrice: $unitPrice, ')
+          ..write('discountAmount: $discountAmount, ')
+          ..write('amount: $amount, ')
+          ..write('remark: $remark')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    itemId,
+    invoiceId,
+    lineNo,
+    productId,
+    productCode,
+    productName,
+    unit,
+    quantity,
+    unitPrice,
+    discountAmount,
+    amount,
+    remark,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ArInvoiceItem &&
+          other.itemId == this.itemId &&
+          other.invoiceId == this.invoiceId &&
+          other.lineNo == this.lineNo &&
+          other.productId == this.productId &&
+          other.productCode == this.productCode &&
+          other.productName == this.productName &&
+          other.unit == this.unit &&
+          other.quantity == this.quantity &&
+          other.unitPrice == this.unitPrice &&
+          other.discountAmount == this.discountAmount &&
+          other.amount == this.amount &&
+          other.remark == this.remark);
+}
+
+class ArInvoiceItemsCompanion extends UpdateCompanion<ArInvoiceItem> {
+  final Value<String> itemId;
+  final Value<String> invoiceId;
+  final Value<int> lineNo;
+  final Value<String> productId;
+  final Value<String> productCode;
+  final Value<String> productName;
+  final Value<String> unit;
+  final Value<double> quantity;
+  final Value<double> unitPrice;
+  final Value<double> discountAmount;
+  final Value<double> amount;
+  final Value<String?> remark;
+  final Value<int> rowid;
+  const ArInvoiceItemsCompanion({
+    this.itemId = const Value.absent(),
+    this.invoiceId = const Value.absent(),
+    this.lineNo = const Value.absent(),
+    this.productId = const Value.absent(),
+    this.productCode = const Value.absent(),
+    this.productName = const Value.absent(),
+    this.unit = const Value.absent(),
+    this.quantity = const Value.absent(),
+    this.unitPrice = const Value.absent(),
+    this.discountAmount = const Value.absent(),
+    this.amount = const Value.absent(),
+    this.remark = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ArInvoiceItemsCompanion.insert({
+    required String itemId,
+    required String invoiceId,
+    required int lineNo,
+    required String productId,
+    required String productCode,
+    required String productName,
+    required String unit,
+    required double quantity,
+    required double unitPrice,
+    this.discountAmount = const Value.absent(),
+    required double amount,
+    this.remark = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : itemId = Value(itemId),
+       invoiceId = Value(invoiceId),
+       lineNo = Value(lineNo),
+       productId = Value(productId),
+       productCode = Value(productCode),
+       productName = Value(productName),
+       unit = Value(unit),
+       quantity = Value(quantity),
+       unitPrice = Value(unitPrice),
+       amount = Value(amount);
+  static Insertable<ArInvoiceItem> custom({
+    Expression<String>? itemId,
+    Expression<String>? invoiceId,
+    Expression<int>? lineNo,
+    Expression<String>? productId,
+    Expression<String>? productCode,
+    Expression<String>? productName,
+    Expression<String>? unit,
+    Expression<double>? quantity,
+    Expression<double>? unitPrice,
+    Expression<double>? discountAmount,
+    Expression<double>? amount,
+    Expression<String>? remark,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (itemId != null) 'item_id': itemId,
+      if (invoiceId != null) 'invoice_id': invoiceId,
+      if (lineNo != null) 'line_no': lineNo,
+      if (productId != null) 'product_id': productId,
+      if (productCode != null) 'product_code': productCode,
+      if (productName != null) 'product_name': productName,
+      if (unit != null) 'unit': unit,
+      if (quantity != null) 'quantity': quantity,
+      if (unitPrice != null) 'unit_price': unitPrice,
+      if (discountAmount != null) 'discount_amount': discountAmount,
+      if (amount != null) 'amount': amount,
+      if (remark != null) 'remark': remark,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ArInvoiceItemsCompanion copyWith({
+    Value<String>? itemId,
+    Value<String>? invoiceId,
+    Value<int>? lineNo,
+    Value<String>? productId,
+    Value<String>? productCode,
+    Value<String>? productName,
+    Value<String>? unit,
+    Value<double>? quantity,
+    Value<double>? unitPrice,
+    Value<double>? discountAmount,
+    Value<double>? amount,
+    Value<String?>? remark,
+    Value<int>? rowid,
+  }) {
+    return ArInvoiceItemsCompanion(
+      itemId: itemId ?? this.itemId,
+      invoiceId: invoiceId ?? this.invoiceId,
+      lineNo: lineNo ?? this.lineNo,
+      productId: productId ?? this.productId,
+      productCode: productCode ?? this.productCode,
+      productName: productName ?? this.productName,
+      unit: unit ?? this.unit,
+      quantity: quantity ?? this.quantity,
+      unitPrice: unitPrice ?? this.unitPrice,
+      discountAmount: discountAmount ?? this.discountAmount,
+      amount: amount ?? this.amount,
+      remark: remark ?? this.remark,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (itemId.present) {
+      map['item_id'] = Variable<String>(itemId.value);
+    }
+    if (invoiceId.present) {
+      map['invoice_id'] = Variable<String>(invoiceId.value);
+    }
+    if (lineNo.present) {
+      map['line_no'] = Variable<int>(lineNo.value);
+    }
+    if (productId.present) {
+      map['product_id'] = Variable<String>(productId.value);
+    }
+    if (productCode.present) {
+      map['product_code'] = Variable<String>(productCode.value);
+    }
+    if (productName.present) {
+      map['product_name'] = Variable<String>(productName.value);
+    }
+    if (unit.present) {
+      map['unit'] = Variable<String>(unit.value);
+    }
+    if (quantity.present) {
+      map['quantity'] = Variable<double>(quantity.value);
+    }
+    if (unitPrice.present) {
+      map['unit_price'] = Variable<double>(unitPrice.value);
+    }
+    if (discountAmount.present) {
+      map['discount_amount'] = Variable<double>(discountAmount.value);
+    }
+    if (amount.present) {
+      map['amount'] = Variable<double>(amount.value);
+    }
+    if (remark.present) {
+      map['remark'] = Variable<String>(remark.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ArInvoiceItemsCompanion(')
+          ..write('itemId: $itemId, ')
+          ..write('invoiceId: $invoiceId, ')
+          ..write('lineNo: $lineNo, ')
+          ..write('productId: $productId, ')
+          ..write('productCode: $productCode, ')
+          ..write('productName: $productName, ')
+          ..write('unit: $unit, ')
+          ..write('quantity: $quantity, ')
+          ..write('unitPrice: $unitPrice, ')
+          ..write('discountAmount: $discountAmount, ')
+          ..write('amount: $amount, ')
+          ..write('remark: $remark, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -22433,6 +23202,18 @@ class $ArReceiptsTable extends ArReceipts
     defaultConstraints: GeneratedColumn.constraintIsAlways(
       'REFERENCES customers (customer_id)',
     ),
+  );
+  static const VerificationMeta _customerNameMeta = const VerificationMeta(
+    'customerName',
+  );
+  @override
+  late final GeneratedColumn<String> customerName = GeneratedColumn<String>(
+    'customer_name',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(maxTextLength: 300),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
   );
   static const VerificationMeta _totalAmountMeta = const VerificationMeta(
     'totalAmount',
@@ -22543,6 +23324,7 @@ class $ArReceiptsTable extends ArReceipts
     receiptNo,
     receiptDate,
     customerId,
+    customerName,
     totalAmount,
     paymentMethod,
     bankName,
@@ -22599,6 +23381,17 @@ class $ArReceiptsTable extends ArReceipts
       );
     } else if (isInserting) {
       context.missing(_customerIdMeta);
+    }
+    if (data.containsKey('customer_name')) {
+      context.handle(
+        _customerNameMeta,
+        customerName.isAcceptableOrUnknown(
+          data['customer_name']!,
+          _customerNameMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_customerNameMeta);
     }
     if (data.containsKey('total_amount')) {
       context.handle(
@@ -22696,6 +23489,10 @@ class $ArReceiptsTable extends ArReceipts
         DriftSqlType.string,
         data['${effectivePrefix}customer_id'],
       )!,
+      customerName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}customer_name'],
+      )!,
       totalAmount: attachedDatabase.typeMapping.read(
         DriftSqlType.double,
         data['${effectivePrefix}total_amount'],
@@ -22746,6 +23543,7 @@ class ArReceipt extends DataClass implements Insertable<ArReceipt> {
   final String receiptNo;
   final DateTime receiptDate;
   final String customerId;
+  final String customerName;
   final double totalAmount;
   final String paymentMethod;
   final String? bankName;
@@ -22760,6 +23558,7 @@ class ArReceipt extends DataClass implements Insertable<ArReceipt> {
     required this.receiptNo,
     required this.receiptDate,
     required this.customerId,
+    required this.customerName,
     required this.totalAmount,
     required this.paymentMethod,
     this.bankName,
@@ -22777,6 +23576,7 @@ class ArReceipt extends DataClass implements Insertable<ArReceipt> {
     map['receipt_no'] = Variable<String>(receiptNo);
     map['receipt_date'] = Variable<DateTime>(receiptDate);
     map['customer_id'] = Variable<String>(customerId);
+    map['customer_name'] = Variable<String>(customerName);
     map['total_amount'] = Variable<double>(totalAmount);
     map['payment_method'] = Variable<String>(paymentMethod);
     if (!nullToAbsent || bankName != null) {
@@ -22805,6 +23605,7 @@ class ArReceipt extends DataClass implements Insertable<ArReceipt> {
       receiptNo: Value(receiptNo),
       receiptDate: Value(receiptDate),
       customerId: Value(customerId),
+      customerName: Value(customerName),
       totalAmount: Value(totalAmount),
       paymentMethod: Value(paymentMethod),
       bankName: bankName == null && nullToAbsent
@@ -22837,6 +23638,7 @@ class ArReceipt extends DataClass implements Insertable<ArReceipt> {
       receiptNo: serializer.fromJson<String>(json['receiptNo']),
       receiptDate: serializer.fromJson<DateTime>(json['receiptDate']),
       customerId: serializer.fromJson<String>(json['customerId']),
+      customerName: serializer.fromJson<String>(json['customerName']),
       totalAmount: serializer.fromJson<double>(json['totalAmount']),
       paymentMethod: serializer.fromJson<String>(json['paymentMethod']),
       bankName: serializer.fromJson<String?>(json['bankName']),
@@ -22856,6 +23658,7 @@ class ArReceipt extends DataClass implements Insertable<ArReceipt> {
       'receiptNo': serializer.toJson<String>(receiptNo),
       'receiptDate': serializer.toJson<DateTime>(receiptDate),
       'customerId': serializer.toJson<String>(customerId),
+      'customerName': serializer.toJson<String>(customerName),
       'totalAmount': serializer.toJson<double>(totalAmount),
       'paymentMethod': serializer.toJson<String>(paymentMethod),
       'bankName': serializer.toJson<String?>(bankName),
@@ -22873,6 +23676,7 @@ class ArReceipt extends DataClass implements Insertable<ArReceipt> {
     String? receiptNo,
     DateTime? receiptDate,
     String? customerId,
+    String? customerName,
     double? totalAmount,
     String? paymentMethod,
     Value<String?> bankName = const Value.absent(),
@@ -22887,6 +23691,7 @@ class ArReceipt extends DataClass implements Insertable<ArReceipt> {
     receiptNo: receiptNo ?? this.receiptNo,
     receiptDate: receiptDate ?? this.receiptDate,
     customerId: customerId ?? this.customerId,
+    customerName: customerName ?? this.customerName,
     totalAmount: totalAmount ?? this.totalAmount,
     paymentMethod: paymentMethod ?? this.paymentMethod,
     bankName: bankName.present ? bankName.value : this.bankName,
@@ -22907,6 +23712,9 @@ class ArReceipt extends DataClass implements Insertable<ArReceipt> {
       customerId: data.customerId.present
           ? data.customerId.value
           : this.customerId,
+      customerName: data.customerName.present
+          ? data.customerName.value
+          : this.customerName,
       totalAmount: data.totalAmount.present
           ? data.totalAmount.value
           : this.totalAmount,
@@ -22934,6 +23742,7 @@ class ArReceipt extends DataClass implements Insertable<ArReceipt> {
           ..write('receiptNo: $receiptNo, ')
           ..write('receiptDate: $receiptDate, ')
           ..write('customerId: $customerId, ')
+          ..write('customerName: $customerName, ')
           ..write('totalAmount: $totalAmount, ')
           ..write('paymentMethod: $paymentMethod, ')
           ..write('bankName: $bankName, ')
@@ -22953,6 +23762,7 @@ class ArReceipt extends DataClass implements Insertable<ArReceipt> {
     receiptNo,
     receiptDate,
     customerId,
+    customerName,
     totalAmount,
     paymentMethod,
     bankName,
@@ -22971,6 +23781,7 @@ class ArReceipt extends DataClass implements Insertable<ArReceipt> {
           other.receiptNo == this.receiptNo &&
           other.receiptDate == this.receiptDate &&
           other.customerId == this.customerId &&
+          other.customerName == this.customerName &&
           other.totalAmount == this.totalAmount &&
           other.paymentMethod == this.paymentMethod &&
           other.bankName == this.bankName &&
@@ -22987,6 +23798,7 @@ class ArReceiptsCompanion extends UpdateCompanion<ArReceipt> {
   final Value<String> receiptNo;
   final Value<DateTime> receiptDate;
   final Value<String> customerId;
+  final Value<String> customerName;
   final Value<double> totalAmount;
   final Value<String> paymentMethod;
   final Value<String?> bankName;
@@ -23002,6 +23814,7 @@ class ArReceiptsCompanion extends UpdateCompanion<ArReceipt> {
     this.receiptNo = const Value.absent(),
     this.receiptDate = const Value.absent(),
     this.customerId = const Value.absent(),
+    this.customerName = const Value.absent(),
     this.totalAmount = const Value.absent(),
     this.paymentMethod = const Value.absent(),
     this.bankName = const Value.absent(),
@@ -23018,6 +23831,7 @@ class ArReceiptsCompanion extends UpdateCompanion<ArReceipt> {
     required String receiptNo,
     required DateTime receiptDate,
     required String customerId,
+    required String customerName,
     required double totalAmount,
     this.paymentMethod = const Value.absent(),
     this.bankName = const Value.absent(),
@@ -23032,6 +23846,7 @@ class ArReceiptsCompanion extends UpdateCompanion<ArReceipt> {
        receiptNo = Value(receiptNo),
        receiptDate = Value(receiptDate),
        customerId = Value(customerId),
+       customerName = Value(customerName),
        totalAmount = Value(totalAmount),
        userId = Value(userId);
   static Insertable<ArReceipt> custom({
@@ -23039,6 +23854,7 @@ class ArReceiptsCompanion extends UpdateCompanion<ArReceipt> {
     Expression<String>? receiptNo,
     Expression<DateTime>? receiptDate,
     Expression<String>? customerId,
+    Expression<String>? customerName,
     Expression<double>? totalAmount,
     Expression<String>? paymentMethod,
     Expression<String>? bankName,
@@ -23055,6 +23871,7 @@ class ArReceiptsCompanion extends UpdateCompanion<ArReceipt> {
       if (receiptNo != null) 'receipt_no': receiptNo,
       if (receiptDate != null) 'receipt_date': receiptDate,
       if (customerId != null) 'customer_id': customerId,
+      if (customerName != null) 'customer_name': customerName,
       if (totalAmount != null) 'total_amount': totalAmount,
       if (paymentMethod != null) 'payment_method': paymentMethod,
       if (bankName != null) 'bank_name': bankName,
@@ -23073,6 +23890,7 @@ class ArReceiptsCompanion extends UpdateCompanion<ArReceipt> {
     Value<String>? receiptNo,
     Value<DateTime>? receiptDate,
     Value<String>? customerId,
+    Value<String>? customerName,
     Value<double>? totalAmount,
     Value<String>? paymentMethod,
     Value<String?>? bankName,
@@ -23089,6 +23907,7 @@ class ArReceiptsCompanion extends UpdateCompanion<ArReceipt> {
       receiptNo: receiptNo ?? this.receiptNo,
       receiptDate: receiptDate ?? this.receiptDate,
       customerId: customerId ?? this.customerId,
+      customerName: customerName ?? this.customerName,
       totalAmount: totalAmount ?? this.totalAmount,
       paymentMethod: paymentMethod ?? this.paymentMethod,
       bankName: bankName ?? this.bankName,
@@ -23116,6 +23935,9 @@ class ArReceiptsCompanion extends UpdateCompanion<ArReceipt> {
     }
     if (customerId.present) {
       map['customer_id'] = Variable<String>(customerId.value);
+    }
+    if (customerName.present) {
+      map['customer_name'] = Variable<String>(customerName.value);
     }
     if (totalAmount.present) {
       map['total_amount'] = Variable<double>(totalAmount.value);
@@ -23157,6 +23979,7 @@ class ArReceiptsCompanion extends UpdateCompanion<ArReceipt> {
           ..write('receiptNo: $receiptNo, ')
           ..write('receiptDate: $receiptDate, ')
           ..write('customerId: $customerId, ')
+          ..write('customerName: $customerName, ')
           ..write('totalAmount: $totalAmount, ')
           ..write('paymentMethod: $paymentMethod, ')
           ..write('bankName: $bankName, ')
@@ -28509,6 +29332,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   );
   late final $CouponsTable coupons = $CouponsTable(this);
   late final $ArInvoicesTable arInvoices = $ArInvoicesTable(this);
+  late final $ArInvoiceItemsTable arInvoiceItems = $ArInvoiceItemsTable(this);
   late final $ArReceiptsTable arReceipts = $ArReceiptsTable(this);
   late final $ArReceiptAllocationsTable arReceiptAllocations =
       $ArReceiptAllocationsTable(this);
@@ -28557,6 +29381,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     promotionUsages,
     coupons,
     arInvoices,
+    arInvoiceItems,
     arReceipts,
     arReceiptAllocations,
     apInvoices,
@@ -31805,6 +32630,29 @@ final class $$ProductsTableReferences
     );
   }
 
+  static MultiTypedResultKey<$ArInvoiceItemsTable, List<ArInvoiceItem>>
+  _arInvoiceItemsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.arInvoiceItems,
+    aliasName: $_aliasNameGenerator(
+      db.products.productId,
+      db.arInvoiceItems.productId,
+    ),
+  );
+
+  $$ArInvoiceItemsTableProcessedTableManager get arInvoiceItemsRefs {
+    final manager = $$ArInvoiceItemsTableTableManager($_db, $_db.arInvoiceItems)
+        .filter(
+          (f) => f.productId.productId.sqlEquals(
+            $_itemColumn<String>('product_id')!,
+          ),
+        );
+
+    final cache = $_typedResult.readTableOrNull(_arInvoiceItemsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
   static MultiTypedResultKey<$ApInvoiceItemsTable, List<ApInvoiceItem>>
   _apInvoiceItemsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
     db.apInvoiceItems,
@@ -32147,6 +32995,31 @@ class $$ProductsTableFilterComposer
           }) => $$StockMovementsTableFilterComposer(
             $db: $db,
             $table: $db.stockMovements,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> arInvoiceItemsRefs(
+    Expression<bool> Function($$ArInvoiceItemsTableFilterComposer f) f,
+  ) {
+    final $$ArInvoiceItemsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.productId,
+      referencedTable: $db.arInvoiceItems,
+      getReferencedColumn: (t) => t.productId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ArInvoiceItemsTableFilterComposer(
+            $db: $db,
+            $table: $db.arInvoiceItems,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -32646,6 +33519,31 @@ class $$ProductsTableAnnotationComposer
     return f(composer);
   }
 
+  Expression<T> arInvoiceItemsRefs<T extends Object>(
+    Expression<T> Function($$ArInvoiceItemsTableAnnotationComposer a) f,
+  ) {
+    final $$ArInvoiceItemsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.productId,
+      referencedTable: $db.arInvoiceItems,
+      getReferencedColumn: (t) => t.productId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ArInvoiceItemsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.arInvoiceItems,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
   Expression<T> apInvoiceItemsRefs<T extends Object>(
     Expression<T> Function($$ApInvoiceItemsTableAnnotationComposer a) f,
   ) {
@@ -32693,6 +33591,7 @@ class $$ProductsTableTableManager
             bool salesOrderItemsRefs,
             bool purchaseReturnItemsRefs,
             bool stockMovementsRefs,
+            bool arInvoiceItemsRefs,
             bool apInvoiceItemsRefs,
           })
         > {
@@ -32850,6 +33749,7 @@ class $$ProductsTableTableManager
                 salesOrderItemsRefs = false,
                 purchaseReturnItemsRefs = false,
                 stockMovementsRefs = false,
+                arInvoiceItemsRefs = false,
                 apInvoiceItemsRefs = false,
               }) {
                 return PrefetchHooks(
@@ -32861,6 +33761,7 @@ class $$ProductsTableTableManager
                     if (salesOrderItemsRefs) db.salesOrderItems,
                     if (purchaseReturnItemsRefs) db.purchaseReturnItems,
                     if (stockMovementsRefs) db.stockMovements,
+                    if (arInvoiceItemsRefs) db.arInvoiceItems,
                     if (apInvoiceItemsRefs) db.apInvoiceItems,
                   ],
                   addJoins:
@@ -33023,6 +33924,27 @@ class $$ProductsTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (arInvoiceItemsRefs)
+                        await $_getPrefetchedData<
+                          Product,
+                          $ProductsTable,
+                          ArInvoiceItem
+                        >(
+                          currentTable: table,
+                          referencedTable: $$ProductsTableReferences
+                              ._arInvoiceItemsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$ProductsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).arInvoiceItemsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.productId == item.productId,
+                              ),
+                          typedResults: items,
+                        ),
                       if (apInvoiceItemsRefs)
                         await $_getPrefetchedData<
                           Product,
@@ -33072,6 +33994,7 @@ typedef $$ProductsTableProcessedTableManager =
         bool salesOrderItemsRefs,
         bool purchaseReturnItemsRefs,
         bool stockMovementsRefs,
+        bool arInvoiceItemsRefs,
         bool apInvoiceItemsRefs,
       })
     >;
@@ -47375,6 +48298,7 @@ typedef $$ArInvoicesTableCreateCompanionBuilder =
       Value<String?> referenceType,
       Value<String?> referenceId,
       Value<String> status,
+      Value<String?> remark,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
       Value<int> rowid,
@@ -47392,6 +48316,7 @@ typedef $$ArInvoicesTableUpdateCompanionBuilder =
       Value<String?> referenceType,
       Value<String?> referenceId,
       Value<String> status,
+      Value<String?> remark,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
       Value<int> rowid,
@@ -47417,6 +48342,29 @@ final class $$ArInvoicesTableReferences
     if (item == null) return manager;
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static MultiTypedResultKey<$ArInvoiceItemsTable, List<ArInvoiceItem>>
+  _arInvoiceItemsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.arInvoiceItems,
+    aliasName: $_aliasNameGenerator(
+      db.arInvoices.invoiceId,
+      db.arInvoiceItems.invoiceId,
+    ),
+  );
+
+  $$ArInvoiceItemsTableProcessedTableManager get arInvoiceItemsRefs {
+    final manager = $$ArInvoiceItemsTableTableManager($_db, $_db.arInvoiceItems)
+        .filter(
+          (f) => f.invoiceId.invoiceId.sqlEquals(
+            $_itemColumn<String>('invoice_id')!,
+          ),
+        );
+
+    final cache = $_typedResult.readTableOrNull(_arInvoiceItemsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
     );
   }
 
@@ -47513,6 +48461,11 @@ class $$ArInvoicesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get remark => $composableBuilder(
+    column: $table.remark,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnFilters(column),
@@ -47544,6 +48497,31 @@ class $$ArInvoicesTableFilterComposer
           ),
     );
     return composer;
+  }
+
+  Expression<bool> arInvoiceItemsRefs(
+    Expression<bool> Function($$ArInvoiceItemsTableFilterComposer f) f,
+  ) {
+    final $$ArInvoiceItemsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.invoiceId,
+      referencedTable: $db.arInvoiceItems,
+      getReferencedColumn: (t) => t.invoiceId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ArInvoiceItemsTableFilterComposer(
+            $db: $db,
+            $table: $db.arInvoiceItems,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
   }
 
   Expression<bool> arReceiptAllocationsRefs(
@@ -47628,6 +48606,11 @@ class $$ArInvoicesTableOrderingComposer
 
   ColumnOrderings<String> get status => $composableBuilder(
     column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get remark => $composableBuilder(
+    column: $table.remark,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -47716,6 +48699,9 @@ class $$ArInvoicesTableAnnotationComposer
   GeneratedColumn<String> get status =>
       $composableBuilder(column: $table.status, builder: (column) => column);
 
+  GeneratedColumn<String> get remark =>
+      $composableBuilder(column: $table.remark, builder: (column) => column);
+
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
 
@@ -47743,6 +48729,31 @@ class $$ArInvoicesTableAnnotationComposer
           ),
     );
     return composer;
+  }
+
+  Expression<T> arInvoiceItemsRefs<T extends Object>(
+    Expression<T> Function($$ArInvoiceItemsTableAnnotationComposer a) f,
+  ) {
+    final $$ArInvoiceItemsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.invoiceId,
+      referencedTable: $db.arInvoiceItems,
+      getReferencedColumn: (t) => t.invoiceId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ArInvoiceItemsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.arInvoiceItems,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
   }
 
   Expression<T> arReceiptAllocationsRefs<T extends Object>(
@@ -47787,6 +48798,7 @@ class $$ArInvoicesTableTableManager
           ArInvoice,
           PrefetchHooks Function({
             bool customerId,
+            bool arInvoiceItemsRefs,
             bool arReceiptAllocationsRefs,
           })
         > {
@@ -47814,6 +48826,7 @@ class $$ArInvoicesTableTableManager
                 Value<String?> referenceType = const Value.absent(),
                 Value<String?> referenceId = const Value.absent(),
                 Value<String> status = const Value.absent(),
+                Value<String?> remark = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -47829,6 +48842,7 @@ class $$ArInvoicesTableTableManager
                 referenceType: referenceType,
                 referenceId: referenceId,
                 status: status,
+                remark: remark,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -47846,6 +48860,7 @@ class $$ArInvoicesTableTableManager
                 Value<String?> referenceType = const Value.absent(),
                 Value<String?> referenceId = const Value.absent(),
                 Value<String> status = const Value.absent(),
+                Value<String?> remark = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -47861,6 +48876,7 @@ class $$ArInvoicesTableTableManager
                 referenceType: referenceType,
                 referenceId: referenceId,
                 status: status,
+                remark: remark,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -47874,10 +48890,15 @@ class $$ArInvoicesTableTableManager
               )
               .toList(),
           prefetchHooksCallback:
-              ({customerId = false, arReceiptAllocationsRefs = false}) {
+              ({
+                customerId = false,
+                arInvoiceItemsRefs = false,
+                arReceiptAllocationsRefs = false,
+              }) {
                 return PrefetchHooks(
                   db: db,
                   explicitlyWatchedTables: [
+                    if (arInvoiceItemsRefs) db.arInvoiceItems,
                     if (arReceiptAllocationsRefs) db.arReceiptAllocations,
                   ],
                   addJoins:
@@ -47915,6 +48936,27 @@ class $$ArInvoicesTableTableManager
                       },
                   getPrefetchedDataCallback: (items) async {
                     return [
+                      if (arInvoiceItemsRefs)
+                        await $_getPrefetchedData<
+                          ArInvoice,
+                          $ArInvoicesTable,
+                          ArInvoiceItem
+                        >(
+                          currentTable: table,
+                          referencedTable: $$ArInvoicesTableReferences
+                              ._arInvoiceItemsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$ArInvoicesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).arInvoiceItemsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.invoiceId == item.invoiceId,
+                              ),
+                          typedResults: items,
+                        ),
                       if (arReceiptAllocationsRefs)
                         await $_getPrefetchedData<
                           ArInvoice,
@@ -47956,7 +48998,571 @@ typedef $$ArInvoicesTableProcessedTableManager =
       $$ArInvoicesTableUpdateCompanionBuilder,
       (ArInvoice, $$ArInvoicesTableReferences),
       ArInvoice,
-      PrefetchHooks Function({bool customerId, bool arReceiptAllocationsRefs})
+      PrefetchHooks Function({
+        bool customerId,
+        bool arInvoiceItemsRefs,
+        bool arReceiptAllocationsRefs,
+      })
+    >;
+typedef $$ArInvoiceItemsTableCreateCompanionBuilder =
+    ArInvoiceItemsCompanion Function({
+      required String itemId,
+      required String invoiceId,
+      required int lineNo,
+      required String productId,
+      required String productCode,
+      required String productName,
+      required String unit,
+      required double quantity,
+      required double unitPrice,
+      Value<double> discountAmount,
+      required double amount,
+      Value<String?> remark,
+      Value<int> rowid,
+    });
+typedef $$ArInvoiceItemsTableUpdateCompanionBuilder =
+    ArInvoiceItemsCompanion Function({
+      Value<String> itemId,
+      Value<String> invoiceId,
+      Value<int> lineNo,
+      Value<String> productId,
+      Value<String> productCode,
+      Value<String> productName,
+      Value<String> unit,
+      Value<double> quantity,
+      Value<double> unitPrice,
+      Value<double> discountAmount,
+      Value<double> amount,
+      Value<String?> remark,
+      Value<int> rowid,
+    });
+
+final class $$ArInvoiceItemsTableReferences
+    extends BaseReferences<_$AppDatabase, $ArInvoiceItemsTable, ArInvoiceItem> {
+  $$ArInvoiceItemsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $ArInvoicesTable _invoiceIdTable(_$AppDatabase db) =>
+      db.arInvoices.createAlias(
+        $_aliasNameGenerator(
+          db.arInvoiceItems.invoiceId,
+          db.arInvoices.invoiceId,
+        ),
+      );
+
+  $$ArInvoicesTableProcessedTableManager get invoiceId {
+    final $_column = $_itemColumn<String>('invoice_id')!;
+
+    final manager = $$ArInvoicesTableTableManager(
+      $_db,
+      $_db.arInvoices,
+    ).filter((f) => f.invoiceId.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_invoiceIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $ProductsTable _productIdTable(_$AppDatabase db) =>
+      db.products.createAlias(
+        $_aliasNameGenerator(
+          db.arInvoiceItems.productId,
+          db.products.productId,
+        ),
+      );
+
+  $$ProductsTableProcessedTableManager get productId {
+    final $_column = $_itemColumn<String>('product_id')!;
+
+    final manager = $$ProductsTableTableManager(
+      $_db,
+      $_db.products,
+    ).filter((f) => f.productId.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_productIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$ArInvoiceItemsTableFilterComposer
+    extends Composer<_$AppDatabase, $ArInvoiceItemsTable> {
+  $$ArInvoiceItemsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get itemId => $composableBuilder(
+    column: $table.itemId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get lineNo => $composableBuilder(
+    column: $table.lineNo,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get productCode => $composableBuilder(
+    column: $table.productCode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get productName => $composableBuilder(
+    column: $table.productName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get unit => $composableBuilder(
+    column: $table.unit,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get quantity => $composableBuilder(
+    column: $table.quantity,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get unitPrice => $composableBuilder(
+    column: $table.unitPrice,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get discountAmount => $composableBuilder(
+    column: $table.discountAmount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get amount => $composableBuilder(
+    column: $table.amount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get remark => $composableBuilder(
+    column: $table.remark,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$ArInvoicesTableFilterComposer get invoiceId {
+    final $$ArInvoicesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.invoiceId,
+      referencedTable: $db.arInvoices,
+      getReferencedColumn: (t) => t.invoiceId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ArInvoicesTableFilterComposer(
+            $db: $db,
+            $table: $db.arInvoices,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$ProductsTableFilterComposer get productId {
+    final $$ProductsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.productId,
+      referencedTable: $db.products,
+      getReferencedColumn: (t) => t.productId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProductsTableFilterComposer(
+            $db: $db,
+            $table: $db.products,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ArInvoiceItemsTableOrderingComposer
+    extends Composer<_$AppDatabase, $ArInvoiceItemsTable> {
+  $$ArInvoiceItemsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get itemId => $composableBuilder(
+    column: $table.itemId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get lineNo => $composableBuilder(
+    column: $table.lineNo,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get productCode => $composableBuilder(
+    column: $table.productCode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get productName => $composableBuilder(
+    column: $table.productName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get unit => $composableBuilder(
+    column: $table.unit,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get quantity => $composableBuilder(
+    column: $table.quantity,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get unitPrice => $composableBuilder(
+    column: $table.unitPrice,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get discountAmount => $composableBuilder(
+    column: $table.discountAmount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get amount => $composableBuilder(
+    column: $table.amount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get remark => $composableBuilder(
+    column: $table.remark,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$ArInvoicesTableOrderingComposer get invoiceId {
+    final $$ArInvoicesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.invoiceId,
+      referencedTable: $db.arInvoices,
+      getReferencedColumn: (t) => t.invoiceId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ArInvoicesTableOrderingComposer(
+            $db: $db,
+            $table: $db.arInvoices,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$ProductsTableOrderingComposer get productId {
+    final $$ProductsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.productId,
+      referencedTable: $db.products,
+      getReferencedColumn: (t) => t.productId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProductsTableOrderingComposer(
+            $db: $db,
+            $table: $db.products,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ArInvoiceItemsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ArInvoiceItemsTable> {
+  $$ArInvoiceItemsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get itemId =>
+      $composableBuilder(column: $table.itemId, builder: (column) => column);
+
+  GeneratedColumn<int> get lineNo =>
+      $composableBuilder(column: $table.lineNo, builder: (column) => column);
+
+  GeneratedColumn<String> get productCode => $composableBuilder(
+    column: $table.productCode,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get productName => $composableBuilder(
+    column: $table.productName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get unit =>
+      $composableBuilder(column: $table.unit, builder: (column) => column);
+
+  GeneratedColumn<double> get quantity =>
+      $composableBuilder(column: $table.quantity, builder: (column) => column);
+
+  GeneratedColumn<double> get unitPrice =>
+      $composableBuilder(column: $table.unitPrice, builder: (column) => column);
+
+  GeneratedColumn<double> get discountAmount => $composableBuilder(
+    column: $table.discountAmount,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get amount =>
+      $composableBuilder(column: $table.amount, builder: (column) => column);
+
+  GeneratedColumn<String> get remark =>
+      $composableBuilder(column: $table.remark, builder: (column) => column);
+
+  $$ArInvoicesTableAnnotationComposer get invoiceId {
+    final $$ArInvoicesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.invoiceId,
+      referencedTable: $db.arInvoices,
+      getReferencedColumn: (t) => t.invoiceId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ArInvoicesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.arInvoices,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$ProductsTableAnnotationComposer get productId {
+    final $$ProductsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.productId,
+      referencedTable: $db.products,
+      getReferencedColumn: (t) => t.productId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProductsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.products,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ArInvoiceItemsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ArInvoiceItemsTable,
+          ArInvoiceItem,
+          $$ArInvoiceItemsTableFilterComposer,
+          $$ArInvoiceItemsTableOrderingComposer,
+          $$ArInvoiceItemsTableAnnotationComposer,
+          $$ArInvoiceItemsTableCreateCompanionBuilder,
+          $$ArInvoiceItemsTableUpdateCompanionBuilder,
+          (ArInvoiceItem, $$ArInvoiceItemsTableReferences),
+          ArInvoiceItem,
+          PrefetchHooks Function({bool invoiceId, bool productId})
+        > {
+  $$ArInvoiceItemsTableTableManager(
+    _$AppDatabase db,
+    $ArInvoiceItemsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ArInvoiceItemsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ArInvoiceItemsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ArInvoiceItemsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> itemId = const Value.absent(),
+                Value<String> invoiceId = const Value.absent(),
+                Value<int> lineNo = const Value.absent(),
+                Value<String> productId = const Value.absent(),
+                Value<String> productCode = const Value.absent(),
+                Value<String> productName = const Value.absent(),
+                Value<String> unit = const Value.absent(),
+                Value<double> quantity = const Value.absent(),
+                Value<double> unitPrice = const Value.absent(),
+                Value<double> discountAmount = const Value.absent(),
+                Value<double> amount = const Value.absent(),
+                Value<String?> remark = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ArInvoiceItemsCompanion(
+                itemId: itemId,
+                invoiceId: invoiceId,
+                lineNo: lineNo,
+                productId: productId,
+                productCode: productCode,
+                productName: productName,
+                unit: unit,
+                quantity: quantity,
+                unitPrice: unitPrice,
+                discountAmount: discountAmount,
+                amount: amount,
+                remark: remark,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String itemId,
+                required String invoiceId,
+                required int lineNo,
+                required String productId,
+                required String productCode,
+                required String productName,
+                required String unit,
+                required double quantity,
+                required double unitPrice,
+                Value<double> discountAmount = const Value.absent(),
+                required double amount,
+                Value<String?> remark = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ArInvoiceItemsCompanion.insert(
+                itemId: itemId,
+                invoiceId: invoiceId,
+                lineNo: lineNo,
+                productId: productId,
+                productCode: productCode,
+                productName: productName,
+                unit: unit,
+                quantity: quantity,
+                unitPrice: unitPrice,
+                discountAmount: discountAmount,
+                amount: amount,
+                remark: remark,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$ArInvoiceItemsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({invoiceId = false, productId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (invoiceId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.invoiceId,
+                                referencedTable: $$ArInvoiceItemsTableReferences
+                                    ._invoiceIdTable(db),
+                                referencedColumn:
+                                    $$ArInvoiceItemsTableReferences
+                                        ._invoiceIdTable(db)
+                                        .invoiceId,
+                              )
+                              as T;
+                    }
+                    if (productId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.productId,
+                                referencedTable: $$ArInvoiceItemsTableReferences
+                                    ._productIdTable(db),
+                                referencedColumn:
+                                    $$ArInvoiceItemsTableReferences
+                                        ._productIdTable(db)
+                                        .productId,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$ArInvoiceItemsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ArInvoiceItemsTable,
+      ArInvoiceItem,
+      $$ArInvoiceItemsTableFilterComposer,
+      $$ArInvoiceItemsTableOrderingComposer,
+      $$ArInvoiceItemsTableAnnotationComposer,
+      $$ArInvoiceItemsTableCreateCompanionBuilder,
+      $$ArInvoiceItemsTableUpdateCompanionBuilder,
+      (ArInvoiceItem, $$ArInvoiceItemsTableReferences),
+      ArInvoiceItem,
+      PrefetchHooks Function({bool invoiceId, bool productId})
     >;
 typedef $$ArReceiptsTableCreateCompanionBuilder =
     ArReceiptsCompanion Function({
@@ -47964,6 +49570,7 @@ typedef $$ArReceiptsTableCreateCompanionBuilder =
       required String receiptNo,
       required DateTime receiptDate,
       required String customerId,
+      required String customerName,
       required double totalAmount,
       Value<String> paymentMethod,
       Value<String?> bankName,
@@ -47981,6 +49588,7 @@ typedef $$ArReceiptsTableUpdateCompanionBuilder =
       Value<String> receiptNo,
       Value<DateTime> receiptDate,
       Value<String> customerId,
+      Value<String> customerName,
       Value<double> totalAmount,
       Value<String> paymentMethod,
       Value<String?> bankName,
@@ -48089,6 +49697,11 @@ class $$ArReceiptsTableFilterComposer
 
   ColumnFilters<DateTime> get receiptDate => $composableBuilder(
     column: $table.receiptDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get customerName => $composableBuilder(
+    column: $table.customerName,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -48228,6 +49841,11 @@ class $$ArReceiptsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get customerName => $composableBuilder(
+    column: $table.customerName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<double> get totalAmount => $composableBuilder(
     column: $table.totalAmount,
     builder: (column) => ColumnOrderings(column),
@@ -48332,6 +49950,11 @@ class $$ArReceiptsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get receiptDate => $composableBuilder(
     column: $table.receiptDate,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get customerName => $composableBuilder(
+    column: $table.customerName,
     builder: (column) => column,
   );
 
@@ -48476,6 +50099,7 @@ class $$ArReceiptsTableTableManager
                 Value<String> receiptNo = const Value.absent(),
                 Value<DateTime> receiptDate = const Value.absent(),
                 Value<String> customerId = const Value.absent(),
+                Value<String> customerName = const Value.absent(),
                 Value<double> totalAmount = const Value.absent(),
                 Value<String> paymentMethod = const Value.absent(),
                 Value<String?> bankName = const Value.absent(),
@@ -48491,6 +50115,7 @@ class $$ArReceiptsTableTableManager
                 receiptNo: receiptNo,
                 receiptDate: receiptDate,
                 customerId: customerId,
+                customerName: customerName,
                 totalAmount: totalAmount,
                 paymentMethod: paymentMethod,
                 bankName: bankName,
@@ -48508,6 +50133,7 @@ class $$ArReceiptsTableTableManager
                 required String receiptNo,
                 required DateTime receiptDate,
                 required String customerId,
+                required String customerName,
                 required double totalAmount,
                 Value<String> paymentMethod = const Value.absent(),
                 Value<String?> bankName = const Value.absent(),
@@ -48523,6 +50149,7 @@ class $$ArReceiptsTableTableManager
                 receiptNo: receiptNo,
                 receiptDate: receiptDate,
                 customerId: customerId,
+                customerName: customerName,
                 totalAmount: totalAmount,
                 paymentMethod: paymentMethod,
                 bankName: bankName,
@@ -52952,6 +54579,8 @@ class $AppDatabaseManager {
       $$CouponsTableTableManager(_db, _db.coupons);
   $$ArInvoicesTableTableManager get arInvoices =>
       $$ArInvoicesTableTableManager(_db, _db.arInvoices);
+  $$ArInvoiceItemsTableTableManager get arInvoiceItems =>
+      $$ArInvoiceItemsTableTableManager(_db, _db.arInvoiceItems);
   $$ArReceiptsTableTableManager get arReceipts =>
       $$ArReceiptsTableTableManager(_db, _db.arReceipts);
   $$ArReceiptAllocationsTableTableManager get arReceiptAllocations =>
