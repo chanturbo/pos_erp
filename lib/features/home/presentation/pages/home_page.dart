@@ -12,12 +12,15 @@ import '../../../ap/presentation/pages/ap_invoice_list_page.dart';
 import '../../../ar/presentation/pages/ar_invoice_list_page.dart';        // ✅ Day 36-38
 import '../../../ar/presentation/pages/ar_receipt_list_page.dart';        // ✅ Day 39-40
 import '../../../promotions/presentation/pages/promotion_list_page.dart'; // ✅ Day 41-45
+import '../../../branches/presentation/pages/branch_list_page.dart';      // ✅ Week 7
+import '../../../branches/presentation/pages/sync_status_page.dart';      // ✅ Week 7
+import '../../../branches/presentation/providers/branch_provider.dart';   // ✅ Week 7
 import '../../../testing/test_page.dart';
 import '../../../sales/presentation/pages/pos_page.dart';
 import '../../../sales/presentation/pages/sales_history_page.dart';
 import '../../../dashboard/presentation/pages/dashboard_page.dart';
 import '../../../inventory/presentation/pages/stock_balance_page.dart';
-import '../../../inventory/presentation/pages/stock_adjustment_page.dart'; // 🆕
+import '../../../inventory/presentation/pages/stock_adjustment_page.dart';
 import '../../../reports/presentation/pages/reports_page.dart';
 import '../../../../core/shortcuts/keyboard_shortcuts.dart';
 import '../../../settings/presentation/pages/settings_page.dart';
@@ -29,6 +32,7 @@ class HomePage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authProvider);
     final user = authState.user;
+    final syncAsync = ref.watch(syncStatusProvider); // ✅ Week 7
 
     return KeyboardShortcuts(
       onPosShortcut: () {
@@ -78,6 +82,38 @@ class HomePage extends ConsumerWidget {
           title: const Text('หน้าหลัก'),
           automaticallyImplyLeading: false,
           actions: [
+            // ✅ Week 7 — Sync status badge
+            syncAsync.when(
+              data: (sync) => IconButton(
+                icon: Stack(
+                  children: [
+                    Icon(
+                      sync.isOnline ? Icons.sync : Icons.sync_disabled,
+                      color: sync.isOnline ? null : Colors.red,
+                    ),
+                    if (sync.hasPending)
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        child: Container(
+                          width: 9,
+                          height: 9,
+                          decoration: const BoxDecoration(
+                            color: Colors.orange,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                tooltip: sync.pendingCount > 0
+                    ? 'รอ Sync ${sync.pendingCount} รายการ'
+                    : 'Sync สถานะ',
+                onPressed: () => _push(context, const SyncStatusPage()),
+              ),
+              loading: () => const SizedBox(width: 48),
+              error: (_, __) => const SizedBox(width: 48),
+            ),
             // Settings button
             IconButton(
               icon: const Icon(Icons.settings),
@@ -213,7 +249,7 @@ class HomePage extends ConsumerWidget {
                         onTap: () => _push(context, const SalesHistoryPage()),
                       ),
 
-                      // Row 2: คลัง  ← เพิ่ม ปรับสต๊อก ถัดจาก คลังสินค้า
+                      // Row 2: คลัง
                       _buildMenuCard(
                         context,
                         icon: Icons.warehouse,
@@ -221,7 +257,6 @@ class HomePage extends ConsumerWidget {
                         color: Colors.green,
                         onTap: () => _push(context, const StockBalancePage()),
                       ),
-                      // 🆕 ปรับสต๊อก
                       _buildMenuCard(
                         context,
                         icon: Icons.tune,
@@ -245,7 +280,7 @@ class HomePage extends ConsumerWidget {
                         onTap: () => _push(context, const SupplierListPage()),
                       ),
 
-                      // Row 3: จัดซื้อ  ← ลูกค้า/ซัพพลายเออร์ เลื่อนมาจาก Row 2
+                      // Row 3: จัดซื้อ
                       _buildMenuCard(
                         context,
                         icon: Icons.shopping_bag,
@@ -310,7 +345,7 @@ class HomePage extends ConsumerWidget {
                         onTap: () => _push(context, const ReportsPage()),
                       ),
 
-                      // ─── Row 5: โปรโมชั่น ────────────────────────────────
+                      // Row 5: โปรโมชั่น + สาขา
                       // ✅ Day 41-45
                       _buildMenuCard(
                         context,
@@ -318,6 +353,22 @@ class HomePage extends ConsumerWidget {
                         title: 'โปรโมชั่น',
                         color: Colors.orange.shade700,
                         onTap: () => _push(context, const PromotionListPage()),
+                      ),
+                      // ✅ Week 7
+                      _buildMenuCard(
+                        context,
+                        icon: Icons.store,
+                        title: 'จัดการสาขา',
+                        color: Colors.indigo.shade600,
+                        onTap: () => _push(context, const BranchListPage()),
+                      ),
+                      // ✅ Week 7
+                      _buildMenuCard(
+                        context,
+                        icon: Icons.sync_alt,
+                        title: 'Sync สถานะ',
+                        color: Colors.blueGrey,
+                        onTap: () => _push(context, const SyncStatusPage()),
                       ),
                     ],
                   ),

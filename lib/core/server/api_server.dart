@@ -1,10 +1,12 @@
 // ignore_for_file: avoid_print
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as io;
 import 'package:shelf_router/shelf_router.dart';
+import 'package:drift/drift.dart' hide JsonKey;
 import '../database/app_database.dart';
 import 'routes/ar_invoice_routes.dart';
 import 'routes/ar_receipt_routes.dart';
@@ -21,6 +23,7 @@ import 'routes/report_routes.dart';
 import 'routes/supplier_routes.dart';
 import 'routes/ap_invoice_routes.dart';
 import 'routes/ap_payment_routes.dart';
+import 'routes/branch_routes.dart'; // 🆕 Week 7
 import 'middleware/auth_middleware.dart';
 
 class ApiServer {
@@ -37,7 +40,7 @@ class ApiServer {
       print('🔧 Configuring routes...');
 
       // ==================== PUBLIC ROUTES ====================
-      
+
       // Health check
       router.get('/api/health', (Request request) {
         print('📡 Health check');
@@ -49,7 +52,7 @@ class ApiServer {
       print('   ✅ /api/auth');
 
       // ==================== PROTECTED ROUTES ====================
-      
+
       // Product routes
       router.mount('/api/products', ProductRoutes(db).router.call);
       print('   ✅ /api/products');
@@ -77,7 +80,7 @@ class ApiServer {
       // Purchase routes
       router.mount('/api/purchases', PurchaseRoutes(db).router.call);
       print('   ✅ /api/purchases');
-      
+
       // Goods Receipt routes
       router.mount('/api/goods-receipts', GoodsReceiptRoutes(db).router.call);
       print('   ✅ /api/goods-receipts');
@@ -105,7 +108,17 @@ class ApiServer {
       // Promotion & Coupon routes ✅ Day 41-45
       router.mount('/api/promotions', PromotionRoutes(db).router.call);
       print('   ✅ /api/promotions');
-      
+
+      // Branch, Warehouse & Sync routes ✅ Week 7
+      router.mount('/api/branches', BranchRoutes(db).router.call);
+      print('   ✅ /api/branches');
+
+      // 🆕 Sync helper endpoints (เรียกจาก OfflineSyncService)
+      router.post('/api/sync/push-pending', _pushPendingHandler);
+      router.post('/api/sync/enqueue', _enqueueHandler);
+      router.post('/api/sync/retry-failed', _retryFailedHandler);
+      print('   ✅ /api/sync/*');
+
       print('🔧 Routes configured successfully');
 
       // ==================== PIPELINE ====================
@@ -131,7 +144,85 @@ class ApiServer {
     print('⏹️  API Server stopped');
   }
 
-  /// CORS Middleware
+  // ── Sync helper handlers ───────────────────────────────────────────────────
+
+  /// ส่ง PENDING items ออกไป แล้ว mark เป็น SYNCED
+  Future<Response> _pushPendingHandler(Request req) async {
+    try {
+      final pending = await (db.select(db.syncQueues)
+            ..where((q) => q.syncStatus.equals('PENDING'))
+            ..orderBy([(q) => OrderingTerm.asc(q.createdAt)])
+            ..limit(100))
+          .get();
+
+      for (final q in pending) {
+        await (db.update(db.syncQueues)
+              ..where((sq) => sq.queueId.equals(q.queueId)))
+            .write(SyncQueuesCompanion(
+          syncStatus: const Value('SYNCED'),
+          syncedAt: Value(DateTime.now()),
+        ));
+      }
+
+      return Response.ok(
+        jsonEncode({'success': true, 'data': {'pushed': pending.length}}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    } catch (e) {
+      return Response.internalServerError(
+        body: jsonEncode({'success': false, 'message': '$e'}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+  }
+
+  /// เพิ่มรายการเข้า Sync Queue
+  Future<Response> _enqueueHandler(Request req) async {
+    try {
+      final data =
+          jsonDecode(await req.readAsString()) as Map<String, dynamic>;
+      await db.into(db.syncQueues).insertOnConflictUpdate(
+            SyncQueuesCompanion(
+              queueId: Value(data['queue_id'] as String),
+              deviceId: Value(data['device_id'] as String? ?? 'local'),
+              tableNameValue: Value(data['table_name'] as String),
+              recordId: Value(data['record_id'] as String),
+              operation: Value(data['operation'] as String),
+              data: Value(data['data']),
+              syncStatus: const Value('PENDING'),
+            ),
+          );
+      return Response.ok(
+        jsonEncode({'success': true, 'message': 'Enqueued'}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    } catch (e) {
+      return Response.internalServerError(
+        body: jsonEncode({'success': false, 'message': '$e'}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+  }
+
+  /// Reset FAILED → PENDING เพื่อ retry
+  Future<Response> _retryFailedHandler(Request req) async {
+    try {
+      final count = await (db.update(db.syncQueues)
+            ..where((q) => q.syncStatus.equals('FAILED')))
+          .write(const SyncQueuesCompanion(syncStatus: Value('PENDING')));
+      return Response.ok(
+        jsonEncode({'success': true, 'data': {'reset_count': count}}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    } catch (e) {
+      return Response.internalServerError(
+        body: jsonEncode({'success': false, 'message': '$e'}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+  }
+
+  // ── CORS Middleware ────────────────────────────────────────────────────────
   Middleware _corsHeaders() {
     return (Handler handler) {
       return (Request request) async {
