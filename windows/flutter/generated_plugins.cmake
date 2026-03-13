@@ -4,6 +4,8 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   connectivity_plus
+  permission_handler_windows
+  printing
   sqlite3_flutter_libs
 )
 
