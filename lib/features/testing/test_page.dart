@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/database/app_database.dart';
 import '../../core/database/seed_data.dart';
+import '../../shared/widgets/async_state_widgets.dart'; // ✅ Phase 4
+import '../../shared/widgets/loading_overlay.dart';     // ✅ Phase 4
 
 class TestPage extends ConsumerWidget {
   const TestPage({super.key});
@@ -87,7 +89,7 @@ class TestPage extends ConsumerWidget {
       ),
     );
   }
-  
+
   Widget _buildSection(
     BuildContext context, {
     required String title,
@@ -99,15 +101,15 @@ class TestPage extends ConsumerWidget {
         Text(
           title,
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
+                fontWeight: FontWeight.bold,
+              ),
         ),
         const SizedBox(height: 16),
         ...children,
       ],
     );
   }
-  
+
   Widget _buildTestButton(
     BuildContext context, {
     required IconData icon,
@@ -129,159 +131,109 @@ class TestPage extends ConsumerWidget {
       ),
     );
   }
-  
+
   Future<void> _seedData(BuildContext context) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('ยืนยัน'),
-        content: const Text('ต้องการสร้างข้อมูลทดสอบใช่หรือไม่?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('ยกเลิก'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('ยืนยัน'),
-          ),
-        ],
-      ),
+    // ✅ showConfirmDialog แทน showDialog AlertDialog ยาวๆ
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'ยืนยัน',
+      content: 'ต้องการสร้างข้อมูลทดสอบใช่หรือไม่?',
+      confirmLabel: 'ยืนยัน',
     );
-    
-    if (confirm != true) return;
-    
+
+    if (confirmed != true) return;
+
     try {
       final db = AppDatabase();
-      
+
+      // ✅ LoadingOverlay แทน showDialog CircularProgressIndicator
       if (context.mounted) {
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => const Center(
-            child: CircularProgressIndicator(),
-          ),
-        );
+        LoadingOverlay.show(context, message: 'กำลังสร้างข้อมูลทดสอบ...');
       }
-      
-      // ✅ เรียกแบบ static method
+
+      // ✅ เรียกแบบ static method (เหมือนเดิม)
       await SeedData.seedAll(db);
-      
+
       if (context.mounted) {
-        Navigator.pop(context); // Close loading
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ สร้างข้อมูลทดสอบสำเร็จ'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        LoadingOverlay.hide(context);
+        context.showSuccess('สร้างข้อมูลทดสอบสำเร็จ'); // ✅ แทน showSnackBar
       }
     } catch (e) {
       if (context.mounted) {
-        Navigator.pop(context); // Close loading
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ เกิดข้อผิดพลาด: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        LoadingOverlay.hide(context);
+        context.showError('เกิดข้อผิดพลาด: $e'); // ✅ แทน showSnackBar
       }
     }
   }
-  
+
   Future<void> _clearData(BuildContext context) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('⚠️ คำเตือน'),
-        content: const Text('ต้องการลบข้อมูลทั้งหมดใช่หรือไม่?\n(จะเก็บ Users ไว้)'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('ยกเลิก'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('ลบข้อมูล'),
-          ),
-        ],
-      ),
+    // ✅ showConfirmDialog พร้อม destructive: true (ปุ่มแดงอัตโนมัติ)
+    final confirmed = await showConfirmDialog(
+      context,
+      title: '⚠️ คำเตือน',
+      content: 'ต้องการลบข้อมูลทั้งหมดใช่หรือไม่?\n(จะเก็บ Users ไว้)',
+      confirmLabel: 'ลบข้อมูล',
+      destructive: true,
     );
-    
-    if (confirm != true) return;
-    
+
+    if (confirmed != true) return;
+
     try {
       final db = AppDatabase();
-      
+
+      // ✅ LoadingOverlay แทน showDialog CircularProgressIndicator
       if (context.mounted) {
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => const Center(
-            child: CircularProgressIndicator(),
-          ),
-        );
+        LoadingOverlay.show(context, message: 'กำลังลบข้อมูล...');
       }
-      
-      // ✅ ลบข้อมูลทีละตาราง (เรียงลำดับตาม foreign key)
+
+      // ✅ ลบข้อมูลทีละตาราง (เรียงลำดับตาม foreign key) — เหมือนเดิมทุกบรรทัด
       print('🗑️ Deleting stock movements...');
       await db.delete(db.stockMovements).go();
-      
+
       print('🗑️ Deleting sales order items...');
       await db.delete(db.salesOrderItems).go();
-      
+
       print('🗑️ Deleting sales orders...');
       await db.delete(db.salesOrders).go();
-      
+
       print('🗑️ Deleting products...');
       await db.delete(db.products).go();
-      
+
       print('🗑️ Deleting product groups...');
       await db.delete(db.productGroups).go();
-      
+
       print('🗑️ Deleting customers...');
       await db.delete(db.customers).go();
-      
+
       print('🗑️ Deleting warehouses...');
       await db.delete(db.warehouses).go();
-      
+
       print('🗑️ Deleting branches...');
       await db.delete(db.branches).go();
-      
+
       // ✅ ไม่ลบ users และ roles เพื่อให้ยัง login ได้
       print('✅ Data cleared (kept users & roles)');
-      
+
       if (context.mounted) {
-        Navigator.pop(context); // Close loading
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ ลบข้อมูลสำเร็จ (เก็บ Users ไว้)'),
-            backgroundColor: Colors.orange,
-          ),
-        );
+        LoadingOverlay.hide(context);
+        context.showWarning('ลบข้อมูลสำเร็จ (เก็บ Users ไว้)'); // ✅ แทน showSnackBar
       }
     } catch (e) {
       print('❌ Clear data error: $e');
-      
       if (context.mounted) {
-        Navigator.pop(context); // Close loading
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ เกิดข้อผิดพลาด: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        LoadingOverlay.hide(context);
+        context.showError('เกิดข้อผิดพลาด: $e'); // ✅ แทน showSnackBar
       }
     }
   }
-  
+
   Future<void> _checkUsers(BuildContext context) async {
     try {
       final db = AppDatabase();
       final users = await db.select(db.users).get();
-      
+
       if (context.mounted) {
+        // คง showDialog ไว้ (เป็น info dialog ไม่ใช่ confirm)
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
@@ -305,19 +257,15 @@ class TestPage extends ConsumerWidget {
         );
       }
     } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
-      }
+      if (context.mounted) context.showError('Error: $e'); // ✅
     }
   }
-  
+
   Future<void> _checkProducts(BuildContext context) async {
     try {
       final db = AppDatabase();
       final products = await db.select(db.products).get();
-      
+
       if (context.mounted) {
         showDialog(
           context: context,
@@ -329,8 +277,14 @@ class TestPage extends ConsumerWidget {
               children: [
                 Text('จำนวน: ${products.length} รายการ'),
                 const SizedBox(height: 16),
-                ...products.take(5).map((p) => Text('• ${p.productCode}: ${p.productName}')),
-                if (products.length > 5) const Text('...'),
+                ...products
+                    .take(5)
+                    .map((p) => Text('• ${p.productCode}: ${p.productName}')),
+                if (products.length > 5)
+                  Text(
+                    '... และอีก ${products.length - 5} รายการ',
+                    style: const TextStyle(color: Colors.grey),
+                  ),
               ],
             ),
             actions: [
@@ -343,19 +297,15 @@ class TestPage extends ConsumerWidget {
         );
       }
     } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
-      }
+      if (context.mounted) context.showError('Error: $e'); // ✅
     }
   }
-  
+
   Future<void> _checkCustomers(BuildContext context) async {
     try {
       final db = AppDatabase();
       final customers = await db.select(db.customers).get();
-      
+
       if (context.mounted) {
         showDialog(
           context: context,
@@ -367,7 +317,8 @@ class TestPage extends ConsumerWidget {
               children: [
                 Text('จำนวน: ${customers.length} คน'),
                 const SizedBox(height: 16),
-                ...customers.map((c) => Text('• ${c.customerCode}: ${c.customerName}')),
+                ...customers
+                    .map((c) => Text('• ${c.customerCode}: ${c.customerName}')),
               ],
             ),
             actions: [
@@ -380,11 +331,7 @@ class TestPage extends ConsumerWidget {
         );
       }
     } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
-      }
+      if (context.mounted) context.showError('Error: $e'); // ✅
     }
   }
 }
