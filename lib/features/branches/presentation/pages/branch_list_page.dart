@@ -2,7 +2,6 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 import '../providers/branch_provider.dart';
 import '../../data/models/branch_model.dart';
 import 'branch_form_page.dart';
@@ -58,7 +57,7 @@ class BranchListPage extends ConsumerWidget {
                         height: 20,
                         child: CircularProgressIndicator(
                             color: Colors.white, strokeWidth: 2)))),
-            error: (_, __) => const Icon(Icons.sync_problem),
+            error: (_, _) => const Icon(Icons.sync_problem),
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
