@@ -7,6 +7,7 @@ import 'package:drift/drift.dart' hide Column;
 import 'package:intl/date_symbol_data_local.dart';
 import 'core/config/app_mode.dart';
 import 'shared/theme/app_theme.dart';
+import 'shared/theme/theme_provider.dart'; // 🌙 เพิ่ม
 import 'features/auth/presentation/providers/auth_provider.dart';
 import 'routes/app_router.dart';
 import 'core/database/app_database.dart';
@@ -16,7 +17,8 @@ import 'core/database/seed_data.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await initializeDateFormatting('th_TH'); // ✅ เพิ่ม
+  await initializeDateFormatting('th_TH');
+
   // Initialize App Mode
   await AppModeConfig.initialize();
   
@@ -111,6 +113,7 @@ class MyApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authProvider);
+    final themeMode = ref.watch(themeModeProvider); // 🌙 เพิ่ม
     
     return ScreenUtilInit(
       designSize: const Size(1920, 1080),
@@ -120,6 +123,8 @@ class MyApp extends ConsumerWidget {
         return MaterialApp(
           title: 'POS + ERP System',
           theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,  // 🌙 เพิ่ม
+          themeMode: themeMode,           // 🌙 เพิ่ม
           debugShowCheckedModeBanner: false,
           
           // เลือกหน้าเริ่มต้นตาม Auth State
