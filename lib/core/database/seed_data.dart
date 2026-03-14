@@ -96,7 +96,7 @@ class SeedData {
         userId: 'USR001',
         // ❌ ลบ companyId ออก (ไม่มีใน schema)
         username: 'admin',
-        passwordHash: 'admin123',
+        passwordHash: '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9', // SHA256('admin123')
         fullName: 'ผู้ดูแลระบบ',
         email: const Value('admin@pos.com'),
         roleId: const Value('ADMIN'),
@@ -106,7 +106,7 @@ class SeedData {
       UsersCompanion.insert(
         userId: 'USR002',
         username: 'cashier',
-        passwordHash: 'cashier123',
+        passwordHash: 'b4c94003c562bb0d89535eca77f07284fe560fd48a7cc1ed99f0a56263d616ba', // SHA256('cashier123')
         fullName: 'แคชเชียร์',
         email: const Value('cashier@pos.com'),
         roleId: const Value('CASHIER'),

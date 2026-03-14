@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../providers/auth_provider.dart';
+import '../../../../routes/app_router.dart';
+import '../providers/auth_provider.dart'; // ✅ เพิ่ม สำหรับ isCashierRole helper
 
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
@@ -10,49 +11,58 @@ class LoginPage extends ConsumerStatefulWidget {
 }
 
 class _LoginPageState extends ConsumerState<LoginPage> {
-  final _formKey = GlobalKey<FormState>();
+  final _formKey           = GlobalKey<FormState>();
   final _usernameController = TextEditingController(text: 'admin');
   final _passwordController = TextEditingController(text: 'admin123');
-  bool _obscurePassword = true;
-  
+  bool _obscurePassword    = true;
+
   @override
   void dispose() {
     _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
-  
+
   Future<void> _handleLogin() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-    
+    if (!_formKey.currentState!.validate()) return;
+
     final success = await ref.read(authProvider.notifier).login(
       username: _usernameController.text.trim(),
       password: _passwordController.text,
     );
-    
-    if (mounted) {
-      if (success) {
-        // Navigate to home
-        Navigator.of(context).pushReplacementNamed('/home');
-      } else {
-        // Show error
-        final error = ref.read(authProvider).error;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(error ?? 'เข้าสู่ระบบไม่สำเร็จ'),
-            backgroundColor: Colors.red,
-          ),
+
+    if (!mounted) return;
+
+    if (success) {
+      final user   = ref.read(authProvider).user;
+      final roleId = user?.roleId?.toUpperCase() ?? '';
+
+      // ── Role-based redirect ─────────────────────────────────
+      // CASHIER / SALE / POS → เข้า POS โดยตรง (isCashierMode: true)
+      // ADMIN / อื่นๆ         → เข้าหน้าหลัก
+      if (AppRouter.isCashierRole(roleId)) {
+        Navigator.of(context).pushReplacementNamed(
+          AppRouter.pos,
+          arguments: true, // isCashierMode = true
         );
+      } else {
+        Navigator.of(context).pushReplacementNamed(AppRouter.home);
       }
+    } else {
+      final error = ref.read(authProvider).error;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error ?? 'เข้าสู่ระบบไม่สำเร็จ'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
-  
+
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
-    
+
     return Scaffold(
       body: Center(
         child: SingleChildScrollView(
@@ -75,23 +85,25 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                         color: Colors.blue,
                       ),
                       const SizedBox(height: 16),
-                      
+
                       // Title
                       Text(
                         'POS + ERP System',
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         'เข้าสู่ระบบ',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: Colors.grey,
-                        ),
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(color: Colors.grey),
                       ),
                       const SizedBox(height: 32),
-                      
+
                       // Username
                       TextFormField(
                         controller: _usernameController,
@@ -100,16 +112,14 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                           prefixIcon: Icon(Icons.person),
                           border: OutlineInputBorder(),
                         ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'กรุณากรอก Username';
-                          }
-                          return null;
-                        },
+                        validator: (v) =>
+                            (v == null || v.isEmpty)
+                                ? 'กรุณากรอก Username'
+                                : null,
                         enabled: !authState.isLoading,
                       ),
                       const SizedBox(height: 16),
-                      
+
                       // Password
                       TextFormField(
                         controller: _passwordController,
@@ -118,36 +128,30 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                           labelText: 'Password',
                           prefixIcon: const Icon(Icons.lock),
                           suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscurePassword
-                                  ? Icons.visibility
-                                  : Icons.visibility_off,
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                _obscurePassword = !_obscurePassword;
-                              });
-                            },
+                            icon: Icon(_obscurePassword
+                                ? Icons.visibility
+                                : Icons.visibility_off),
+                            onPressed: () => setState(
+                                () => _obscurePassword = !_obscurePassword),
                           ),
                           border: const OutlineInputBorder(),
                         ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'กรุณากรอก Password';
-                          }
-                          return null;
-                        },
+                        validator: (v) =>
+                            (v == null || v.isEmpty)
+                                ? 'กรุณากรอก Password'
+                                : null,
                         enabled: !authState.isLoading,
                         onFieldSubmitted: (_) => _handleLogin(),
                       ),
                       const SizedBox(height: 24),
-                      
+
                       // Login Button
                       SizedBox(
                         width: double.infinity,
                         height: 48,
                         child: ElevatedButton(
-                          onPressed: authState.isLoading ? null : _handleLogin,
+                          onPressed:
+                              authState.isLoading ? null : _handleLogin,
                           child: authState.isLoading
                               ? const SizedBox(
                                   height: 20,
@@ -164,8 +168,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      
-                      // Info
+
+                      // Info box — รักษาจากไฟล์เดิม
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
@@ -174,11 +178,12 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                         ),
                         child: const Row(
                           children: [
-                            Icon(Icons.info_outline, size: 20, color: Colors.blue),
+                            Icon(Icons.info_outline,
+                                size: 20, color: Colors.blue),
                             SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                'Username: admin\nPassword: admin123',
+                                'Admin: admin / admin123\nCashier: cashier / cashier123  (→ เข้า POS โดยตรง)',
                                 style: TextStyle(fontSize: 12),
                               ),
                             ),
