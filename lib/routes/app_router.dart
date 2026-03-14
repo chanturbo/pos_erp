@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../features/auth/presentation/pages/login_page.dart';
+import '../features/auth/presentation/providers/auth_provider.dart'; // ✅ เพิ่ม สำหรับ _RootRedirect
 import '../features/home/presentation/pages/home_page.dart';
 import '../features/sales/presentation/pages/pos_page.dart';
 import '../shared/utils/app_transitions.dart'; // ✅ Phase 4
@@ -7,12 +9,14 @@ import '../shared/utils/app_transitions.dart'; // ✅ Phase 4
 /// ╔══════════════════════════════════════════════════════════════╗
 /// ║  AppRouter — Role-based Navigation                           ║
 /// ╠══════════════════════════════════════════════════════════════╣
-/// ║  CASHIER / SALE / POS  →  /pos   (isCashierMode: true)      ║
-/// ║  ADMIN / อื่นๆ          →  /home                             ║
+/// ║  /            → redirect ตาม auth state (แก้ "no route /")  ║
+/// ║  CASHIER       →  /pos   (isCashierMode: true)              ║
+/// ║  ADMIN / อื่นๆ →  /home                                     ║
 /// ╚══════════════════════════════════════════════════════════════╝
 class AppRouter {
   AppRouter._();
 
+  static const String root  = '/';       // ✅ เพิ่ม — แก้ back จาก PosPage
   static const String login = '/login';
   static const String home  = '/home';
   static const String pos   = '/pos';
@@ -26,6 +30,16 @@ class AppRouter {
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
+      // ── Root: redirect ตาม auth state ──────────────────────
+      // ✅ เพิ่มใหม่ — ป้องกัน "no route defined for /"
+      // MaterialApp จะ push '/' เข้า stack โดยอัตโนมัติเมื่อ
+      // initialRoute ไม่ใช่ '/' ทำให้เกิด error เมื่อ back
+      case root:
+        return FadeSlideRoute(
+          settings: settings,
+          page: const _RootRedirect(),
+        );
+
       // ── Login ─────────────────────────────────────────────
       case login:
         return FadeSlideRoute(
@@ -62,5 +76,50 @@ class AppRouter {
           ),
         );
     }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// _RootRedirect
+// อ่าน auth state แล้ว pushReplacement ไปหน้าที่ถูกต้อง
+// ทำให้ route '/' มีอยู่จริง → ไม่เกิด "no route defined for /"
+// ─────────────────────────────────────────────────────────────────
+class _RootRedirect extends ConsumerWidget {
+  const _RootRedirect();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authProvider);
+
+    // ยังโหลด auth อยู่ — รอก่อน
+    if (authState.isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    // redirect หลัง frame แรก render เสร็จ
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!context.mounted) return;
+
+      if (authState.isAuthenticated) {
+        final roleId = authState.user?.roleId?.toUpperCase() ?? '';
+        if (AppRouter.isCashierRole(roleId)) {
+          Navigator.of(context).pushReplacementNamed(
+            AppRouter.pos,
+            arguments: true, // isCashierMode
+          );
+        } else {
+          Navigator.of(context).pushReplacementNamed(AppRouter.home);
+        }
+      } else {
+        Navigator.of(context).pushReplacementNamed(AppRouter.login);
+      }
+    });
+
+    // Splash ระหว่างรอ redirect
+    return const Scaffold(
+      body: Center(child: CircularProgressIndicator()),
+    );
   }
 }

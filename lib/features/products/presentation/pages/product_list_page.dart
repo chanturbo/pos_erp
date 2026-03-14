@@ -179,7 +179,7 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
   // ─────────────────────────────────────────────────────────────
   Widget _buildToolbar(AsyncValue productAsync) {
     return Container(
-      color: Colors.white,
+      color: Theme.of(context).colorScheme.surface,
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       child: Column(
         children: [
@@ -329,11 +329,14 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
             ),
             title: Text(p.productName,
                 style: const TextStyle(
-                    fontSize: 14, fontWeight: FontWeight.w600)),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1A1A1A))), // ✅ เข้มเสมอ
             subtitle: Text(
               'รหัส: ${p.productCode}  ·  หน่วย: ${p.baseUnit}',
-              style: const TextStyle(fontSize: 12),
-            ),
+              style: const TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF666666))), // ✅ เข้มเสมอ
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -459,11 +462,16 @@ class _ProductTableRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = product;
+    // ── สีที่คงที่ไม่ขึ้นกับ dark mode ─────────────────────────
+    // Table/Card ใช้พื้นหลังขาว → ตัวหนังสือต้องเข้มเสมอ
+    const nameColor = Color(0xFF1A1A1A);
+    const codeColor = Color(0xFF555555);
+
     return InkWell(
       onDoubleTap: onEdit,
       hoverColor: _orange.withValues(alpha: 0.05),
       child: Container(
-        color: isEven ? Colors.white : _surface,
+        color: isEven ? Colors.white : const Color(0xFFF9F9F7),
         child: Row(
           children: [
             // No.
@@ -471,8 +479,8 @@ class _ProductTableRow extends StatelessWidget {
               width: 48,
               child: Center(
                 child: Text('$no',
-                    style: TextStyle(
-                        fontSize: 12, color: Colors.grey[400])),
+                    style: const TextStyle(
+                        fontSize: 12, color: Color(0xFFBBBBBB))),
               ),
             ),
             // รหัส
@@ -485,7 +493,8 @@ class _ProductTableRow extends StatelessWidget {
                     style: const TextStyle(
                         fontFamily: 'monospace',
                         fontSize: 13,
-                        fontWeight: FontWeight.w500)),
+                        fontWeight: FontWeight.w500,
+                        color: codeColor)),
               ),
             ),
             // ชื่อ + barcode
@@ -498,12 +507,15 @@ class _ProductTableRow extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(p.productName,
-                        style: const TextStyle(fontSize: 13),
+                        style: const TextStyle(
+                            fontSize: 13,
+                            color: nameColor), // ✅ เข้มเสมอ
                         overflow: TextOverflow.ellipsis),
                     if (p.barcode != null && p.barcode!.isNotEmpty)
                       Text(p.barcode!,
-                          style: TextStyle(
-                              fontSize: 11, color: Colors.grey[500])),
+                          style: const TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF999999))),
                   ],
                 ),
               ),
@@ -513,7 +525,9 @@ class _ProductTableRow extends StatelessWidget {
               flex: 1,
               child: Center(
                   child: Text(p.baseUnit,
-                      style: const TextStyle(fontSize: 12))),
+                      style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF1A1A1A)))),
             ),
             // ราคาขาย
             Expanded(

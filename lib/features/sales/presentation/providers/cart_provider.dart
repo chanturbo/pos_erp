@@ -173,6 +173,22 @@ class CartNotifier extends Notifier<CartState> {
     }
   }
   
+  /// ตั้งค่าจำนวนโดยตรง — ใช้กับ inline edit ใน CartPanel
+  void setQuantity(String productId, double quantity) {
+    final items = List<CartItem>.from(state.items);
+    final index =
+        items.indexWhere((item) => item.productId == productId);
+    if (index >= 0) {
+      final item = items[index];
+      final safe = quantity < 0.001 ? 1.0 : quantity;
+      items[index] = item.copyWith(
+        quantity: safe,
+        amount: safe * item.unitPrice,
+      );
+      state = state.copyWith(items: items);
+    }
+  }
+
   /// ลบสินค้า
   void removeItem(String productId) {
     final items = state.items.where((item) => item.productId != productId).toList();

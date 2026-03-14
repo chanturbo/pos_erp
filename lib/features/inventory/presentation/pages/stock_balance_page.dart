@@ -423,12 +423,16 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
                 color: Colors.white,
               ),
             ),
-            title: Text(s.productName),
+            title: Text(s.productName,
+                style: const TextStyle(
+                    color: Color(0xFF1A1A1A))), // ✅
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('รหัส: ${s.productCode}'),
-                Text('คลัง: ${s.warehouseName}'),
+                Text('รหัส: ${s.productCode}',
+                    style: const TextStyle(color: Color(0xFF555555))),
+                Text('คลัง: ${s.warehouseName}',
+                    style: const TextStyle(color: Color(0xFF555555))),
               ],
             ),
             trailing: Column(
@@ -586,6 +590,13 @@ class _StockTableRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // ── สีคงที่ ไม่ขึ้นกับ dark mode ──────────────────────────
+    const nameColor  = Color(0xFF1A1A1A);
+    const codeColor  = Color(0xFF555555);
+    const whColor    = Color(0xFF666666);
+    const unitColor  = Color(0xFF1A1A1A);
+    const noColor    = Color(0xFFBBBBBB);
+
     return InkWell(
       onTap: onTap,
       hoverColor: _orange.withValues(alpha: 0.05),
@@ -593,7 +604,7 @@ class _StockTableRow extends StatelessWidget {
         decoration: BoxDecoration(
           color: isLow
               ? const Color(0xFFFFF8E1)
-              : (isEven ? Colors.white : _surface),
+              : (isEven ? Colors.white : const Color(0xFFF9F9F7)),
           border: isLow
               ? const Border(
                   left: BorderSide(color: _warning, width: 3))
@@ -606,8 +617,8 @@ class _StockTableRow extends StatelessWidget {
               width: 48,
               child: Center(
                 child: Text('$no',
-                    style: TextStyle(
-                        fontSize: 12, color: Colors.grey[400])),
+                    style: const TextStyle(
+                        fontSize: 12, color: noColor)),
               ),
             ),
             // รหัส
@@ -620,7 +631,8 @@ class _StockTableRow extends StatelessWidget {
                     style: const TextStyle(
                         fontSize: 13,
                         fontFamily: 'monospace',
-                        fontWeight: FontWeight.w500)),
+                        fontWeight: FontWeight.w500,
+                        color: codeColor)), // ✅
               ),
             ),
             // ชื่อ
@@ -630,7 +642,9 @@ class _StockTableRow extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(
                     vertical: 11, horizontal: 8),
                 child: Text(stock.productName,
-                    style: const TextStyle(fontSize: 13),
+                    style: const TextStyle(
+                        fontSize: 13,
+                        color: nameColor), // ✅
                     overflow: TextOverflow.ellipsis),
               ),
             ),
@@ -640,8 +654,9 @@ class _StockTableRow extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: Text(stock.warehouseName,
-                    style: TextStyle(
-                        fontSize: 12, color: Colors.grey[600])),
+                    style: const TextStyle(
+                        fontSize: 12,
+                        color: whColor)), // ✅
               ),
             ),
             // คงเหลือ
@@ -667,9 +682,10 @@ class _StockTableRow extends StatelessWidget {
               flex: 1,
               child: Center(
                   child: Text(stock.baseUnit,
-                      style: const TextStyle(fontSize: 12))),
+                      style: const TextStyle(
+                          fontSize: 12,
+                          color: unitColor))),
             ),
-            // สถานะ badge
             Expanded(
               flex: 2,
               child: Center(

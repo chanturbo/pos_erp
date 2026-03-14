@@ -2,22 +2,31 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../products/presentation/providers/product_provider.dart';
 import '../../../customers/data/models/customer_model.dart';
-import '../../../auth/presentation/providers/auth_provider.dart'; // ✅ เพิ่ม สำหรับ isCashierMode
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/cart_provider.dart';
 import '../widgets/product_grid.dart';
 import '../widgets/cart_panel.dart';
 import '../widgets/customer_selector_dialog.dart';
 import '../widgets/discount_dialog.dart';
 import '../widgets/hold_orders_dialog.dart';
-import '../../../../shared/services/mobile_scanner_service.dart';  // ✅ Phase 5
-import '../../../../shared/widgets/barcode_listener.dart';         // ✅ USB Scanner
+import '../../../../shared/services/mobile_scanner_service.dart'; // ✅ Phase 5
+import '../../../../shared/widgets/barcode_listener.dart';        // ✅ USB Scanner
+import '../../../../shared/theme/app_theme.dart';
+
+// ── OAG Identity tokens ──────────────────────────────────────────
+const _navy    = AppTheme.navyColor;
+const _orange  = AppTheme.primaryColor;
+const _surface = AppTheme.surfaceColor;
+const _border  = AppTheme.borderColor;
+const _success = AppTheme.successColor;
+const _error   = AppTheme.errorColor;
+const _info    = AppTheme.infoColor;
 
 class PosPage extends ConsumerStatefulWidget {
   /// isCashierMode = true  → Cashier login โดยตรง
   ///   - leading = Logout (ไม่มี back button)
   ///   - PopScope ปิด back gesture
-  ///   - AppBar แสดง cashier badge
-  /// isCashierMode = false → เข้าจาก HomePage ปกติ (มี back button)
+  /// isCashierMode = false → เข้าจาก HomePage ปกติ
   final bool isCashierMode;
 
   const PosPage({super.key, this.isCashierMode = false});
@@ -36,9 +45,7 @@ class _PosPageState extends ConsumerState<PosPage> {
     super.dispose();
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // Logout — ใช้เฉพาะ Cashier Mode
-  // ─────────────────────────────────────────────────────────────
+  // ── Logout (Cashier Mode) ────────────────────────────────────
   Future<void> _handleLogout() async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -72,20 +79,23 @@ class _PosPageState extends ConsumerState<PosPage> {
     final holdOrdersState = ref.watch(holdOrdersProvider);
     final user            = widget.isCashierMode
         ? ref.watch(authProvider).user
-        : null; // อ่าน user เฉพาะตอนต้องการแสดง badge
+        : null;
 
-    // ✅ ครอบด้วย PopScope เมื่อเป็น Cashier Mode (ปิด back gesture)
+    final hasCustomer = cartState.customerId != null &&
+        cartState.customerId != 'WALK_IN';
+
     return PopScope(
       canPop: !widget.isCashierMode,
-      // ✅ BarcodeListener ครอบทั้งหน้า POS — รักษาจากไฟล์เดิม
+      // ✅ BarcodeListener ครอบทั้งหน้า
       child: BarcodeListener(
         onBarcodeScanned: (barcode) {
           _searchController.text = barcode;
           setState(() => _searchQuery = barcode);
         },
         child: Scaffold(
+          backgroundColor: _surface,
           appBar: AppBar(
-            // ── Leading ──────────────────────────────────────
+            // ── Leading ────────────────────────────────────
             automaticallyImplyLeading: !widget.isCashierMode,
             leading: widget.isCashierMode
                 ? IconButton(
@@ -97,104 +107,113 @@ class _PosPageState extends ConsumerState<PosPage> {
 
             title: Row(
               children: [
-                // ── Cashier Badge (เฉพาะ isCashierMode) ──────
+                // Cashier badge
                 if (widget.isCashierMode && user != null) ...[
                   Container(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 8, vertical: 3),
                     margin: const EdgeInsets.only(right: 10),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE57200).withValues(alpha: 0.20),
+                      color: _orange.withValues(alpha: 0.20),
                       borderRadius: BorderRadius.circular(6),
                       border: Border.all(
-                        color: const Color(0xFFE57200).withValues(alpha: 0.5),
-                      ),
+                          color: _orange.withValues(alpha: 0.5)),
                     ),
                     child: Text(
                       user.fullName,
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFFFF9D45),
+                        color: AppTheme.primaryLight,
                       ),
                     ),
                   ),
                 ],
 
                 const Text('จุดขาย'),
-                const SizedBox(width: 16),
+                const SizedBox(width: 12),
 
-                // ✅ Customer chip — รักษาจากไฟล์เดิม
+                // ── Customer chip ───────────────────────────
                 Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: cartState.customerId != null &&
-                              cartState.customerId != 'WALK_IN'
-                          ? Colors.blue[100]
-                          : Colors.grey[200],
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: cartState.customerId != null &&
-                                cartState.customerId != 'WALK_IN'
-                            ? Colors.blue
-                            : Colors.grey,
-                        width: 1,
+                  child: GestureDetector(
+                    onTap: () async {
+                      final result = await showDialog<CustomerModel?>(
+                        context: context,
+                        builder: (_) => const CustomerSelectorDialog(),
+                      );
+                      if (result != null) {
+                        ref.read(cartProvider.notifier).setCustomer(
+                          result.customerId,
+                          result.customerName,
+                        );
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        // ลูกค้าที่เลือก = info tint, ลูกค้าทั่วไป = navy tint
+                        color: hasCustomer
+                            ? AppTheme.infoContainer
+                            : const Color(0xFF1F2E54),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: hasCustomer
+                              ? _info.withValues(alpha: 0.5)
+                              : AppTheme.navyBorder,
+                          width: 1,
+                        ),
                       ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.person,
-                          size: 16,
-                          color: cartState.customerId != null &&
-                                  cartState.customerId != 'WALK_IN'
-                              ? Colors.blue
-                              : Colors.grey[700],
-                        ),
-                        const SizedBox(width: 8),
-                        Flexible(
-                          child: Text(
-                            cartState.customerName ?? 'ลูกค้าทั่วไป',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: cartState.customerId != null &&
-                                      cartState.customerId != 'WALK_IN'
-                                  ? Colors.blue
-                                  : Colors.grey[700],
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.person,
+                            size: 14,
+                            color: hasCustomer
+                                ? _info
+                                : Colors.white60,
+                          ),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              cartState.customerName ?? 'ลูกค้าทั่วไป',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: hasCustomer
+                                    ? _info
+                                    : Colors.white70,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            overflow: TextOverflow.ellipsis,
                           ),
-                        ),
-                        if (cartState.customerId != null &&
-                            cartState.customerId != 'WALK_IN') ...[
-                          const SizedBox(width: 4),
-                          InkWell(
-                            onTap: () {
-                              ref.read(cartProvider.notifier).setCustomer(
-                                  'WALK_IN', 'ลูกค้าทั่วไป');
-                            },
-                            child: const Icon(Icons.close,
-                                size: 16, color: Colors.blue),
-                          ),
+                          if (hasCustomer) ...[
+                            const SizedBox(width: 4),
+                            InkWell(
+                              onTap: () => ref
+                                  .read(cartProvider.notifier)
+                                  .setCustomer('WALK_IN', 'ลูกค้าทั่วไป'),
+                              borderRadius: BorderRadius.circular(8),
+                              child: Icon(Icons.close,
+                                  size: 14, color: _info),
+                            ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
                   ),
                 ),
 
-                const SizedBox(width: 16),
+                const SizedBox(width: 12),
 
-                // Cart count badge
+                // Cart count badge — Orange แทน red
                 if (cartState.itemCount > 0)
                   Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 4),
+                        horizontal: 10, vertical: 3),
                     decoration: BoxDecoration(
-                      color: Colors.red,
+                      color: _orange,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
@@ -202,6 +221,7 @@ class _PosPageState extends ConsumerState<PosPage> {
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
+                        fontSize: 12,
                       ),
                     ),
                   ),
@@ -211,7 +231,7 @@ class _PosPageState extends ConsumerState<PosPage> {
             actions: [
               // Customer Button
               IconButton(
-                icon: const Icon(Icons.person_add),
+                icon: const Icon(Icons.person_add_outlined),
                 tooltip: 'เลือกลูกค้า',
                 onPressed: () async {
                   final result = await showDialog<CustomerModel?>(
@@ -229,7 +249,7 @@ class _PosPageState extends ConsumerState<PosPage> {
 
               // Discount Button
               IconButton(
-                icon: const Icon(Icons.discount),
+                icon: const Icon(Icons.discount_outlined),
                 tooltip: 'ส่วนลด',
                 onPressed: () async {
                   final result = await showDialog<Map<String, double>>(
@@ -249,14 +269,12 @@ class _PosPageState extends ConsumerState<PosPage> {
               Stack(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.folder),
+                    icon: const Icon(Icons.folder_outlined),
                     tooltip: 'บิลที่พัก',
-                    onPressed: () {
-                      showDialog(
-                        context: context,
-                        builder: (_) => const HoldOrdersDialog(),
-                      );
-                    },
+                    onPressed: () => showDialog(
+                      context: context,
+                      builder: (_) => const HoldOrdersDialog(),
+                    ),
                   ),
                   if (holdOrdersState.orders.isNotEmpty)
                     Positioned(
@@ -265,7 +283,7 @@ class _PosPageState extends ConsumerState<PosPage> {
                       child: Container(
                         padding: const EdgeInsets.all(4),
                         decoration: const BoxDecoration(
-                          color: Colors.red,
+                          color: _orange, // Orange แทน red
                           shape: BoxShape.circle,
                         ),
                         constraints: const BoxConstraints(
@@ -291,41 +309,62 @@ class _PosPageState extends ConsumerState<PosPage> {
           // ── Body ─────────────────────────────────────────────
           body: Column(
             children: [
-              // Search Bar & Hold Button
-              Padding(
-                padding: const EdgeInsets.all(16),
+              // ── Toolbar: Search + Hold button ───────────────
+              Container(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  border: Border(
+                    bottom: BorderSide(color: _border),
+                  ),
+                ),
                 child: Row(
                   children: [
                     Expanded(
-                      child: TextField(
-                        controller: _searchController,
-                        decoration: InputDecoration(
-                          hintText: 'ค้นหาสินค้า...',
-                          prefixIcon: const Icon(Icons.search),
-                          // ✅ ScannerButton เมื่อช่องว่าง — รักษาจากไฟล์เดิม
-                          suffixIcon: _searchQuery.isNotEmpty
-                              ? IconButton(
-                                  icon: const Icon(Icons.clear),
-                                  onPressed: () {
-                                    _searchController.clear();
-                                    setState(() => _searchQuery = '');
-                                  },
-                                )
-                              : ScannerButton(
-                                  tooltip: 'สแกนบาร์โค้ดสินค้า',
-                                  onScanned: (value) {
-                                    _searchController.text = value;
-                                    setState(() => _searchQuery = value);
-                                  },
-                                ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
+                      child: SizedBox(
+                        height: 40,
+                        child: TextField(
+                          controller: _searchController,
+                          decoration: InputDecoration(
+                            hintText: 'ค้นหาสินค้า / บาร์โค้ด...',
+                            prefixIcon:
+                                const Icon(Icons.search, size: 18),
+                            suffixIcon: _searchQuery.isNotEmpty
+                                ? IconButton(
+                                    icon:
+                                        const Icon(Icons.clear, size: 16),
+                                    onPressed: () {
+                                      _searchController.clear();
+                                      setState(() => _searchQuery = '');
+                                    },
+                                  )
+                                // ✅ ScannerButton เมื่อช่องว่าง
+                                : ScannerButton(
+                                    tooltip: 'สแกนบาร์โค้ดสินค้า',
+                                    onScanned: (value) {
+                                      _searchController.text = value;
+                                      setState(
+                                          () => _searchQuery = value);
+                                    },
+                                  ),
+                            isDense: true,
+                            contentPadding: EdgeInsets.zero,
+                            border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8)),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(
+                                  color: _orange, width: 1.5),
+                            ),
                           ),
+                          onChanged: (v) =>
+                              setState(() => _searchQuery = v),
                         ),
-                        onChanged: (v) => setState(() => _searchQuery = v),
                       ),
                     ),
                     const SizedBox(width: 12),
+
+                    // พักบิล button — OAG Orange
                     ElevatedButton.icon(
                       onPressed: cartState.items.isEmpty
                           ? null
@@ -335,78 +374,65 @@ class _PosPageState extends ConsumerState<PosPage> {
                                 builder: (_) => _HoldOrderNameDialog(),
                               );
                               if (result != null && result.isNotEmpty) {
-                                ref.read(cartProvider.notifier).hold(result);
+                                ref
+                                    .read(cartProvider.notifier)
+                                    .hold(result);
                                 if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                        content: Text('พักบิล: $result')),
-                                  );
+                                  ScaffoldMessenger.of(context)
+                                      .showSnackBar(SnackBar(
+                                    content: Text('พักบิล: $result'),
+                                    backgroundColor: _orange,
+                                    behavior: SnackBarBehavior.floating,
+                                  ));
                                 }
                               }
                             },
-                      icon: const Icon(Icons.save),
+                      icon: const Icon(Icons.bookmark_add_outlined,
+                          size: 16),
                       label: const Text('พักบิล'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.orange,
+                        backgroundColor: _orange,
+                        foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 16,
-                        ),
+                            horizontal: 16, vertical: 10),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
                       ),
                     ),
                   ],
                 ),
               ),
 
-              // Main Content
+              // ── Main Content ─────────────────────────────────
               Expanded(
                 child: Row(
                   children: [
-                    // Product Grid (60%)
+                    // Product Grid (60%) — Navy header ใน product_grid
                     Expanded(
                       flex: 60,
                       child: productAsync.when(
                         data: (products) {
-                          final filteredProducts = products.where((product) {
+                          final filtered = products.where((p) {
                             if (_searchQuery.isEmpty) return true;
                             final q = _searchQuery.toLowerCase();
-                            return product.productName
+                            return p.productName
                                     .toLowerCase()
                                     .contains(q) ||
-                                product.productCode
+                                p.productCode
                                     .toLowerCase()
                                     .contains(q) ||
-                                (product.barcode
+                                (p.barcode
                                         ?.toLowerCase()
                                         .contains(q) ??
                                     false);
                           }).toList();
 
-                          if (filteredProducts.isEmpty) {
-                            return Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const Icon(Icons.inventory_2_outlined,
-                                      size: 80, color: Colors.grey),
-                                  const SizedBox(height: 16),
-                                  Text(_searchQuery.isEmpty
-                                      ? 'ไม่มีสินค้า'
-                                      : 'ไม่พบสินค้า'),
-                                  const SizedBox(height: 16),
-                                  ElevatedButton.icon(
-                                    onPressed: () => ref
-                                        .read(productListProvider.notifier)
-                                        .refresh(),
-                                    icon: const Icon(Icons.refresh),
-                                    label: const Text('รีเฟรช'),
-                                  ),
-                                ],
-                              ),
-                            );
+                          if (filtered.isEmpty) {
+                            return _buildEmptyProducts();
                           }
 
-                          return ProductGrid(products: filteredProducts);
+                          return ProductGrid(products: filtered);
                         },
                         loading: () => const Center(
                           child: Column(
@@ -418,27 +444,13 @@ class _PosPageState extends ConsumerState<PosPage> {
                             ],
                           ),
                         ),
-                        error: (error, _) => Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(Icons.error_outline,
-                                  size: 80, color: Colors.red),
-                              const SizedBox(height: 16),
-                              Text('เกิดข้อผิดพลาด: $error'),
-                              const SizedBox(height: 16),
-                              ElevatedButton.icon(
-                                onPressed: () => ref
-                                    .read(productListProvider.notifier)
-                                    .refresh(),
-                                icon: const Icon(Icons.refresh),
-                                label: const Text('ลองใหม่'),
-                              ),
-                            ],
-                          ),
-                        ),
+                        error: (e, _) => _buildProductError(e),
                       ),
                     ),
+
+                    // Divider
+                    const VerticalDivider(
+                        width: 1, thickness: 1, color: _border),
 
                     // Cart Panel (40%)
                     const Expanded(
@@ -454,10 +466,74 @@ class _PosPageState extends ConsumerState<PosPage> {
       ),
     );
   }
+
+  // ── Empty state ────────────────────────────────────────────────
+  Widget _buildEmptyProducts() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: _surface,
+              shape: BoxShape.circle,
+              border: Border.all(color: _border),
+            ),
+            child: const Icon(Icons.inventory_2_outlined,
+                size: 38, color: Colors.grey),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            _searchQuery.isEmpty ? 'ไม่มีสินค้า' : 'ไม่พบสินค้า "$_searchQuery"',
+            style: const TextStyle(
+                fontSize: 15, fontWeight: FontWeight.w500),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _searchQuery.isEmpty
+                ? 'กรุณาเพิ่มสินค้าในระบบก่อน'
+                : 'ลองค้นหาด้วยคำอื่น',
+            style: const TextStyle(
+                fontSize: 13, color: AppTheme.subtextColor),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: () =>
+                ref.read(productListProvider.notifier).refresh(),
+            icon: const Icon(Icons.refresh, size: 16),
+            label: const Text('รีเฟรช'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Error state ────────────────────────────────────────────────
+  Widget _buildProductError(Object e) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.error_outline, size: 64, color: _error),
+          const SizedBox(height: 12),
+          Text('เกิดข้อผิดพลาด: $e'),
+          const SizedBox(height: 12),
+          ElevatedButton.icon(
+            onPressed: () =>
+                ref.read(productListProvider.notifier).refresh(),
+            icon: const Icon(Icons.refresh, size: 16),
+            label: const Text('ลองใหม่'),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Hold Order Name Dialog — รักษาจากไฟล์เดิม
+// Hold Order Name Dialog — รักษา logic เดิม
 // ─────────────────────────────────────────────────────────────────
 class _HoldOrderNameDialog extends StatefulWidget {
   @override
@@ -485,14 +561,33 @@ class _HoldOrderNameDialogState extends State<_HoldOrderNameDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('พักบิล'),
+      title: Row(
+        children: [
+          Container(
+            width: 4,
+            height: 18,
+            decoration: BoxDecoration(
+              color: AppTheme.primaryColor,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(width: 10),
+          const Text('พักบิล'),
+        ],
+      ),
       content: TextField(
         controller: _controller,
-        decoration: const InputDecoration(
-          labelText: 'ชื่อบิล',
-          border: OutlineInputBorder(),
-        ),
         autofocus: true,
+        decoration: InputDecoration(
+          labelText: 'ชื่อบิล',
+          border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8)),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(
+                color: AppTheme.primaryColor, width: 1.5),
+          ),
+        ),
       ),
       actions: [
         TextButton(
@@ -500,6 +595,11 @@ class _HoldOrderNameDialogState extends State<_HoldOrderNameDialog> {
           child: const Text('ยกเลิก'),
         ),
         ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppTheme.primaryColor,
+            foregroundColor: Colors.white,
+            elevation: 0,
+          ),
           onPressed: () => Navigator.pop(context, _controller.text),
           child: const Text('ตกลง'),
         ),
