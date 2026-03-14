@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/product_provider.dart';
 import '../../data/models/product_model.dart';
+import '../../../../shared/services/mobile_scanner_service.dart'; // ✅ Phase 5
 
 class ProductFormPage extends ConsumerStatefulWidget {
   final ProductModel? product;
@@ -108,12 +109,17 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
             ),
             const SizedBox(height: 16),
             
-            // Barcode
+            // Barcode ✅ + ScannerButton
             TextFormField(
               controller: _barcodeController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'บาร์โค้ด',
-                border: OutlineInputBorder(),
+                border: const OutlineInputBorder(),
+                suffixIcon: ScannerButton(
+                  onScanned: (value) {
+                    setState(() => _barcodeController.text = value);
+                  },
+                ),
               ),
             ),
             const SizedBox(height: 16),

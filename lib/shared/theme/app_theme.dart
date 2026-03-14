@@ -1,63 +1,163 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+/// ╔══════════════════════════════════════════════════════════════════╗
+/// ║              OAG Identity System — Design Tokens                 ║
+/// ╠══════════════════════════════════════════════════════════════════╣
+/// ║  01 · Primary    #E57200  OAG Orange                            ║
+/// ║  02 · Sidebar    #16213E  Navy                                  ║
+/// ║  03 · Success    #2E7D32  Green  → Paid / Completed             ║
+/// ║  04 · Error      #C62828  Red    → Overdue / Failed             ║
+/// ║  05 · Warning    #F9A825  Yellow → Pending / Low Stock          ║
+/// ║  06 · Info       #1565C0  Blue   → Draft / In Progress          ║
+/// ║  07 · Surface    #F4F4F0  Neutral Background                    ║
+/// ║  08 · Font       IBM Plex Sans Thai → Sarabun (fallback)        ║
+/// ╚══════════════════════════════════════════════════════════════════╝
 class AppTheme {
-  // ─────────────────────────────────────────
-  // Brand Colors
-  // ─────────────────────────────────────────
-  static const primaryColor = Color(0xFF2196F3);
-  static const secondaryColor = Color(0xFF03A9F4);
-  static const errorColor = Color(0xFFF44336);
-  static const successColor = Color(0xFF4CAF50);
-  static const warningColor = Color(0xFFFF9800);
+  AppTheme._();
 
-  // ─────────────────────────────────────────
-  // Light Theme
-  // ─────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────
+  // 01 · Brand Colors
+  // ─────────────────────────────────────────────────────────────────
+
+  /// OAG Orange — Primary action / active state / brand identity
+  static const Color primaryColor       = Color(0xFFE57200);
+  static const Color primaryLight       = Color(0xFFFF9D45);
+  static const Color primaryDark        = Color(0xFFAC4F00);
+  static const Color primaryContainer   = Color(0xFFFFE0C2);
+  static const Color onPrimaryContainer = Color(0xFF4A1900);
+
+  /// Navy — Sidebar / Navigation / AppBar
+  static const Color navyColor          = Color(0xFF16213E);
+  static const Color navyLight          = Color(0xFF1F2E54);
+  static const Color navyDark           = Color(0xFF0D1528);
+  static const Color navyBorder         = Color(0xFF2A3A60);
+
+  // ─────────────────────────────────────────────────────────────────
+  // 02 · Semantic Colors
+  // ─────────────────────────────────────────────────────────────────
+
+  /// Success — เขียว (Paid, Completed, Stock OK)
+  static const Color successColor       = Color(0xFF2E7D32);
+  static const Color successLight       = Color(0xFF60AD5E);
+  static const Color successContainer   = Color(0xFFB9F6CA);
+
+  /// Error — แดง (Overdue, Error, Out of Stock)
+  static const Color errorColor         = Color(0xFFC62828);
+  static const Color errorLight         = Color(0xFFEF5350);
+  static const Color errorContainer     = Color(0xFFFFCDD2);
+
+  /// Warning — เหลือง (Partial, Pending, Low Stock)
+  static const Color warningColor       = Color(0xFFF9A825);
+  static const Color warningLight       = Color(0xFFFFD54F);
+  static const Color warningContainer   = Color(0xFFFFF8E1);
+
+  /// Info — น้ำเงิน (Draft, In Progress)
+  static const Color infoColor          = Color(0xFF1565C0);
+  static const Color infoLight          = Color(0xFF5E92F3);
+  static const Color infoContainer      = Color(0xFFE3F2FD);
+
+  /// Supplementary — ใช้ตามโมดูล
+  static const Color purpleColor        = Color(0xFF6A1B9A); // AP/AR บัญชี
+  static const Color tealColor          = Color(0xFF00695C); // Payment
+  static const Color brownColor         = Color(0xFF4E342E); // เอกสาร/Invoice
+
+  // ─────────────────────────────────────────────────────────────────
+  // 03 · Neutral / Surface
+  // ─────────────────────────────────────────────────────────────────
+
+  static const Color surfaceColor       = Color(0xFFF4F4F0); // Neutral Background
+  static const Color cardWhite          = Color(0xFFFFFFFF);
+  static const Color borderColor        = Color(0xFFE0E0E0);
+  static const Color subtextColor       = Color(0xFF757575);
+
+  // ─────────────────────────────────────────────────────────────────
+  // 04 · Typography helper — IBM Plex Sans Thai → Sarabun fallback
+  // ─────────────────────────────────────────────────────────────────
+
+  static TextTheme _buildTextTheme(TextTheme base) =>
+      GoogleFonts.ibmPlexSansThaiTextTheme(base);
+
+  // ─────────────────────────────────────────────────────────────────
+  // 05 · Light Theme
+  // ─────────────────────────────────────────────────────────────────
   static ThemeData lightTheme = ThemeData(
     useMaterial3: true,
     brightness: Brightness.light,
     colorScheme: ColorScheme.fromSeed(
       seedColor: primaryColor,
       brightness: Brightness.light,
+    ).copyWith(
+      primary: primaryColor,
+      onPrimary: Colors.white,
+      primaryContainer: primaryContainer,
+      onPrimaryContainer: onPrimaryContainer,
+      secondary: navyColor,
+      onSecondary: Colors.white,
+      error: errorColor,
+      surface: cardWhite,
+      onSurface: const Color(0xFF1A1A1A),
     ),
-    textTheme: GoogleFonts.promptTextTheme(ThemeData.light().textTheme),
-    scaffoldBackgroundColor: const Color(0xFFF5F5F5),
+    scaffoldBackgroundColor: surfaceColor,
+    textTheme: _buildTextTheme(ThemeData.light().textTheme),
     appBarTheme: const AppBarTheme(
       centerTitle: true,
       elevation: 0,
       scrolledUnderElevation: 1,
-      backgroundColor: Colors.white,
-      foregroundColor: Color(0xFF1A1A1A),
+      backgroundColor: navyColor,           // ← Navy AppBar
+      foregroundColor: Colors.white,
       surfaceTintColor: Colors.transparent,
+      iconTheme: IconThemeData(color: Colors.white),
+      actionsIconTheme: IconThemeData(color: Colors.white),
+      titleTextStyle: TextStyle(
+        color: Colors.white,
+        fontSize: 18,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.2,
+      ),
     ),
     cardTheme: CardThemeData(
       elevation: 0,
-      color: Colors.white,
+      color: cardWhite,
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey.shade200),
+        side: const BorderSide(color: borderColor),
       ),
     ),
     drawerTheme: const DrawerThemeData(
-      backgroundColor: Colors.white,
+      backgroundColor: navyColor,           // ← Navy Sidebar/Drawer
       surfaceTintColor: Colors.transparent,
     ),
     navigationRailTheme: NavigationRailThemeData(
-      backgroundColor: Colors.white,
+      backgroundColor: navyColor,           // ← Navy Navigation Rail
       selectedIconTheme: const IconThemeData(color: primaryColor),
-      unselectedIconTheme: IconThemeData(color: Colors.grey.shade600),
-      indicatorColor: primaryColor.withValues(alpha: 0.12),
+      unselectedIconTheme: const IconThemeData(color: Color(0xFF8A9BC0)),
+      selectedLabelTextStyle: const TextStyle(
+        color: primaryColor,
+        fontWeight: FontWeight.w600,
+      ),
+      unselectedLabelTextStyle: const TextStyle(color: Color(0xFF8A9BC0)),
+      indicatorColor: primaryColor.withValues(alpha: 0.18),
     ),
     inputDecorationTheme: InputDecorationTheme(
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: borderColor),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: primaryColor, width: 1.5),
+      ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
       filled: true,
       fillColor: Colors.grey.shade50,
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
+        backgroundColor: primaryColor,     // ← Primary Button = Orange
+        foregroundColor: Colors.white,
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         elevation: 0,
@@ -65,14 +165,19 @@ class AppTheme {
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
+        foregroundColor: primaryColor,     // ← Secondary Button = Outlined Orange
+        side: const BorderSide(color: primaryColor),
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(foregroundColor: primaryColor),
+    ),
     chipTheme: ChipThemeData(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
     ),
-    dividerTheme: DividerThemeData(color: Colors.grey.shade200, space: 1),
+    dividerTheme: const DividerThemeData(color: borderColor, space: 1),
     listTileTheme: const ListTileThemeData(
       contentPadding: EdgeInsets.symmetric(horizontal: 16),
     ),
@@ -97,82 +202,92 @@ class AppTheme {
     dialogTheme: DialogThemeData(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       surfaceTintColor: Colors.transparent,
-      backgroundColor: Colors.white,
+      backgroundColor: cardWhite,
     ),
     popupMenuTheme: PopupMenuThemeData(
-      color: Colors.white,
+      color: cardWhite,
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
-        side: BorderSide(color: Colors.grey.shade200),
+        side: const BorderSide(color: borderColor),
       ),
     ),
     tabBarTheme: const TabBarThemeData(
       labelColor: primaryColor,
-      unselectedLabelColor: Color(0xFF757575),
+      unselectedLabelColor: subtextColor,
       indicatorColor: primaryColor,
     ),
     floatingActionButtonTheme: const FloatingActionButtonThemeData(
+      backgroundColor: primaryColor,
+      foregroundColor: Colors.white,
       elevation: 2,
     ),
   );
 
-  // ─────────────────────────────────────────
-  // Dark Theme
-  // ─────────────────────────────────────────
-  static const _darkBg = Color(0xFF121212);
-  static const _darkSurface = Color(0xFF1E1E1E);
+  // ─────────────────────────────────────────────────────────────────
+  // 06 · Dark Theme
+  // ─────────────────────────────────────────────────────────────────
+  static const _darkBg       = Color(0xFF121212);
+  static const _darkSurface  = Color(0xFF1E1E1E);
   static const _darkSurface2 = Color(0xFF2A2A2A);
-  static const _darkBorder = Color(0xFF333333);
-  static const _darkText = Color(0xFFE0E0E0);
-  static const _darkSubtext = Color(0xFF9E9E9E);
-  static const _darkPrimary = Color(0xFF64B5F6); // lighter blue for dark bg
+  static const _darkBorder   = Color(0xFF333333);
+  static const _darkText     = Color(0xFFE0E0E0);
+  static const _darkSubtext  = Color(0xFF9E9E9E);
+
+  /// Dark mode: ใช้ primaryLight (#FF9D45) เพื่อ contrast บน dark bg
+  static const _darkPrimary  = Color(0xFFFF9D45);
 
   static ThemeData darkTheme = ThemeData(
     useMaterial3: true,
     brightness: Brightness.dark,
-    colorScheme:
-        ColorScheme.fromSeed(
-          seedColor: primaryColor,
-          brightness: Brightness.dark,
-        ).copyWith(
-          primary: _darkPrimary,
-          onPrimary: const Color(0xFF003366),
-          secondary: const Color(0xFF4FC3F7),
-          surface: _darkSurface,
-          onSurface: _darkText,
-          error: const Color(0xFFEF9A9A),
-        ),
-    textTheme: GoogleFonts.promptTextTheme(
-      ThemeData.dark().textTheme,
-    ).apply(bodyColor: _darkText, displayColor: _darkText),
+    colorScheme: ColorScheme.fromSeed(
+      seedColor: primaryColor,
+      brightness: Brightness.dark,
+    ).copyWith(
+      primary: _darkPrimary,
+      onPrimary: const Color(0xFF4A1900),
+      secondary: const Color(0xFF8A9BC0),
+      surface: _darkSurface,
+      onSurface: _darkText,
+      error: const Color(0xFFEF9A9A),
+    ),
+    textTheme: _buildTextTheme(ThemeData.dark().textTheme)
+        .apply(bodyColor: _darkText, displayColor: _darkText),
     scaffoldBackgroundColor: _darkBg,
     appBarTheme: const AppBarTheme(
       centerTitle: true,
       elevation: 0,
       scrolledUnderElevation: 1,
-      backgroundColor: _darkSurface,
+      backgroundColor: navyDark,           // ← Darker Navy for dark mode
       foregroundColor: _darkText,
       surfaceTintColor: Colors.transparent,
+      iconTheme: IconThemeData(color: _darkText),
+      actionsIconTheme: IconThemeData(color: _darkText),
+      titleTextStyle: TextStyle(
+        color: _darkText,
+        fontSize: 18,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.2,
+      ),
     ),
     cardTheme: CardThemeData(
       elevation: 0,
-      color: Colors.white,
+      color: _darkSurface,
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey.shade200),
+        side: const BorderSide(color: _darkBorder),
       ),
     ),
     drawerTheme: const DrawerThemeData(
-      backgroundColor: _darkSurface,
+      backgroundColor: navyDark,
       surfaceTintColor: Colors.transparent,
     ),
     navigationRailTheme: const NavigationRailThemeData(
-      backgroundColor: _darkSurface,
+      backgroundColor: navyDark,
       selectedIconTheme: IconThemeData(color: _darkPrimary),
       unselectedIconTheme: IconThemeData(color: _darkSubtext),
-      indicatorColor: Color(0x2264B5F6),
+      indicatorColor: Color(0x33FF9D45),
     ),
     inputDecorationTheme: InputDecorationTheme(
       border: OutlineInputBorder(
@@ -196,7 +311,7 @@ class AppTheme {
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         backgroundColor: _darkPrimary,
-        foregroundColor: const Color(0xFF003366),
+        foregroundColor: const Color(0xFF4A1900),
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         elevation: 0,
@@ -242,7 +357,7 @@ class AppTheme {
             ? _darkPrimary
             : Colors.transparent,
       ),
-      checkColor: WidgetStateProperty.all(const Color(0xFF003366)),
+      checkColor: WidgetStateProperty.all(const Color(0xFF4A1900)),
     ),
     radioTheme: RadioThemeData(
       fillColor: WidgetStateProperty.resolveWith(
@@ -260,7 +375,7 @@ class AppTheme {
     dialogTheme: DialogThemeData(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       surfaceTintColor: Colors.transparent,
-      backgroundColor: Colors.white,
+      backgroundColor: _darkSurface,
     ),
     bottomSheetTheme: const BottomSheetThemeData(
       backgroundColor: _darkSurface,
@@ -275,52 +390,42 @@ class AppTheme {
       ),
     ),
     tabBarTheme: const TabBarThemeData(
-      labelColor: primaryColor,
-      unselectedLabelColor: Color(0xFF757575),
-      indicatorColor: primaryColor,
+      labelColor: _darkPrimary,
+      unselectedLabelColor: _darkSubtext,
+      indicatorColor: _darkPrimary,
     ),
     dataTableTheme: const DataTableThemeData(
-      headingTextStyle: TextStyle(
-        color: _darkText,
-        fontWeight: FontWeight.bold,
-      ),
+      headingTextStyle:
+          TextStyle(color: _darkText, fontWeight: FontWeight.bold),
       dataTextStyle: TextStyle(color: _darkText),
       headingRowColor: WidgetStatePropertyAll(_darkSurface2),
     ),
     floatingActionButtonTheme: const FloatingActionButtonThemeData(
       backgroundColor: _darkPrimary,
-      foregroundColor: Color(0xFF003366),
+      foregroundColor: Color(0xFF4A1900),
       elevation: 2,
     ),
-    progressIndicatorTheme: const ProgressIndicatorThemeData(
-      color: _darkPrimary,
-    ),
+    progressIndicatorTheme:
+        const ProgressIndicatorThemeData(color: _darkPrimary),
     iconTheme: const IconThemeData(color: _darkSubtext),
     primaryIconTheme: const IconThemeData(color: _darkText),
   );
 
-  // ─────────────────────────────────────────
-  // Helper: สีตาม brightness
-  // ─────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────
+  // 07 · Context-aware Helpers (รักษา API เดิม)
+  // ─────────────────────────────────────────────────────────────────
+
   static Color cardColor(BuildContext context) =>
-      Theme.of(context).brightness == Brightness.dark
-      ? _darkSurface
-      : Colors.white;
+      isDark(context) ? _darkSurface : cardWhite;
 
-  static Color surfaceColor(BuildContext context) =>
-      Theme.of(context).brightness == Brightness.dark
-      ? _darkSurface2
-      : Colors.grey.shade50;
+  static Color surfaceColorOf(BuildContext context) =>
+      isDark(context) ? _darkSurface2 : Colors.grey.shade50;
 
-  static Color borderColor(BuildContext context) =>
-      Theme.of(context).brightness == Brightness.dark
-      ? _darkBorder
-      : Colors.grey.shade200;
+  static Color borderColorOf(BuildContext context) =>
+      isDark(context) ? _darkBorder : borderColor;
 
-  static Color subtextColor(BuildContext context) =>
-      Theme.of(context).brightness == Brightness.dark
-      ? _darkSubtext
-      : Colors.grey.shade600;
+  static Color subtextColorOf(BuildContext context) =>
+      isDark(context) ? _darkSubtext : subtextColor;
 
   static bool isDark(BuildContext context) =>
       Theme.of(context).brightness == Brightness.dark;

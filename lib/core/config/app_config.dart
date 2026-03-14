@@ -3,174 +3,196 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 
+// ─────────────────────────────────────────
+// Environment Enum
+// ─────────────────────────────────────────
+enum Environment { development, staging, production }
+
 class AppConfig {
+  AppConfig._();
+
   // ========================================
   // APP INFORMATION
   // ========================================
-  
-  static const appName = 'POS + ERP System';
-  static const appVersion = '1.0.0';
-  static const companyName = 'Your Company';
-  
+
+  static const String appName = 'POS + ERP System';
+  static const String appVersion = '1.0.0';
+  static const int buildNumber = 1;
+  static const String companyName = 'Your Company';
+
   // ========================================
-  // API BASE URL - Auto Detect Platform
+  // ENVIRONMENT
+  // ✅ เปลี่ยนเป็น production ก่อน build release
   // ========================================
-  
-  /// API Base URL - เปลี่ยนตาม platform อัตโนมัติ
-  static String get apiBaseUrl {
-    if (kIsWeb) {
-      // Web: ใช้ localhost
-      return 'http://127.0.0.1:$defaultServerPort';
-    } else if (Platform.isAndroid) {
-      // Android Emulator: ใช้ 10.0.2.2
-      // Android Real Device: ใช้ IP จริงของเครื่อง Mac
-      return _isEmulator 
-          ? 'http://10.0.2.2:$defaultServerPort' 
-          : 'http://192.168.1.100:$defaultServerPort';
-    } else if (Platform.isIOS) {
-      // iOS Simulator: ใช้ localhost
-      // iOS Real Device: ใช้ IP จริงของเครื่อง Mac
-      return _isEmulator 
-          ? 'http://127.0.0.1:$defaultServerPort' 
-          : 'http://192.168.1.100:$defaultServerPort';
-    } else {
-      // macOS, Windows, Linux: ใช้ localhost
-      return 'http://127.0.0.1:$defaultServerPort';
-    }
-  }
-  
-  /// ตรวจสอบว่าเป็น Emulator/Simulator หรือไม่
-  /// 
-  /// ⚠️ สำหรับการใช้งาน:
-  /// - true = ทดสอบบน Emulator/Simulator (ใช้ 10.0.2.2 หรือ 127.0.0.1)
-  /// - false = ทดสอบบนเครื่องจริง (ใช้ IP ของเครื่อง Mac)
-  static bool get _isEmulator {
-    return true; // ⚠️ เปลี่ยนเป็น false เมื่อทดสอบบนมือถือจริง
-  }
-  
+
+  static const Environment _env = Environment.development;
+
+  static bool get isDevelopment => _env == Environment.development;
+  static bool get isStaging => _env == Environment.staging;
+  static bool get isProduction => _env == Environment.production;
+
+  // ✅ ซ่อน debug info ใน production
+  static bool get showDebugBanner => isDevelopment;
+  static bool get enableLogging => !isProduction;
+  static bool get enableSeeding => isDevelopment; // seed data เฉพาะ dev
+
   // ========================================
   // SERVER CONFIGURATION
   // ========================================
-  
-  static const defaultServerPort = 8080;
-  static const webSocketPath = '/ws';
-  
-  // ========================================
-  // ENVIRONMENT MODE (สำหรับ Production)
-  // ========================================
-  
-  /// Environment Mode
-  /// - development: ใช้ localhost
-  /// - staging: ใช้ staging server
-  /// - production: ใช้ production server
-  static const String _environment = 'development';
-  
-  /// API Base URL แบบแยก Environment
-  static String get apiBaseUrlByEnv {
-    switch (_environment) {
-      case 'development':
-        return kIsWeb 
-            ? 'http://127.0.0.1:$defaultServerPort'
-            : Platform.isAndroid
-                ? 'http://10.0.2.2:$defaultServerPort'  // Android Emulator
-                : 'http://127.0.0.1:$defaultServerPort'; // iOS Simulator or macOS
-      case 'staging':
-        return 'https://staging-api.yourcompany.com';
-      case 'production':
-        return 'https://api.yourcompany.com';
-      default:
-        return 'http://127.0.0.1:$defaultServerPort';
-    }
-  }
-  
-  // ========================================
-  // NETWORK CONFIGURATION
-  // ========================================
-  
-  /// Timeout Configuration
+
+  static const int defaultServerPort = 8080;
+  static const String webSocketPath = '/ws';
+
+  // Timeout
   static const Duration connectTimeout = Duration(seconds: 10);
-  static const Duration receiveTimeout = Duration(seconds: 10);
-  
+  static const Duration receiveTimeout = Duration(seconds: 30);
+
   // ========================================
-  // DATABASE CONFIGURATION
+  // API BASE URL
+  // auto-detect platform + environment
   // ========================================
-  
-  static const databaseName = 'pos_erp.db';
-  static const databaseVersion = 1;
-  
-  // ========================================
-  // PAGINATION CONFIGURATION
-  // ========================================
-  
-  static const defaultPageSize = 20;
-  
-  // ========================================
-  // SESSION CONFIGURATION
-  // ========================================
-  
-  static const sessionTimeout = Duration(hours: 8);
-  
-  // ========================================
-  // HELPER METHODS
-  // ========================================
-  
-  /// WebSocket URL
+
+  static String get apiBaseUrl {
+    // Production / Staging — ใช้ remote server
+    if (isProduction) {
+      return 'https://api.yourcompany.com';
+    }
+
+    if (isStaging) {
+      return 'https://staging-api.yourcompany.com';
+    }
+
+    // Development — localhost ตาม platform
+    if (kIsWeb) {
+      return 'http://127.0.0.1:$defaultServerPort';
+    }
+
+    if (Platform.isAndroid) {
+      return _isEmulator
+          ? 'http://10.0.2.2:$defaultServerPort'
+          : 'http://$_localNetworkIp:$defaultServerPort';
+    }
+
+    if (Platform.isIOS) {
+      return _isEmulator
+          ? 'http://127.0.0.1:$defaultServerPort'
+          : 'http://$_localNetworkIp:$defaultServerPort';
+    }
+
+    return 'http://127.0.0.1:$defaultServerPort';
+  }
+
+  /// WebSocket URL (derived from apiBaseUrl)
   static String get webSocketUrl {
-    final host = apiBaseUrl.replaceAll('http://', '').replaceAll('https://', '');
+    final host = apiBaseUrl.replaceAll(RegExp(r'https?://'), '');
     final protocol = apiBaseUrl.startsWith('https') ? 'wss' : 'ws';
     return '$protocol://$host$webSocketPath';
   }
-  
-  /// แสดง IP Address ของเครื่อง (สำหรับ Debug)
+
+  // ─── Emulator / Real device ───────────
+  /// ⚠️ เปลี่ยนเป็น false เมื่อทดสอบบนมือถือจริง
+  static bool get _isEmulator => isDevelopment;
+
+  /// IP ของเครื่อง dev สำหรับ real device
+  /// เปลี่ยนเป็น IP จริงของเครื่อง Mac/PC ที่รัน server
+  static String get _localNetworkIp => '192.168.1.100';
+
+  // ========================================
+  // DATABASE CONFIGURATION
+  // ========================================
+
+  static const String databaseName = 'pos_erp.db';
+  static const int databaseVersion = 1;
+
+  /// ที่เก็บ database แยกตาม platform
+  static String get databaseDescription {
+    if (kIsWeb) return 'IndexedDB (browser)';
+    if (Platform.isAndroid)
+      return '/data/data/<package>/databases/$databaseName';
+    if (Platform.isIOS) return 'Documents/$databaseName';
+    if (Platform.isMacOS)
+      return '~/Library/Application Support/<bundle>/$databaseName';
+    if (Platform.isWindows) return '%APPDATA%\\pos_erp\\$databaseName';
+    return databaseName;
+  }
+
+  // ========================================
+  // PAGINATION & SESSION
+  // ========================================
+
+  static const int defaultPageSize = 20;
+  static const Duration sessionTimeout = Duration(hours: 8);
+
+  // ========================================
+  // FEATURE FLAGS
+  // ตั้งค่า feature ที่จะเปิด/ปิด per environment
+  // ========================================
+
+  static bool get enableBarcodeScanner => true;
+  static bool get enableOfflineSync => true;
+  static bool get enableMultiBranch => true;
+  static bool get enableRestaurantMode => true;
+  static bool get enableDarkMode => true;
+
+  // ========================================
+  // PERFORMANCE LIMITS (production-safe)
+  // ========================================
+
+  static const int maxProductsInMemory = 5000;
+  static const int maxCustomersInMemory = 2000;
+  static const int maxOrdersPerPage = 50;
+  static const int searchDebounceMs = 300;
+
+  // ========================================
+  // HELPER METHODS
+  // ========================================
+
+  /// ดึง Local IP ของเครื่อง (สำหรับ QR setup mobile client)
   static Future<String> getLocalIP() async {
     try {
       final interfaces = await NetworkInterface.list();
-      for (var interface in interfaces) {
-        for (var addr in interface.addresses) {
-          // หา IPv4 ที่ไม่ใช่ loopback
+      for (final iface in interfaces) {
+        for (final addr in iface.addresses) {
           if (addr.type == InternetAddressType.IPv4 && !addr.isLoopback) {
-            print('📡 Local IP: ${addr.address}');
             return addr.address;
           }
         }
       }
     } catch (e) {
-      print('❌ Error getting IP: $e');
+      if (enableLogging) print('❌ Error getting IP: $e');
     }
     return '127.0.0.1';
   }
-  
-  /// แสดงข้อมูล Configuration ปัจจุบัน (สำหรับ Debug)
+
+  /// แสดง config ปัจจุบัน (debug เท่านั้น)
   static void printConfig() {
-    print('========================================');
-    print('📱 APP CONFIGURATION');
-    print('========================================');
-    print('App Name: $appName');
-    print('Version: $appVersion');
-    print('Environment: $_environment');
-    print('Platform: ${_getPlatformName()}');
-    print('Is Emulator: $_isEmulator');
-    print('========================================');
+    if (!enableLogging) return;
+    print('════════════════════════════════════');
+    print('📱 APP CONFIG');
+    print('  Name:        $appName v$appVersion ($buildNumber)');
+    print('  Environment: ${_env.name.toUpperCase()}');
+    print('  Platform:    ${_platformName()}');
+    print('  Is Emulator: $_isEmulator');
+    print('────────────────────────────────────');
     print('🌐 NETWORK');
-    print('========================================');
-    print('API Base URL: $apiBaseUrl');
-    print('WebSocket URL: $webSocketUrl');
-    print('Server Port: $defaultServerPort');
-    print('========================================');
+    print('  API URL:     $apiBaseUrl');
+    print('  WS URL:      $webSocketUrl');
+    print('  Port:        $defaultServerPort');
+    print('────────────────────────────────────');
     print('💾 DATABASE');
-    print('========================================');
-    print('Database Name: $databaseName');
-    print('Database Version: $databaseVersion');
-    print('========================================');
-    print('⚙️ OTHER');
-    print('========================================');
-    print('Page Size: $defaultPageSize');
-    print('Session Timeout: ${sessionTimeout.inHours} hours');
-    print('========================================');
+    print('  Name:        $databaseName (v$databaseVersion)');
+    print('  Location:    $databaseDescription');
+    print('────────────────────────────────────');
+    print('🚩 FEATURE FLAGS');
+    print('  Scanner:     $enableBarcodeScanner');
+    print('  Offline:     $enableOfflineSync');
+    print('  Multi-branch:$enableMultiBranch');
+    print('  Restaurant:  $enableRestaurantMode');
+    print('  Dark Mode:   $enableDarkMode');
+    print('════════════════════════════════════');
   }
-  
-  /// ดึงชื่อ Platform
-  static String _getPlatformName() {
+
+  static String _platformName() {
     if (kIsWeb) return 'Web';
     if (Platform.isAndroid) return 'Android';
     if (Platform.isIOS) return 'iOS';

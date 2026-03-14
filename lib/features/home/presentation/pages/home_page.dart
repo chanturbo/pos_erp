@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../shared/theme/app_theme.dart';           // OAG Identity
 import '../../../ap/presentation/pages/ap_payment_list_page.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../products/presentation/pages/product_list_page.dart';
@@ -32,20 +33,36 @@ class HomePage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authProvider);
-    final user = authState.user;
+    final user      = authState.user;
     final syncAsync = ref.watch(syncStatusProvider); // ✅ Week 7
 
     return KeyboardShortcuts(
-      onPosShortcut: () => _push(context, const PosPage()),
-      onProductShortcut: () => _push(context, const ProductListPage()),
-      onCustomerShortcut: () => _push(context, const CustomerListPage()),
+      onPosShortcut:          () => _push(context, const PosPage()),
+      onProductShortcut:      () => _push(context, const ProductListPage()),
+      onCustomerShortcut:     () => _push(context, const CustomerListPage()),
       onSalesHistoryShortcut: () => _push(context, const SalesHistoryPage()),
-      onDashboardShortcut: () => _push(context, const DashboardPage()),
-      onInventoryShortcut: () => _push(context, const StockBalancePage()),
-      onReportsShortcut: () => _push(context, const ReportsPage()),
+      onDashboardShortcut:    () => _push(context, const DashboardPage()),
+      onInventoryShortcut:    () => _push(context, const StockBalancePage()),
+      onReportsShortcut:      () => _push(context, const ReportsPage()),
       child: Scaffold(
+        // AppBar สีจาก theme (navyColor) — กำหนดใน AppTheme.lightTheme
         appBar: AppBar(
-          title: const Text('หน้าหลัก'),
+          title: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // OAG Orange brand dot
+              Container(
+                width: 8,
+                height: 8,
+                margin: const EdgeInsets.only(right: 8),
+                decoration: const BoxDecoration(
+                  color: AppTheme.primaryColor,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const Text('หน้าหลัก'),
+            ],
+          ),
           automaticallyImplyLeading: false,
           actions: [
             // ✅ Week 7 — Sync status badge
@@ -55,7 +72,7 @@ class HomePage extends ConsumerWidget {
                   children: [
                     Icon(
                       sync.isOnline ? Icons.sync : Icons.sync_disabled,
-                      color: sync.isOnline ? null : Colors.red,
+                      color: sync.isOnline ? Colors.white70 : AppTheme.errorLight,
                     ),
                     if (sync.hasPending)
                       Positioned(
@@ -65,7 +82,7 @@ class HomePage extends ConsumerWidget {
                           width: 9,
                           height: 9,
                           decoration: const BoxDecoration(
-                            color: Colors.orange,
+                            color: AppTheme.primaryColor, // Orange badge
                             shape: BoxShape.circle,
                           ),
                         ),
@@ -99,7 +116,7 @@ class HomePage extends ConsumerWidget {
                 child: Center(
                   child: Text(
                     user?.fullName ?? '',
-                    style: const TextStyle(fontSize: 14),
+                    style: const TextStyle(fontSize: 14, color: Colors.white70),
                   ),
                 ),
               ),
@@ -136,47 +153,73 @@ class HomePage extends ConsumerWidget {
             ),
           ],
         ),
+
         body: Center(
           child: SingleChildScrollView(
-            padding: context.pagePadding, // ✅ responsive padding
+            padding: context.pagePadding,
             child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: context.contentMaxWidth), // ✅ responsive max width
+              constraints: BoxConstraints(maxWidth: context.contentMaxWidth),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Welcome section
-                  Icon(
-                    Icons.check_circle,
-                    size: context.isMobile ? 64 : 100, // ✅ responsive icon
-                    color: Colors.green,
+                  // ── Welcome Banner (Navy card) ─────────────────
+                  Container(
+                    padding: EdgeInsets.all(context.isMobile ? 16 : 20),
+                    margin: EdgeInsets.only(bottom: context.isMobile ? 20 : 28),
+                    decoration: BoxDecoration(
+                      color: AppTheme.navyColor,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primaryColor.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: AppTheme.primaryColor.withValues(alpha: 0.4),
+                            ),
+                          ),
+                          child: Icon(
+                            Icons.check_circle_rounded,
+                            size: context.isMobile ? 26 : 32,
+                            color: AppTheme.primaryColor,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'ยินดีต้อนรับ ${user?.fullName ?? ''}',
+                                style: TextStyle(
+                                  fontSize: context.isMobile ? 15 : 18,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                user?.username ?? '',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF8A9BC0),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  SizedBox(height: context.isMobile ? 12 : 24),
-                  Text(
-                    'เข้าสู่ระบบสำเร็จ!',
-                    style: context.isMobile
-                        ? Theme.of(context).textTheme.headlineSmall
-                        : Theme.of(context).textTheme.headlineMedium,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'ยินดีต้อนรับ ${user?.fullName ?? ''}',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Username: ${user?.username ?? ''}',
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodyLarge
-                        ?.copyWith(color: Colors.grey),
-                  ),
-                  SizedBox(height: context.isMobile ? 24 : 32),
 
-                  // ✅ Responsive Grid Menu
+                  // ── Responsive Grid Menu ───────────────────────
                   GridView.count(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    crossAxisCount: context.menuGridColumns, // ✅ 2/3/4/5 ตามหน้าจอ
+                    crossAxisCount: context.menuGridColumns, // ✅ 2/3/4/5
                     mainAxisSpacing: context.isMobile ? 10 : 16,
                     crossAxisSpacing: context.isMobile ? 10 : 16,
                     childAspectRatio: context.isMobile ? 1.1 : 1.0,
@@ -185,90 +228,90 @@ class HomePage extends ConsumerWidget {
                       _buildMenuCard(context,
                           icon: Icons.dashboard,
                           title: 'Dashboard',
-                          color: Colors.indigo,
+                          color: AppTheme.navyLight,
                           onTap: () => _push(context, const DashboardPage())),
                       _buildMenuCard(context,
                           icon: Icons.shopping_cart,
                           title: 'การขาย',
-                          color: Colors.blue,
+                          color: AppTheme.infoColor,
                           onTap: () => _push(context, const PosPage())),
                       _buildMenuCard(context,
                           icon: Icons.inventory,
                           title: 'สินค้า',
-                          color: Colors.orange,
+                          color: AppTheme.primaryColor,
                           onTap: () => _push(context, const ProductListPage())),
                       _buildMenuCard(context,
                           icon: Icons.receipt_long,
                           title: 'รายการขาย',
-                          color: Colors.indigo,
+                          color: AppTheme.navyColor,
                           onTap: () => _push(context, const SalesHistoryPage())),
 
                       // Row 2: คลัง
                       _buildMenuCard(context,
                           icon: Icons.warehouse,
                           title: 'คลังสินค้า',
-                          color: Colors.green,
+                          color: AppTheme.successColor,
                           onTap: () => _push(context, const StockBalancePage())),
                       _buildMenuCard(context,
                           icon: Icons.tune,
                           title: 'ปรับสต๊อก',
-                          color: Colors.deepPurple,
+                          color: AppTheme.purpleColor,
                           onTap: () => _push(context, const StockAdjustmentPage())),
                       _buildMenuCard(context,
                           icon: Icons.people,
                           title: 'ลูกค้า',
-                          color: Colors.purple,
+                          color: const Color(0xFF7B1FA2),
                           onTap: () => _push(context, const CustomerListPage())),
                       _buildMenuCard(context,
                           icon: Icons.business,
                           title: 'ซัพพลายเออร์',
-                          color: Colors.cyan,
+                          color: AppTheme.infoLight,
                           onTap: () => _push(context, const SupplierListPage())),
 
                       // Row 3: จัดซื้อ
                       _buildMenuCard(context,
                           icon: Icons.shopping_bag,
                           title: 'ซื้อสินค้า',
-                          color: Colors.red,
+                          color: AppTheme.errorColor,
                           onTap: () => _push(context, const PurchaseOrderListPage())),
                       _buildMenuCard(context,
                           icon: Icons.inventory_2,
                           title: 'รับสินค้า',
-                          color: Colors.deepOrange,
+                          color: AppTheme.primaryDark,
                           onTap: () => _push(context, const GoodsReceiptListPage())),
                       _buildMenuCard(context,
                           icon: Icons.assignment_return,
                           title: 'คืนสินค้า',
-                          color: Colors.amber,
+                          color: AppTheme.warningColor,
                           onTap: () => _push(context, const PurchaseReturnListPage())),
                       _buildMenuCard(context,
                           icon: Icons.receipt,
                           title: 'ใบแจ้งหนี้ AP',
-                          color: Colors.brown,
+                          color: AppTheme.brownColor,
                           onTap: () => _push(context, const ApInvoiceListPage())),
 
                       // Row 4: บัญชี
                       _buildMenuCard(context,
                           icon: Icons.payments,
                           title: 'จ่ายเงิน AP',
-                          color: Colors.teal,
+                          color: AppTheme.tealColor,
                           onTap: () => _push(context, const ApPaymentListPage())),
                       // ✅ Day 36-38
                       _buildMenuCard(context,
                           icon: Icons.request_page,
                           title: 'ใบแจ้งหนี้ AR',
-                          color: Colors.teal.shade700,
+                          color: const Color(0xFF00695C),
                           onTap: () => _push(context, const ArInvoiceListPage())),
                       // ✅ Day 39-40
                       _buildMenuCard(context,
                           icon: Icons.price_check,
                           title: 'รับเงิน AR',
-                          color: Colors.green.shade700,
+                          color: AppTheme.successColor,
                           onTap: () => _push(context, const ArReceiptListPage())),
                       _buildMenuCard(context,
                           icon: Icons.assessment,
                           title: 'รายงาน',
-                          color: Colors.pink,
+                          color: const Color(0xFFAD1457),
                           onTap: () => _push(context, const ReportsPage())),
 
                       // Row 5: โปรโมชั่น + สาขา
@@ -276,19 +319,19 @@ class HomePage extends ConsumerWidget {
                       _buildMenuCard(context,
                           icon: Icons.local_offer,
                           title: 'โปรโมชั่น',
-                          color: Colors.orange.shade700,
+                          color: AppTheme.primaryColor,
                           onTap: () => _push(context, const PromotionListPage())),
                       // ✅ Week 7
                       _buildMenuCard(context,
                           icon: Icons.store,
                           title: 'จัดการสาขา',
-                          color: Colors.indigo.shade600,
+                          color: AppTheme.navyColor,
                           onTap: () => _push(context, const BranchListPage())),
                       // ✅ Week 7
                       _buildMenuCard(context,
                           icon: Icons.sync_alt,
                           title: 'Sync สถานะ',
-                          color: Colors.blueGrey,
+                          color: const Color(0xFF546E7A),
                           onTap: () => _push(context, const SyncStatusPage())),
                     ],
                   ),
@@ -301,9 +344,10 @@ class HomePage extends ConsumerWidget {
     );
   }
 
-  void _push(BuildContext context, Widget page) {
-    Navigator.push(context, MaterialPageRoute(builder: (context) => page));
-  }
+  // ── Helpers ─────────────────────────────────────────────────────
+
+  void _push(BuildContext context, Widget page) =>
+      Navigator.push(context, MaterialPageRoute(builder: (_) => page));
 
   Widget _buildMenuCard(
     BuildContext context, {
@@ -312,24 +356,39 @@ class HomePage extends ConsumerWidget {
     required Color color,
     required VoidCallback onTap,
   }) {
-    final iconSize = context.isMobile ? 36.0 : 48.0;   // ✅ responsive icon size
-    final fontSize = context.isMobile ? 12.0 : 16.0;   // ✅ responsive font size
+    final iconSize = context.isMobile ? 36.0 : 48.0;
+    final fontSize = context.isMobile ? 12.0 : 15.0;
+    final isDark   = AppTheme.isDark(context);
 
     return Card(
-      elevation: 4,
+      elevation: 0,
+      color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: isDark ? const Color(0xFF333333) : const Color(0xFFE0E0E0),
+        ),
+      ),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
+        hoverColor: AppTheme.primaryColor.withValues(alpha: 0.06),
+        splashColor: AppTheme.primaryColor.withValues(alpha: 0.12),
         child: Padding(
-          padding: EdgeInsets.all(context.isMobile ? 8 : 12), // ✅
+          padding: EdgeInsets.all(context.isMobile ? 8 : 12),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              // Icon bubble with semantic color border
               Container(
-                padding: EdgeInsets.all(context.isMobile ? 10 : 14), // ✅
+                padding: EdgeInsets.all(context.isMobile ? 10 : 14),
                 decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
+                  color: color.withValues(alpha: 0.10),
                   shape: BoxShape.circle,
+                  border: Border.all(
+                    color: color.withValues(alpha: 0.28),
+                    width: 1.5,
+                  ),
                 ),
                 child: Icon(icon, size: iconSize, color: color),
               ),
@@ -338,7 +397,10 @@ class HomePage extends ConsumerWidget {
                 title,
                 style: TextStyle(
                   fontSize: fontSize,
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w600,
+                  color: isDark
+                      ? const Color(0xFFE0E0E0)
+                      : const Color(0xFF1A1A1A),
                 ),
                 textAlign: TextAlign.center,
                 maxLines: 2,

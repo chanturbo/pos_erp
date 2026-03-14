@@ -6,6 +6,7 @@ import '../../data/models/purchase_order_item_model.dart';
 import '../providers/purchase_provider.dart';
 import '../../../suppliers/presentation/providers/supplier_provider.dart';
 import '../../../products/presentation/providers/product_provider.dart';
+import '../../../../../shared/services/mobile_scanner_service.dart'; // ✅ Phase 5
 
 class PurchaseOrderFormPage extends ConsumerStatefulWidget {
   final PurchaseOrderModel? order;
@@ -511,6 +512,8 @@ class _ProductSelectionDialogState
   String? _selectedProductId;
   final _quantityController = TextEditingController(text: '1');
   final _priceController = TextEditingController();
+  // ✅ Phase 5 — สำหรับกรอง dropdown จาก barcode scan
+  String _productSearch = '';
 
   @override
   void dispose() {
@@ -521,8 +524,41 @@ class _ProductSelectionDialogState
 
   @override
   Widget build(BuildContext context) {
+    // กรองสินค้าตาม barcode หรือ code ที่สแกนได้
+    final filteredProducts = _productSearch.isEmpty
+        ? widget.products
+        : widget.products.where((p) {
+            final q = _productSearch.toLowerCase();
+            return (p.productCode?.toLowerCase().contains(q) ?? false) ||
+                (p.productName?.toLowerCase().contains(q) ?? false) ||
+                (p.barcode?.toLowerCase().contains(q) ?? false);
+          }).toList();
+
     return AlertDialog(
-      title: const Text('เลือกสินค้า'),
+      title: Row(
+        children: [
+          const Text('เลือกสินค้า'),
+          const Spacer(),
+          // ✅ ScannerButton ใน title bar ของ dialog
+          ScannerButton(
+            tooltip: 'สแกนบาร์โค้ดสินค้า',
+            onScanned: (value) {
+              setState(() {
+                _productSearch = value;
+                // ถ้าค้นพบสินค้าเดียว เลือกให้เลย
+                final matched = widget.products.where((p) =>
+                    (p.barcode?.toLowerCase() == value.toLowerCase()) ||
+                    (p.productCode?.toLowerCase() == value.toLowerCase()));
+                if (matched.length == 1) {
+                  _selectedProductId = matched.first.productId;
+                  _priceController.text =
+                      matched.first.priceLevel1.toString();
+                }
+              });
+            },
+          ),
+        ],
+      ),
       content: SizedBox(
         width: 400,
         child: Column(
@@ -530,7 +566,8 @@ class _ProductSelectionDialogState
           children: [
             DropdownButtonFormField<String>(
               decoration: const InputDecoration(labelText: 'สินค้า'),
-              items: widget.products.map<DropdownMenuItem<String>>((product) {
+              value: _selectedProductId,
+              items: filteredProducts.map<DropdownMenuItem<String>>((product) {
                 return DropdownMenuItem<String>(
                   value: product.productId,
                   child: Text(

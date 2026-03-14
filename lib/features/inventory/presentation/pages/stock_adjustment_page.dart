@@ -16,6 +16,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../inventory/data/models/stock_balance_model.dart';
 import '../../../inventory/presentation/providers/stock_provider.dart';
 import 'stock_movement_history_page.dart';
+import '../../../../shared/services/mobile_scanner_service.dart'; // ✅ Phase 5
 
 // ════════════════════════════════════════════════════════════════
 // ✅ STEP 1: StockAdjustmentPage — หน้าเมนูหลัก
@@ -243,7 +244,7 @@ class _AdjustStockSubPageState extends ConsumerState<AdjustStockSubPage> {
                 width: 360,
                 child: Column(
                   children: [
-                    // Search bar
+                    // Search bar ✅ + ScannerButton
                     Padding(
                       padding: const EdgeInsets.all(12),
                       child: TextField(
@@ -260,7 +261,12 @@ class _AdjustStockSubPageState extends ConsumerState<AdjustStockSubPage> {
                                     setState(() => _searchQuery = '');
                                   },
                                 )
-                              : null,
+                              : ScannerButton(
+                                  onScanned: (value) {
+                                    _searchController.text = value;
+                                    setState(() => _searchQuery = value);
+                                  },
+                                ),
                         ),
                         onChanged: (v) => setState(() => _searchQuery = v),
                       ),
@@ -992,7 +998,13 @@ class _StockTakeSubPageState extends ConsumerState<StockTakeSubPage> {
                           setState(() => _searchQuery = '');
                         },
                       )
-                    : null,
+                    // ✅ ScannerButton เมื่อช่องว่าง
+                    : ScannerButton(
+                        onScanned: (value) {
+                          _searchController.text = value;
+                          setState(() => _searchQuery = value);
+                        },
+                      ),
               ),
               onChanged: (v) => setState(() => _searchQuery = v),
             ),
@@ -1505,7 +1517,13 @@ class _StockTransferSubPageState extends ConsumerState<StockTransferSubPage> {
                                     setState(() => _searchQuery = '');
                                   },
                                 )
-                              : null,
+                              // ✅ ScannerButton เมื่อช่องว่าง
+                              : ScannerButton(
+                                  onScanned: (value) {
+                                    _searchController.text = value;
+                                    setState(() => _searchQuery = value);
+                                  },
+                                ),
                         ),
                         onChanged: (v) => setState(() => _searchQuery = v),
                       ),

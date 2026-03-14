@@ -42,38 +42,66 @@ class MobileScannerService {
   }
 
   /// Fallback สำหรับ Desktop — กรอก barcode มือ
+  /// ✅ ใช้ _ManualInputDialog (StatefulWidget) เพื่อจัดการ
+  /// controller lifecycle อย่างถูกต้อง
   static Future<ScanResult?> _showManualInputDialog(
       BuildContext context) async {
-    final ctrl = TextEditingController();
     final result = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('กรอกบาร์โค้ด / QR Code'),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          decoration: const InputDecoration(
-            hintText: 'สแกนหรือกรอกบาร์โค้ด',
-            prefixIcon: Icon(Icons.qr_code_scanner),
-          ),
-          onSubmitted: (v) => Navigator.pop(ctx, v),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('ยกเลิก'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, ctrl.text),
-            child: const Text('ตกลง'),
-          ),
-        ],
-      ),
+      builder: (ctx) => const _ManualInputDialog(),
     );
 
-    ctrl.dispose();
     if (result == null || result.isEmpty) return null;
     return ScanResult(value: result, type: ScanType.unknown);
+  }
+}
+
+// ─────────────────────────────────────────
+// _ManualInputDialog
+// StatefulWidget — controller อยู่ใน State
+// dispose() ถูกเรียกโดย Flutter lifecycle เอง
+// ─────────────────────────────────────────
+class _ManualInputDialog extends StatefulWidget {
+  const _ManualInputDialog();
+
+  @override
+  State<_ManualInputDialog> createState() => _ManualInputDialogState();
+}
+
+class _ManualInputDialogState extends State<_ManualInputDialog> {
+  // ✅ controller อยู่ใน State — dispose() ถูกเรียกหลัง dialog ปิดแน่นอน
+  final TextEditingController _ctrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('กรอกบาร์โค้ด / QR Code'),
+      content: TextField(
+        controller: _ctrl,
+        autofocus: true,
+        decoration: const InputDecoration(
+          hintText: 'สแกนหรือกรอกบาร์โค้ด',
+          prefixIcon: Icon(Icons.qr_code_scanner),
+        ),
+        onSubmitted: (v) => Navigator.pop(context, v),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('ยกเลิก'),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context, _ctrl.text),
+          child: const Text('ตกลง'),
+        ),
+      ],
+    );
   }
 }
 

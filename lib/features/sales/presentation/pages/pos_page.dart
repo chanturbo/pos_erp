@@ -8,6 +8,8 @@ import '../widgets/cart_panel.dart';
 import '../widgets/customer_selector_dialog.dart';
 import '../widgets/discount_dialog.dart';
 import '../widgets/hold_orders_dialog.dart';
+import '../../../../shared/services/mobile_scanner_service.dart';  // ✅ Phase 5
+import '../../../../shared/widgets/barcode_listener.dart';         // ✅ USB Scanner
 
 class PosPage extends ConsumerStatefulWidget {
   const PosPage({super.key});
@@ -32,7 +34,15 @@ class _PosPageState extends ConsumerState<PosPage> {
     final cartState = ref.watch(cartProvider);
     final holdOrdersState = ref.watch(holdOrdersProvider);
     
-    return Scaffold(
+    // ✅ USB Barcode Scanner — ครอบทั้งหน้า POS
+    // สแกนได้ทุกเวลาโดยไม่ต้อง focus TextField
+    return BarcodeListener(
+      onBarcodeScanned: (barcode) {
+        // ค้นหาสินค้าจาก barcode แล้วใส่ลง search field
+        _searchController.text = barcode;
+        setState(() => _searchQuery = barcode);
+      },
+      child: Scaffold(
       appBar: AppBar(
         title: Row(
           children: [
@@ -220,7 +230,14 @@ class _PosPageState extends ConsumerState<PosPage> {
                                 });
                               },
                             )
-                          : null,
+                          // ✅ ScannerButton เมื่อช่องว่าง
+                          : ScannerButton(
+                              tooltip: 'สแกนบาร์โค้ดสินค้า',
+                              onScanned: (value) {
+                                _searchController.text = value;
+                                setState(() => _searchQuery = value);
+                              },
+                            ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
@@ -347,6 +364,7 @@ class _PosPageState extends ConsumerState<PosPage> {
           ),
         ],
       ),
+    ),    // ← ปิด BarcodeListener
     );
   }
 }
