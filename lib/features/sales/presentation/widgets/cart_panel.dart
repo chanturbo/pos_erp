@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/cart_provider.dart';
 import '../pages/payment_page.dart';
+import '../../../products/presentation/providers/product_provider.dart'; // ✅ scan เพิ่มสินค้า
+import '../../../../shared/services/mobile_scanner_service.dart';        // ✅ MobileScannerService
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/responsive_utils.dart';
 
@@ -39,6 +41,10 @@ class CartPanel extends ConsumerWidget {
                 ? null
                 : () => ref.read(cartProvider.notifier).clear(),
           ),
+
+          // ── Scan Row — Search field + ปุ่มสแกน ─────────────
+          // row แยกข้างบนรายการ: [🔍 barcode input] [🔲 สแกน]
+          _ScanRow(ref: ref),
 
           // ── Column labels ────────────────────────────────────
           if (cartState.items.isNotEmpty) const _ColHeader(),
@@ -143,6 +149,197 @@ class _CartHeader extends StatelessWidget {
     );
   }
 }
+
+// ─────────────────────────────────────────────────────────────────
+// Scan Row — Search field + Scan button
+// row แยกระหว่าง Header และรายการสินค้า
+// พิมพ์ barcode แล้ว Enter หรือกดปุ่มสแกน → เพิ่มสินค้าทันที
+// ─────────────────────────────────────────────────────────────────
+class _ScanRow extends ConsumerStatefulWidget {
+  final WidgetRef ref;
+  const _ScanRow({required this.ref});
+
+  @override
+  ConsumerState<_ScanRow> createState() => _ScanRowState();
+}
+
+class _ScanRowState extends ConsumerState<_ScanRow> {
+  final _ctrl = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  // ── ค้นหาสินค้าจาก barcode / productCode แล้วเพิ่มทันที ──────
+  Future<void> _addByBarcode(BuildContext context, String raw) async {
+    final b = raw.trim().toLowerCase();
+    if (b.isEmpty) return;
+
+    final productsAsync = ref.read(productListProvider);
+    if (!productsAsync.hasValue) return;
+
+    final match = productsAsync.value!.firstWhere(
+      (p) =>
+          (p.barcode?.toLowerCase() == b) ||
+          p.productCode.toLowerCase() == b,
+      orElse: () => throw _NotFoundError(),
+    );
+
+    ref.read(cartProvider.notifier).addItem(
+      productId:   match.productId,
+      productCode: match.productCode,
+      productName: match.productName,
+      unit:        match.baseUnit,
+      unitPrice:   match.priceLevel1,
+    );
+
+    // ล้าง field หลังเพิ่มสำเร็จ
+    _ctrl.clear();
+    setState(() => _query = '');
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Row(children: [
+          const Icon(Icons.check_circle, color: Colors.white, size: 16),
+          const SizedBox(width: 8),
+          Expanded(child: Text('เพิ่ม ${match.productName} แล้ว')),
+        ]),
+        backgroundColor: AppTheme.successColor,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(milliseconds: 800),
+      ));
+    }
+  }
+
+  // ── เปิดกล้องแบบต่อเนื่อง — สแกนซ้ำได้ ไม่ปิดกล้อง ─────────
+  Future<void> _onScanTap(BuildContext context) async {
+    await MobileScannerService.openContinuous(
+      context,
+      onScanned: (result) {
+        if (result.value.isEmpty) return;
+        _addByBarcode(context, result.value).catchError((_) {
+          _notFound(context, result.value);
+        });
+      },
+    );
+  }
+
+  // ── กรณีไม่พบสินค้า ──────────────────────────────────────────
+  void _notFound(BuildContext context, String barcode) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Row(children: [
+        const Icon(Icons.search_off, color: Colors.white, size: 16),
+        const SizedBox(width: 8),
+        Expanded(child: Text('ไม่พบสินค้า: $barcode')),
+      ]),
+      backgroundColor: AppTheme.errorColor,
+      behavior: SnackBarBehavior.floating,
+      duration: const Duration(seconds: 2),
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: _border)),
+      ),
+      child: Row(
+        children: [
+          // ── Barcode / productCode input ───────────────────────
+          Expanded(
+            child: SizedBox(
+              height: 34,
+              child: TextField(
+                controller: _ctrl,
+                decoration: InputDecoration(
+                  hintText: 'บาร์โค้ด / รหัสสินค้า...',
+                  hintStyle: const TextStyle(
+                      fontSize: 12, color: AppTheme.subtextColor),
+                  prefixIcon: const Icon(Icons.search, size: 16),
+                  suffixIcon: _query.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, size: 14),
+                          padding: EdgeInsets.zero,
+                          onPressed: () {
+                            _ctrl.clear();
+                            setState(() => _query = '');
+                          },
+                        )
+                      : null,
+                  isDense: true,
+                  contentPadding: EdgeInsets.zero,
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(6)),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide:
+                        const BorderSide(color: _orange, width: 1.5),
+                  ),
+                ),
+                style: const TextStyle(
+                    fontSize: 12, color: Color(0xFF1A1A1A)),
+                onChanged: (v) => setState(() => _query = v),
+                onSubmitted: (v) async {
+                  try {
+                    await _addByBarcode(context, v);
+                  } on _NotFoundError {
+                    _notFound(context, v);
+                  }
+                },
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+
+          // ── Scan button ──────────────────────────────────────
+          Tooltip(
+            message: 'สแกน QR / Barcode เพิ่มสินค้า',
+            child: InkWell(
+              onTap: () async {
+                try {
+                  await _onScanTap(context);
+                } on _NotFoundError catch (_) {
+                  // handled inside _addByBarcode → _notFound
+                }
+              },
+              borderRadius: BorderRadius.circular(6),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: _orange,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.qr_code_scanner,
+                        size: 15, color: Colors.white),
+                    SizedBox(width: 5),
+                    Text('สแกน',
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NotFoundError implements Exception {}
 
 // ─────────────────────────────────────────────────────────────────
 // Column labels

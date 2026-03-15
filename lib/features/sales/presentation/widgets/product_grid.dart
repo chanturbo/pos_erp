@@ -20,7 +20,7 @@ final productViewModeProvider =
 
 class _ViewModeNotifier extends Notifier<ProductViewMode> {
   @override
-  ProductViewMode build() => ProductViewMode.grid;
+  ProductViewMode build() => ProductViewMode.list;
   void set(ProductViewMode mode) => state = mode;
 }
 
