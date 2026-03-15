@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../products/data/models/product_model.dart';
@@ -188,6 +189,68 @@ class _ToggleBtn extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────
+// _ProductImage — แสดงรูปจาก path หรือ placeholder ถ้าไม่มีรูป
+// size = 0 → ขยายเต็ม parent (ใช้กับ Grid card ภายใน Expanded)
+// size > 0 → กำหนดขนาดตายตัว (ใช้กับ List row)
+// ─────────────────────────────────────────────────────────────────
+class _ProductImage extends StatelessWidget {
+  final String? imagePath;
+  final double size;       // 0 = expand, >0 = fixed
+  final BorderRadius borderRadius;
+
+  const _ProductImage({
+    required this.imagePath,
+    required this.size,
+    required this.borderRadius,
+  });
+
+  bool get _isExpand => size <= 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasImage = imagePath != null && imagePath!.isNotEmpty;
+    final file     = hasImage ? File(imagePath!) : null;
+    final exists   = file != null && file.existsSync();
+
+    Widget content;
+    if (hasImage && exists) {
+      content = ClipRRect(
+        borderRadius: borderRadius,
+        child: Image.file(
+          file!,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _placeholder(),
+        ),
+      );
+    } else {
+      content = _placeholder();
+    }
+
+    if (_isExpand) {
+      return SizedBox.expand(child: content);
+    }
+    return SizedBox(width: size, height: size, child: content);
+  }
+
+  Widget _placeholder() {
+    final iconSize = _isExpand ? 36.0 : (size * 0.38).clamp(14.0, 48.0);
+    return Container(
+      decoration: BoxDecoration(
+        color: _orange.withValues(alpha: 0.06),
+        borderRadius: borderRadius,
+      ),
+      child: Center(
+        child: Icon(
+          Icons.inventory_2_outlined,
+          size: iconSize,
+          color: _orange.withValues(alpha: 0.45),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
 // GRID VIEW — responsive columns
 // ─────────────────────────────────────────────────────────────────
 class _GridView extends ConsumerWidget {
@@ -274,21 +337,13 @@ class _ProductGridCard extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // รูปสินค้า
+            // รูปสินค้า — size=0 → expand เต็ม Expanded area
             Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: _orange.withValues(alpha: 0.06),
-                  borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(10)),
-                ),
-                child: Center(
-                  child: Icon(
-                    Icons.inventory_2_outlined,
-                    size: 40,
-                    color: _orange.withValues(alpha: 0.45),
-                  ),
-                ),
+              child: _ProductImage(
+                imagePath: product.imagePath,
+                size: 0,
+                borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(10)),
               ),
             ),
 
@@ -398,28 +453,11 @@ class _ProductListRow extends ConsumerWidget {
         ),
         child: Row(
           children: [
-            // Initials box
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: _orange.withValues(alpha: 0.10),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                    color: _orange.withValues(alpha: 0.2)),
-              ),
-              child: Center(
-                child: Text(
-                  product.productCode.length >= 2
-                      ? product.productCode.substring(0, 2)
-                      : product.productCode,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: _orange,
-                  ),
-                ),
-              ),
+            // รูปสินค้า (40x40) — หรือ initials ถ้าไม่มีรูป
+            _ProductImage(
+              imagePath: product.imagePath,
+              size: 40,
+              borderRadius: BorderRadius.circular(8),
             ),
             const SizedBox(width: 10),
 

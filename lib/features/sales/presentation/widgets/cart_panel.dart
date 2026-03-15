@@ -31,7 +31,9 @@ class CartPanel extends ConsumerWidget {
       decoration: const BoxDecoration(
         color: _surface,
         border: Border(left: BorderSide(color: _border)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
       ),
+      clipBehavior: Clip.antiAlias, // ✅ ตัดมุมของ children ให้มนตาม borderRadius
       child: Column(
         children: [
           // ── Header ──────────────────────────────────────────
@@ -86,6 +88,7 @@ class _CartHeader extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: const BoxDecoration(
         color: _navy,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
         border: Border(
             bottom: BorderSide(color: AppTheme.navyBorder)),
       ),

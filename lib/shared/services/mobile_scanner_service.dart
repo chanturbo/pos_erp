@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mobile_scanner/mobile_scanner.dart'; // ✅ mobile_scanner: ^6.0.0
 import '../../../../shared/theme/app_theme.dart';
 
 // เปิดกล้องทุก platform (Mobile + Desktop ที่มี webcam)
@@ -169,8 +170,33 @@ class _ScannerSheet extends StatefulWidget {
 }
 
 class _ScannerSheetState extends State<_ScannerSheet> {
-  bool _torchOn = false;
+  late final MobileScannerController _controller;
   bool _cooldown = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = MobileScannerController(
+      detectionSpeed: DetectionSpeed.normal,
+      facing: CameraFacing.back,
+      formats: [
+        BarcodeFormat.qrCode,
+        BarcodeFormat.ean13,
+        BarcodeFormat.ean8,
+        BarcodeFormat.code128,
+        BarcodeFormat.code39,
+        BarcodeFormat.upcA,
+        BarcodeFormat.upcE,
+        BarcodeFormat.itf,
+      ],
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   void _handleDetected(String value, ScanType type) {
     if (_cooldown || value.isEmpty) return;
@@ -188,7 +214,7 @@ class _ScannerSheetState extends State<_ScannerSheet> {
     return Container(
       height: sheetH,
       decoration: const BoxDecoration(
-        color: Color(0xCC000000), // กึ่งโปร่งใส — เห็นหน้าหลังได้
+        color: Color(0xCC000000),
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: Column(
@@ -211,11 +237,8 @@ class _ScannerSheetState extends State<_ScannerSheet> {
                 const SizedBox(height: 10),
                 Row(
                   children: [
-                    const Icon(
-                      Icons.qr_code_scanner,
-                      color: AppTheme.primaryLight,
-                      size: 18,
-                    ),
+                    const Icon(Icons.qr_code_scanner,
+                        color: AppTheme.primaryLight, size: 18),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -233,20 +256,30 @@ class _ScannerSheetState extends State<_ScannerSheet> {
                     ),
                     // Torch
                     IconButton(
-                      icon: Icon(
-                        _torchOn ? Icons.flash_on : Icons.flash_off,
-                        color: _torchOn ? Colors.yellow : Colors.white54,
-                        size: 20,
+                      icon: ValueListenableBuilder(
+                        valueListenable: _controller,
+                        builder: (_, state, __) => Icon(
+                          state.torchState == TorchState.on
+                              ? Icons.flash_on
+                              : Icons.flash_off,
+                          color: state.torchState == TorchState.on
+                              ? Colors.yellow
+                              : Colors.white54,
+                          size: 20,
+                        ),
                       ),
-                      onPressed: () => setState(() => _torchOn = !_torchOn),
+                      onPressed: () => _controller.toggleTorch(),
+                    ),
+                    // Switch camera
+                    IconButton(
+                      icon: const Icon(Icons.cameraswitch,
+                          color: Colors.white54, size: 20),
+                      onPressed: () => _controller.switchCamera(),
                     ),
                     // Close
                     IconButton(
-                      icon: const Icon(
-                        Icons.close,
-                        color: Colors.white70,
-                        size: 20,
-                      ),
+                      icon: const Icon(Icons.close,
+                          color: Colors.white70, size: 20),
                       onPressed: () => Navigator.pop(context),
                     ),
                   ],
@@ -259,27 +292,30 @@ class _ScannerSheetState extends State<_ScannerSheet> {
           Expanded(
             child: Stack(
               children: [
-                // ✅ เปิด comment นี้เมื่อเพิ่ม mobile_scanner: ^6.0.0
-                //
-                // ClipRRect(
-                //   child: MobileScanner(
-                //     controller: MobileScannerController(
-                //         torchEnabled: _torchOn),
-                //     onDetect: (capture) {
-                //       final barcode = capture.barcodes.firstOrNull;
-                //       final value   = barcode?.rawValue;
-                //       if (value == null) return;
-                //       HapticFeedback.mediumImpact();
-                //       _handleDetected(
-                //         value,
-                //         barcode!.format == BarcodeFormat.qrCode
-                //             ? ScanType.qrCode
-                //             : ScanType.barcode,
-                //       );
-                //     },
-                //   ),
-                // ),
-                Container(color: Colors.black54), // placeholder
+                // กล้องจริง
+                MobileScanner(
+                  controller: _controller,
+                  onDetect: (capture) {
+                    if (_cooldown) return;
+                    for (final barcode in capture.barcodes) {
+                      final value = barcode.rawValue;
+                      if (value == null || value.isEmpty) continue;
+                      _handleDetected(
+                        value,
+                        barcode.format == BarcodeFormat.qrCode
+                            ? ScanType.qrCode
+                            : ScanType.barcode,
+                      );
+                      break;
+                    }
+                  },
+                  errorBuilder: (context, error) => Center(
+                    child: Text(
+                      'กล้องไม่พร้อม: ${error.errorCode}',
+                      style: const TextStyle(color: Colors.red),
+                    ),
+                  ),
+                ),
 
                 Center(child: _ScanOverlay()),
 
@@ -288,11 +324,8 @@ class _ScannerSheetState extends State<_ScannerSheet> {
                   Container(
                     color: AppTheme.successColor.withValues(alpha: 0.15),
                     child: const Center(
-                      child: Icon(
-                        Icons.check_circle,
-                        color: Colors.white,
-                        size: 64,
-                      ),
+                      child: Icon(Icons.check_circle,
+                          color: Colors.white, size: 64),
                     ),
                   ),
               ],
@@ -303,12 +336,15 @@ class _ScannerSheetState extends State<_ScannerSheet> {
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 10),
             child: TextButton.icon(
-              style: TextButton.styleFrom(foregroundColor: Colors.white60),
+              style:
+                  TextButton.styleFrom(foregroundColor: Colors.white60),
               icon: const Icon(Icons.keyboard, size: 16),
-              label: const Text('กรอกเอง', style: TextStyle(fontSize: 12)),
+              label:
+                  const Text('กรอกเอง', style: TextStyle(fontSize: 12)),
               onPressed: () async {
                 final result =
-                    await MobileScannerService._showManualInputDialog(context);
+                    await MobileScannerService._showManualInputDialog(
+                        context);
                 if (result == null) return;
                 widget.onScanned(result);
                 if (context.mounted) {
@@ -342,27 +378,47 @@ class _ScannerPage extends StatefulWidget {
 }
 
 class _ScannerPageState extends State<_ScannerPage> {
-  bool _torchOn = false;
-  bool _scanned = false; // ใช้เฉพาะ single-scan mode เพื่อ debounce
+  late final MobileScannerController _controller;
+  bool _scanned = false;
 
-  // ── เรียกเมื่อสแกนได้ barcode ────────────────────────────────
+  @override
+  void initState() {
+    super.initState();
+    _controller = MobileScannerController(
+      detectionSpeed: DetectionSpeed.normal,
+      facing: CameraFacing.back,
+      formats: [
+        BarcodeFormat.qrCode,
+        BarcodeFormat.ean13,
+        BarcodeFormat.ean8,
+        BarcodeFormat.code128,
+        BarcodeFormat.code39,
+        BarcodeFormat.upcA,
+        BarcodeFormat.upcE,
+        BarcodeFormat.itf,
+      ],
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
   void _handleDetected(String value, ScanType type) {
-    if (!widget.continuous && _scanned)
-      return; // single-scan: ป้องกัน double-detect
+    if (!widget.continuous && _scanned) return;
     if (value.isEmpty) return;
 
     final result = ScanResult(value: value, type: type);
 
     if (widget.continuous) {
-      // Continuous: เรียก callback แล้วแสดง feedback — ไม่ pop
       widget.onScanned?.call(result);
-      // Reset สั้นๆ เพื่อป้องกัน detect ซ้ำจาก frame เดิม
       setState(() => _scanned = true);
       Future.delayed(const Duration(milliseconds: 800), () {
         if (mounted) setState(() => _scanned = false);
       });
     } else {
-      // Single: pop กลับพร้อมผล
       setState(() => _scanned = true);
       Navigator.pop(context, result);
     }
@@ -381,43 +437,58 @@ class _ScannerPageState extends State<_ScannerPage> {
               : 'สแกนบาร์โค้ด / QR Code',
         ),
         actions: [
-          // Torch toggle
-          IconButton(
-            icon: Icon(
-              _torchOn ? Icons.flash_on : Icons.flash_off,
-              color: _torchOn ? Colors.yellow : Colors.white,
+          // Torch
+          ValueListenableBuilder(
+            valueListenable: _controller,
+            builder: (_, state, __) => IconButton(
+              icon: Icon(
+                state.torchState == TorchState.on
+                    ? Icons.flash_on
+                    : Icons.flash_off,
+                color: state.torchState == TorchState.on
+                    ? Colors.yellow
+                    : Colors.white,
+              ),
+              onPressed: () => _controller.toggleTorch(),
             ),
-            onPressed: () => setState(() => _torchOn = !_torchOn),
+          ),
+          // Switch camera
+          IconButton(
+            icon: const Icon(Icons.cameraswitch),
+            onPressed: () => _controller.switchCamera(),
           ),
         ],
       ),
       body: Stack(
         children: [
-          // ── Camera Preview ──────────────────────────────────
-          // ✅ เปิด comment นี้เมื่อเพิ่ม mobile_scanner: ^6.0.0 ใน pubspec
-          //
-          // MobileScanner(
-          //   controller: MobileScannerController(torchEnabled: _torchOn),
-          //   onDetect: (capture) {
-          //     if (_scanned && !widget.continuous) return;
-          //     final barcode = capture.barcodes.first;
-          //     final value   = barcode.rawValue;
-          //     if (value == null) return;
-          //     HapticFeedback.mediumImpact();
-          //     _handleDetected(
-          //       value,
-          //       barcode.format == BarcodeFormat.qrCode
-          //           ? ScanType.qrCode
-          //           : ScanType.barcode,
-          //     );
-          //   },
-          // ),
-          Container(color: Colors.black87),
+          // กล้องจริง
+          MobileScanner(
+            controller: _controller,
+            onDetect: (capture) {
+              if (_scanned && !widget.continuous) return;
+              for (final barcode in capture.barcodes) {
+                final value = barcode.rawValue;
+                if (value == null || value.isEmpty) continue;
+                _handleDetected(
+                  value,
+                  barcode.format == BarcodeFormat.qrCode
+                      ? ScanType.qrCode
+                      : ScanType.barcode,
+                );
+                break;
+              }
+            },
+            errorBuilder: (context, error) => Center(
+              child: Text(
+                'กล้องไม่พร้อม: ${error.errorCode}',
+                style: const TextStyle(color: Colors.red, fontSize: 16),
+              ),
+            ),
+          ),
 
-          // ── Scan Frame Overlay ──────────────────────────────
           Center(child: _ScanOverlay()),
 
-          // ── Feedback เมื่อสแกนได้ (continuous mode) ─────────
+          // Feedback (continuous mode)
           if (widget.continuous && _scanned)
             Positioned(
               top: 20,
@@ -426,9 +497,7 @@ class _ScannerPageState extends State<_ScannerPage> {
               child: Center(
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 8,
-                  ),
+                      horizontal: 20, vertical: 8),
                   decoration: BoxDecoration(
                     color: AppTheme.successColor,
                     borderRadius: BorderRadius.circular(20),
@@ -436,43 +505,38 @@ class _ScannerPageState extends State<_ScannerPage> {
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.check_circle, color: Colors.white, size: 16),
+                      Icon(Icons.check_circle,
+                          color: Colors.white, size: 16),
                       SizedBox(width: 6),
-                      Text(
-                        'เพิ่มแล้ว!',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                      Text('เพิ่มแล้ว!',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold)),
                     ],
                   ),
                 ),
               ),
             ),
 
-          // ── Manual Input Button ─────────────────────────────
+          // Manual input
           Positioned(
             bottom: 40,
             left: 0,
             right: 0,
             child: Center(
               child: TextButton.icon(
-                style: TextButton.styleFrom(foregroundColor: Colors.white),
+                style: TextButton.styleFrom(
+                    foregroundColor: Colors.white),
                 icon: const Icon(Icons.keyboard),
                 label: const Text('กรอกเอง'),
                 onPressed: () async {
                   final result =
                       await MobileScannerService._showManualInputDialog(
-                        context,
-                      );
+                          context);
                   if (result == null || !context.mounted) return;
-
                   if (widget.continuous) {
-                    // Continuous: เรียก callback แล้วอยู่ต่อ
                     widget.onScanned?.call(result);
                   } else {
-                    // Single: pop กลับ
                     Navigator.pop(context, result);
                   }
                 },

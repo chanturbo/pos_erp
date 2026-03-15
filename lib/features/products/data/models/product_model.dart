@@ -14,6 +14,7 @@ class ProductModel {
   final bool isStockControl;
   final bool allowNegativeStock;
   final bool isActive;
+  final String? imagePath; // ✅ path รูปภาพในเครื่อง
   
   ProductModel({
     required this.productId,
@@ -31,6 +32,7 @@ class ProductModel {
     this.isStockControl = true,
     this.allowNegativeStock = false,
     this.isActive = true,
+    this.imagePath,
   });
   
   factory ProductModel.fromJson(Map<String, dynamic> json) {
@@ -50,6 +52,7 @@ class ProductModel {
       isStockControl: json['is_stock_control'] as bool? ?? true,
       allowNegativeStock: json['allow_negative_stock'] as bool? ?? false,
       isActive: json['is_active'] as bool? ?? true,
+      imagePath: json['image_path'] as String?,
     );
   }
   
@@ -70,6 +73,7 @@ class ProductModel {
       'is_stock_control': isStockControl,
       'allow_negative_stock': allowNegativeStock,
       'is_active': isActive,
+      'image_path': imagePath,
     };
   }
 }

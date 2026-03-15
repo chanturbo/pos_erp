@@ -93,16 +93,16 @@ class _DashboardBody extends StatelessWidget {
               ? Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(child: _TodayCard(stats: stats)),
+                    Expanded(child: _QuickActionsCard()),  // ✅ เมนูด่วนก่อน
                     const SizedBox(width: 16),
-                    Expanded(child: _QuickActionsCard()),
+                    Expanded(child: _TodayCard(stats: stats)),
                   ],
                 )
               : Column(
                   children: [
-                    _TodayCard(stats: stats),
+                    _QuickActionsCard(),                   // ✅ เมนูด่วนก่อน
                     SizedBox(height: context.isMobile ? 12 : 16),
-                    _QuickActionsCard(),
+                    _TodayCard(stats: stats),
                   ],
                 ),
         ],

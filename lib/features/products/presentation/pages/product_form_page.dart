@@ -1,8 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:file_picker/file_picker.dart'; // ✅ เพิ่มใน pubspec: file_picker: ^8.0.0
 import '../providers/product_provider.dart';
 import '../../data/models/product_model.dart';
 import '../../../../shared/services/mobile_scanner_service.dart'; // ✅ Phase 5
+import '../../../../shared/theme/app_theme.dart';
 
 class ProductFormPage extends ConsumerStatefulWidget {
   final ProductModel? product;
@@ -28,6 +31,9 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
   bool _isStockControl = true;
   bool _allowNegativeStock = false;
   bool _isLoading = false;
+
+  // ── Image ─────────────────────────────────────────────────────
+  String? _imagePath;    // path ปัจจุบัน (จาก DB หรือเลือกใหม่)
   
   @override
   void initState() {
@@ -46,6 +52,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     if (widget.product != null) {
       _isStockControl = widget.product!.isStockControl;
       _allowNegativeStock = widget.product!.allowNegativeStock;
+      _imagePath = widget.product!.imagePath; // ✅ โหลด path เดิม
     }
   }
   
@@ -64,6 +71,20 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     super.dispose();
   }
 
+  // ── เลือกรูปจาก file picker ──────────────────────────────────
+  Future<void> _pickImage() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      allowMultiple: false,
+    );
+    if (result == null || result.files.isEmpty) return;
+    final path = result.files.first.path;
+    if (path == null) return;
+    setState(() => _imagePath = path);
+  }
+
+  void _removeImage() => setState(() => _imagePath = null);
+
   @override
   Widget build(BuildContext context) {
     final isEdit = widget.product != null;
@@ -77,6 +98,14 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            // ── รูปสินค้า ────────────────────────────────────
+            _ImagePickerWidget(
+              imagePath: _imagePath,
+              onPick: _pickImage,
+              onRemove: _removeImage,
+            ),
+            const SizedBox(height: 20),
+
             // Product Code
             TextFormField(
               controller: _codeController,
@@ -109,15 +138,26 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
             ),
             const SizedBox(height: 16),
             
-            // Barcode ✅ + ScannerButton
+            // Barcode + ปุ่มสแกน (bottom sheet เหมือนหน้าขาย)
             TextFormField(
               controller: _barcodeController,
               decoration: InputDecoration(
                 labelText: 'บาร์โค้ด',
                 border: const OutlineInputBorder(),
-                suffixIcon: ScannerButton(
-                  onScanned: (value) {
-                    setState(() => _barcodeController.text = value);
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.qr_code_scanner),
+                  tooltip: 'สแกนบาร์โค้ด',
+                  onPressed: () async {
+                    // ใช้ openContinuous เพื่อให้ UI เหมือนหน้าขาย
+                    // แต่ปิด sheet ทันทีหลังสแกนได้ 1 รายการ
+                    await MobileScannerService.openContinuous(
+                      context,
+                      onScanned: (result) {
+                        setState(() =>
+                            _barcodeController.text = result.value);
+                        Navigator.of(context).pop(); // ✅ ปิด sheet ทันที
+                      },
+                    );
                   },
                 ),
               ),
@@ -312,6 +352,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
       'standard_cost': double.parse(_costController.text.isEmpty ? '0' : _costController.text),
       'is_stock_control': _isStockControl,
       'allow_negative_stock': _allowNegativeStock,
+      'image_path': _imagePath, // ✅ ส่ง path รูปไปด้วย
     };
     
     bool success;
@@ -336,17 +377,143 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(widget.product != null ? 'แก้ไขสินค้าสำเร็จ' : 'เพิ่มสินค้าสำเร็จ'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppTheme.successColor,
           ),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('เกิดข้อผิดพลาด'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppTheme.errorColor,
           ),
         );
       }
     }
   }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// _ImagePickerWidget — preview + ปุ่มเลือก/ลบรูป
+// ─────────────────────────────────────────────────────────────────
+class _ImagePickerWidget extends StatelessWidget {
+  final String? imagePath;
+  final VoidCallback onPick;
+  final VoidCallback onRemove;
+
+  const _ImagePickerWidget({
+    required this.imagePath,
+    required this.onPick,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final hasImage  = imagePath != null && imagePath!.isNotEmpty;
+    final file      = hasImage ? File(imagePath!) : null;
+    final fileExists = file != null && file.existsSync();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'รูปสินค้า',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: AppTheme.navyColor,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            // ── Preview box ─────────────────────────────────
+            GestureDetector(
+              onTap: onPick,
+              child: Container(
+                width: 110,
+                height: 110,
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: hasImage && fileExists
+                        ? AppTheme.primaryColor.withValues(alpha: 0.4)
+                        : AppTheme.borderColor,
+                    width: hasImage && fileExists ? 1.5 : 1,
+                  ),
+                ),
+                child: hasImage && fileExists
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(9),
+                        child: Image.file(
+                          file!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => _placeholder(),
+                        ),
+                      )
+                    : _placeholder(),
+              ),
+            ),
+            const SizedBox(width: 16),
+
+            // ── Buttons ──────────────────────────────────────
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: onPick,
+                  icon: const Icon(Icons.photo_library_outlined, size: 16),
+                  label: Text(hasImage ? 'เปลี่ยนรูป' : 'เลือกรูป'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryColor,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 10),
+                  ),
+                ),
+                if (hasImage) ...[
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: onRemove,
+                    icon: const Icon(Icons.delete_outline,
+                        size: 16, color: AppTheme.errorColor),
+                    label: const Text('ลบรูป',
+                        style: TextStyle(color: AppTheme.errorColor)),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: AppTheme.errorColor),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 10),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 8),
+                Text(
+                  'รองรับ JPG, PNG, WEBP',
+                  style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _placeholder() => Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.add_photo_alternate_outlined,
+              size: 32,
+              color: AppTheme.primaryColor.withValues(alpha: 0.5)),
+          const SizedBox(height: 6),
+          Text(
+            'กดเพื่อ\nเลือกรูป',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+                fontSize: 11,
+                color: AppTheme.primaryColor.withValues(alpha: 0.7)),
+          ),
+        ],
+      );
 }

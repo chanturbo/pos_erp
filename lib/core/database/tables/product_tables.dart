@@ -65,6 +65,7 @@ class Products extends Table {
   
   // Images
   TextColumn get imageUrls => text().nullable().map(const JsonConverter())();
+  TextColumn get imagePath => text().nullable()(); // ✅ path รูปหลักในเครื่อง
   
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();

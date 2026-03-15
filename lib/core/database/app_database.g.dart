@@ -2975,6 +2975,17 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   ).withConverter<Map<String, dynamic>?>($ProductsTable.$converterimageUrlsn);
+  static const VerificationMeta _imagePathMeta = const VerificationMeta(
+    'imagePath',
+  );
+  @override
+  late final GeneratedColumn<String> imagePath = GeneratedColumn<String>(
+    'image_path',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _isActiveMeta = const VerificationMeta(
     'isActive',
   );
@@ -3041,6 +3052,7 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
     vatType,
     vatRate,
     imageUrls,
+    imagePath,
     isActive,
     createdAt,
     updatedAt,
@@ -3242,6 +3254,12 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
         vatRate.isAcceptableOrUnknown(data['vat_rate']!, _vatRateMeta),
       );
     }
+    if (data.containsKey('image_path')) {
+      context.handle(
+        _imagePathMeta,
+        imagePath.isAcceptableOrUnknown(data['image_path']!, _imagePathMeta),
+      );
+    }
     if (data.containsKey('is_active')) {
       context.handle(
         _isActiveMeta,
@@ -3377,6 +3395,10 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
           data['${effectivePrefix}image_urls'],
         ),
       ),
+      imagePath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}image_path'],
+      ),
       isActive: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}is_active'],
@@ -3435,6 +3457,7 @@ class Product extends DataClass implements Insertable<Product> {
   final String vatType;
   final double vatRate;
   final Map<String, dynamic>? imageUrls;
+  final String? imagePath;
   final bool isActive;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -3464,6 +3487,7 @@ class Product extends DataClass implements Insertable<Product> {
     required this.vatType,
     required this.vatRate,
     this.imageUrls,
+    this.imagePath,
     required this.isActive,
     required this.createdAt,
     required this.updatedAt,
@@ -3516,6 +3540,9 @@ class Product extends DataClass implements Insertable<Product> {
         $ProductsTable.$converterimageUrlsn.toSql(imageUrls),
       );
     }
+    if (!nullToAbsent || imagePath != null) {
+      map['image_path'] = Variable<String>(imagePath);
+    }
     map['is_active'] = Variable<bool>(isActive);
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
@@ -3565,6 +3592,9 @@ class Product extends DataClass implements Insertable<Product> {
       imageUrls: imageUrls == null && nullToAbsent
           ? const Value.absent()
           : Value(imageUrls),
+      imagePath: imagePath == null && nullToAbsent
+          ? const Value.absent()
+          : Value(imagePath),
       isActive: Value(isActive),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
@@ -3604,6 +3634,7 @@ class Product extends DataClass implements Insertable<Product> {
       vatType: serializer.fromJson<String>(json['vatType']),
       vatRate: serializer.fromJson<double>(json['vatRate']),
       imageUrls: serializer.fromJson<Map<String, dynamic>?>(json['imageUrls']),
+      imagePath: serializer.fromJson<String?>(json['imagePath']),
       isActive: serializer.fromJson<bool>(json['isActive']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
@@ -3640,6 +3671,7 @@ class Product extends DataClass implements Insertable<Product> {
       'vatType': serializer.toJson<String>(vatType),
       'vatRate': serializer.toJson<double>(vatRate),
       'imageUrls': serializer.toJson<Map<String, dynamic>?>(imageUrls),
+      'imagePath': serializer.toJson<String?>(imagePath),
       'isActive': serializer.toJson<bool>(isActive),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
@@ -3672,6 +3704,7 @@ class Product extends DataClass implements Insertable<Product> {
     String? vatType,
     double? vatRate,
     Value<Map<String, dynamic>?> imageUrls = const Value.absent(),
+    Value<String?> imagePath = const Value.absent(),
     bool? isActive,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -3705,6 +3738,7 @@ class Product extends DataClass implements Insertable<Product> {
     vatType: vatType ?? this.vatType,
     vatRate: vatRate ?? this.vatRate,
     imageUrls: imageUrls.present ? imageUrls.value : this.imageUrls,
+    imagePath: imagePath.present ? imagePath.value : this.imagePath,
     isActive: isActive ?? this.isActive,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
@@ -3766,6 +3800,7 @@ class Product extends DataClass implements Insertable<Product> {
       vatType: data.vatType.present ? data.vatType.value : this.vatType,
       vatRate: data.vatRate.present ? data.vatRate.value : this.vatRate,
       imageUrls: data.imageUrls.present ? data.imageUrls.value : this.imageUrls,
+      imagePath: data.imagePath.present ? data.imagePath.value : this.imagePath,
       isActive: data.isActive.present ? data.isActive.value : this.isActive,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
@@ -3800,6 +3835,7 @@ class Product extends DataClass implements Insertable<Product> {
           ..write('vatType: $vatType, ')
           ..write('vatRate: $vatRate, ')
           ..write('imageUrls: $imageUrls, ')
+          ..write('imagePath: $imagePath, ')
           ..write('isActive: $isActive, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
@@ -3834,6 +3870,7 @@ class Product extends DataClass implements Insertable<Product> {
     vatType,
     vatRate,
     imageUrls,
+    imagePath,
     isActive,
     createdAt,
     updatedAt,
@@ -3867,6 +3904,7 @@ class Product extends DataClass implements Insertable<Product> {
           other.vatType == this.vatType &&
           other.vatRate == this.vatRate &&
           other.imageUrls == this.imageUrls &&
+          other.imagePath == this.imagePath &&
           other.isActive == this.isActive &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
@@ -3898,6 +3936,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
   final Value<String> vatType;
   final Value<double> vatRate;
   final Value<Map<String, dynamic>?> imageUrls;
+  final Value<String?> imagePath;
   final Value<bool> isActive;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
@@ -3928,6 +3967,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     this.vatType = const Value.absent(),
     this.vatRate = const Value.absent(),
     this.imageUrls = const Value.absent(),
+    this.imagePath = const Value.absent(),
     this.isActive = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -3959,6 +3999,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     this.vatType = const Value.absent(),
     this.vatRate = const Value.absent(),
     this.imageUrls = const Value.absent(),
+    this.imagePath = const Value.absent(),
     this.isActive = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -3993,6 +4034,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     Expression<String>? vatType,
     Expression<double>? vatRate,
     Expression<String>? imageUrls,
+    Expression<String>? imagePath,
     Expression<bool>? isActive,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
@@ -4025,6 +4067,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
       if (vatType != null) 'vat_type': vatType,
       if (vatRate != null) 'vat_rate': vatRate,
       if (imageUrls != null) 'image_urls': imageUrls,
+      if (imagePath != null) 'image_path': imagePath,
       if (isActive != null) 'is_active': isActive,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -4058,6 +4101,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     Value<String>? vatType,
     Value<double>? vatRate,
     Value<Map<String, dynamic>?>? imageUrls,
+    Value<String?>? imagePath,
     Value<bool>? isActive,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
@@ -4089,6 +4133,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
       vatType: vatType ?? this.vatType,
       vatRate: vatRate ?? this.vatRate,
       imageUrls: imageUrls ?? this.imageUrls,
+      imagePath: imagePath ?? this.imagePath,
       isActive: isActive ?? this.isActive,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -4178,6 +4223,9 @@ class ProductsCompanion extends UpdateCompanion<Product> {
         $ProductsTable.$converterimageUrlsn.toSql(imageUrls.value),
       );
     }
+    if (imagePath.present) {
+      map['image_path'] = Variable<String>(imagePath.value);
+    }
     if (isActive.present) {
       map['is_active'] = Variable<bool>(isActive.value);
     }
@@ -4221,6 +4269,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
           ..write('vatType: $vatType, ')
           ..write('vatRate: $vatRate, ')
           ..write('imageUrls: $imageUrls, ')
+          ..write('imagePath: $imagePath, ')
           ..write('isActive: $isActive, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -32418,6 +32467,7 @@ typedef $$ProductsTableCreateCompanionBuilder =
       Value<String> vatType,
       Value<double> vatRate,
       Value<Map<String, dynamic>?> imageUrls,
+      Value<String?> imagePath,
       Value<bool> isActive,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
@@ -32450,6 +32500,7 @@ typedef $$ProductsTableUpdateCompanionBuilder =
       Value<String> vatType,
       Value<double> vatRate,
       Value<Map<String, dynamic>?> imageUrls,
+      Value<String?> imagePath,
       Value<bool> isActive,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
@@ -32814,6 +32865,11 @@ class $$ProductsTableFilterComposer
   get imageUrls => $composableBuilder(
     column: $table.imageUrls,
     builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<String> get imagePath => $composableBuilder(
+    column: $table.imagePath,
+    builder: (column) => ColumnFilters(column),
   );
 
   ColumnFilters<bool> get isActive => $composableBuilder(
@@ -33184,6 +33240,11 @@ class $$ProductsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get imagePath => $composableBuilder(
+    column: $table.imagePath,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get isActive => $composableBuilder(
     column: $table.isActive,
     builder: (column) => ColumnOrderings(column),
@@ -33335,6 +33396,9 @@ class $$ProductsTableAnnotationComposer
   GeneratedColumnWithTypeConverter<Map<String, dynamic>?, String>
   get imageUrls =>
       $composableBuilder(column: $table.imageUrls, builder: (column) => column);
+
+  GeneratedColumn<String> get imagePath =>
+      $composableBuilder(column: $table.imagePath, builder: (column) => column);
 
   GeneratedColumn<bool> get isActive =>
       $composableBuilder(column: $table.isActive, builder: (column) => column);
@@ -33634,6 +33698,7 @@ class $$ProductsTableTableManager
                 Value<String> vatType = const Value.absent(),
                 Value<double> vatRate = const Value.absent(),
                 Value<Map<String, dynamic>?> imageUrls = const Value.absent(),
+                Value<String?> imagePath = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
@@ -33664,6 +33729,7 @@ class $$ProductsTableTableManager
                 vatType: vatType,
                 vatRate: vatRate,
                 imageUrls: imageUrls,
+                imagePath: imagePath,
                 isActive: isActive,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -33697,6 +33763,7 @@ class $$ProductsTableTableManager
                 Value<String> vatType = const Value.absent(),
                 Value<double> vatRate = const Value.absent(),
                 Value<Map<String, dynamic>?> imageUrls = const Value.absent(),
+                Value<String?> imagePath = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
@@ -33727,6 +33794,7 @@ class $$ProductsTableTableManager
                 vatType: vatType,
                 vatRate: vatRate,
                 imageUrls: imageUrls,
+                imagePath: imagePath,
                 isActive: isActive,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
