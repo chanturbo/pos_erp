@@ -1,17 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pos_erp/features/customers/data/models/customer_model.dart';
+import '../../../../shared/pdf/pdf_report_button.dart';
 import '../providers/customer_provider.dart';
 import 'customer_form_page.dart';
-import 'customer_pdf_report.dart'; // ✅ PDF report
+import 'customer_pdf_report.dart';
+import '../../../../shared/theme/app_colors.dart';
 
-// ─────────────────────────────────────────────────────────────────
-// สีหลัก (ตามภาพ: orange theme)
-// ─────────────────────────────────────────────────────────────────
-const _kPrimary = Color(0xFFE8622A);
-const _kPrimaryLight = Color(0xFFFFF3EE);
-const _kBorder = Color(0xFFE8E8E8);
-const _kHeaderBg = Color(0xFFF9F9F9);
-const _kTextSub = Color(0xFF8A8A8A);
+// ── Colors → AppColors ──────────────────────────────────────────
 
 class CustomerListPage extends ConsumerStatefulWidget {
   const CustomerListPage({super.key});
@@ -24,11 +20,17 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
   bool _showMembersOnly = false;
-  bool _isTableView     = true;  // ✅ user เลือก Table/Card ได้
+  bool _isTableView = true;
+  bool _userResized = false;
 
-  // ✅ ความกว้างคอลัมน์ (pixel) — ลากขยาย/ย่อได้
+  // ── Sort ───────────────────────────────────────────────────────
+  // column keys: 'name','code','phone','memberNo','points','creditLimit','status'
+  String _sortColumn = 'name';
+  bool   _sortAsc    = true;
+
+  // ✅ ความกว้างคอลัมน์ (pixel) — auto-fit ตามเนื้อหา + ลากขยาย/ย่อได้
   // ลำดับ: [ชื่อ, รหัส, โทร, สมาชิก, คะแนน, เครดิต, สถานะ, จัดการ]
-  final List<double> _colWidths = [220, 130, 130, 130, 100, 120, 90, 100];
+  final List<double> _colWidths = [200, 110, 120, 120, 80, 110, 80, 100];
   static const List<double> _colMinW = [120, 80, 80, 80, 70, 80, 70, 100];
   static const List<double> _colMaxW = [400, 250, 220, 220, 160, 200, 120, 100];
 
@@ -78,24 +80,27 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
             },
             onToggleMember: () =>
                 setState(() => _showMembersOnly = !_showMembersOnly),
-            onToggleView: () =>
-                setState(() => _isTableView = !_isTableView),
-            onRefresh: () =>
-                ref.read(customerListProvider.notifier).refresh(),
+            onToggleView: () => setState(() => _isTableView = !_isTableView),
+            onRefresh: () => ref.read(customerListProvider.notifier).refresh(),
             onAdd: () async {
-              await Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const CustomerFormPage()));
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const CustomerFormPage()),
+              );
             },
           ),
 
           // ── Table ──────────────────────────────────────────────
           Expanded(
             child: customerAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator(color: _kPrimary)),
+              loading: () => const Center(
+                child: CircularProgressIndicator(color: AppColors.primary),
+              ),
               error: (e, _) => _buildError(e),
               data: (customers) {
                 final filtered = customers.where((c) {
-                  if (_showMembersOnly && (c.memberNo == null || c.memberNo!.isEmpty)) {
+                  if (_showMembersOnly &&
+                      (c.memberNo == null || c.memberNo!.isEmpty)) {
                     return false;
                   }
                   if (_searchQuery.isEmpty) return true;
@@ -106,6 +111,30 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
                       (c.memberNo?.toLowerCase().contains(q) ?? false);
                 }).toList();
 
+                // ── Sort ────────────────────────────────────────
+                filtered.sort((a, b) {
+                  int cmp;
+                  switch (_sortColumn) {
+                    case 'name':
+                      cmp = a.customerName.compareTo(b.customerName);
+                    case 'code':
+                      cmp = a.customerCode.compareTo(b.customerCode);
+                    case 'phone':
+                      cmp = (a.phone ?? '').compareTo(b.phone ?? '');
+                    case 'memberNo':
+                      cmp = (a.memberNo ?? '').compareTo(b.memberNo ?? '');
+                    case 'points':
+                      cmp = a.points.compareTo(b.points);
+                    case 'creditLimit':
+                      cmp = a.creditLimit.compareTo(b.creditLimit);
+                    case 'status':
+                      cmp = (b.isActive ? 1 : 0).compareTo(a.isActive ? 1 : 0);
+                    default:
+                      cmp = 0;
+                  }
+                  return _sortAsc ? cmp : -cmp;
+                });
+
                 if (filtered.isEmpty) return _buildEmpty();
 
                 // ✅ Card View เมื่อ user เลือก
@@ -113,127 +142,166 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
                   return _buildCustomerCardView(context, filtered);
                 }
 
-                // ✅ ปรับ colWidths ตามขนาดหน้าจอจริง
+                // ✅ Auto-fit colWidths ตามเนื้อหา (เฉพาะครั้งแรก / ยังไม่ resize)
                 final screenW = MediaQuery.of(context).size.width - 32;
-                _adjustColWidths(screenW);
+                if (!_userResized) _autoFitColWidths(filtered, screenW);
 
-                final totalW = 40.0 + 16.0 +
+                final totalW =
+                    40.0 +
+                    16.0 +
                     _colWidths.fold(0.0, (s, w) => s + w) +
-                    28.0 + 32.0;
+                    28.0 +
+                    32.0;
                 final tableW = totalW > screenW ? totalW : screenW;
 
                 return Stack(
                   children: [
                     Container(
-                  margin: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: _kBorder),
-                  ),
-                  // ✅ แนวตั้ง scroll ด้านนอก, แนวนอน scroll ด้านใน
-                  child: Column(
-                    children: [
-                      // ── Header + Rows scroll แนวนอนพร้อมกัน ──────
-                      Expanded(
-                        child: Scrollbar(
-                          controller: _hScroll,
-                          thumbVisibility: true,
-                          trackVisibility: true,
-                          child: SingleChildScrollView(
-                            controller: _hScroll,
-                            scrollDirection: Axis.horizontal,
-                            child: SizedBox(
-                              width: tableW,
-                            child: Column(
-                              children: [
-                                // Header (resizable)
-                                _ResizableTableHeader(
-                                  colWidths: _colWidths,
-                                  colMinW: _colMinW,
-                                  colMaxW: _colMaxW,
-                                  onResize: (i, w) =>
-                                      setState(() => _colWidths[i] = w),
-                                  onReset: () => setState(() {
-                                    _colWidths.setAll(
-                                        0, [220, 130, 130, 130, 100, 120, 90, 100]);
-                                  }),
-                                ),
-                                const Divider(height: 1, color: _kBorder),
-                                // Rows — ใช้ shrinkWrap ภายใน Column ที่รู้ขนาดแล้ว
-                                Expanded(
-                                  child: ListView.separated(
-                                    itemCount: filtered.length,
-                                    separatorBuilder: (_, __) =>
-                                        const Divider(height: 1, color: _kBorder),
-                                    itemBuilder: (context, i) {
-                                      final c = filtered[i];
-                                      final isMember = c.memberNo != null &&
-                                          c.memberNo!.isNotEmpty;
-                                      final isSystem = c.customerId == 'WALK_IN';
-                                      return _CustomerRow(
-                                        customer: c,
-                                        isMember: isMember,
-                                        isSystem: isSystem,
+                      margin: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      // ✅ แนวตั้ง scroll ด้านนอก, แนวนอน scroll ด้านใน
+                      child: Column(
+                        children: [
+                          // ── Header + Rows scroll แนวนอนพร้อมกัน ──────
+                          Expanded(
+                            child: Scrollbar(
+                              controller: _hScroll,
+                              thumbVisibility: true,
+                              trackVisibility: true,
+                              child: SingleChildScrollView(
+                                controller: _hScroll,
+                                scrollDirection: Axis.horizontal,
+                                child: SizedBox(
+                                  width: tableW,
+                                  child: Column(
+                                    children: [
+                                      // Header (resizable + sortable)
+                                      _ResizableTableHeader(
                                         colWidths: _colWidths,
-                                        avatarColor: isSystem
-                                            ? const Color(0xFF546E7A)
-                                            : _avatarColor(c.customerName),
-                                        onEdit: isSystem
-                                            ? null
-                                            : () async {
-                                                await Navigator.push(
-                                                  context,
-                                                  MaterialPageRoute(
-                                                    builder: (_) =>
-                                                        CustomerFormPage(customer: c),
-                                                  ),
-                                                );
-                                              },
-                                        onDelete: isSystem
-                                            ? null
-                                            : () => _confirmDelete(
-                                                c.customerId, c.customerName),
-                                      );
-                                    },
+                                        colMinW: _colMinW,
+                                        colMaxW: _colMaxW,
+                                        sortColumn: _sortColumn,
+                                        sortAsc: _sortAsc,
+                                        onSort: (col) => setState(() {
+                                          if (_sortColumn == col) {
+                                            _sortAsc = !_sortAsc;
+                                          } else {
+                                            _sortColumn = col;
+                                            _sortAsc = true;
+                                          }
+                                        }),
+                                        onResize: (i, w) => setState(() {
+                                          _colWidths[i] = w;
+                                          _userResized = true;
+                                        }),
+                                        onReset: () => setState(() {
+                                          _colWidths.setAll(0, [
+                                            200, 110, 120, 120, 80, 110, 80, 100,
+                                          ]);
+                                          _userResized = false;
+                                        }),
+                                      ),
+                                      const Divider(
+                                        height: 1,
+                                        color: AppColors.border,
+                                      ),
+                                      // Rows — ใช้ shrinkWrap ภายใน Column ที่รู้ขนาดแล้ว
+                                      Expanded(
+                                        child: ListView.separated(
+                                          itemCount: filtered.length,
+                                          separatorBuilder: (_, __) =>
+                                              const Divider(
+                                                height: 1,
+                                                color: AppColors.border,
+                                              ),
+                                          itemBuilder: (context, i) {
+                                            final c = filtered[i];
+                                            final isMember =
+                                                c.memberNo != null &&
+                                                c.memberNo!.isNotEmpty;
+                                            final isSystem =
+                                                c.customerId == 'WALK_IN';
+                                            return _CustomerRow(
+                                              customer: c,
+                                              isMember: isMember,
+                                              isSystem: isSystem,
+                                              colWidths: _colWidths,
+                                              avatarColor: isSystem
+                                                  ? const Color(0xFF546E7A)
+                                                  : _avatarColor(
+                                                      c.customerName,
+                                                    ),
+                                              onEdit: isSystem
+                                                  ? null
+                                                  : () async {
+                                                      await Navigator.push(
+                                                        context,
+                                                        MaterialPageRoute(
+                                                          builder: (_) =>
+                                                              CustomerFormPage(
+                                                                customer: c,
+                                                              ),
+                                                        ),
+                                                      );
+                                                    },
+                                              onDelete: isSystem
+                                                  ? null
+                                                  : () => _confirmDelete(
+                                                      c.customerId,
+                                                      c.customerName,
+                                                    ),
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          // ── Footer (ไม่ scroll แนวนอน) ───────────────
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 10,
+                            ),
+                            decoration: const BoxDecoration(
+                              color: AppColors.headerBg,
+                              borderRadius: BorderRadius.only(
+                                bottomLeft: Radius.circular(12),
+                                bottomRight: Radius.circular(12),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Text(
+                                  'ทั้งหมด ${filtered.length} รายการ',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.textSub,
                                   ),
                                 ),
                               ],
                             ),
-                            ),
                           ),
-                        ),
+                        ],
                       ),
-                      // ── Footer (ไม่ scroll แนวนอน) ───────────────
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 10),
-                        decoration: const BoxDecoration(
-                          color: _kHeaderBg,
-                          borderRadius: BorderRadius.only(
-                            bottomLeft: Radius.circular(12),
-                            bottomRight: Radius.circular(12),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Text(
-                              'ทั้งหมด ${filtered.length} รายการ',
-                              style: const TextStyle(
-                                  fontSize: 12, color: _kTextSub),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ), // Container
+                    ), // Container
                     // ✅ ปุ่ม PDF ลอยมุมขวาล่าง
                     Positioned(
                       bottom: 24,
                       right: 24,
-                      child: CustomerReportButton(
-                        customers: filtered,
+                      child: PdfReportButton(
+                        emptyMessage: 'ไม่มีข้อมูลลูกค้า',
+                        title: 'รายงานลูกค้า',
+                        filename: () => PdfFilename.generate('customer_report'),
+                        buildPdf: () => CustomerPdfBuilder.build(filtered),
+                        hasData: filtered.isNotEmpty,
                       ),
                     ),
                   ],
@@ -267,7 +335,7 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
-            side: const BorderSide(color: _kBorder),
+            side: const BorderSide(color: AppColors.border),
           ),
           color: Colors.white,
           child: Padding(
@@ -283,23 +351,32 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
                       backgroundColor: isSystem
                           ? const Color(0xFF546E7A)
                           : (isMember ? const Color(0xFFFFB300) : color),
-                      child: Text(initial,
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold)),
+                      child: Text(
+                        initial,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                     if (isMember)
                       Positioned(
-                        right: -2, bottom: -2,
+                        right: -2,
+                        bottom: -2,
                         child: Container(
-                          width: 14, height: 14,
+                          width: 14,
+                          height: 14,
                           decoration: BoxDecoration(
                             color: const Color(0xFFFFB300),
                             shape: BoxShape.circle,
                             border: Border.all(color: Colors.white, width: 1.5),
                           ),
-                          child: const Icon(Icons.star, size: 8, color: Colors.white),
+                          child: const Icon(
+                            Icons.star,
+                            size: 8,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                   ],
@@ -314,18 +391,23 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
                       Row(
                         children: [
                           Expanded(
-                            child: Text(c.customerName,
-                                style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFF1A1A1A)),
-                                overflow: TextOverflow.ellipsis),
+                            child: Text(
+                              c.customerName,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF1A1A1A),
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                           const SizedBox(width: 8),
                           // Status badge
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 2),
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: c.isActive
                                   ? const Color(0xFFE8F5E9)
@@ -336,7 +418,8 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Container(
-                                  width: 5, height: 5,
+                                  width: 5,
+                                  height: 5,
                                   decoration: BoxDecoration(
                                     color: c.isActive
                                         ? const Color(0xFF4CAF50)
@@ -361,31 +444,48 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
                         ],
                       ),
                       const SizedBox(height: 3),
-                      Text('รหัส: \${c.customerCode}',
-                          style: const TextStyle(
-                              fontSize: 11, color: _kTextSub)),
+                      Text(
+                        'รหัส: \${c.customerCode}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textSub,
+                        ),
+                      ),
                       if (c.phone != null)
-                        Text('โทร: \${c.phone}',
-                            style: const TextStyle(
-                                fontSize: 11, color: _kTextSub)),
+                        Text(
+                          'โทร: \${c.phone}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textSub,
+                          ),
+                        ),
                       if (isMember)
                         Row(
                           children: [
-                            Icon(Icons.card_membership,
-                                size: 11, color: Colors.amber[700]),
+                            Icon(
+                              Icons.card_membership,
+                              size: 11,
+                              color: Colors.amber[700],
+                            ),
                             const SizedBox(width: 3),
-                            Text('\${c.memberNo}  ·  \${c.points} pt',
-                                style: TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.amber[700],
-                                    fontWeight: FontWeight.w500)),
+                            Text(
+                              '\${c.memberNo}  ·  \${c.points} pt',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.amber[700],
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
                           ],
                         ),
                       if (c.creditLimit > 0)
-                        Text('วงเงิน: ฿\${c.creditLimit.toStringAsFixed(0)}',
-                            style: const TextStyle(
-                                fontSize: 11,
-                                color: Color(0xFF1565C0))),
+                        Text(
+                          'วงเงิน: ฿\${c.creditLimit.toStringAsFixed(0)}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF1565C0),
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -394,16 +494,21 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
                 if (isSystem)
                   Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 4),
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFECEFF1),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Text('ระบบ',
-                        style: TextStyle(
-                            fontSize: 10,
-                            color: Color(0xFF546E7A),
-                            fontWeight: FontWeight.w600)),
+                    child: const Text(
+                      'ระบบ',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Color(0xFF546E7A),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   )
                 else
                   Row(
@@ -440,23 +545,88 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
     );
   }
 
-    // ─────────────────────────────────────────────────────────────
-  // ปรับ colWidths อัตโนมัติตามความกว้างหน้าจอ
   // ─────────────────────────────────────────────────────────────
-  void _adjustColWidths(double screenW) {
-    // รวม fixed: ลำดับ(40+16) + reset(28) + padding(32) = 116
-    const fixed = 116.0;
-    // ratio ของแต่ละคอลัมน์ [ชื่อ, รหัส, โทร, สมาชิก, คะแนน, เครดิต, สถานะ, จัดการ]
-    const ratios = [3.0, 2.0, 2.0, 2.0, 1.5, 1.5, 1.2, 1.3];
-    final available = screenW - fixed;
-    final totalRatio = ratios.fold(0.0, (s, r) => s + r);
+  // Auto-fit colWidths ตามความยาวข้อความจริงใน list
+  // ─────────────────────────────────────────────────────────────
+  void _autoFitColWidths(List<CustomerModel> rows, double screenW) {
+    // ── Header label widths (fontSize 12, w600 ~7.5px/char Thai)
+    // คอลัมน์ที่ sort ได้ บวก sort icon (13px) + gap (3px) = +16
+    // คอลัมน์ที่ไม่ sort บวกแค่ padding (16px)
+    const hPad     = 16.0;
+    const sortIcon = 16.0;
+    const hCharW   = 7.5;
+
+    // [ชื่อ-นามสกุล, รหัสลูกค้า, โทรศัพท์, เลขสมาชิก, คะแนน, วงเงินเครดิต, สถานะ, จัดการ]
+    final labels  = ['ชื่อ-นามสกุล', 'รหัสลูกค้า', 'โทรศัพท์', 'เลขสมาชิก',
+                     'คะแนน',        'วงเงินเครดิต', 'สถานะ',    'จัดการ'];
+    final hasSort = [true, true, true, true, true, true, true, false];
+
+    final headerMinW = List<double>.generate(labels.length, (i) {
+      final lw = labels[i].length * hCharW + hPad;
+      return hasSort[i] ? lw + sortIcon : lw;
+    });
+
+    // เริ่มต้น maxW = header min (floor ที่ content ย่อไม่ได้)
+    final maxW = List<double>.from(headerMinW);
+
+    // ── Content character widths ──────────────────────────────
+    const charW   = 7.2;  // regular fontSize 13
+    const numCharW = 7.4; // ตัวเลข
+    const cPad    = 24.0; // horizontal padding ต่อ cell content
+
+    for (final c in rows) {
+      // 0: ชื่อ + avatar(36) + gap(10)
+      final nameW = c.customerName.length * charW + 46 + cPad;
+      if (nameW > maxW[0]) maxW[0] = nameW.clamp(_colMinW[0], _colMaxW[0]);
+
+      // 1: รหัสลูกค้า
+      final codeW = c.customerCode.length * charW + cPad;
+      if (codeW > maxW[1]) maxW[1] = codeW.clamp(_colMinW[1], _colMaxW[1]);
+
+      // 2: โทรศัพท์
+      final phoneW = (c.phone?.length ?? 1) * charW + cPad;
+      if (phoneW > maxW[2]) maxW[2] = phoneW.clamp(_colMinW[2], _colMaxW[2]);
+
+      // 3: เลขสมาชิก (icon 13 + gap 4 = +17)
+      final memW = (c.memberNo?.length ?? 1) * charW + 17 + cPad;
+      if (memW > maxW[3]) maxW[3] = memW.clamp(_colMinW[3], _colMaxW[3]);
+
+      // 4: คะแนน — badge "XXXXX pt" icon(12)+gap(3)+text
+      final ptW = '${c.points} pt'.length * 7.0 + 15 + cPad;
+      if (ptW > maxW[4]) maxW[4] = ptW.clamp(_colMinW[4], _colMaxW[4]);
+
+      // 5: วงเงินเครดิต
+      final creditStr = c.creditLimit > 0
+          ? '฿${c.creditLimit.toStringAsFixed(0)}'
+          : '-';
+      final creditW = creditStr.length * numCharW + cPad;
+      if (creditW > maxW[5]) maxW[5] = creditW.clamp(_colMinW[5], _colMaxW[5]);
+
+      // 6: สถานะ — badge fixed ≥ header
+      // 7: จัดการ — fixed 100px
+    }
+
+    // clamp ทุกคอลัมน์
+    for (int i = 0; i < maxW.length; i++) {
+      maxW[i] = maxW[i].clamp(_colMinW[i], _colMaxW[i]);
+    }
+    maxW[7] = 100.0; // จัดการ fixed
+
+    // กระจาย space ที่เหลือให้คอลัมน์ชื่อ (index 0)
+    const totalFixed = 116.0; // ลำดับ(40+16) + reset(28) + padding(32)
+    final totalCols  = maxW.fold(0.0, (s, w) => s + w);
+    final available  = screenW - totalFixed;
+    if (totalCols < available) {
+      maxW[0] = (maxW[0] + (available - totalCols))
+          .clamp(_colMinW[0], _colMaxW[0]);
+    }
+
     for (int i = 0; i < _colWidths.length; i++) {
-      final computed = (available * ratios[i] / totalRatio);
-      _colWidths[i] = computed.clamp(_colMinW[i], _colMaxW[i]);
+      _colWidths[i] = maxW[i];
     }
   }
 
-    Future<void> _confirmDelete(String id, String name) async {
+  Future<void> _confirmDelete(String id, String name) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -476,13 +646,16 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
       ),
     );
     if (confirm == true && mounted) {
-      final success =
-          await ref.read(customerListProvider.notifier).deleteCustomer(id);
+      final success = await ref
+          .read(customerListProvider.notifier)
+          .deleteCustomer(id);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(success ? 'ลบลูกค้าสำเร็จ' : 'ลบลูกค้าไม่สำเร็จ'),
-          backgroundColor: success ? Colors.green : Colors.red,
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(success ? 'ลบลูกค้าสำเร็จ' : 'ลบลูกค้าไม่สำเร็จ'),
+            backgroundColor: success ? Colors.green : Colors.red,
+          ),
+        );
       }
     }
   }
@@ -492,8 +665,11 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(_showMembersOnly ? Icons.card_membership : Icons.people_outline,
-              size: 72, color: Colors.grey[300]),
+          Icon(
+            _showMembersOnly ? Icons.card_membership : Icons.people_outline,
+            size: 72,
+            color: Colors.grey[300],
+          ),
           const SizedBox(height: 16),
           Text(
             _searchQuery.isEmpty
@@ -504,15 +680,17 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
           const SizedBox(height: 20),
           ElevatedButton.icon(
             onPressed: () async {
-              await Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const CustomerFormPage()));
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const CustomerFormPage()),
+              );
             },
             icon: const Icon(Icons.add),
             label: const Text('เพิ่มลูกค้า'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: _kPrimary,
+              backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
-            ),            
+            ),
           ),
         ],
       ),
@@ -539,58 +717,76 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// _ResizableTableHeader — header ที่ลากขยาย/ย่อคอลัมน์ได้
+// _ResizableTableHeader — header ที่ลากขยาย/ย่อ + กดเรียงลำดับได้
 // ─────────────────────────────────────────────────────────────────
 class _ResizableTableHeader extends StatelessWidget {
   final List<double> colWidths;
   final List<double> colMinW;
   final List<double> colMaxW;
+  final String sortColumn;
+  final bool sortAsc;
+  final void Function(String column) onSort;
   final void Function(int index, double width) onResize;
   final VoidCallback onReset;
 
-  static const _labels = [
-    'ชื่อ-นามสกุล', 'รหัสลูกค้า', 'โทรศัพท์',
-    'เลขสมาชิก', 'คะแนน', 'วงเงินเครดิต', 'สถานะ', 'จัดการ',
+  // label, sortKey ('' = ไม่ sort ได้)
+  static const _cols = [
+    ('ชื่อ-นามสกุล',   'name'),
+    ('รหัสลูกค้า',     'code'),
+    ('โทรศัพท์',       'phone'),
+    ('เลขสมาชิก',     'memberNo'),
+    ('คะแนน',         'points'),
+    ('วงเงินเครดิต',  'creditLimit'),
+    ('สถานะ',         'status'),
+    ('จัดการ',        ''),
   ];
 
   const _ResizableTableHeader({
     required this.colWidths,
     required this.colMinW,
     required this.colMaxW,
+    required this.sortColumn,
+    required this.sortAsc,
+    required this.onSort,
     required this.onResize,
     required this.onReset,
   });
 
   @override
   Widget build(BuildContext context) {
-    const labelStyle = TextStyle(
-      fontSize: 12,
-      fontWeight: FontWeight.w600,
-      color: _kTextSub,
-    );
-
     return Container(
-      color: _kHeaderBg,
-      // padding จะถูกนับใน tableW แล้ว — ใส่แค่ vertical
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      color: AppColors.navy,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
       child: Row(
         children: [
-          // ลำดับ (fixed, ไม่ resize)
+          // ลำดับ (fixed, ไม่ sort)
           const SizedBox(
             width: 40,
-            child: Text('รหัส', style: labelStyle),
+            height: 40,
+            child: Center(
+              child: Text('รหัส',
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white70)),
+            ),
           ),
           const SizedBox(width: 16),
 
-          // คอลัมน์ที่ resize ได้ (0–7)
-          ...List.generate(_labels.length, (i) {
+          // คอลัมน์ที่ resize + sort ได้
+          ...List.generate(_cols.length, (i) {
+            final (label, sortKey) = _cols[i];
+            final isActive = sortKey.isNotEmpty && sortColumn == sortKey;
             return _ResizableCell(
-              label: _labels[i],
+              label: label,
+              sortKey: sortKey,
               width: colWidths[i],
               minWidth: colMinW[i],
               maxWidth: colMaxW[i],
-              labelStyle: labelStyle,
-              isLast: i == _labels.length - 1,
+              isActive: isActive,
+              sortAsc: sortAsc,
+              isLast: i == _cols.length - 1,
+              onSort: sortKey.isNotEmpty ? () => onSort(sortKey) : null,
               onResize: (delta) {
                 final newW = (colWidths[i] + delta)
                     .clamp(colMinW[i], colMaxW[i]);
@@ -599,7 +795,7 @@ class _ResizableTableHeader extends StatelessWidget {
             );
           }),
 
-          // ปุ่ม reset ความกว้าง
+          // ปุ่ม reset
           Tooltip(
             message: 'รีเซตความกว้างคอลัมน์',
             child: InkWell(
@@ -608,7 +804,7 @@ class _ResizableTableHeader extends StatelessWidget {
               child: const Padding(
                 padding: EdgeInsets.all(4),
                 child: Icon(Icons.settings_backup_restore,
-                    size: 14, color: _kTextSub),
+                    size: 14, color: Colors.white54),
               ),
             ),
           ),
@@ -619,24 +815,30 @@ class _ResizableTableHeader extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// _ResizableCell — เซลล์ header พร้อม drag handle ด้านขวา
+// _ResizableCell — เซลล์ header พร้อม drag handle + กด sort
 // ─────────────────────────────────────────────────────────────────
 class _ResizableCell extends StatefulWidget {
   final String label;
+  final String sortKey;
   final double width;
   final double minWidth;
   final double maxWidth;
-  final TextStyle labelStyle;
+  final bool isActive;
+  final bool sortAsc;
   final bool isLast;
+  final VoidCallback? onSort;
   final void Function(double delta) onResize;
 
   const _ResizableCell({
     required this.label,
+    required this.sortKey,
     required this.width,
     required this.minWidth,
     required this.maxWidth,
-    required this.labelStyle,
+    required this.isActive,
+    required this.sortAsc,
     required this.isLast,
+    required this.onSort,
     required this.onResize,
   });
 
@@ -649,20 +851,72 @@ class _ResizableCellState extends State<_ResizableCell> {
 
   @override
   Widget build(BuildContext context) {
+    final canSort    = widget.onSort != null;
+    // active = ส้ม, inactive = white70 (บน navy background)
+    const activeColor   = Color(0xFFFF9D45); // เหมือน product
+    const inactiveColor = Colors.white70;
+    final labelColor = widget.isActive ? activeColor : inactiveColor;
+
     return SizedBox(
       width: widget.width,
+      height: 40,
       child: Row(
         children: [
-          // Label
+          // ── Label (กดเพื่อ sort) ──────────────────────────────
           Expanded(
-            child: Text(
-              widget.label,
-              style: widget.labelStyle,
-              overflow: TextOverflow.ellipsis,
-            ),
+            child: canSort
+                ? InkWell(
+                    onTap: widget.onSort,
+                    borderRadius: BorderRadius.circular(4),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 4, horizontal: 2),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              widget.label,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: labelColor,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 3),
+                          // Sort icon
+                          Icon(
+                            widget.isActive
+                                ? (widget.sortAsc
+                                    ? Icons.arrow_upward_rounded
+                                    : Icons.arrow_downward_rounded)
+                                : Icons.unfold_more_rounded,
+                            size: 13,
+                            color: widget.isActive
+                                ? activeColor
+                                : Colors.white38,
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                : Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
+                    child: Text(
+                      widget.label,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: inactiveColor,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
           ),
 
-          // Drag handle (ซ่อนใน isLast)
+          // ── Drag handle ───────────────────────────────────────
           if (!widget.isLast)
             MouseRegion(
               cursor: SystemMouseCursors.resizeColumn,
@@ -679,11 +933,11 @@ class _ResizableCellState extends State<_ResizableCell> {
                   alignment: Alignment.center,
                   child: Container(
                     width: 2,
-                    height: _hovering ? 20 : 12,
+                    height: _hovering ? 22 : 12,
                     decoration: BoxDecoration(
                       color: _hovering
-                          ? _kPrimary
-                          : _kBorder,
+                          ? const Color(0xFFFF9D45)  // active = ส้ม
+                          : Colors.white24,           // inactive = white บน navy
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -703,7 +957,7 @@ class _CustomerRow extends StatefulWidget {
   final dynamic customer;
   final bool isMember;
   final bool isSystem;
-  final List<double> colWidths;  // ✅ รับความกว้างจาก parent
+  final List<double> colWidths; // ✅ รับความกว้างจาก parent
   final Color avatarColor;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
@@ -739,7 +993,7 @@ class _CustomerRowState extends State<_CustomerRow> {
       onExit: (_) => setState(() => _hovered = false),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 120),
-        color: _hovered ? _kPrimaryLight : Colors.white,
+        color: _hovered ? AppColors.primaryLight : Colors.white,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Row(
           children: [
@@ -750,7 +1004,7 @@ class _CustomerRowState extends State<_CustomerRow> {
                 c.customerCode.length > 6
                     ? c.customerCode.substring(c.customerCode.length - 4)
                     : c.customerCode,
-                style: const TextStyle(fontSize: 11, color: _kTextSub),
+                style: const TextStyle(fontSize: 11, color: AppColors.textSub),
               ),
             ),
             const SizedBox(width: 16),
@@ -766,11 +1020,14 @@ class _CustomerRowState extends State<_CustomerRow> {
                       CircleAvatar(
                         radius: 18,
                         backgroundColor: widget.avatarColor,
-                        child: Text(initial,
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold)),
+                        child: Text(
+                          initial,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                       if (widget.isMember)
                         Positioned(
@@ -782,10 +1039,16 @@ class _CustomerRowState extends State<_CustomerRow> {
                             decoration: BoxDecoration(
                               color: const Color(0xFFFFB300),
                               shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 1.5),
+                              border: Border.all(
+                                color: Colors.white,
+                                width: 1.5,
+                              ),
                             ),
-                            child: const Icon(Icons.star,
-                                size: 8, color: Colors.white),
+                            child: const Icon(
+                              Icons.star,
+                              size: 8,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                     ],
@@ -795,7 +1058,10 @@ class _CustomerRowState extends State<_CustomerRow> {
                     child: Text(
                       c.customerName,
                       style: const TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w500),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black87,
+                      ),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -806,17 +1072,21 @@ class _CustomerRowState extends State<_CustomerRow> {
             // รหัส — w[1]
             SizedBox(
               width: w[1],
-              child: Text(c.customerCode,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 13, color: _kTextSub)),
+              child: Text(
+                c.customerCode,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 13, color: AppColors.textSub),
+              ),
             ),
 
             // โทร — w[2]
             SizedBox(
               width: w[2],
-              child: Text(c.phone ?? '-',
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 13, color: _kTextSub)),
+              child: Text(
+                c.phone ?? '-',
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 13, color: AppColors.textSub),
+              ),
             ),
 
             // เลขสมาชิก — w[3]
@@ -825,23 +1095,29 @@ class _CustomerRowState extends State<_CustomerRow> {
               child: widget.isMember
                   ? Row(
                       children: [
-                        const Icon(Icons.card_membership,
-                            size: 13, color: Color(0xFFFFB300)),
+                        const Icon(
+                          Icons.card_membership,
+                          size: 13,
+                          color: Color(0xFFFFB300),
+                        ),
                         const SizedBox(width: 4),
                         Flexible(
                           child: Text(
                             c.memberNo ?? '',
                             style: const TextStyle(
-                                fontSize: 12,
-                                color: Color(0xFFFFB300),
-                                fontWeight: FontWeight.w500),
+                              fontSize: 12,
+                              color: Color(0xFFFFB300),
+                              fontWeight: FontWeight.w500,
+                            ),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
                     )
-                  : const Text('-',
-                      style: TextStyle(fontSize: 13, color: _kTextSub)),
+                  : const Text(
+                      '-',
+                      style: TextStyle(fontSize: 13, color: AppColors.textSub),
+                    ),
             ),
 
             // คะแนน — w[4]
@@ -850,7 +1126,9 @@ class _CustomerRowState extends State<_CustomerRow> {
               child: widget.isMember
                   ? Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFFFFF8E1),
                         borderRadius: BorderRadius.circular(10),
@@ -859,19 +1137,27 @@ class _CustomerRowState extends State<_CustomerRow> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.stars,
-                              size: 12, color: Color(0xFFFFB300)),
+                          const Icon(
+                            Icons.stars,
+                            size: 12,
+                            color: Color(0xFFFFB300),
+                          ),
                           const SizedBox(width: 3),
-                          Text('${c.points} pt',
-                              style: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFFE65100))),
+                          Text(
+                            '${c.points} pt',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFFE65100),
+                            ),
+                          ),
                         ],
                       ),
                     )
-                  : const Text('-',
-                      style: TextStyle(fontSize: 13, color: _kTextSub)),
+                  : const Text(
+                      '-',
+                      style: TextStyle(fontSize: 13, color: AppColors.textSub),
+                    ),
             ),
 
             // วงเงินเครดิต — w[5]
@@ -881,10 +1167,14 @@ class _CustomerRowState extends State<_CustomerRow> {
                   ? Text(
                       '฿${c.creditLimit.toStringAsFixed(0)}',
                       style: const TextStyle(
-                          fontSize: 13, color: Color(0xFF1565C0)),
+                        fontSize: 13,
+                        color: Color(0xFF1565C0),
+                      ),
                     )
-                  : const Text('-',
-                      style: TextStyle(fontSize: 13, color: _kTextSub)),
+                  : const Text(
+                      '-',
+                      style: TextStyle(fontSize: 13, color: AppColors.textSub),
+                    ),
             ),
 
             // สถานะ — w[6]
@@ -893,7 +1183,9 @@ class _CustomerRowState extends State<_CustomerRow> {
               child: Center(
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 4),
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: c.isActive
                         ? const Color(0xFFE8F5E9)
@@ -938,7 +1230,9 @@ class _CustomerRowState extends State<_CustomerRow> {
                   ? Center(
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: const Color(0xFFECEFF1),
                           borderRadius: BorderRadius.circular(10),
@@ -991,11 +1285,11 @@ class _CustomerListTopBar extends StatelessWidget {
   final TextEditingController searchController;
   final String searchQuery;
   final bool showMembersOnly;
-  final bool isTableView;       // ✅ เพิ่ม
+  final bool isTableView; // ✅ เพิ่ม
   final ValueChanged<String> onSearchChanged;
   final VoidCallback onSearchCleared;
   final VoidCallback onToggleMember;
-  final VoidCallback onToggleView;  // ✅ เพิ่ม
+  final VoidCallback onToggleView; // ✅ เพิ่ม
   final VoidCallback onRefresh;
   final VoidCallback onAdd;
 
@@ -1043,9 +1337,10 @@ class _CustomerListTopBar extends StatelessWidget {
         const Text(
           'รายการลูกค้า',
           style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1A1A1A)),
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF1A1A1A),
+          ),
         ),
         const Spacer(),
         // Search — ยืดหยุ่นแต่มี max width
@@ -1072,11 +1367,14 @@ class _CustomerListTopBar extends StatelessWidget {
               decoration: BoxDecoration(
                 color: const Color(0xFFF5F5F5),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: _kBorder),
+                border: Border.all(color: AppColors.border),
               ),
               child: Icon(
-                isTableView ? Icons.view_agenda_outlined : Icons.table_rows_outlined,
-                size: 17, color: _kTextSub,
+                isTableView
+                    ? Icons.view_agenda_outlined
+                    : Icons.table_rows_outlined,
+                size: 17,
+                color: AppColors.textSub,
               ),
             ),
           ),
@@ -1107,9 +1405,10 @@ class _CustomerListTopBar extends StatelessWidget {
               child: Text(
                 'รายการลูกค้า',
                 style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1A1A1A)),
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1A1A1A),
+                ),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -1125,11 +1424,14 @@ class _CustomerListTopBar extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: const Color(0xFFF5F5F5),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: _kBorder),
+                    border: Border.all(color: AppColors.border),
                   ),
                   child: Icon(
-                    isTableView ? Icons.view_agenda_outlined : Icons.table_rows_outlined,
-                    size: 17, color: _kTextSub,
+                    isTableView
+                        ? Icons.view_agenda_outlined
+                        : Icons.table_rows_outlined,
+                    size: 17,
+                    color: AppColors.textSub,
                   ),
                 ),
               ),
@@ -1161,31 +1463,34 @@ class _BackBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => InkWell(
-        onTap: onTap,
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(8),
+    child: Container(
+      padding: const EdgeInsets.all(7),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F5F5),
         borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.all(7),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF5F5F5),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: _kBorder),
-          ),
-          child:
-              const Icon(Icons.arrow_back_ios_new, size: 15, color: _kTextSub),
-        ),
-      );
+        border: Border.all(color: AppColors.border),
+      ),
+      child: const Icon(
+        Icons.arrow_back_ios_new,
+        size: 15,
+        color: AppColors.textSub,
+      ),
+    ),
+  );
 }
 
 class _PageIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(7),
-        decoration: BoxDecoration(
-          color: _kPrimaryLight,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: const Icon(Icons.people, color: _kPrimary, size: 18),
-      );
+    padding: const EdgeInsets.all(7),
+    decoration: BoxDecoration(
+      color: AppColors.primaryLight,
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child: const Icon(Icons.people, color: AppColors.primary, size: 18),
+  );
 }
 
 class _SearchField extends StatelessWidget {
@@ -1203,40 +1508,43 @@ class _SearchField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SizedBox(
-        height: 38,
-        child: TextField(
-          controller: controller,
-          style: const TextStyle(fontSize: 13),
-          decoration: InputDecoration(
-            hintText: 'ค้นหาลูกค้า...',
-            hintStyle: const TextStyle(fontSize: 13, color: _kTextSub),
-            prefixIcon:
-                const Icon(Icons.search, size: 17, color: _kTextSub),
-            suffixIcon: query.isNotEmpty
-                ? IconButton(
-                    icon: const Icon(Icons.clear, size: 15),
-                    onPressed: onCleared,
-                  )
-                : null,
-            contentPadding: EdgeInsets.zero,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: _kBorder),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: _kBorder),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: _kPrimary, width: 1.5),
-            ),
-            filled: true,
-            fillColor: Colors.white,
-          ),
-          onChanged: onChanged,
+    height: 38,
+    child: TextField(
+      controller: controller,
+      style: const TextStyle(fontSize: 13),
+      decoration: InputDecoration(
+        hintText: 'ค้นหาลูกค้า...',
+        hintStyle: const TextStyle(fontSize: 13, color: AppColors.textSub),
+        prefixIcon: const Icon(
+          Icons.search,
+          size: 17,
+          color: AppColors.textSub,
         ),
-      );
+        suffixIcon: query.isNotEmpty
+            ? IconButton(
+                icon: const Icon(Icons.clear, size: 15),
+                onPressed: onCleared,
+              )
+            : null,
+        contentPadding: EdgeInsets.zero,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: AppColors.border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: AppColors.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+        ),
+        filled: true,
+        fillColor: Colors.white,
+      ),
+      onChanged: onChanged,
+    ),
+  );
 }
 
 class _MemberToggle extends StatelessWidget {
@@ -1246,30 +1554,27 @@ class _MemberToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Tooltip(
-        message: active ? 'แสดงทั้งหมด' : 'แสดงเฉพาะสมาชิก',
-        child: InkWell(
-          onTap: onTap,
+    message: active ? 'แสดงทั้งหมด' : 'แสดงเฉพาะสมาชิก',
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.all(7),
+        decoration: BoxDecoration(
+          color: active ? const Color(0xFFFFF8E1) : const Color(0xFFF5F5F5),
           borderRadius: BorderRadius.circular(8),
-          child: Container(
-            padding: const EdgeInsets.all(7),
-            decoration: BoxDecoration(
-              color: active
-                  ? const Color(0xFFFFF8E1)
-                  : const Color(0xFFF5F5F5),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                  color: active
-                      ? const Color(0xFFFFE082)
-                      : _kBorder),
-            ),
-            child: Icon(Icons.card_membership,
-                size: 17,
-                color: active
-                    ? const Color(0xFFFFB300)
-                    : _kTextSub),
+          border: Border.all(
+            color: active ? const Color(0xFFFFE082) : AppColors.border,
           ),
         ),
-      );
+        child: Icon(
+          Icons.card_membership,
+          size: 17,
+          color: active ? const Color(0xFFFFB300) : AppColors.textSub,
+        ),
+      ),
+    ),
+  );
 }
 
 class _RefreshBtn extends StatelessWidget {
@@ -1278,21 +1583,21 @@ class _RefreshBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Tooltip(
-        message: 'รีเฟรช',
-        child: InkWell(
-          onTap: onTap,
+    message: 'รีเฟรช',
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.all(7),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF5F5F5),
           borderRadius: BorderRadius.circular(8),
-          child: Container(
-            padding: const EdgeInsets.all(7),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF5F5F5),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: _kBorder),
-            ),
-            child: const Icon(Icons.refresh, size: 17, color: _kTextSub),
-          ),
+          border: Border.all(color: AppColors.border),
         ),
-      );
+        child: const Icon(Icons.refresh, size: 17, color: AppColors.textSub),
+      ),
+    ),
+  );
 }
 
 class _AddBtn extends StatelessWidget {
@@ -1302,25 +1607,28 @@ class _AddBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ElevatedButton.icon(
-        onPressed: onTap,
-        icon: const Icon(Icons.add, size: 18),
-        label: compact
-            ? const SizedBox.shrink()
-            : const Text('เพิ่มลูกค้า',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: _kPrimary,
-          foregroundColor: Colors.white,
-          // ✅ เพิ่มความสูง: vertical 9 → 13
-          padding: EdgeInsets.symmetric(
-              horizontal: compact ? 12 : 18, vertical: 13),
-          minimumSize: Size.zero,
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8)),
-          elevation: 0,
-        ),
-      );
+    onPressed: onTap,
+    icon: const Icon(Icons.add, size: 18),
+    label: compact
+        ? const SizedBox.shrink()
+        : const Text(
+            'เพิ่มลูกค้า',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          ),
+    style: ElevatedButton.styleFrom(
+      backgroundColor: AppColors.primary,
+      foregroundColor: Colors.white,
+      // ✅ เพิ่มความสูง: vertical 9 → 13
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 12 : 18,
+        vertical: 13,
+      ),
+      minimumSize: Size.zero,
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      elevation: 0,
+    ),
+  );
 }
 
 class _ToolbarButton extends StatelessWidget {
@@ -1335,7 +1643,7 @@ class _ToolbarButton extends StatelessWidget {
     required this.label,
     required this.onTap,
     this.active = false,
-    this.activeColor = _kPrimary,
+    this.activeColor = AppColors.primary,
   });
 
   @override
@@ -1348,19 +1656,24 @@ class _ToolbarButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: active ? activeColor.withValues(alpha: 0.1) : Colors.white,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: active ? activeColor : _kBorder,
-          ),
+          border: Border.all(color: active ? activeColor : AppColors.border),
         ),
         child: Row(
           children: [
-            Icon(icon, size: 16, color: active ? activeColor : _kTextSub),
+            Icon(
+              icon,
+              size: 16,
+              color: active ? activeColor : AppColors.textSub,
+            ),
             const SizedBox(width: 6),
-            Text(label,
-                style: TextStyle(
-                    fontSize: 12,
-                    color: active ? activeColor : _kTextSub,
-                    fontWeight: FontWeight.w500)),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: active ? activeColor : AppColors.textSub,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
           ],
         ),
       ),

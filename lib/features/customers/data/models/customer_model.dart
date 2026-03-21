@@ -12,6 +12,7 @@ class CustomerModel {
   final double currentBalance;
   final String? memberNo;
   final int points;
+  final int priceLevel; // ระดับราคา 1-5
   final bool isActive;
   
   CustomerModel({
@@ -28,6 +29,7 @@ class CustomerModel {
     this.currentBalance = 0,
     this.memberNo,
     this.points = 0,
+    this.priceLevel = 1,
     this.isActive = true,
   });
   
@@ -46,6 +48,7 @@ class CustomerModel {
       currentBalance: (json['current_balance'] as num?)?.toDouble() ?? 0,
       memberNo: json['member_no'] as String?,
       points: json['points'] as int? ?? 0,
+      priceLevel: json['price_level'] as int? ?? 1,
       isActive: json['is_active'] as bool? ?? true,
     );
   }
@@ -65,6 +68,7 @@ class CustomerModel {
       'current_balance': currentBalance,
       'member_no': memberNo,
       'points': points,
+      'price_level': priceLevel,
       'is_active': isActive,
     };
   }

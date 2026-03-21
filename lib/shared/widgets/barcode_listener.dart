@@ -20,7 +20,9 @@ class BarcodeListener extends StatefulWidget {
     required this.child,
     required this.onBarcodeScanned,
     this.minLength = 3,
-    this.maxInterval = const Duration(milliseconds: 50),
+    // ✅ FIX #2: เพิ่ม threshold เป็น 100ms รองรับ Mac latency
+    // Mac + USB HID อาจช้ากว่า 50ms ต่อ character
+    this.maxInterval = const Duration(milliseconds: 100),
     this.enabled = true,
   });
 
@@ -33,7 +35,7 @@ class BarcodeListener extends StatefulWidget {
   final int minLength;
 
   /// ระยะเวลาสูงสุดระหว่างแต่ละตัวอักษร
-  /// USB scanner พิมพ์เร็วกว่า 50ms/ตัว
+  /// USB scanner พิมพ์เร็วกว่า 100ms/ตัว บน Mac
   final Duration maxInterval;
 
   /// เปิด/ปิด listener
@@ -48,9 +50,23 @@ class _BarcodeListenerState extends State<BarcodeListener> {
   DateTime? _lastKeyTime;
   Timer? _resetTimer;
 
+  // ✅ FIX #1: ย้าย FocusNode มาอยู่ใน State และ dispose() ถูกต้อง
+  late final FocusNode _focusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode = FocusNode();
+    // requestFocus ใน initState แทนการสร้างใหม่ทุก build()
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focusNode.requestFocus();
+    });
+  }
+
   @override
   void dispose() {
     _resetTimer?.cancel();
+    _focusNode.dispose(); // ✅ dispose() ถูกต้อง ไม่รั่ว
     super.dispose();
   }
 
@@ -90,9 +106,11 @@ class _BarcodeListenerState extends State<BarcodeListener> {
       _buffer.write(char);
     }
 
-    // ── Auto reset ถ้าไม่มี Enter ใน 200ms ──
+    // ── Auto reset ถ้าไม่มี Enter ใน 300ms ──
+    // ✅ FIX #2: เพิ่ม reset timer เป็น 300ms (เดิม 200ms)
+    // รองรับ scanner ที่ส่งช้าหรือ barcode ยาว
     _resetTimer?.cancel();
-    _resetTimer = Timer(const Duration(milliseconds: 200), () {
+    _resetTimer = Timer(const Duration(milliseconds: 300), () {
       _buffer.clear();
       _lastKeyTime = null;
     });
@@ -131,16 +149,16 @@ class _BarcodeListenerState extends State<BarcodeListener> {
 
     // hyphen, dash (พบใน barcode บางประเภท)
     if (key == LogicalKeyboardKey.minus ||
-        key == LogicalKeyboardKey.numpadSubtract)
-      return '-';
+        key == LogicalKeyboardKey.numpadSubtract) return '-';
 
     return null;
   }
 
   @override
   Widget build(BuildContext context) {
+    // ✅ FIX #1: ใช้ _focusNode จาก State แทนการสร้างใหม่ทุก build()
     return KeyboardListener(
-      focusNode: FocusNode()..requestFocus(),
+      focusNode: _focusNode,
       onKeyEvent: _handleKey,
       child: widget.child,
     );

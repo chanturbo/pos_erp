@@ -4,19 +4,10 @@ import '../providers/product_provider.dart';
 import '../../data/models/product_model.dart';
 import 'product_form_page.dart';
 import 'product_pdf_report.dart'; // ✅ PDF report
+import '../../../../shared/theme/app_colors.dart';
+import '../../../../shared/pdf/pdf_report_button.dart';
 
-// ── OAG Identity ─────────────────────────────────────────────────
-const _navy    = Color(0xFF16213E);
-const _orange  = Color(0xFFE57200);
-const _kPrimary     = Color(0xFFE8622A);   // orange (same as _orange tone)
-const _kPrimaryLight = Color(0xFFFFF3EE);
-const _kHeaderBg    = Color(0xFFF9F9F9);
-const _kTextSub     = Color(0xFF8A8A8A);
-const _surface = Color(0xFFF4F4F0);
-const _border  = Color(0xFFE0E0E0);
-const _success = Color(0xFF2E7D32);
-const _error   = Color(0xFFC62828);
-const _info    = Color(0xFF1565C0);
+// ── Colors → AppColors ──────────────────────────────────────────
 
 class ProductListPage extends ConsumerStatefulWidget {
   const ProductListPage({super.key});
@@ -30,12 +21,13 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
   String _searchQuery = '';
   bool   _isTableView   = true;
   bool   _isActiveOnly  = false; // filter เฉพาะสินค้าที่ใช้งาน
+  bool   _userResized   = false; // ✅ ป้องกัน auto-adjust override ค่าที่ user ลากไว้
   String _sortColumn   = 'productCode';
   bool   _sortAsc      = true;
 
-  // ✅ ความกว้างคอลัมน์ที่ resize ได้
+  // ✅ ความกว้างคอลัมน์ที่ resize ได้ (ค่าเริ่มต้นก่อน auto-fit)
   // ลำดับ: [รหัส, ชื่อ, หน่วย, ราคา, ต้นทุน, สต๊อก, สถานะ, จัดการ]
-  final List<double> _colWidths = [120, 260, 80, 110, 110, 70, 80, 88];
+  final List<double> _colWidths = [90, 200, 60, 90, 80, 56, 72, 88];
   static const List<double> _colMinW  = [80, 140, 60, 80, 80, 50, 60, 88];
   static const List<double> _colMaxW  = [220, 500, 140, 180, 180, 100, 120, 88];
 
@@ -105,7 +97,7 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
             child: const Text('ยกเลิก'),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: _error),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
             onPressed: () => Navigator.pop(context, true),
             child: const Text('ลบ'),
           ),
@@ -121,7 +113,7 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(ok ? 'ลบสินค้าสำเร็จ' : 'ลบสินค้าไม่สำเร็จ'),
-      backgroundColor: ok ? _success : _error,
+      backgroundColor: ok ? AppColors.success : AppColors.error,
       behavior: SnackBarBehavior.floating,
     ));
   }
@@ -180,7 +172,13 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
                     Positioned(
                       bottom: 16,
                       right: 16,
-                      child: ProductReportButton(products: filtered),
+                      child: PdfReportButton(
+                        emptyMessage: 'ไม่มีข้อมูลสินค้า',
+                        title:    'รายงานสินค้า',
+                        filename: () => PdfFilename.generate('product_report'),
+                        buildPdf: () => ProductPdfBuilder.build(filtered),
+                        hasData:  filtered.isNotEmpty,
+                      ),
                     ),
                   ],
                 );
@@ -205,15 +203,15 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
           child: Row(
             children: [
-              _SummaryChip('ทั้งหมด', all.length, _navy),
+              _SummaryChip('ทั้งหมด', all.length, AppColors.navy),
               const SizedBox(width: 8),
-              _SummaryChip('กรองแล้ว', filtered.length, _orange),
+              _SummaryChip('กรองแล้ว', filtered.length, AppColors.primaryDark),
               const SizedBox(width: 8),
               _SummaryChip('ใช้งาน',
-                  all.where((p) => p.isActive).length, _success),
+                  all.where((p) => p.isActive).length, AppColors.success),
               const SizedBox(width: 8),
               _SummaryChip('ปิดใช้',
-                  all.where((p) => !p.isActive).length, _error),
+                  all.where((p) => !p.isActive).length, AppColors.error),
             ],
           ),
         );
@@ -225,26 +223,72 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
   // ─────────────────────────────────────────────────────────────
   // TABLE VIEW
   // ─────────────────────────────────────────────────────────────
+  // Auto-fit colWidths ตามความยาวข้อความจริงใน list
   // ─────────────────────────────────────────────────────────────
-  // ปรับ colWidths อัตโนมัติตามความกว้างหน้าจอ
-  // ─────────────────────────────────────────────────────────────
-  void _adjustColWidths(double screenW) {
-    // fixed: no.(48) + reset(28) = 76
-    const fixed = 76.0;
-    // ratio [รหัส, ชื่อ, หน่วย, ราคา, ต้นทุน, สต๊อก, สถานะ, จัดการ]
-    const ratios = [1.5, 3.5, 1.0, 1.5, 1.5, 0.8, 1.0, 1.0];
-    final available = screenW - fixed;
-    final totalRatio = ratios.fold(0.0, (s, r) => s + r);
+  void _autoFitColWidths(List<ProductModel> rows, double screenW) {
+    // ── Header minimum widths (hardcoded จากการวัดจริง) ───────────
+    // วัดจาก NotoSansThai fontSize=12, w600
+    // = label width + padding(16) + sort icon(16) [เฉพาะคอลัมน์ที่ sort ได้]
+    // [รหัสสินค้า, ชื่อสินค้า, หน่วย, ราคาขาย, ต้นทุน, สต๊อก, สถานะ, จัดการ]
+    const headerMinW = [112.0, 112.0, 60.0, 96.0, 84.0, 58.0, 62.0, 88.0];
+    //  รหัสสินค้า: 10 Thai + sort = ~112
+    //  ชื่อสินค้า: 10 Thai + sort = ~112
+    //  หน่วย:      5 Thai         = ~60
+    //  ราคาขาย:   7 Thai + sort  = ~96   ← ปัญหาเดิม ต้องไม่ต่ำกว่านี้
+    //  ต้นทุน:    6 Thai + sort  = ~84
+    //  สต๊อก:     5 Thai         = ~58
+    //  สถานะ:     5 Thai         = ~62
+    //  จัดการ:    6 Thai (no sort)= ~88 (ตรงกับ colMinW)
+
+    // เริ่มต้น maxW = headerMinW — content ย่อต่ำกว่านี้ไม่ได้
+    final maxW = List<double>.from(headerMinW);
+
+    // ── Content widths ────────────────────────────────────────────
+    const codeCharW = 7.8;  // monospace fontSize 13
+    const nameCharW = 7.2;  // regular fontSize 13
+    const unitCharW = 7.2;
+    const numCharW  = 7.4;  // ตัวเลข
+    const cPad      = 20.0; // horizontal padding ต่อ cell
+
+    for (final p in rows) {
+      final codeW  = p.productCode.length * codeCharW + cPad;
+      final nameW  = p.productName.length * nameCharW + cPad;
+      final unitW  = p.baseUnit.length * unitCharW + cPad;
+      final priceW = '฿${p.priceLevel1.toStringAsFixed(2)}'.length * numCharW + cPad;
+      final costW  = '฿${p.standardCost.toStringAsFixed(2)}'.length * numCharW + cPad;
+
+      if (codeW  > maxW[0]) maxW[0] = codeW;
+      if (nameW  > maxW[1]) maxW[1] = nameW;
+      if (unitW  > maxW[2]) maxW[2] = unitW;
+      if (priceW > maxW[3]) maxW[3] = priceW;
+      if (costW  > maxW[4]) maxW[4] = costW;
+      // [5] สต๊อก, [6] สถานะ, [7] จัดการ — ไม่มี text content → headerMinW เป็น floor อยู่แล้ว
+    }
+
+    // ── Clamp: floor = max(headerMinW, colMinW), ceil = colMaxW ───
+    for (int i = 0; i < maxW.length; i++) {
+      final floor = headerMinW[i] > _colMinW[i] ? headerMinW[i] : _colMinW[i];
+      maxW[i] = maxW[i].clamp(floor, _colMaxW[i]);
+    }
+
+    // กระจาย space ที่เหลือให้คอลัมน์ชื่อ (index 1)
+    const totalFixed = 76.0; // No.(48) + reset(28)
+    final totalCols  = maxW.fold(0.0, (s, w) => s + w);
+    final available  = screenW - totalFixed;
+    if (totalCols < available) {
+      final floor1 = headerMinW[1] > _colMinW[1] ? headerMinW[1] : _colMinW[1];
+      maxW[1] = (maxW[1] + (available - totalCols)).clamp(floor1, _colMaxW[1]);
+    }
+
     for (int i = 0; i < _colWidths.length; i++) {
-      final computed = available * ratios[i] / totalRatio;
-      _colWidths[i] = computed.clamp(_colMinW[i], _colMaxW[i]);
+      _colWidths[i] = maxW[i];
     }
   }
 
   Widget _buildTableView(List<ProductModel> products) {
-    // ✅ ปรับ colWidths ตามขนาดหน้าจอจริง
+    // ✅ Auto-fit colWidths ตามเนื้อหา เฉพาะครั้งแรก / ยังไม่ resize
     final screenW = MediaQuery.of(context).size.width;
-    _adjustColWidths(screenW);
+    if (!_userResized) _autoFitColWidths(products, screenW);
 
     final totalW = 48.0 +
         _colWidths.fold(0.0, (s, w) => s + w) +
@@ -271,9 +315,13 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
               sortColumn: _sortColumn,
               sortAsc: _sortAsc,
               onSort: _onSort,
-              onResize: (i, w) => setState(() => _colWidths[i] = w),
+              onResize: (i, w) => setState(() {
+                _colWidths[i] = w;
+                _userResized = true; // ✅ user resize แล้ว หยุด auto-adjust
+              }),
               onReset: () => setState(() {
-                _colWidths.setAll(0, [120, 260, 80, 110, 110, 70, 80, 88]);
+                _colWidths.setAll(0, [90, 200, 60, 90, 80, 56, 72, 88]);
+                _userResized = false; // ✅ reset → auto-fit ทำงานอีกครั้ง
               }),
             ),
             // Rows — shrinkWrap ได้เพราะ Column รู้ขนาดจาก SizedBox แล้ว
@@ -315,7 +363,7 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
-            side: const BorderSide(color: _border),
+            side: const BorderSide(color: AppColors.borderDark),
           ),
           child: ListTile(
             contentPadding:
@@ -324,10 +372,10 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
             leading: Container(
               width: 44, height: 44,
               decoration: BoxDecoration(
-                color: _orange.withValues(alpha: 0.10),
+                color: AppColors.primaryDark.withValues(alpha: 0.10),
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
-                    color: _orange.withValues(alpha: 0.25)),
+                    color: AppColors.primaryDark.withValues(alpha: 0.25)),
               ),
               child: Center(
                 child: Text(
@@ -336,7 +384,7 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
                       : p.productCode,
                   style: const TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: _orange,
+                      color: AppColors.primaryDark,
                       fontSize: 13),
                 ),
               ),
@@ -363,7 +411,7 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
                         style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
-                            color: _info)),
+                            color: AppColors.info)),
                     _StatusBadge(active: p.isActive),
                   ],
                 ),
@@ -371,7 +419,7 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
                 // Edit button
                 IconButton(
                   icon: const Icon(Icons.edit_outlined,
-                      size: 18, color: _info),
+                      size: 18, color: AppColors.info),
                   tooltip: 'แก้ไข',
                   constraints:
                       const BoxConstraints(minWidth: 36, minHeight: 36),
@@ -384,7 +432,7 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
                 // Delete button
                 IconButton(
                   icon: const Icon(Icons.delete_outline,
-                      size: 18, color: _error),
+                      size: 18, color: AppColors.error),
                   tooltip: 'ลบ',
                   constraints:
                       const BoxConstraints(minWidth: 36, minHeight: 36),
@@ -441,7 +489,7 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline, size: 72, color: _error),
+            const Icon(Icons.error_outline, size: 72, color: AppColors.error),
             const SizedBox(height: 12),
             Text('เกิดข้อผิดพลาด: $e'),
             const SizedBox(height: 12),
@@ -532,7 +580,7 @@ class _ProductListTopBar extends StatelessWidget {
           icon: Icons.check_circle_outline,
           tooltip: isActiveOnly ? 'แสดงทั้งหมด' : 'เฉพาะที่ใช้งาน',
           active: isActiveOnly,
-          activeColor: _success,
+          activeColor: AppColors.success,
           onTap: onToggleActive,
         ),
         const SizedBox(width: 6),
@@ -543,7 +591,7 @@ class _ProductListTopBar extends StatelessWidget {
               : Icons.table_rows_outlined,
           tooltip: isTableView ? 'Card View' : 'Table View',
           active: false,
-          activeColor: _navy,
+          activeColor: AppColors.navy,
           onTap: onToggleView,
         ),
         const SizedBox(width: 6),
@@ -580,7 +628,7 @@ class _ProductListTopBar extends StatelessWidget {
               icon: Icons.check_circle_outline,
               tooltip: isActiveOnly ? 'แสดงทั้งหมด' : 'เฉพาะที่ใช้งาน',
               active: isActiveOnly,
-              activeColor: _success,
+              activeColor: AppColors.success,
               onTap: onToggleActive,
             ),
             const SizedBox(width: 4),
@@ -590,7 +638,7 @@ class _ProductListTopBar extends StatelessWidget {
                   : Icons.table_rows_outlined,
               tooltip: isTableView ? 'Card View' : 'Table View',
               active: false,
-              activeColor: _navy,
+              activeColor: AppColors.navy,
               onTap: onToggleView,
             ),
             const SizedBox(width: 4),
@@ -625,7 +673,7 @@ class _PBackBtn extends StatelessWidget {
           decoration: BoxDecoration(
             color: const Color(0xFFF5F5F5),
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: _border),
+            border: Border.all(color: AppColors.borderDark),
           ),
           child: const Icon(Icons.arrow_back_ios_new,
               size: 15, color: Color(0xFF8A8A8A)),
@@ -638,11 +686,11 @@ class _PPageIcon extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.all(7),
         decoration: BoxDecoration(
-          color: _kPrimaryLight,
+          color: AppColors.primaryLight,
           borderRadius: BorderRadius.circular(8),
         ),
         child: const Icon(Icons.inventory_2_outlined,
-            color: _kPrimary, size: 18),
+            color: AppColors.primary, size: 18),
       );
 }
 
@@ -685,7 +733,7 @@ class _PSearchField extends StatelessWidget {
             focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
                 borderSide:
-                    const BorderSide(color: _kPrimary, width: 1.5)),
+                    const BorderSide(color: AppColors.primary, width: 1.5)),
             filled: true,
             fillColor: Colors.white,
           ),
@@ -721,7 +769,7 @@ class _PToggleBtn extends StatelessWidget {
                   : const Color(0xFFF5F5F5),
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                  color: active ? activeColor : _border),
+                  color: active ? activeColor : AppColors.borderDark),
             ),
             child: Icon(icon,
                 size: 17,
@@ -745,7 +793,7 @@ class _PRefreshBtn extends StatelessWidget {
             decoration: BoxDecoration(
               color: const Color(0xFFF5F5F5),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: _border),
+              border: Border.all(color: AppColors.borderDark),
             ),
             child: const Icon(Icons.refresh,
                 size: 17, color: Color(0xFF8A8A8A)),
@@ -768,7 +816,7 @@ class _PAddBtn extends StatelessWidget {
                 style: TextStyle(
                     fontSize: 13, fontWeight: FontWeight.w600)),
         style: ElevatedButton.styleFrom(
-          backgroundColor: _kPrimary,
+          backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
           padding: EdgeInsets.symmetric(
               horizontal: compact ? 12 : 18, vertical: 13),
@@ -812,7 +860,7 @@ class _ProductTableRow extends StatelessWidget {
     final w = colWidths;
     return InkWell(
       onDoubleTap: onEdit,
-      hoverColor: _orange.withValues(alpha: 0.05),
+      hoverColor: AppColors.primaryDark.withValues(alpha: 0.05),
       child: Container(
         color: isEven ? Colors.white : const Color(0xFFF9F9F7),
         child: Row(
@@ -882,7 +930,7 @@ class _ProductTableRow extends StatelessWidget {
                       style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          color: _info)),
+                          color: AppColors.info)),
                 ),
               ),
             ),
@@ -906,7 +954,7 @@ class _ProductTableRow extends StatelessWidget {
                 child: Icon(
                   p.isStockControl ? Icons.inventory_2 : Icons.remove,
                   size: 16,
-                  color: p.isStockControl ? _success : Colors.grey[400],
+                  color: p.isStockControl ? AppColors.success : Colors.grey[400],
                 ),
               ),
             ),
@@ -923,12 +971,12 @@ class _ProductTableRow extends StatelessWidget {
                 children: [
                   _ActionIconBtn(
                       icon: Icons.edit_outlined,
-                      color: _info,
+                      color: AppColors.info,
                       tooltip: 'แก้ไข',
                       onTap: onEdit),
                   _ActionIconBtn(
                       icon: Icons.delete_outline,
-                      color: _error,
+                      color: AppColors.error,
                       tooltip: 'ลบ',
                       onTap: onDelete),
                 ],
@@ -984,7 +1032,7 @@ class _ProductResizableHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: _navy,
+      color: AppColors.navy,
       child: Row(
         children: [
           // No. fixed
@@ -1209,85 +1257,6 @@ class _ActionIconBtn extends StatelessWidget {
       );
 }
 
-class _HeaderCell extends StatelessWidget {
-  final String label;
-  final int flex;
-  final double? width;
-  final bool center;
-  const _HeaderCell(this.label,
-      {this.flex = 1, this.width, this.center = false});
-
-  @override
-  Widget build(BuildContext context) {
-    final text = Text(label,
-        style: const TextStyle(
-            color: Colors.white70,
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.4));
-    final content = Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-      child: center ? Center(child: text) : text,
-    );
-    if (width != null) return SizedBox(width: width, child: content);
-    return Expanded(flex: flex, child: content);
-  }
-}
-
-class _SortableHeader extends StatelessWidget {
-  final String label;
-  final String column;
-  final String current;
-  final bool ascending;
-  final void Function(String) onSort;
-  final int flex;
-  final bool rightAlign;
-  const _SortableHeader(
-      this.label, this.column, this.current, this.ascending, this.onSort,
-      {this.flex = 1, this.rightAlign = false});
-
-  @override
-  Widget build(BuildContext context) {
-    final isActive = current == column;
-    return Expanded(
-      flex: flex,
-      child: InkWell(
-        onTap: () => onSort(column),
-        child: Padding(
-          padding:
-              const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-          child: Row(
-            mainAxisAlignment: rightAlign
-                ? MainAxisAlignment.end
-                : MainAxisAlignment.start,
-            children: [
-              Text(label,
-                  style: TextStyle(
-                      color: isActive
-                          ? const Color(0xFFFF9D45)
-                          : Colors.white70,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.4)),
-              const SizedBox(width: 4),
-              Icon(
-                isActive
-                    ? (ascending
-                        ? Icons.arrow_upward
-                        : Icons.arrow_downward)
-                    : Icons.unfold_more,
-                size: 13,
-                color: isActive
-                    ? const Color(0xFFFF9D45)
-                    : Colors.white38,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 class _SummaryChip extends StatelessWidget {
   final String label;
