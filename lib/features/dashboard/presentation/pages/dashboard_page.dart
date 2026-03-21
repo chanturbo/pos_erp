@@ -83,28 +83,26 @@ class _DashboardBody extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Stats Cards ────────────────────────────────────
-          _buildStatsGrid(context),
-          SizedBox(height: context.isMobile ? 16 : 24),
-
-          // ── Bottom Section ─────────────────────────────────
-          // Desktop: side-by-side | Mobile/Tablet: stacked
-          context.isDesktopOrWider
-              ? Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(child: _QuickActionsCard()),  // ✅ เมนูด่วนก่อน
-                    const SizedBox(width: 16),
-                    Expanded(child: _TodayCard(stats: stats)),
-                  ],
-                )
-              : Column(
-                  children: [
-                    _QuickActionsCard(),                   // ✅ เมนูด่วนก่อน
-                    SizedBox(height: context.isMobile ? 12 : 16),
-                    _TodayCard(stats: stats),
-                  ],
-                ),
+          if (context.isDesktopOrWider) ...[
+            // ── Desktop: Stats ก่อน แล้ว Quick + Overview คู่กัน ──────
+            _buildStatsGrid(context),
+            const SizedBox(height: 24),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: _QuickActionsCard()),
+                const SizedBox(width: 16),
+                Expanded(child: _TodayCard(stats: stats)),
+              ],
+            ),
+          ] else ...[
+            // ── Mobile/Tablet: เมนูด่วนก่อน → Stats → Overview ─────────
+            _QuickActionsCard(),
+            SizedBox(height: context.isMobile ? 12 : 16),
+            _buildStatsGrid(context),
+            SizedBox(height: context.isMobile ? 12 : 16),
+            _TodayCard(stats: stats),
+          ],
         ],
       ),
     );
@@ -357,11 +355,15 @@ class _QuickActionsCard extends StatelessWidget {
           children: [
             _CardHeader(title: 'เมนูด่วน'),
             const SizedBox(height: 14),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
+            GridView.count(
+              crossAxisCount: 2,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+              childAspectRatio: context.isMobile ? 2.4 : 2.8,
               children: actions
-                  .map((a) => _QuickChip(action: a))
+                  .map((a) => _QuickItemCard(action: a))
                   .toList(),
             ),
           ],
@@ -443,42 +445,57 @@ class _QuickAction {
   });
 }
 
-class _QuickChip extends StatelessWidget {
+class _QuickItemCard extends StatelessWidget {
   final _QuickAction action;
-  const _QuickChip({required this.action});
+  const _QuickItemCard({required this.action});
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: action.onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: EdgeInsets.symmetric(
-          horizontal: context.isMobile ? 10 : 12,
-          vertical: context.isMobile ? 6 : 7,
-        ),
-        decoration: BoxDecoration(
-          color: action.color.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-              color: action.color.withValues(alpha: 0.25)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(action.icon,
-                size: context.isMobile ? 13 : 15,
-                color: action.color),
-            SizedBox(width: context.isMobile ? 5 : 6),
-            Text(
-              action.label,
-              style: TextStyle(
-                fontSize: context.isMobile ? 11 : 12,
-                color: action.color,
-                fontWeight: FontWeight.w500,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: action.onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: context.isMobile ? 12 : 14,
+            vertical: context.isMobile ? 10 : 12,
+          ),
+          decoration: BoxDecoration(
+            color: action.color.withValues(alpha: 0.07),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+                color: action.color.withValues(alpha: 0.2)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: action.color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(action.icon,
+                    size: context.isMobile ? 18 : 20,
+                    color: action.color),
               ),
-            ),
-          ],
+              SizedBox(width: context.isMobile ? 10 : 12),
+              Expanded(
+                child: Text(
+                  action.label,
+                  style: TextStyle(
+                    fontSize: context.isMobile ? 12 : 13,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF1A1A1A),
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              Icon(Icons.chevron_right,
+                  size: 16,
+                  color: action.color.withValues(alpha: 0.5)),
+            ],
+          ),
         ),
       ),
     );

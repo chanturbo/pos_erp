@@ -96,7 +96,8 @@ class SeedData {
         userId: 'USR001',
         // ❌ ลบ companyId ออก (ไม่มีใน schema)
         username: 'admin',
-        passwordHash: '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9', // SHA256('admin123')
+        passwordHash:
+            '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9', // SHA256('admin123')
         fullName: 'ผู้ดูแลระบบ',
         email: const Value('admin@pos.com'),
         roleId: const Value('ADMIN'),
@@ -106,7 +107,8 @@ class SeedData {
       UsersCompanion.insert(
         userId: 'USR002',
         username: 'cashier',
-        passwordHash: 'b4c94003c562bb0d89535eca77f07284fe560fd48a7cc1ed99f0a56263d616ba', // SHA256('cashier123')
+        passwordHash:
+            'b4c94003c562bb0d89535eca77f07284fe560fd48a7cc1ed99f0a56263d616ba', // SHA256('cashier123')
         fullName: 'แคชเชียร์',
         email: const Value('cashier@pos.com'),
         roleId: const Value('CASHIER'),
@@ -126,7 +128,7 @@ class SeedData {
   /// Seed Customers
   static Future<void> seedCustomers(AppDatabase db) async {
     final customers = [
-      // ลูกค้าทั่วไป
+      // ✅ ลูกค้าระบบ — ห้ามลบ ห้ามแก้ไข (Walk-in / ไม่ระบุลูกค้า)
       CustomersCompanion.insert(
         customerId: 'WALK_IN',
         customerCode: 'WALK-IN',
@@ -410,7 +412,7 @@ class SeedData {
         contactPerson: const Value('คุณสมชาย'),
         phone: const Value('02-111-2222'),
         email: const Value('contact@supplier-a.com'),
-        lineId: const Value('@supplierA'),  // ✅ เพิ่มบรรทัดนี้
+        lineId: const Value('@supplierA'), // ✅ เพิ่มบรรทัดนี้
         address: const Value('123 ถนนพระราม 4 กรุงเทพฯ'),
         taxId: const Value('0105566001234'),
         creditTerm: const Value(30),
@@ -424,7 +426,7 @@ class SeedData {
         contactPerson: const Value('คุณสมหญิง'),
         phone: const Value('02-222-3333'),
         email: const Value('info@supplier-b.com'),
-        lineId: const Value('@supplierB'),  // ✅ เพิ่มบรรทัดนี้
+        lineId: const Value('@supplierB'), // ✅ เพิ่มบรรทัดนี้
         address: const Value('456 ถนนสุขุมวิท กรุงเทพฯ'),
         taxId: const Value('0105566005678'),
         creditTerm: const Value(45),
@@ -438,7 +440,7 @@ class SeedData {
         contactPerson: const Value('คุณสมศักดิ์'),
         phone: const Value('081-444-5555'),
         email: const Value('sales@wholesale-c.com'),
-        lineId: const Value('@supplierC'),  // ✅ เพิ่มบรรทัดนี้
+        lineId: const Value('@supplierC'), // ✅ เพิ่มบรรทัดนี้
         creditTerm: const Value(7),
         creditLimit: const Value(50000.0),
         currentBalance: const Value(0.0),

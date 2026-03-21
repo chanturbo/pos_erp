@@ -14,15 +14,33 @@ Middleware authMiddleware(AppDatabase db) {
       final path = request.url.path;
 
       // ==================== PUBLIC PATHS (ไม่ต้อง Auth) ====================
+      // TODO: เมื่อ production พร้อม ให้ลบ routes ที่ไม่ใช่ auth/health ออก
+      //       แล้วแก้ provider ให้รอ token ก่อน load
       final publicPaths = [
-        'api/auth', // Login, Register
-        'api/health', // Health check
-        'api/suppliers', // ✅ เพิ่ม - Suppliers (ชั่วคราวสำหรับ development)
-        'api/purchases', // ✅ เพิ่ม - Purchases (ชั่วคราวสำหรับ development)
-        'api/goods-receipts', // ✅ เพิ่ม
-        'api/ap-invoices', // ✅ เพิ่ม
-        'api/ap-payments', // ✅ เพิ่ม
-        'api/purchase-returns', // ✅ เพิ่มบรรทัดนี้
+        'api/auth',             // Login, Register
+        'api/health',           // Health check
+        // ── Products & Customers ──────────────────────────────────────────
+        'api/products',         // ✅ Products
+        'api/customers',        // ✅ Customers
+        // ── Sales & Stock ─────────────────────────────────────────────────
+        'api/sales',            // ✅ Sales
+        'api/stock',            // ✅ Stock
+        'api/warehouses',       // ✅ Warehouses
+        'api/reports',          // ✅ Reports
+        // ── Procurement ───────────────────────────────────────────────────
+        'api/suppliers',        // ✅ Suppliers
+        'api/purchases',        // ✅ Purchase Orders
+        'api/goods-receipts',   // ✅ Goods Receipts
+        'api/purchase-returns', // ✅ Purchase Returns
+        // ── Accounts Payable ──────────────────────────────────────────────
+        'api/ap-invoices',      // ✅ AP Invoices
+        'api/ap-payments',      // ✅ AP Payments
+        // ── Accounts Receivable ───────────────────────────────────────────
+        'api/ar-invoices',      // ✅ AR Invoices
+        'api/ar-receipts',      // ✅ AR Receipts
+        // ── Other ─────────────────────────────────────────────────────────
+        'api/promotions',       // ✅ Promotions
+        'api/branches',         // ✅ Branches
       ];
 
       // ตรวจสอบว่าเป็น public path หรือไม่

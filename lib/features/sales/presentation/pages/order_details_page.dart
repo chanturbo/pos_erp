@@ -7,7 +7,7 @@ import '../widgets/receipt_widget.dart';
 
 class OrderDetailsPage extends ConsumerStatefulWidget {
   final String orderId;
-  
+
   const OrderDetailsPage({super.key, required this.orderId});
 
   @override
@@ -17,20 +17,18 @@ class OrderDetailsPage extends ConsumerStatefulWidget {
 class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
   SalesOrderModel? _order;
   bool _isLoading = true;
-  
+
   @override
   void initState() {
     super.initState();
     _loadOrderDetails();
   }
-  
+
   Future<void> _loadOrderDetails() async {
-    setState(() {
-      _isLoading = true;
-    });
-    
-    final order = await ref.read(salesHistoryProvider.notifier).getOrderDetails(widget.orderId);
-    
+    setState(() => _isLoading = true);
+    final order = await ref
+        .read(salesHistoryProvider.notifier)
+        .getOrderDetails(widget.orderId);
     setState(() {
       _order = order;
       _isLoading = false;
@@ -47,9 +45,7 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
             IconButton(
               icon: const Icon(Icons.print),
               tooltip: 'พิมพ์ใบเสร็จ',
-              onPressed: () {
-                _showReceiptPreview();
-              },
+              onPressed: _showReceiptPreview,
             ),
         ],
       ),
@@ -60,10 +56,16 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
               : _buildOrderDetails(),
     );
   }
-  
+
   Widget _buildOrderDetails() {
     final order = _order!;
-    
+    // ✅ Week 5: คำนวณ points ที่ได้รับจากใบขายนี้
+    final earnedPoints = calculateEarnedPoints(order.totalAmount);
+    final isWalkIn = order.customerId == null ||
+        order.customerId == 'WALK_IN' ||
+        order.customerId!.isEmpty;
+    final hasMember = !isWalkIn && earnedPoints > 0;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Center(
@@ -72,7 +74,7 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Order Info Card
+              // ── Order Info Card ──────────────────────────────
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -91,23 +93,64 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
                           ),
                           Chip(
                             label: Text(order.status),
-                            backgroundColor: _getStatusColor(order.status),
-                            labelStyle: const TextStyle(color: Colors.white),
+                            backgroundColor:
+                                _getStatusColor(order.status),
+                            labelStyle:
+                                const TextStyle(color: Colors.white),
                           ),
                         ],
                       ),
                       const Divider(),
-                      _buildInfoRow('วันที่', DateFormat('dd/MM/yyyy HH:mm').format(order.orderDate)),
+                      _buildInfoRow('วันที่',
+                          DateFormat('dd/MM/yyyy HH:mm')
+                              .format(order.orderDate)),
                       if (order.customerName != null)
                         _buildInfoRow('ลูกค้า', order.customerName!),
-                      _buildInfoRow('ชำระด้วย', _getPaymentTypeText(order.paymentType)),
+                      _buildInfoRow(
+                          'ชำระด้วย', _getPaymentTypeText(order.paymentType)),
+                      // ✅ Week 5: แสดง Points ที่ได้รับ
+                      if (hasMember)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.amber[50],
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.amber[200]!),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.stars,
+                                    color: Colors.amber, size: 20),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'สะสมคะแนน: +$earnedPoints pt',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.amber[800],
+                                  ),
+                                ),
+                                const Spacer(),
+                                Text(
+                                  'ทุก ฿$kPointsPerBaht = 1 pt',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.amber[600],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
               ),
               const SizedBox(height: 16),
-              
-              // Items Card
+
+              // ── Items Card ───────────────────────────────────
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -117,9 +160,7 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
                       const Text(
                         'รายการสินค้า',
                         style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
+                            fontSize: 18, fontWeight: FontWeight.bold),
                       ),
                       const Divider(),
                       ...?order.items?.map((item) => _buildItemRow(item)),
@@ -128,8 +169,8 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
                 ),
               ),
               const SizedBox(height: 16),
-              
-              // Summary Card
+
+              // ── Summary Card ─────────────────────────────────
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -137,13 +178,47 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
                     children: [
                       _buildSummaryRow('ยอดรวม', order.subtotal),
                       if (order.discountAmount > 0)
-                        _buildSummaryRow('ส่วนลด', -order.discountAmount, isDiscount: true),
+                        _buildSummaryRow('ส่วนลด', -order.discountAmount,
+                            isDiscount: true),
                       const Divider(),
-                      _buildSummaryRow('ยอดชำระ', order.totalAmount, isTotal: true),
+                      _buildSummaryRow('ยอดชำระ', order.totalAmount,
+                          isTotal: true),
                       if (order.paymentType == 'CASH') ...[
                         const SizedBox(height: 8),
                         _buildSummaryRow('รับเงิน', order.paidAmount),
-                        _buildSummaryRow('เงินทอน', order.changeAmount, isChange: true),
+                        _buildSummaryRow('เงินทอน', order.changeAmount,
+                            isChange: true),
+                      ],
+                      // ✅ Week 5: สรุป points ด้านล่าง summary
+                      if (hasMember) ...[
+                        const Divider(),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.stars,
+                                    size: 16, color: Colors.amber),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'คะแนนที่ได้รับ',
+                                  style: TextStyle(
+                                    color: Colors.amber[700],
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Text(
+                              '+$earnedPoints pt',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.amber[700],
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
                     ],
                   ),
@@ -155,7 +230,7 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
       ),
     );
   }
-  
+
   Widget _buildInfoRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -163,22 +238,18 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
         children: [
           SizedBox(
             width: 100,
-            child: Text(
-              label,
-              style: TextStyle(color: Colors.grey[600]),
-            ),
+            child: Text(label,
+                style: TextStyle(color: Colors.grey[600])),
           ),
           Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(fontWeight: FontWeight.w500),
-            ),
+            child: Text(value,
+                style: const TextStyle(fontWeight: FontWeight.w500)),
           ),
         ],
       ),
     );
   }
-  
+
   Widget _buildItemRow(SalesOrderItemModel item) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -189,31 +260,20 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  item.productName,
-                  style: const TextStyle(fontWeight: FontWeight.w500),
-                ),
-                Text(
-                  item.productCode,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                  ),
-                ),
+                Text(item.productName,
+                    style: const TextStyle(fontWeight: FontWeight.w500)),
+                Text(item.productCode,
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600])),
               ],
             ),
           ),
           Expanded(
-            child: Text(
-              '${item.quantity.toStringAsFixed(0)}x',
-              textAlign: TextAlign.center,
-            ),
+            child: Text('${item.quantity.toStringAsFixed(0)}x',
+                textAlign: TextAlign.center),
           ),
           Expanded(
-            child: Text(
-              '฿${item.unitPrice.toStringAsFixed(2)}',
-              textAlign: TextAlign.right,
-            ),
+            child: Text('฿${item.unitPrice.toStringAsFixed(2)}',
+                textAlign: TextAlign.right),
           ),
           Expanded(
             child: Text(
@@ -226,8 +286,10 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
       ),
     );
   }
-  
-  Widget _buildSummaryRow(String label, double amount, {
+
+  Widget _buildSummaryRow(
+    String label,
+    double amount, {
     bool isDiscount = false,
     bool isTotal = false,
     bool isChange = false,
@@ -237,18 +299,18 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: isTotal ? 18 : 14,
-              fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
-            ),
-          ),
+          Text(label,
+              style: TextStyle(
+                fontSize: isTotal ? 18 : 14,
+                fontWeight:
+                    isTotal ? FontWeight.bold : FontWeight.normal,
+              )),
           Text(
             '฿${amount.toStringAsFixed(2)}',
             style: TextStyle(
               fontSize: isTotal ? 22 : 14,
-              fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
+              fontWeight:
+                  isTotal ? FontWeight.bold : FontWeight.normal,
               color: isDiscount
                   ? Colors.red
                   : isChange
@@ -262,7 +324,7 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
       ),
     );
   }
-  
+
   Color _getStatusColor(String status) {
     switch (status) {
       case 'COMPLETED':
@@ -275,7 +337,7 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
         return Colors.grey;
     }
   }
-  
+
   String _getPaymentTypeText(String type) {
     switch (type) {
       case 'CASH':
@@ -288,31 +350,24 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
         return type;
     }
   }
-  
+
   void _showReceiptPreview() {
     showDialog(
       context: context,
-      builder: (context) => Dialog(
+      builder: (_) => Dialog(
         child: Container(
           width: 400,
-          constraints: const BoxConstraints(
-            maxHeight: 700, // ✅ เพิ่ม constraint
-          ),
+          constraints: const BoxConstraints(maxHeight: 700),
           padding: const EdgeInsets.all(16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Header - ไม่ scroll
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'ใบเสร็จ',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  const Text('ใบเสร็จ',
+                      style: TextStyle(
+                          fontSize: 20, fontWeight: FontWeight.bold)),
                   IconButton(
                     icon: const Icon(Icons.close),
                     onPressed: () => Navigator.pop(context),
@@ -320,15 +375,11 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
                 ],
               ),
               const Divider(),
-              
-              // Content - มี scroll ✅
               Expanded(
                 child: SingleChildScrollView(
                   child: ReceiptWidget(order: _order!),
                 ),
               ),
-              
-              // Action - ไม่ scroll
               const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
@@ -336,14 +387,14 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
                   onPressed: () {
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('พิมพ์ใบเสร็จ (เร็วๆ นี้...)')),
+                      const SnackBar(
+                          content: Text('พิมพ์ใบเสร็จ (เร็วๆ นี้...)')),
                     );
                   },
                   icon: const Icon(Icons.print),
                   label: const Text('พิมพ์'),
                   style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
+                      padding: const EdgeInsets.symmetric(vertical: 16)),
                 ),
               ),
             ],
