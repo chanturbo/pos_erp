@@ -5,7 +5,68 @@ import 'package:shelf/shelf.dart';
 import '../../database/app_database.dart';
 import '../../services/auth_service.dart';
 
-/// Middleware สำหรับตรวจสอบ Authentication
+// ─────────────────────────────────────────────────────────────────
+// Role constants — ตรงกับ roles ใน seed_data.dart
+// ─────────────────────────────────────────────────────────────────
+class AppRoles {
+  static const admin = 'ADMIN';
+  static const manager = 'MANAGER';
+  static const cashier = 'CASHIER';
+  static const warehouse = 'WAREHOUSE';
+  static const accountant = 'ACCOUNTANT';
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Helper: ดึง authenticated user จาก request context
+// ใช้ใน route handlers แทนการพึ่ง data['user_id'] จาก body
+// ─────────────────────────────────────────────────────────────────
+User? getAuthUser(Request request) {
+  return request.context['user'] as User?;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// roleGuard — จำกัด route ให้เฉพาะ role ที่กำหนด
+//
+// ตัวอย่าง:
+//   return roleGuard(request, [AppRoles.admin], () => _deleteHandler(...));
+// ─────────────────────────────────────────────────────────────────
+Future<Response> roleGuard(
+  Request request,
+  List<String> allowedRoles,
+  Future<Response> Function() handler,
+) async {
+  final user = getAuthUser(request);
+
+  if (user == null) {
+    return Response(
+      401,
+      body: jsonEncode({'success': false, 'message': 'Unauthorized — กรุณาเข้าสู่ระบบก่อน'}),
+      headers: {'Content-Type': 'application/json'},
+    );
+  }
+
+  if (!allowedRoles.contains(user.roleId ?? '')) {
+    return Response(
+      403,
+      body: jsonEncode({
+        'success': false,
+        'message': 'Forbidden — สิทธิ์ ${user.roleId} ไม่สามารถดำเนินการนี้ได้',
+      }),
+      headers: {'Content-Type': 'application/json'},
+    );
+  }
+
+  return handler();
+}
+
+// ─────────────────────────────────────────────────────────────────
+// authMiddleware
+//
+// ✅ Public paths: api/auth + api/health เท่านั้น
+// ✅ ทุก business route ต้อง Bearer token — ไม่มีข้อยกเว้น
+// ✅ inject User object เข้า request.context['user']
+//    → route handlers ใช้ getAuthUser(request) ได้ทันที
+// ─────────────────────────────────────────────────────────────────
 Middleware authMiddleware(AppDatabase db) {
   final authService = AuthService(db);
 
@@ -13,91 +74,69 @@ Middleware authMiddleware(AppDatabase db) {
     return (Request request) async {
       final path = request.url.path;
 
-      // ==================== PUBLIC PATHS (ไม่ต้อง Auth) ====================
-      // TODO: เมื่อ production พร้อม ให้ลบ routes ที่ไม่ใช่ auth/health ออก
-      //       แล้วแก้ provider ให้รอ token ก่อน load
-      final publicPaths = [
-        'api/auth',             // Login, Register
-        'api/health',           // Health check
-        // ── Products & Customers ──────────────────────────────────────────
-        'api/products',         // ✅ Products
-        'api/customers',        // ✅ Customers
-        // ── Sales & Stock ─────────────────────────────────────────────────
-        'api/sales',            // ✅ Sales
-        'api/stock',            // ✅ Stock
-        'api/warehouses',       // ✅ Warehouses
-        'api/reports',          // ✅ Reports
-        // ── Procurement ───────────────────────────────────────────────────
-        'api/suppliers',        // ✅ Suppliers
-        'api/purchases',        // ✅ Purchase Orders
-        'api/goods-receipts',   // ✅ Goods Receipts
-        'api/purchase-returns', // ✅ Purchase Returns
-        // ── Accounts Payable ──────────────────────────────────────────────
-        'api/ap-invoices',      // ✅ AP Invoices
-        'api/ap-payments',      // ✅ AP Payments
-        // ── Accounts Receivable ───────────────────────────────────────────
-        'api/ar-invoices',      // ✅ AR Invoices
-        'api/ar-receipts',      // ✅ AR Receipts
-        // ── Other ─────────────────────────────────────────────────────────
-        'api/promotions',       // ✅ Promotions
-        'api/branches',         // ✅ Branches
-      ];
-
-      // ตรวจสอบว่าเป็น public path หรือไม่
-      for (final publicPath in publicPaths) {
-        if (path.startsWith(publicPath)) {
-          print('✅ Public path: $path - Skip auth');
-          return handler(request);
-        }
+      // ── Public paths — เฉพาะ 2 นี้เท่านั้น ──────────────────
+      if (path == 'api/health' ||
+          path.startsWith('api/auth/') ||
+          path == 'api/auth') {
+        return handler(request);
       }
 
-      // ==================== PROTECTED PATHS (ต้อง Auth) ====================
-      print('🔒 Protected path: $path - Checking auth...');
-
+      // ── ทุก path อื่น: ต้อง Bearer token ──────────────────────
       final authHeader = request.headers['authorization'];
 
       if (authHeader == null || !authHeader.startsWith('Bearer ')) {
-        print('❌ Missing or invalid Authorization header');
         return Response(
           401,
           body: jsonEncode({
             'success': false,
-            'message': 'Unauthorized - Missing token',
+            'message': 'Unauthorized — กรุณาเข้าสู่ระบบก่อน',
           }),
           headers: {'Content-Type': 'application/json'},
         );
       }
 
       try {
-        final token = authHeader.replaceFirst('Bearer ', '');
+        final token = authHeader.replaceFirst('Bearer ', '').trim();
+
+        if (token.isEmpty) {
+          return Response(
+            401,
+            body: jsonEncode({'success': false, 'message': 'Unauthorized — Token ไม่ถูกต้อง'}),
+            headers: {'Content-Type': 'application/json'},
+          );
+        }
+
         final user = await authService.verifyToken(token);
 
         if (user == null) {
-          print('❌ Invalid token');
           return Response(
             401,
             body: jsonEncode({
               'success': false,
-              'message': 'Unauthorized - Invalid token',
+              'message': 'Unauthorized — Token หมดอายุหรือไม่ถูกต้อง',
             }),
             headers: {'Content-Type': 'application/json'},
           );
         }
 
-        print('✅ User authenticated: ${user.userId}');
+        if (!user.isActive) {
+          return Response(
+            403,
+            body: jsonEncode({
+              'success': false,
+              'message': 'Forbidden — บัญชีผู้ใช้นี้ถูกปิดการใช้งาน',
+            }),
+            headers: {'Content-Type': 'application/json'},
+          );
+        }
 
-        // เพิ่ม user ลง request context
-        final updatedRequest = request.change(context: {'user': user});
-
-        return handler(updatedRequest);
+        // ✅ inject User เข้า context → route handlers ใช้ getAuthUser()
+        return handler(request.change(context: {'user': user}));
       } catch (e) {
-        print('❌ Auth error: $e');
+        print('❌ Auth middleware error: $e');
         return Response(
           401,
-          body: jsonEncode({
-            'success': false,
-            'message': 'Unauthorized - Token verification failed',
-          }),
+          body: jsonEncode({'success': false, 'message': 'Unauthorized — ไม่สามารถยืนยันตัวตนได้'}),
           headers: {'Content-Type': 'application/json'},
         );
       }

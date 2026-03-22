@@ -10,6 +10,13 @@ class CartItem {
   final double unitPrice;
   final double amount;
 
+  // ✅ เก็บราคาทุก level ไว้ เพื่อให้ re-price ได้เมื่อเปลี่ยนลูกค้า
+  final double priceLevel1;
+  final double priceLevel2;
+  final double priceLevel3;
+  final double priceLevel4;
+  final double priceLevel5;
+
   CartItem({
     required this.productId,
     required this.productCode,
@@ -18,10 +25,27 @@ class CartItem {
     required this.quantity,
     required this.unitPrice,
     required this.amount,
+    this.priceLevel1 = 0,
+    this.priceLevel2 = 0,
+    this.priceLevel3 = 0,
+    this.priceLevel4 = 0,
+    this.priceLevel5 = 0,
   });
+
+  /// ✅ คืนราคาตาม priceLevel (1-5), fallback = priceLevel1
+  double priceForLevel(int level) {
+    switch (level) {
+      case 2: return priceLevel2 > 0 ? priceLevel2 : priceLevel1;
+      case 3: return priceLevel3 > 0 ? priceLevel3 : priceLevel1;
+      case 4: return priceLevel4 > 0 ? priceLevel4 : priceLevel1;
+      case 5: return priceLevel5 > 0 ? priceLevel5 : priceLevel1;
+      default: return priceLevel1;
+    }
+  }
 
   CartItem copyWith({
     double? quantity,
+    double? unitPrice,
     double? amount,
   }) {
     return CartItem(
@@ -30,8 +54,13 @@ class CartItem {
       productName: productName,
       unit: unit,
       quantity: quantity ?? this.quantity,
-      unitPrice: unitPrice,
+      unitPrice: unitPrice ?? this.unitPrice,
       amount: amount ?? this.amount,
+      priceLevel1: priceLevel1,
+      priceLevel2: priceLevel2,
+      priceLevel3: priceLevel3,
+      priceLevel4: priceLevel4,
+      priceLevel5: priceLevel5,
     );
   }
 }
@@ -109,23 +138,28 @@ class CartNotifier extends Notifier<CartState> {
     required String unit,
     required double unitPrice,
     double quantity = 1,
+    // ✅ รับราคาทุก level เพื่อให้ re-price ได้
+    double priceLevel1 = 0,
+    double priceLevel2 = 0,
+    double priceLevel3 = 0,
+    double priceLevel4 = 0,
+    double priceLevel5 = 0,
   }) {
     final items = List<CartItem>.from(state.items);
     final existingIndex =
         items.indexWhere((item) => item.productId == productId);
 
     if (existingIndex >= 0) {
-      // เพิ่มจำนวน
+      // เพิ่มจำนวน (คงราคาเดิม)
       final existing = items[existingIndex];
       final newQuantity = existing.quantity + quantity;
-      final newAmount = newQuantity * unitPrice;
-
       items[existingIndex] = existing.copyWith(
         quantity: newQuantity,
-        amount: newAmount,
+        amount: newQuantity * existing.unitPrice,
       );
     } else {
       // เพิ่มรายการใหม่
+      final p1 = priceLevel1 > 0 ? priceLevel1 : unitPrice;
       items.add(CartItem(
         productId: productId,
         productCode: productCode,
@@ -134,6 +168,11 @@ class CartNotifier extends Notifier<CartState> {
         quantity: quantity,
         unitPrice: unitPrice,
         amount: quantity * unitPrice,
+        priceLevel1: p1,
+        priceLevel2: priceLevel2,
+        priceLevel3: priceLevel3,
+        priceLevel4: priceLevel4,
+        priceLevel5: priceLevel5,
       ));
     }
 
@@ -202,7 +241,7 @@ class CartNotifier extends Notifier<CartState> {
     state = state.copyWith(items: items);
   }
 
-  /// ✅ ตั้งค่าลูกค้า พร้อม priceLevel
+  /// ✅ ตั้งค่าลูกค้า พร้อม priceLevel (ไม่ re-price อัตโนมัติ)
   void setCustomer(String? customerId, String? customerName,
       {int priceLevel = 1}) {
     state = state.copyWith(
@@ -210,6 +249,25 @@ class CartNotifier extends Notifier<CartState> {
       customerName: customerName,
       customerPriceLevel: priceLevel,
     );
+  }
+
+  /// ✅ คำนวณราคาสินค้าทุกรายการใหม่ตาม priceLevel ปัจจุบัน
+  void repriceItems() {
+    final level = state.customerPriceLevel;
+    final repriced = state.items.map((item) {
+      final newPrice = item.priceForLevel(level);
+      return item.copyWith(
+        unitPrice: newPrice,
+        amount: item.quantity * newPrice,
+      );
+    }).toList();
+    state = state.copyWith(items: repriced);
+  }
+
+  /// ✅ ตรวจว่า priceLevel ใหม่ต่างจากเดิมและมีสินค้าในตะกร้าหรือไม่
+  bool hasItemsWithDifferentLevel(int newLevel) {
+    return state.items.isNotEmpty &&
+        newLevel != state.customerPriceLevel;
   }
 
   /// ตั้งค่าส่วนลด

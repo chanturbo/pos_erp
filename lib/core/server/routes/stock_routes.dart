@@ -22,10 +22,9 @@ class StockRoutes {
     return router;
   }
 
-  /// GET /api/stock/balance - ดูสต๊อกคงเหลือ
+  /// GET /api/stock/balance - ดูสต๊อกคงเหลือ (คำนวณจาก stock_movements)
   Future<Response> _getStockBalanceHandler(Request request) async {
     try {
-      // Query สต๊อกคงเหลือ (groupBy product + warehouse)
       final query = '''
         SELECT 
           p.product_id,
@@ -106,7 +105,7 @@ class StockRoutes {
     }
   }
 
-  /// POST /api/stock/in - รับสินค้าเข้า
+  /// POST /api/stock/in - รับสินค้าเข้า (manual)
   Future<Response> _stockInHandler(Request request) async {
     try {
       final payload = await request.readAsString();
@@ -114,9 +113,7 @@ class StockRoutes {
 
       final movementId = 'STK${DateTime.now().millisecondsSinceEpoch}';
 
-      await db
-          .into(db.stockMovements)
-          .insert(
+      await db.into(db.stockMovements).insert(
             StockMovementsCompanion(
               movementId: Value(movementId),
               movementDate: Value(DateTime.now()),
@@ -144,19 +141,17 @@ class StockRoutes {
     }
   }
 
-  /// POST /api/stock/out - เบิกสินค้าออก
+  /// POST /api/stock/out - เบิกสินค้าออก (manual)
   Future<Response> _stockOutHandler(Request request) async {
     try {
       final payload = await request.readAsString();
       final data = jsonDecode(payload) as Map<String, dynamic>;
 
-      final movementId = 'STK${DateTime.now().millisecondsSinceEpoch}';
-
-      // ตรวจสอบสต๊อกก่อน
       final productId = data['product_id'] as String;
       final warehouseId = data['warehouse_id'] as String;
       final quantity = (data['quantity'] as num).toDouble();
 
+      // ✅ ตรวจสอบสต๊อกก่อนเสมอ
       final currentStock = await _getCurrentStock(productId, warehouseId);
 
       if (currentStock < quantity) {
@@ -170,16 +165,16 @@ class StockRoutes {
         );
       }
 
-      await db
-          .into(db.stockMovements)
-          .insert(
+      final movementId = 'STK${DateTime.now().millisecondsSinceEpoch}';
+
+      await db.into(db.stockMovements).insert(
             StockMovementsCompanion(
               movementId: Value(movementId),
               movementDate: Value(DateTime.now()),
               movementType: const Value('OUT'),
               productId: Value(productId),
               warehouseId: Value(warehouseId),
-              quantity: Value(-quantity), // ✅ ติดลบเพราะเป็นการเบิกออก
+              quantity: Value(-quantity), // ลบ = เบิกออก
               referenceNo: Value(data['reference_no'] as String?),
               remark: Value(data['remark'] as String?),
             ),
@@ -206,8 +201,6 @@ class StockRoutes {
       final payload = await request.readAsString();
       final data = jsonDecode(payload) as Map<String, dynamic>;
 
-      final movementId = 'STK${DateTime.now().millisecondsSinceEpoch}';
-
       final productId = data['product_id'] as String;
       final warehouseId = data['warehouse_id'] as String;
       final newBalance = (data['new_balance'] as num).toDouble();
@@ -216,16 +209,16 @@ class StockRoutes {
       final currentStock = await _getCurrentStock(productId, warehouseId);
       final adjustQty = newBalance - currentStock;
 
-      await db
-          .into(db.stockMovements)
-          .insert(
+      final movementId = 'STK${DateTime.now().millisecondsSinceEpoch}';
+
+      await db.into(db.stockMovements).insert(
             StockMovementsCompanion(
               movementId: Value(movementId),
               movementDate: Value(DateTime.now()),
               movementType: const Value('ADJUST'),
               productId: Value(productId),
               warehouseId: Value(warehouseId),
-              quantity: Value(adjustQty),
+              quantity: Value(adjustQty), // บวก/ลบ ขึ้นกับผล
               referenceNo: Value(data['reference_no'] as String?),
               remark: Value(data['remark'] as String?),
             ),
@@ -251,7 +244,84 @@ class StockRoutes {
     }
   }
 
-  /// Helper: ดึงสต๊อกปัจจุบัน
+  /// POST /api/stock/transfer - โอนย้ายสินค้าระหว่างคลัง
+  Future<Response> _stockTransferHandler(Request request) async {
+    try {
+      final payload = await request.readAsString();
+      final data = jsonDecode(payload) as Map<String, dynamic>;
+
+      final productId = data['product_id'] as String;
+      final fromWarehouseId = data['from_warehouse_id'] as String;
+      final toWarehouseId = data['to_warehouse_id'] as String;
+      final quantity = (data['quantity'] as num).toDouble();
+
+      // ✅ ตรวจสอบสต๊อกคลังต้นทางก่อน (นอก transaction)
+      final currentStock = await _getCurrentStock(productId, fromWarehouseId);
+
+      if (currentStock < quantity) {
+        return Response(
+          400,
+          body: jsonEncode({
+            'success': false,
+            'message': 'สต๊อกคลังต้นทางไม่เพียงพอ (คงเหลือ: $currentStock)',
+          }),
+          headers: {'Content-Type': 'application/json'},
+        );
+      }
+
+      final ts = DateTime.now().millisecondsSinceEpoch;
+      final transferId = 'TRF$ts';
+
+      // ─────────────────────────────────────────────────────────────
+      // ✅ สร้าง OUT + IN ใน transaction เดียว
+      //    ถ้า crash กลางทาง ทั้งคู่จะ rollback → สต๊อกไม่สูญหาย
+      // ─────────────────────────────────────────────────────────────
+      await db.transaction(() async {
+        // OUT จากคลังต้นทาง
+        await db.into(db.stockMovements).insert(
+              StockMovementsCompanion(
+                movementId: Value('${transferId}_OUT'),
+                movementDate: Value(DateTime.now()),
+                movementType: const Value('TRANSFER_OUT'),
+                productId: Value(productId),
+                warehouseId: Value(fromWarehouseId),
+                quantity: Value(-quantity),
+                referenceNo: Value(transferId),
+                remark: Value(data['remark'] as String?),
+              ),
+            );
+
+        // IN เข้าคลังปลายทาง
+        await db.into(db.stockMovements).insert(
+              StockMovementsCompanion(
+                movementId: Value('${transferId}_IN'),
+                movementDate: Value(DateTime.now()),
+                movementType: const Value('TRANSFER_IN'),
+                productId: Value(productId),
+                warehouseId: Value(toWarehouseId),
+                quantity: Value(quantity),
+                referenceNo: Value(transferId),
+                remark: Value(data['remark'] as String?),
+              ),
+            );
+      });
+
+      return Response.ok(
+        jsonEncode({
+          'success': true,
+          'message': 'โอนย้ายสินค้าสำเร็จ',
+          'data': {'transfer_id': transferId},
+        }),
+        headers: {'Content-Type': 'application/json'},
+      );
+    } catch (e) {
+      return Response.internalServerError(
+        body: jsonEncode({'success': false, 'message': 'เกิดข้อผิดพลาด: $e'}),
+      );
+    }
+  }
+
+  /// Helper: คำนวณสต๊อกปัจจุบันจาก stock_movements (single source of truth)
   Future<double> _getCurrentStock(String productId, String warehouseId) async {
     final result = await db
         .customSelect(
@@ -268,80 +338,5 @@ class StockRoutes {
         .getSingle();
 
     return result.read<double>('balance');
-  }
-
-  // เพิ่ม handler ใหม่
-  /// POST /api/stock/transfer - โอนย้ายสินค้าระหว่างคลัง
-  Future<Response> _stockTransferHandler(Request request) async {
-    try {
-      final payload = await request.readAsString();
-      final data = jsonDecode(payload) as Map<String, dynamic>;
-
-      final productId = data['product_id'] as String;
-      final fromWarehouseId = data['from_warehouse_id'] as String;
-      final toWarehouseId = data['to_warehouse_id'] as String;
-      final quantity = (data['quantity'] as num).toDouble();
-
-      // ตรวจสอบสต๊อกคลังต้นทาง
-      final currentStock = await _getCurrentStock(productId, fromWarehouseId);
-
-      if (currentStock < quantity) {
-        return Response(
-          400,
-          body: jsonEncode({
-            'success': false,
-            'message': 'สต๊อกคลังต้นทางไม่เพียงพอ (คงเหลือ: $currentStock)',
-          }),
-          headers: {'Content-Type': 'application/json'},
-        );
-      }
-
-      final transferId = 'TRF${DateTime.now().millisecondsSinceEpoch}';
-
-      // สร้าง Movement OUT จากคลังต้นทาง
-      await db
-          .into(db.stockMovements)
-          .insert(
-            StockMovementsCompanion(
-              movementId: Value('${transferId}_OUT'),
-              movementDate: Value(DateTime.now()),
-              movementType: const Value('TRANSFER_OUT'),
-              productId: Value(productId),
-              warehouseId: Value(fromWarehouseId),
-              quantity: Value(-quantity),
-              referenceNo: Value(transferId),
-              remark: Value(data['remark'] as String?),
-            ),
-          );
-
-      // สร้าง Movement IN เข้าคลังปลายทาง
-      await db
-          .into(db.stockMovements)
-          .insert(
-            StockMovementsCompanion(
-              movementId: Value('${transferId}_IN'),
-              movementDate: Value(DateTime.now()),
-              movementType: const Value('TRANSFER_IN'),
-              productId: Value(productId),
-              warehouseId: Value(toWarehouseId),
-              quantity: Value(quantity),
-              referenceNo: Value(transferId),
-              remark: Value(data['remark'] as String?),
-            ),
-          );
-
-      return Response.ok(
-        jsonEncode({
-          'success': true,
-          'message': 'โอนย้ายสินค้าสำเร็จ',
-          'data': {'transfer_id': transferId},
-        }),
-        headers: {'Content-Type': 'application/json'},
-      );
-    } catch (e) {
-      return Response.internalServerError(
-        body: jsonEncode({'success': false, 'message': 'เกิดข้อผิดพลาด: $e'}),
-      );
-    }
   }
 }

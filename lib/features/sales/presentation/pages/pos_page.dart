@@ -196,11 +196,64 @@ class _PosPageState extends ConsumerState<PosPage> {
                     builder: (_) => const CustomerSelectorDialog(),
                   );
                   if (result != null) {
-                    ref.read(cartProvider.notifier).setCustomer(
-                      result.customerId,
-                      result.customerName,
-                      priceLevel: result.priceLevel, // ✅ ส่ง priceLevel
-                    );
+                    final notifier = ref.read(cartProvider.notifier);
+                    final newLevel = result.priceLevel;
+
+                    // ✅ ถ้ามีสินค้าในตะกร้าและ priceLevel เปลี่ยน → ถามก่อน
+                    if (notifier.hasItemsWithDifferentLevel(newLevel)) {
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (_) => AlertDialog(
+                          title: const Row(
+                            children: [
+                              Icon(Icons.sell_outlined,
+                                  color: AppTheme.warning, size: 22),
+                              SizedBox(width: 8),
+                              Text('อัพเดทราคาสินค้า?'),
+                            ],
+                          ),
+                          content: Text(
+                            'ลูกค้า "${result.customerName}" '
+                            'ใช้ระดับราคา Level $newLevel'
+                            'ต้องการคำนวณราคาสินค้าในตะกร้าใหม่ด้วยไหม?',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: const Text('คงราคาเดิม'),
+                            ),
+                            ElevatedButton.icon(
+                              onPressed: () => Navigator.pop(context, true),
+                              icon: const Icon(Icons.price_change, size: 16),
+                              label: const Text('อัพเดทราคา'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppTheme.primary,
+                                foregroundColor: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+
+                      // set customer ก่อนเสมอ
+                      notifier.setCustomer(
+                        result.customerId,
+                        result.customerName,
+                        priceLevel: newLevel,
+                      );
+
+                      // re-price เฉพาะเมื่อกด "อัพเดทราคา"
+                      if (confirm == true) {
+                        notifier.repriceItems();
+                      }
+                    } else {
+                      // ตะกร้าว่าง หรือ priceLevel เดิม → set ตรงๆ
+                      notifier.setCustomer(
+                        result.customerId,
+                        result.customerName,
+                        priceLevel: newLevel,
+                      );
+                    }
                   }
                 },
                 child: Container(
@@ -240,9 +293,56 @@ class _PosPageState extends ConsumerState<PosPage> {
                       if (hasCustomer) ...[
                         const SizedBox(width: 4),
                         InkWell(
-                          onTap: () => ref
-                              .read(cartProvider.notifier)
-                              .setCustomer('WALK_IN', 'ลูกค้าทั่วไป'),
+                          onTap: () async {
+                            final notifier = ref.read(cartProvider.notifier);
+                            // ✅ ถ้ามีสินค้าในตะกร้า → ถามก่อน reset ราคา
+                            if (notifier.hasItemsWithDifferentLevel(1)) {
+                              final confirm = await showDialog<bool>(
+                                context: context,
+                                builder: (_) => AlertDialog(
+                                  title: const Row(
+                                    children: [
+                                      Icon(Icons.sell_outlined,
+                                          color: AppTheme.warning, size: 22),
+                                      SizedBox(width: 8),
+                                      Text('อัพเดทราคาสินค้า?'),
+                                    ],
+                                  ),
+                                  content: const Text(
+                                    'เปลี่ยนเป็นลูกค้าทั่วไป (Level 1)'
+                                    'ต้องการคำนวณราคาสินค้าในตะกร้าใหม่ด้วยไหม?',
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.pop(context, false),
+                                      child: const Text('คงราคาเดิม'),
+                                    ),
+                                    ElevatedButton.icon(
+                                      onPressed: () =>
+                                          Navigator.pop(context, true),
+                                      icon: const Icon(
+                                          Icons.price_change, size: 16),
+                                      label: const Text('อัพเดทราคา'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppTheme.primary,
+                                        foregroundColor: Colors.white,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                              notifier.setCustomer(
+                                  'WALK_IN', 'ลูกค้าทั่วไป',
+                                  priceLevel: 1);
+                              if (confirm == true) notifier.repriceItems();
+                            } else {
+                              // ตะกร้าว่าง หรือ level เดิมเป็น 1 อยู่แล้ว
+                              notifier.setCustomer(
+                                  'WALK_IN', 'ลูกค้าทั่วไป',
+                                  priceLevel: 1);
+                            }
+                          },
                           child: Icon(Icons.close,
                               size: 13, color: AppTheme.info),
                         ),
@@ -657,6 +757,12 @@ class _ProductSearchSheetState
       productName: product.productName,
       unit: product.baseUnit,
       unitPrice: unitPrice,
+      // ✅ ส่งราคาทุก level เก็บไว้ใน CartItem เพื่อ re-price ได้
+      priceLevel1: product.priceLevel1,
+      priceLevel2: product.priceLevel2,
+      priceLevel3: product.priceLevel3,
+      priceLevel4: product.priceLevel4,
+      priceLevel5: product.priceLevel5,
     );
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text('เพิ่ม ${product.productName} แล้ว'),

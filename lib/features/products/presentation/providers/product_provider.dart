@@ -4,81 +4,162 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/client/api_client.dart';
 import '../../data/models/product_model.dart';
 
-// Product List State
+// ─────────────────────────────────────────────────────────────
+// State class สำหรับ pagination
+// ─────────────────────────────────────────────────────────────
 class ProductListState {
   final List<ProductModel> products;
   final bool isLoading;
   final String? error;
-  
-  ProductListState({
+  // Pagination
+  final int total;
+  final int limit;
+  final int offset;
+  final bool hasMore;
+
+  const ProductListState({
     required this.products,
     required this.isLoading,
     this.error,
+    this.total = 0,
+    this.limit = 500,
+    this.offset = 0,
+    this.hasMore = false,
   });
-  
+
   ProductListState copyWith({
     List<ProductModel>? products,
     bool? isLoading,
     String? error,
+    int? total,
+    int? limit,
+    int? offset,
+    bool? hasMore,
   }) {
     return ProductListState(
       products: products ?? this.products,
       isLoading: isLoading ?? this.isLoading,
-      error: error ?? this.error,
+      error: error,
+      total: total ?? this.total,
+      limit: limit ?? this.limit,
+      offset: offset ?? this.offset,
+      hasMore: hasMore ?? this.hasMore,
     );
   }
 }
 
-// ✅ Product List Provider - ใช้ AsyncNotifierProvider แทน
-final productListProvider = AsyncNotifierProvider<ProductListNotifier, List<ProductModel>>(() {
-  return ProductListNotifier();
-});
+// ─────────────────────────────────────────────────────────────
+// Provider
+// ─────────────────────────────────────────────────────────────
+final productListProvider =
+    AsyncNotifierProvider<ProductListNotifier, List<ProductModel>>(
+  ProductListNotifier.new,
+);
 
 class ProductListNotifier extends AsyncNotifier<List<ProductModel>> {
+  // เก็บ pagination state แยกต่างหาก
+  int _total = 0;
+  int _limit = 500;
+  int _offset = 0;
+  bool _hasMore = false;
+
+  int get total => _total;
+  int get limit => _limit;
+  bool get hasMore => _hasMore;
+
   @override
   Future<List<ProductModel>> build() async {
-    // ✅ โหลดข้อมูลทันทีเมื่อ build
     return await loadProducts();
   }
-  
-  /// โหลดรายการสินค้า
-  Future<List<ProductModel>> loadProducts() async {
+
+  /// โหลดรายการสินค้า (รองรับ pagination + server-side search)
+  Future<List<ProductModel>> loadProducts({
+    int limit = 500,
+    int offset = 0,
+    String search = '',
+    bool activeOnly = false,
+  }) async {
     try {
-      print('📡 Loading products...');
-      
+      print('📡 Loading products (limit=$limit offset=$offset search="$search")...');
+
       final apiClient = ref.read(apiClientProvider);
-      final response = await apiClient.get('/api/products');
-      
+
+      // ✅ ส่ง params ไปให้ server filter — ไม่โหลดทั้งหมดมา filter ใน Dart
+      final queryParams = <String, dynamic>{
+        'limit': limit,
+        'offset': offset,
+        if (search.isNotEmpty) 'search': search,
+        if (activeOnly) 'active_only': 'true',
+      };
+
+      // ✅ สร้าง URL พร้อม query string เอง เพราะ ApiClient.get() ไม่รับ queryParameters
+      final queryString = queryParams.entries
+          .map((e) => '${e.key}=${Uri.encodeComponent(e.value.toString())}')
+          .join('&');
+      final path =
+          queryString.isEmpty ? '/api/products' : '/api/products?$queryString';
+
+      final response = await apiClient.get(path);
+
       if (response.statusCode == 200) {
         final data = response.data['data'] as List;
-        final products = data.map((json) => ProductModel.fromJson(json)).toList();
-        
-        print('✅ Loaded ${products.length} products');
-        
+        final products =
+            data.map((json) => ProductModel.fromJson(json)).toList();
+
+        // บันทึก pagination info
+        final pagination =
+            response.data['pagination'] as Map<String, dynamic>? ?? {};
+        _total = pagination['total'] as int? ?? products.length;
+        _limit = limit;
+        _offset = offset;
+        _hasMore = pagination['has_more'] as bool? ?? false;
+
+        print('✅ Loaded ${products.length} / $_total products');
         return products;
       } else {
         throw Exception('Failed to load products: ${response.statusCode}');
       }
     } catch (e) {
       print('❌ Error loading products: $e');
-      throw Exception('เกิดข้อผิดพลาด: $e');
+      rethrow;
     }
   }
-  
-  /// Refresh - เรียกใช้เมื่อต้องการ reload
-  Future<void> refresh() async {
+
+  /// Refresh — โหลดใหม่จากต้น
+  Future<void> refresh({String search = '', bool activeOnly = false}) async {
     state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() => loadProducts());
+    state = await AsyncValue.guard(
+      () => loadProducts(
+        limit: _limit,
+        offset: 0,
+        search: search,
+        activeOnly: activeOnly,
+      ),
+    );
   }
-  
+
+  /// โหลดหน้าถัดไป (infinite scroll)
+  Future<void> loadMore({String search = '', bool activeOnly = false}) async {
+    if (!_hasMore) return;
+    final current = state.value ?? [];
+    final next = await loadProducts(
+      limit: _limit,
+      offset: _offset + _limit,
+      search: search,
+      activeOnly: activeOnly,
+    );
+    state = AsyncValue.data([...current, ...next]);
+  }
+
   /// เพิ่มสินค้า
   Future<bool> addProduct(Map<String, dynamic> productData) async {
     try {
       final apiClient = ref.read(apiClientProvider);
-      final response = await apiClient.post('/api/products', data: productData);
-      
+      final response =
+          await apiClient.post('/api/products', data: productData);
+
       if (response.statusCode == 200 || response.statusCode == 201) {
-        await refresh(); // Reload
+        await refresh();
         return true;
       }
       return false;
@@ -87,15 +168,19 @@ class ProductListNotifier extends AsyncNotifier<List<ProductModel>> {
       return false;
     }
   }
-  
+
   /// แก้ไขสินค้า
-  Future<bool> updateProduct(String productId, Map<String, dynamic> productData) async {
+  Future<bool> updateProduct(
+      String productId, Map<String, dynamic> productData) async {
     try {
       final apiClient = ref.read(apiClientProvider);
-      final response = await apiClient.put('/api/products/$productId', data: productData);
-      
+      final response = await apiClient.put(
+        '/api/products/$productId',
+        data: productData,
+      );
+
       if (response.statusCode == 200) {
-        await refresh(); // Reload
+        await refresh();
         return true;
       }
       return false;
@@ -104,15 +189,16 @@ class ProductListNotifier extends AsyncNotifier<List<ProductModel>> {
       return false;
     }
   }
-  
+
   /// ลบสินค้า
   Future<bool> deleteProduct(String productId) async {
     try {
       final apiClient = ref.read(apiClientProvider);
-      final response = await apiClient.delete('/api/products/$productId');
-      
+      final response =
+          await apiClient.delete('/api/products/$productId');
+
       if (response.statusCode == 200) {
-        await refresh(); // Reload
+        await refresh();
         return true;
       }
       return false;

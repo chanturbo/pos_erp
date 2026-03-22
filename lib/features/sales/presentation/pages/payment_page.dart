@@ -23,7 +23,6 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
   @override
   void initState() {
     super.initState();
-    // ตั้งค่าเริ่มต้นเป็นยอดที่ต้องชำระ
     final cartState = ref.read(cartProvider);
     _receivedAmount = cartState.total;
     _receivedController.text = cartState.total.toStringAsFixed(2);
@@ -147,17 +146,15 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
-                      children: [cartState.total, 100, 200, 500, 1000].map((
-                        amount,
-                      ) {
+                      children: [cartState.total, 100, 200, 500, 1000]
+                          .map((amount) {
                         return ActionChip(
                           label: Text('฿${amount.toStringAsFixed(0)}'),
                           onPressed: () {
                             setState(() {
                               _receivedAmount = amount.toDouble();
-                              _receivedController.text = amount.toStringAsFixed(
-                                2,
-                              );
+                              _receivedController.text =
+                                  amount.toStringAsFixed(2);
                             });
                           },
                         );
@@ -167,7 +164,9 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
 
                     // เงินทอน
                     Card(
-                      color: _change >= 0 ? Colors.green[50] : Colors.red[50],
+                      color: _change >= 0
+                          ? Colors.green[50]
+                          : Colors.red[50],
                       child: Padding(
                         padding: const EdgeInsets.all(24),
                         child: Column(
@@ -182,7 +181,9 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                               style: TextStyle(
                                 fontSize: 36,
                                 fontWeight: FontWeight.bold,
-                                color: _change >= 0 ? Colors.green : Colors.red,
+                                color: _change >= 0
+                                    ? Colors.green
+                                    : Colors.red,
                               ),
                             ),
                           ],
@@ -227,16 +228,13 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
   }
 
   Future<void> _handlePayment() async {
-    setState(() {
-      _isProcessing = true;
-    });
+    setState(() => _isProcessing = true);
 
     try {
       final cartState = ref.read(cartProvider);
       final authState = ref.read(authProvider);
       final apiClient = ref.read(apiClientProvider);
 
-      // เตรียมข้อมูล Order
       final orderData = {
         'customer_id': cartState.customerId,
         'customer_name': cartState.customerName,
@@ -249,9 +247,8 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
         'vat_amount': 0.0,
         'total_amount': cartState.total,
         'payment_type': _paymentType,
-        'paid_amount': _paymentType == 'CASH'
-            ? _receivedAmount
-            : cartState.total,
+        'paid_amount':
+            _paymentType == 'CASH' ? _receivedAmount : cartState.total,
         'change_amount': _paymentType == 'CASH' ? _change : 0.0,
         'items': cartState.items
             .map(
@@ -261,34 +258,32 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                 'product_name': item.productName,
                 'unit': item.unit,
                 'quantity': item.quantity,
-                'unit_price': item.unitPrice, // ✅ เปลี่ยนจาก price
+                'unit_price': item.unitPrice,
                 'discount_percent': 0.0,
-                'discount_amount': 0.0, // ✅ เปลี่ยนจาก discount
+                'discount_amount': 0.0,
                 'amount': item.amount,
               },
             )
             .toList(),
       };
 
-      print('📦 Sending order data: $orderData'); // Debug
-      print(
-        '   Customer: ${orderData['customer_name']} (${orderData['customer_id']})',
-      );
-      print('   Total: ${orderData['total_amount']}');
-      print('   Items: ${orderData['items']}');
-      print('   Full data: $orderData');
-     
-      // บันทึก Order
+      print('📦 Sending order: total=${orderData['total_amount']}');
+
       final response = await apiClient.post('/api/sales', data: orderData);
 
-      print('✅ Response: ${response.statusCode}'); // Debug
+      print('✅ Response: ${response.statusCode}');
 
       if (response.statusCode == 200) {
-        // ล้างตะกร้า
         ref.read(cartProvider.notifier).clear();
 
+        // ✅ อ่านค่าแบบ null-safe ป้องกัน crash ถ้า API response ผิดรูปแบบ
+        final responseData =
+            response.data is Map ? response.data as Map : {};
+        final dataMap =
+            responseData['data'] is Map ? responseData['data'] as Map : {};
+        final orderNo = dataMap['order_no'] as String? ?? '-';
+
         if (mounted) {
-          // แสดง Success Dialog
           await showDialog(
             context: context,
             barrierDismissible: false,
@@ -304,8 +299,9 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('เลขที่: ${response.data['data']['order_no']}'),
-                  Text('ยอดชำระ: ฿${cartState.total.toStringAsFixed(2)}'),
+                  Text('เลขที่: $orderNo'),
+                  Text(
+                      'ยอดชำระ: ฿${cartState.total.toStringAsFixed(2)}'),
                   if (_paymentType == 'CASH')
                     Text('เงินทอน: ฿${_change.toStringAsFixed(2)}'),
                 ],
@@ -313,14 +309,13 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
               actions: [
                 TextButton(
                   onPressed: () {
-                    Navigator.pop(context); // Close dialog
-                    Navigator.pop(context); // Back to POS
+                    Navigator.pop(context);
+                    Navigator.pop(context);
                   },
                   child: const Text('ปิด'),
                 ),
                 ElevatedButton(
                   onPressed: () {
-                    // TODO: พิมพ์ใบเสร็จในอนาคต
                     Navigator.pop(context);
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -336,25 +331,56 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
           );
         }
       } else {
-        throw Exception('Save order failed: ${response.statusCode}');
+        // ✅ อ่าน error message จาก API แต่ไม่ expose raw exception
+        final responseData =
+            response.data is Map ? response.data as Map : {};
+        final serverMsg =
+            responseData['message'] as String? ?? 'ไม่สามารถบันทึกออเดอร์ได้';
+        throw Exception(serverMsg);
       }
     } catch (e) {
-      print('❌ Payment error: $e'); // Debug
+      print('❌ Payment error: $e');
 
       if (mounted) {
+        // ✅ แสดงข้อความที่เป็นมิตรกับผู้ใช้ ไม่หลุด stack trace หรือ schema
+        final userMessage = _toUserMessage(e);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('เกิดข้อผิดพลาด: $e'),
+            content: Text(userMessage),
             backgroundColor: Colors.red,
           ),
         );
       }
     } finally {
-      if (mounted) {
-        setState(() {
-          _isProcessing = false;
-        });
-      }
+      if (mounted) setState(() => _isProcessing = false);
     }
+  }
+
+  /// ✅ แปลง exception เป็น user-friendly message
+  /// — ไม่หลุด schema, path, stack trace ไปยัง UI
+  String _toUserMessage(Object e) {
+    final msg = e.toString();
+
+    // ถ้าเป็น server message ที่เราโยนเอง (Exception: xxx) → แสดงตรงๆ
+    if (msg.startsWith('Exception: ') &&
+        !msg.contains('DioException') &&
+        !msg.contains('SocketException')) {
+      return msg.replaceFirst('Exception: ', '');
+    }
+
+    // Network error
+    if (msg.contains('SocketException') ||
+        msg.contains('Connection refused') ||
+        msg.contains('NetworkException')) {
+      return 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาตรวจสอบการเชื่อมต่อ';
+    }
+
+    // Timeout
+    if (msg.contains('TimeoutException') || msg.contains('timeout')) {
+      return 'การเชื่อมต่อหมดเวลา กรุณาลองใหม่';
+    }
+
+    // Fallback — generic message ไม่หลุด internal details
+    return 'เกิดข้อผิดพลาด กรุณาลองใหม่หรือติดต่อผู้ดูแลระบบ';
   }
 }

@@ -18,14 +18,11 @@ class GoodsReceiptRoutes {
 
     final router = Router();
 
-    // Goods Receipt routes
     router.get('/', _getGoodsReceiptsHandler);
     router.get('/<id>', _getGoodsReceiptHandler);
     router.post('/', _createGoodsReceiptHandler);
     router.put('/<id>', _updateGoodsReceiptHandler);
     router.delete('/<id>', _deleteGoodsReceiptHandler);
-
-    // Additional routes
     router.post('/<id>/confirm', _confirmGoodsReceiptHandler);
 
     print('🔧 GoodsReceiptRoutes configured:');
@@ -88,7 +85,6 @@ class GoodsReceiptRoutes {
     try {
       print('📡 GoodsReceiptRoutes: GET /$id');
 
-      // Get goods receipt
       final gr = await (db.select(
         db.goodsReceipts,
       )..where((g) => g.grId.equals(id))).getSingleOrNull();
@@ -100,7 +96,6 @@ class GoodsReceiptRoutes {
         );
       }
 
-      // Get items
       final items = await (db.select(
         db.goodsReceiptItems,
       )..where((i) => i.grId.equals(id))).get();
@@ -156,7 +151,7 @@ class GoodsReceiptRoutes {
     }
   }
 
-  /// POST / - สร้างใบรับสินค้าใหม่
+  /// POST / - สร้างใบรับสินค้าใหม่ (DRAFT)
   Future<Response> _createGoodsReceiptHandler(Request request) async {
     try {
       print('📡 GoodsReceiptRoutes: POST /');
@@ -164,63 +159,70 @@ class GoodsReceiptRoutes {
       final payload = await request.readAsString();
       final data = jsonDecode(payload) as Map<String, dynamic>;
 
-      // Generate GR ID and Number
-      final grId = 'GR${DateTime.now().millisecondsSinceEpoch}';
+      final ts = DateTime.now().millisecondsSinceEpoch;
+      final now = DateTime.fromMillisecondsSinceEpoch(ts);
+
+      final grId = 'GR$ts';
       final grNo =
-          'GR${DateTime.now().year}${DateTime.now().month.toString().padLeft(2, '0')}${DateTime.now().day.toString().padLeft(2, '0')}-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}';
+          'GR${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}-${ts.toString().substring(8)}';
 
-      // Create goods receipt
-      final grCompanion = GoodsReceiptsCompanion(
-        grId: Value(grId),
-        grNo: Value(grNo),
-        grDate: Value(DateTime.parse(data['gr_date'] as String)),
-        poId: Value(data['po_id'] as String?),
-        poNo: Value(data['po_no'] as String?),
-        supplierId: Value(data['supplier_id'] as String),
-        supplierName: Value(data['supplier_name'] as String),
-        warehouseId: Value(data['warehouse_id'] as String),
-        warehouseName: Value(data['warehouse_name'] as String),
-        userId: Value(data['user_id'] as String),
-        status: Value(data['status'] as String? ?? 'DRAFT'),
-        remark: Value(data['remark'] as String?),
-      );
+      // ─────────────────────────────────────────────────────────────
+      // สร้าง GR header + items ใน transaction เดียว
+      // ─────────────────────────────────────────────────────────────
+      await db.transaction(() async {
+        await db.into(db.goodsReceipts).insert(
+              GoodsReceiptsCompanion(
+                grId: Value(grId),
+                grNo: Value(grNo),
+                grDate: Value(DateTime.parse(data['gr_date'] as String)),
+                poId: Value(data['po_id'] as String?),
+                poNo: Value(data['po_no'] as String?),
+                supplierId: Value(data['supplier_id'] as String),
+                supplierName: Value(data['supplier_name'] as String),
+                warehouseId: Value(data['warehouse_id'] as String),
+                warehouseName: Value(data['warehouse_name'] as String),
+                userId: Value(data['user_id'] as String),
+                status: Value(data['status'] as String? ?? 'DRAFT'),
+                remark: Value(data['remark'] as String?),
+              ),
+            );
 
-      await db.into(db.goodsReceipts).insert(grCompanion);
+        if (data['items'] != null) {
+          final items = data['items'] as List;
+          for (var i = 0; i < items.length; i++) {
+            final item = items[i] as Map<String, dynamic>;
+            final itemId = 'GRI$ts$i';
 
-      // Create items
-      if (data['items'] != null) {
-        final items = data['items'] as List;
-        for (var i = 0; i < items.length; i++) {
-          final item = items[i] as Map<String, dynamic>;
-          final itemId = 'GRI${DateTime.now().millisecondsSinceEpoch}$i';
-
-          final itemCompanion = GoodsReceiptItemsCompanion(
-            itemId: Value(itemId),
-            grId: Value(grId),
-            lineNo: Value(i + 1),
-            poItemId: Value(item['po_item_id'] as String?),
-            productId: Value(item['product_id'] as String),
-            productCode: Value(item['product_code'] as String),
-            productName: Value(item['product_name'] as String),
-            unit: Value(item['unit'] as String),
-            orderedQuantity: Value(
-              (item['ordered_quantity'] as num?)?.toDouble() ?? 0,
-            ),
-            receivedQuantity: Value(
-              (item['received_quantity'] as num).toDouble(),
-            ),
-            unitPrice: Value((item['unit_price'] as num?)?.toDouble() ?? 0),
-            amount: Value((item['amount'] as num?)?.toDouble() ?? 0),
-            lotNumber: Value(item['lot_number'] as String?),
-            expiryDate: item['expiry_date'] != null
-                ? Value(DateTime.parse(item['expiry_date'] as String))
-                : const Value.absent(),
-            remark: Value(item['remark'] as String?),
-          );
-
-          await db.into(db.goodsReceiptItems).insert(itemCompanion);
+            await db.into(db.goodsReceiptItems).insert(
+                  GoodsReceiptItemsCompanion(
+                    itemId: Value(itemId),
+                    grId: Value(grId),
+                    lineNo: Value(i + 1),
+                    poItemId: Value(item['po_item_id'] as String?),
+                    productId: Value(item['product_id'] as String),
+                    productCode: Value(item['product_code'] as String),
+                    productName: Value(item['product_name'] as String),
+                    unit: Value(item['unit'] as String),
+                    orderedQuantity: Value(
+                      (item['ordered_quantity'] as num?)?.toDouble() ?? 0,
+                    ),
+                    receivedQuantity: Value(
+                      (item['received_quantity'] as num).toDouble(),
+                    ),
+                    unitPrice: Value(
+                      (item['unit_price'] as num?)?.toDouble() ?? 0,
+                    ),
+                    amount: Value((item['amount'] as num?)?.toDouble() ?? 0),
+                    lotNumber: Value(item['lot_number'] as String?),
+                    expiryDate: item['expiry_date'] != null
+                        ? Value(DateTime.parse(item['expiry_date'] as String))
+                        : const Value.absent(),
+                    remark: Value(item['remark'] as String?),
+                  ),
+                );
+          }
         }
-      }
+      });
 
       print('✅ GoodsReceiptRoutes: Created goods receipt: $grId');
 
@@ -241,7 +243,7 @@ class GoodsReceiptRoutes {
     }
   }
 
-  /// PUT /:id - แก้ไขใบรับสินค้า
+  /// PUT /:id - แก้ไขใบรับสินค้า (DRAFT เท่านั้น)
   Future<Response> _updateGoodsReceiptHandler(
     Request request,
     String id,
@@ -249,18 +251,41 @@ class GoodsReceiptRoutes {
     try {
       print('📡 GoodsReceiptRoutes: PUT /$id');
 
+      // ✅ ป้องกันแก้ไขหลัง confirm แล้ว
+      final gr = await (db.select(
+        db.goodsReceipts,
+      )..where((g) => g.grId.equals(id))).getSingleOrNull();
+
+      if (gr == null) {
+        return Response.notFound(
+          jsonEncode({'success': false, 'message': 'Goods receipt not found'}),
+          headers: {'Content-Type': 'application/json'},
+        );
+      }
+
+      if (gr.status == 'CONFIRMED') {
+        return Response(
+          400,
+          body: jsonEncode({
+            'success': false,
+            'message': 'ไม่สามารถแก้ไขใบรับสินค้าที่ยืนยันแล้ว',
+          }),
+          headers: {'Content-Type': 'application/json'},
+        );
+      }
+
       final payload = await request.readAsString();
       final data = jsonDecode(payload) as Map<String, dynamic>;
 
-      final companion = GoodsReceiptsCompanion(
-        grDate: Value(DateTime.parse(data['gr_date'] as String)),
-        remark: Value(data['remark'] as String?),
-        updatedAt: Value(DateTime.now()),
-      );
-
       await (db.update(
         db.goodsReceipts,
-      )..where((g) => g.grId.equals(id))).write(companion);
+      )..where((g) => g.grId.equals(id))).write(
+        GoodsReceiptsCompanion(
+          grDate: Value(DateTime.parse(data['gr_date'] as String)),
+          remark: Value(data['remark'] as String?),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
 
       print('✅ GoodsReceiptRoutes: Updated goods receipt: $id');
 
@@ -277,7 +302,7 @@ class GoodsReceiptRoutes {
     }
   }
 
-  /// DELETE /:id - ลบใบรับสินค้า
+  /// DELETE /:id - ลบใบรับสินค้า (DRAFT เท่านั้น)
   Future<Response> _deleteGoodsReceiptHandler(
     Request request,
     String id,
@@ -285,13 +310,36 @@ class GoodsReceiptRoutes {
     try {
       print('📡 GoodsReceiptRoutes: DELETE /$id');
 
-      // Delete items first
+      final gr = await (db.select(
+        db.goodsReceipts,
+      )..where((g) => g.grId.equals(id))).getSingleOrNull();
+
+      if (gr == null) {
+        return Response.notFound(
+          jsonEncode({'success': false, 'message': 'Goods receipt not found'}),
+          headers: {'Content-Type': 'application/json'},
+        );
+      }
+
+      // ✅ ป้องกันลบหลัง confirm แล้ว
+      if (gr.status == 'CONFIRMED') {
+        return Response(
+          400,
+          body: jsonEncode({
+            'success': false,
+            'message': 'ไม่สามารถลบใบรับสินค้าที่ยืนยันแล้ว',
+          }),
+          headers: {'Content-Type': 'application/json'},
+        );
+      }
+
       await (db.delete(
         db.goodsReceiptItems,
       )..where((i) => i.grId.equals(id))).go();
 
-      // Delete goods receipt
-      await (db.delete(db.goodsReceipts)..where((g) => g.grId.equals(id))).go();
+      await (db.delete(
+        db.goodsReceipts,
+      )..where((g) => g.grId.equals(id))).go();
 
       print('✅ GoodsReceiptRoutes: Deleted goods receipt: $id');
 
@@ -316,7 +364,6 @@ class GoodsReceiptRoutes {
     try {
       print('📡 GoodsReceiptRoutes: POST /$id/confirm');
 
-      // Get goods receipt
       final gr = await (db.select(
         db.goodsReceipts,
       )..where((g) => g.grId.equals(id))).getSingleOrNull();
@@ -328,130 +375,131 @@ class GoodsReceiptRoutes {
         );
       }
 
-      // Get items
+      // ✅ Guard: ป้องกัน double confirm → สต๊อกถูกเพิ่มสองรอบ
+      if (gr.status == 'CONFIRMED') {
+        return Response(
+          400,
+          body: jsonEncode({
+            'success': false,
+            'message': 'ใบรับสินค้านี้ยืนยันแล้ว ไม่สามารถยืนยันซ้ำได้',
+          }),
+          headers: {'Content-Type': 'application/json'},
+        );
+      }
+
       final items = await (db.select(
         db.goodsReceiptItems,
       )..where((i) => i.grId.equals(id))).get();
 
-      // Create stock movements for each item
-      for (var item in items) {
-        final movementId =
-            'STK${DateTime.now().millisecondsSinceEpoch}${item.lineNo}';
-        final movementNo = 'GR-${gr.grNo}';
-
-        final stockMovement = StockMovementsCompanion(
-          movementId: Value(movementId),
-          movementNo: Value(movementNo),
-          movementDate: Value(gr.grDate),
-          movementType: const Value('GR'),
-          productId: Value(item.productId),
-          warehouseId: Value(gr.warehouseId),
-          userId: Value(gr.userId),
-          quantity: Value(item.receivedQuantity),
-          referenceNo: Value(gr.grNo),
-          remark: Value('รับสินค้าจาก ${gr.supplierName}'),
+      if (items.isEmpty) {
+        return Response(
+          400,
+          body: jsonEncode({
+            'success': false,
+            'message': 'ไม่มีรายการสินค้าในใบรับสินค้า',
+          }),
+          headers: {'Content-Type': 'application/json'},
         );
-
-        await db.into(db.stockMovements).insert(stockMovement);
-
-        // Update or create stock balance
-        final existingBalance =
-            await (db.select(db.stockBalances)
-                  ..where((s) => s.productId.equals(item.productId))
-                  ..where((s) => s.warehouseId.equals(gr.warehouseId)))
-                .getSingleOrNull();
-
-        if (existingBalance != null) {
-          // Update existing balance - ใช้ stockId
-          final newBalance = existingBalance.quantity + item.receivedQuantity;
-          await (db.update(
-            db.stockBalances,
-          )..where((s) => s.stockId.equals(existingBalance.stockId))).write(
-            StockBalancesCompanion(
-              quantity: Value(newBalance),
-              updatedAt: Value(DateTime.now()),
-            ),
-          );
-        } else {
-          // Create new balance - ต้องมี stockId
-          final stockId =
-              'STK${DateTime.now().millisecondsSinceEpoch}${item.lineNo}';
-          await db
-              .into(db.stockBalances)
-              .insert(
-                StockBalancesCompanion(
-                  stockId: Value(stockId),
-                  productId: Value(item.productId),
-                  warehouseId: Value(gr.warehouseId),
-                  quantity: Value(item.receivedQuantity),
-                ),
-              );
-        }
       }
 
-      // Update goods receipt status
-      await (db.update(
-        db.goodsReceipts,
-      )..where((g) => g.grId.equals(id))).write(
-        const GoodsReceiptsCompanion(
-          status: Value('CONFIRMED'),
-          updatedAt: Value.absent(),
-        ),
-      );
+      final ts = DateTime.now().millisecondsSinceEpoch;
 
-      // Update PO item received quantities if linked to PO
-      if (gr.poId != null) {
+      // ─────────────────────────────────────────────────────────────
+      // ทุก operation ใน transaction เดียว:
+      // 1) insert stock_movements ทุกรายการ
+      // 2) update สถานะ GR → CONFIRMED
+      // 3) update PO item quantities (ถ้ามี)
+      // 4) update PO status (ถ้ามี)
+      // ─────────────────────────────────────────────────────────────
+      await db.transaction(() async {
+        // --- 1) บันทึก stock movements (source of truth) ---
         for (var item in items) {
-          if (item.poItemId != null) {
-            final poItem = await (db.select(
-              db.purchaseOrderItems,
-            )..where((i) => i.itemId.equals(item.poItemId!))).getSingleOrNull();
+          final movementId = 'GRM${ts}_${item.lineNo}';
+          final movementNo = 'GR-${gr.grNo}-${item.lineNo}';
 
-            if (poItem != null) {
-              final newReceivedQty =
-                  poItem.receivedQuantity + item.receivedQuantity;
-              final newRemainingQty = poItem.quantity - newReceivedQty;
-
-              await (db.update(
-                db.purchaseOrderItems,
-              )..where((i) => i.itemId.equals(item.poItemId!))).write(
-                PurchaseOrderItemsCompanion(
-                  receivedQuantity: Value(newReceivedQty),
-                  remainingQuantity: Value(
-                    newRemainingQty > 0 ? newRemainingQty : 0,
-                  ),
+          await db.into(db.stockMovements).insert(
+                StockMovementsCompanion(
+                  movementId: Value(movementId),
+                  movementNo: Value(movementNo),
+                  movementDate: Value(gr.grDate),
+                  movementType: const Value('GR'),
+                  productId: Value(item.productId),
+                  warehouseId: Value(gr.warehouseId),
+                  userId: Value(gr.userId),
+                  quantity: Value(item.receivedQuantity), // บวก = รับเข้า
+                  referenceNo: Value(gr.grNo),
+                  remark: Value('รับสินค้าจาก ${gr.supplierName}'),
                 ),
               );
-            }
-          }
+
+          print(
+            '✅ Stock movement: $movementNo (+${item.receivedQuantity} ${item.productId})',
+          );
         }
 
-        // Check if all PO items are fully received
-        final poItems = await (db.select(
-          db.purchaseOrderItems,
-        )..where((i) => i.poId.equals(gr.poId!))).get();
-
-        final allReceived = poItems.every(
-          (item) => item.remainingQuantity <= 0,
-        );
-
-        // Update PO status
+        // --- 2) อัพเดทสถานะ GR → CONFIRMED ---
         await (db.update(
-          db.purchaseOrders,
-        )..where((p) => p.poId.equals(gr.poId!))).write(
-          PurchaseOrdersCompanion(
-            status: Value(allReceived ? 'COMPLETED' : 'PARTIAL'),
+          db.goodsReceipts,
+        )..where((g) => g.grId.equals(id))).write(
+          GoodsReceiptsCompanion(
+            status: const Value('CONFIRMED'),
             updatedAt: Value(DateTime.now()),
           ),
         );
-      }
+
+        // --- 3) อัพเดท PO item quantities (ถ้าผูกกับ PO) ---
+        if (gr.poId != null) {
+          for (var item in items) {
+            if (item.poItemId != null) {
+              final poItem = await (db.select(
+                db.purchaseOrderItems,
+              )..where((i) => i.itemId.equals(item.poItemId!))).getSingleOrNull();
+
+              if (poItem != null) {
+                final newReceivedQty =
+                    poItem.receivedQuantity + item.receivedQuantity;
+                final newRemainingQty = poItem.quantity - newReceivedQty;
+
+                await (db.update(
+                  db.purchaseOrderItems,
+                )..where((i) => i.itemId.equals(item.poItemId!))).write(
+                  PurchaseOrderItemsCompanion(
+                    receivedQuantity: Value(newReceivedQty),
+                    remainingQuantity: Value(
+                      newRemainingQty > 0 ? newRemainingQty : 0,
+                    ),
+                  ),
+                );
+              }
+            }
+          }
+
+          // --- 4) อัพเดทสถานะ PO ---
+          final poItems = await (db.select(
+            db.purchaseOrderItems,
+          )..where((i) => i.poId.equals(gr.poId!))).get();
+
+          final allReceived = poItems.every(
+            (item) => item.remainingQuantity <= 0,
+          );
+
+          await (db.update(
+            db.purchaseOrders,
+          )..where((p) => p.poId.equals(gr.poId!))).write(
+            PurchaseOrdersCompanion(
+              status: Value(allReceived ? 'COMPLETED' : 'PARTIAL'),
+              updatedAt: Value(DateTime.now()),
+            ),
+          );
+        }
+      });
 
       print('✅ GoodsReceiptRoutes: Confirmed goods receipt: $id');
 
       return Response.ok(
         jsonEncode({
           'success': true,
-          'message': 'Goods receipt confirmed and stock updated',
+          'message': 'ยืนยันใบรับสินค้าสำเร็จ สต๊อกได้รับการอัพเดทแล้ว',
         }),
         headers: {'Content-Type': 'application/json'},
       );

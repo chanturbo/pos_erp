@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../settings/presentation/pages/settings_page.dart';
+import '../../../../shared/theme/app_theme.dart';
 import '../providers/stock_provider.dart';
 import '../widgets/stock_in_dialog.dart';
 import '../widgets/stock_out_dialog.dart';
@@ -10,14 +11,14 @@ import '../widgets/stock_transfer_dialog.dart';
 import 'stock_movement_history_page.dart';
 import '../../data/models/stock_balance_model.dart';
 
-// ── OAG Identity ─────────────────────────────────────────────────
-const _navy    = Color(0xFF16213E);
-const _orange  = Color(0xFFE57200);
-const _surface = Color(0xFFF4F4F0);
-const _border  = Color(0xFFE0E0E0);
-const _success = Color(0xFF2E7D32);
-const _error   = Color(0xFFC62828);
-const _warning = Color(0xFFF9A825);
+// ── Color aliases → AppTheme ──────────────────────────────────────
+const _navy    = AppTheme.navyColor;
+const _orange  = AppTheme.primaryColor;
+const _surface = AppTheme.surfaceColor;
+const _border  = AppTheme.borderColor;
+const _success = AppTheme.successColor;
+const _error   = AppTheme.errorColor;
+const _warning = AppTheme.warningColor;
 
 class StockBalancePage extends ConsumerStatefulWidget {
   const StockBalancePage({super.key});
@@ -133,7 +134,7 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
             child: IconButton(
               icon: Icon(Icons.warning_amber_rounded,
                   color: _showLowStockOnly
-                      ? const Color(0xFFFF9D45)
+                      ? AppTheme.primaryLight
                       : null),
               onPressed: () =>
                   setState(() => _showLowStockOnly = !_showLowStockOnly),
@@ -846,7 +847,7 @@ class _SortableHeader extends StatelessWidget {
               Text(label,
                   style: TextStyle(
                       color: isActive
-                          ? const Color(0xFFFF9D45)
+                          ? AppTheme.primaryLight
                           : Colors.white70,
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -860,7 +861,7 @@ class _SortableHeader extends StatelessWidget {
                     : Icons.unfold_more,
                 size: 13,
                 color: isActive
-                    ? const Color(0xFFFF9D45)
+                    ? AppTheme.primaryLight
                     : Colors.white38,
               ),
             ],

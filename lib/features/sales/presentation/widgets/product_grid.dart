@@ -27,28 +27,64 @@ class _ViewModeNotifier extends Notifier<ProductViewMode> {
 
 enum ProductViewMode { grid, list }
 
-// ── Helper: เลือกราคาตาม priceLevel (1-5), fallback = priceLevel1 ──
-double getPriceByLevel(ProductModel product, int level) {
+// ─────────────────────────────────────────────────────────────────
+// Helper: เลือกราคาตาม priceLevel (1-5)
+//
+// ✅ คืนค่า PriceLookupResult เพื่อให้ UI รู้ว่า fallback เกิดขึ้นหรือไม่
+// → ถ้า fallback = true: แสดง warning badge แจ้ง cashier
+//   "ราคา Lv.X ไม่ได้ตั้งค่า ใช้ราคาปกติ"
+// → ไม่ fallback เงียบๆ อีกต่อไป เพื่อป้องกันการเก็บเงินผิด
+// ─────────────────────────────────────────────────────────────────
+class PriceLookupResult {
+  final double price;
+  final bool isFallback; // true = ใช้ราคา Lv.1 แทนเพราะ Lv.X = 0
+  final int requestedLevel;
+
+  const PriceLookupResult({
+    required this.price,
+    required this.isFallback,
+    required this.requestedLevel,
+  });
+}
+
+PriceLookupResult getPriceByLevel(ProductModel product, int level) {
   switch (level) {
     case 2:
-      return product.priceLevel2 > 0
-          ? product.priceLevel2
-          : product.priceLevel1;
+      if (product.priceLevel2 > 0) {
+        return PriceLookupResult(
+            price: product.priceLevel2,
+            isFallback: false,
+            requestedLevel: level);
+      }
     case 3:
-      return product.priceLevel3 > 0
-          ? product.priceLevel3
-          : product.priceLevel1;
+      if (product.priceLevel3 > 0) {
+        return PriceLookupResult(
+            price: product.priceLevel3,
+            isFallback: false,
+            requestedLevel: level);
+      }
     case 4:
-      return product.priceLevel4 > 0
-          ? product.priceLevel4
-          : product.priceLevel1;
+      if (product.priceLevel4 > 0) {
+        return PriceLookupResult(
+            price: product.priceLevel4,
+            isFallback: false,
+            requestedLevel: level);
+      }
     case 5:
-      return product.priceLevel5 > 0
-          ? product.priceLevel5
-          : product.priceLevel1;
-    default:
-      return product.priceLevel1;
+      if (product.priceLevel5 > 0) {
+        return PriceLookupResult(
+            price: product.priceLevel5,
+            isFallback: false,
+            requestedLevel: level);
+      }
   }
+
+  // ✅ Fallback → priceLevel1 แต่ flag isFallback = true เพื่อแจ้ง cashier
+  return PriceLookupResult(
+    price: product.priceLevel1,
+    isFallback: level > 1, // fallback เฉพาะตอนขอ Lv.2-5 แต่ไม่มีราคา
+    requestedLevel: level,
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -109,7 +145,6 @@ class _ProductToolbar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // ✅ แสดง price level badge เมื่อลูกค้ามี priceLevel > 1
     final priceLevel = ref.watch(cartProvider).customerPriceLevel;
     final customerName = ref.watch(cartProvider).customerName;
     final hasSpecialPrice = priceLevel > 1;
@@ -124,8 +159,7 @@ class _ProductToolbar extends ConsumerWidget {
         children: [
           // Count chip
           Container(
-            padding: const EdgeInsets.symmetric(
-                horizontal: 10, vertical: 3),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
             decoration: BoxDecoration(
               color: _navy.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(12),
@@ -140,24 +174,22 @@ class _ProductToolbar extends ConsumerWidget {
             ),
           ),
 
-          // ✅ Price level badge — แสดงเมื่อลูกค้าเป็นสมาชิก
+          // ✅ Price level badge
           if (hasSpecialPrice) ...[
             const SizedBox(width: 8),
             Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 8, vertical: 3),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
                 color: _success.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                    color: _success.withValues(alpha: 0.4)),
+                border: Border.all(color: _success.withValues(alpha: 0.4)),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.loyalty,
-                      size: 11,
-                      color: _success.withValues(alpha: 0.8)),
+                      size: 11, color: _success.withValues(alpha: 0.8)),
                   const SizedBox(width: 4),
                   Text(
                     'ราคา Lv.$priceLevel · ${customerName ?? ''}',
@@ -231,8 +263,8 @@ class _ToggleBtn extends StatelessWidget {
         borderRadius: BorderRadius.circular(6),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
-          padding: const EdgeInsets.symmetric(
-              horizontal: 10, vertical: 6),
+          padding:
+              const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
             color: active ? _orange : Colors.transparent,
             borderRadius: BorderRadius.circular(6),
@@ -249,8 +281,7 @@ class _ToggleBtn extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// _ProductImage — แสดงรูปจาก path หรือ placeholder ถ้าไม่มีรูป
-// size = 0 → ขยายเต็ม parent / size > 0 → fixed
+// _ProductImage
 // ─────────────────────────────────────────────────────────────────
 class _ProductImage extends StatelessWidget {
   final String? imagePath;
@@ -268,8 +299,8 @@ class _ProductImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasImage = imagePath != null && imagePath!.isNotEmpty;
-    final file     = hasImage ? File(imagePath!) : null;
-    final exists   = file != null && file.existsSync();
+    final file = hasImage ? File(imagePath!) : null;
+    final exists = file != null && file.existsSync();
 
     Widget content;
     if (hasImage && exists) {
@@ -285,9 +316,7 @@ class _ProductImage extends StatelessWidget {
       content = _placeholder();
     }
 
-    if (_isExpand) {
-      return SizedBox.expand(child: content);
-    }
+    if (_isExpand) return SizedBox.expand(child: content);
     return SizedBox(width: size, height: size, child: content);
   }
 
@@ -310,7 +339,7 @@ class _ProductImage extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// GRID VIEW — responsive columns
+// GRID VIEW
 // ─────────────────────────────────────────────────────────────────
 class _GridView extends ConsumerWidget {
   final List<ProductModel> products;
@@ -345,7 +374,7 @@ class _GridView extends ConsumerWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// LIST VIEW — compact row
+// LIST VIEW
 // ─────────────────────────────────────────────────────────────────
 class _ListViewContent extends ConsumerWidget {
   final List<ProductModel> products;
@@ -373,10 +402,12 @@ class _ProductGridCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // ✅ watch priceLevel → rebuild เมื่อลูกค้าเปลี่ยน
-    final priceLevel  = ref.watch(cartProvider).customerPriceLevel;
-    final unitPrice   = getPriceByLevel(product, priceLevel);
-    final hasDiscount = priceLevel > 1 && unitPrice < product.priceLevel1;
+    final priceLevel = ref.watch(cartProvider).customerPriceLevel;
+    final lookup = getPriceByLevel(product, priceLevel);
+    final unitPrice = lookup.price;
+    final hasDiscount = priceLevel > 1 &&
+        !lookup.isFallback &&
+        unitPrice < product.priceLevel1;
 
     const nameColor = Color(0xFF1A1A1A);
     const codeColor = AppTheme.subtextColor;
@@ -392,17 +423,46 @@ class _ProductGridCard extends ConsumerWidget {
         borderRadius: BorderRadius.circular(10),
         hoverColor: _orange.withValues(alpha: 0.06),
         splashColor: _orange.withValues(alpha: 0.12),
-        onTap: () => _addToCart(context, ref, unitPrice),
+        onTap: () => _addToCart(context, ref, lookup),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // รูปสินค้า
             Expanded(
-              child: _ProductImage(
-                imagePath: product.imagePath,
-                size: 0,
-                borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(10)),
+              child: Stack(
+                children: [
+                  _ProductImage(
+                    imagePath: product.imagePath,
+                    size: 0,
+                    borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(10)),
+                  ),
+                  // ✅ Warning badge: ราคา Lv.X ยังไม่ได้ตั้งค่า
+                  if (lookup.isFallback)
+                    Positioned(
+                      top: 4,
+                      right: 4,
+                      child: Tooltip(
+                        message:
+                            'ราคา Lv.${lookup.requestedLevel} ยังไม่ได้ตั้งค่า\nใช้ราคาปกติ (Lv.1) แทน',
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 5, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.shade700,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            'ราคาปกติ',
+                            style: TextStyle(
+                                fontSize: 8,
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
 
@@ -412,11 +472,9 @@ class _ProductGridCard extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    product.productCode,
-                    style: const TextStyle(
-                        fontSize: 10, color: codeColor),
-                  ),
+                  Text(product.productCode,
+                      style:
+                          const TextStyle(fontSize: 10, color: codeColor)),
                   const SizedBox(height: 2),
                   Text(
                     product.productName,
@@ -430,10 +488,8 @@ class _ProductGridCard extends ConsumerWidget {
                   ),
                   const SizedBox(height: 4),
                   Row(
-                    mainAxisAlignment:
-                        MainAxisAlignment.spaceBetween,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // ✅ แสดงราคาเดิมขีดทับถ้ามีราคาพิเศษ
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -443,8 +499,7 @@ class _ProductGridCard extends ConsumerWidget {
                               style: const TextStyle(
                                 fontSize: 10,
                                 color: AppTheme.textSub,
-                                decoration:
-                                    TextDecoration.lineThrough,
+                                decoration: TextDecoration.lineThrough,
                               ),
                             ),
                           Text(
@@ -452,10 +507,11 @@ class _ProductGridCard extends ConsumerWidget {
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
-                              // ✅ สีเขียวถ้าราคาพิเศษ, สีปกติถ้าไม่มี
-                              color: hasDiscount
-                                  ? _success
-                                  : _info,
+                              color: lookup.isFallback
+                                  ? Colors.orange.shade700
+                                  : hasDiscount
+                                      ? _success
+                                      : _info,
                             ),
                           ),
                         ],
@@ -481,28 +537,53 @@ class _ProductGridCard extends ConsumerWidget {
   }
 
   void _addToCart(
-      BuildContext context, WidgetRef ref, double unitPrice) {
+      BuildContext context, WidgetRef ref, PriceLookupResult lookup) {
+    // ✅ ถ้า fallback → แจ้ง cashier ก่อนเพิ่ม
+    if (lookup.isFallback) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '⚠ ราคา Lv.${lookup.requestedLevel} ยังไม่ได้ตั้งค่า '
+            '— ใช้ราคาปกติ ฿${lookup.price.toStringAsFixed(2)}',
+          ),
+          backgroundColor: Colors.orange.shade700,
+          duration: const Duration(seconds: 3),
+          behavior: SnackBarBehavior.floating,
+          width: 380,
+        ),
+      );
+    }
+
     ref.read(cartProvider.notifier).addItem(
-      productId: product.productId,
-      productCode: product.productCode,
-      productName: product.productName,
-      unit: product.baseUnit,
-      unitPrice: unitPrice, // ✅ ราคาตาม priceLevel
-    );
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('เพิ่ม ${product.productName} แล้ว'),
-        duration: const Duration(milliseconds: 500),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: _success,
-        width: 300,
-      ),
-    );
+          productId: product.productId,
+          productCode: product.productCode,
+          productName: product.productName,
+          unit: product.baseUnit,
+          unitPrice: lookup.price,
+          // ✅ ส่งราคาทุก level เก็บไว้ใน CartItem เพื่อ re-price ได้
+          priceLevel1: product.priceLevel1,
+          priceLevel2: product.priceLevel2,
+          priceLevel3: product.priceLevel3,
+          priceLevel4: product.priceLevel4,
+          priceLevel5: product.priceLevel5,
+        );
+
+    if (!lookup.isFallback) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('เพิ่ม ${product.productName} แล้ว'),
+          duration: const Duration(milliseconds: 500),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: _success,
+          width: 300,
+        ),
+      );
+    }
   }
 }
 
 // ─────────────────────────────────────────────────────────────────
-// List Row — compact single line
+// List Row
 // ─────────────────────────────────────────────────────────────────
 class _ProductListRow extends ConsumerWidget {
   final ProductModel product;
@@ -515,27 +596,36 @@ class _ProductListRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // ✅ watch priceLevel → rebuild เมื่อลูกค้าเปลี่ยน
-    final priceLevel  = ref.watch(cartProvider).customerPriceLevel;
-    final unitPrice   = getPriceByLevel(product, priceLevel);
-    final hasDiscount = priceLevel > 1 && unitPrice < product.priceLevel1;
+    final priceLevel = ref.watch(cartProvider).customerPriceLevel;
+    final lookup = getPriceByLevel(product, priceLevel);
+    final unitPrice = lookup.price;
+    final hasDiscount = priceLevel > 1 &&
+        !lookup.isFallback &&
+        unitPrice < product.priceLevel1;
 
     return InkWell(
-      onTap: () => _addToCart(context, ref, unitPrice),
+      onTap: () => _addToCart(context, ref, lookup),
       hoverColor: _orange.withValues(alpha: 0.05),
       child: Container(
         margin: const EdgeInsets.only(bottom: 2),
-        padding: const EdgeInsets.symmetric(
-            horizontal: 12, vertical: 9),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
         decoration: BoxDecoration(
-          color: isEven ? Colors.white : const Color(0xFFF9F9F7),
+          // ✅ พื้นหลังสีส้มอ่อนถ้า fallback เพื่อให้ cashier สังเกตเห็น
+          color: lookup.isFallback
+              ? Colors.orange.shade50
+              : isEven
+                  ? Colors.white
+                  : const Color(0xFFF9F9F7),
           borderRadius: BorderRadius.circular(6),
           border: Border.all(
-              color: _border.withValues(alpha: 0.6)),
+            color: lookup.isFallback
+                ? Colors.orange.shade200
+                : _border.withValues(alpha: 0.6),
+          ),
         ),
         child: Row(
           children: [
-            // รูปสินค้า
             _ProductImage(
               imagePath: product.imagePath,
               size: 40,
@@ -543,7 +633,6 @@ class _ProductListRow extends ConsumerWidget {
             ),
             const SizedBox(width: 10),
 
-            // Name + Code
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -557,17 +646,40 @@ class _ProductListRow extends ConsumerWidget {
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
-                  Text(
-                    product.productCode,
-                    style: const TextStyle(
-                        fontSize: 11,
-                        color: AppTheme.subtextColor),
+                  Row(
+                    children: [
+                      Text(
+                        product.productCode,
+                        style: const TextStyle(
+                            fontSize: 11,
+                            color: AppTheme.subtextColor),
+                      ),
+                      // ✅ Warning label ในแถว
+                      if (lookup.isFallback) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 4, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.shade700,
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                          child: Text(
+                            'Lv.${lookup.requestedLevel} ไม่มีราคา',
+                            style: const TextStyle(
+                                fontSize: 8,
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ],
               ),
             ),
 
-            // ✅ Price — แสดงราคาเดิมขีดทับถ้ามีราคาพิเศษ
+            // Price
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -585,7 +697,11 @@ class _ProductListRow extends ConsumerWidget {
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
-                    color: hasDiscount ? _success : _info,
+                    color: lookup.isFallback
+                        ? Colors.orange.shade700
+                        : hasDiscount
+                            ? _success
+                            : _info,
                   ),
                 ),
               ],
@@ -594,7 +710,7 @@ class _ProductListRow extends ConsumerWidget {
 
             // Add button
             InkWell(
-              onTap: () => _addToCart(context, ref, unitPrice),
+              onTap: () => _addToCart(context, ref, lookup),
               borderRadius: BorderRadius.circular(6),
               child: Container(
                 padding: const EdgeInsets.all(6),
@@ -602,8 +718,7 @@ class _ProductListRow extends ConsumerWidget {
                   color: _orange,
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: const Icon(Icons.add,
-                    size: 14, color: Colors.white),
+                child: const Icon(Icons.add, size: 14, color: Colors.white),
               ),
             ),
           ],
@@ -613,22 +728,46 @@ class _ProductListRow extends ConsumerWidget {
   }
 
   void _addToCart(
-      BuildContext context, WidgetRef ref, double unitPrice) {
+      BuildContext context, WidgetRef ref, PriceLookupResult lookup) {
+    if (lookup.isFallback) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '⚠ ราคา Lv.${lookup.requestedLevel} ยังไม่ได้ตั้งค่า '
+            '— ใช้ราคาปกติ ฿${lookup.price.toStringAsFixed(2)}',
+          ),
+          backgroundColor: Colors.orange.shade700,
+          duration: const Duration(seconds: 3),
+          behavior: SnackBarBehavior.floating,
+          width: 380,
+        ),
+      );
+    }
+
     ref.read(cartProvider.notifier).addItem(
-      productId: product.productId,
-      productCode: product.productCode,
-      productName: product.productName,
-      unit: product.baseUnit,
-      unitPrice: unitPrice, // ✅ ราคาตาม priceLevel
-    );
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('เพิ่ม ${product.productName} แล้ว'),
-        duration: const Duration(milliseconds: 500),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: _success,
-        width: 300,
-      ),
-    );
+          productId: product.productId,
+          productCode: product.productCode,
+          productName: product.productName,
+          unit: product.baseUnit,
+          unitPrice: lookup.price,
+          // ✅ ส่งราคาทุก level เก็บไว้ใน CartItem เพื่อ re-price ได้
+          priceLevel1: product.priceLevel1,
+          priceLevel2: product.priceLevel2,
+          priceLevel3: product.priceLevel3,
+          priceLevel4: product.priceLevel4,
+          priceLevel5: product.priceLevel5,
+        );
+
+    if (!lookup.isFallback) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('เพิ่ม ${product.productName} แล้ว'),
+          duration: const Duration(milliseconds: 500),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: _success,
+          width: 300,
+        ),
+      );
+    }
   }
 }
