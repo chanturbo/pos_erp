@@ -8,7 +8,6 @@ import '../providers/cart_provider.dart';
 import '../widgets/product_grid.dart';
 import '../widgets/cart_panel.dart';
 import '../widgets/customer_selector_dialog.dart';
-import '../widgets/discount_dialog.dart';
 import '../widgets/hold_orders_dialog.dart';
 import '../../../../shared/services/mobile_scanner_service.dart'; // ✅ Phase 5
 import '../../../../shared/widgets/barcode_listener.dart';        // ✅ USB Scanner
@@ -375,24 +374,6 @@ class _PosPageState extends ConsumerState<PosPage> {
                     ),
                   ),
                 ),
-
-              // Discount Button
-              IconButton(
-                icon: const Icon(Icons.discount_outlined),
-                tooltip: 'ส่วนลด',
-                onPressed: () async {
-                  final result = await showDialog<Map<String, double>>(
-                    context: context,
-                    builder: (_) => const DiscountDialog(),
-                  );
-                  if (result != null) {
-                    ref.read(cartProvider.notifier).setDiscount(
-                      percent: result['percent'],
-                      amount: result['amount'],
-                    );
-                  }
-                },
-              ),
 
               // Hold Orders Button
               Stack(

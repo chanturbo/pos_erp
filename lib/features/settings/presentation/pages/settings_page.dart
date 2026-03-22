@@ -24,6 +24,8 @@ class SettingsState {
   final bool enableLoyalty;
   final double pointsPerBaht;   // ทุกกี่บาท ได้ 1 แต้ม
   final double pointValue;      // 1 แต้ม = กี่บาท (สำหรับแลก)
+  // ✅ PromptPay
+  final String promptPayId;
 
   SettingsState({
     this.companyName          = 'บริษัท ทดสอบ POS จำกัด',
@@ -37,6 +39,7 @@ class SettingsState {
     this.enableLoyalty        = true,
     this.pointsPerBaht        = 100.0,
     this.pointValue           = 1.0,
+    this.promptPayId          = '',
   });
 
   SettingsState copyWith({
@@ -51,6 +54,7 @@ class SettingsState {
     bool?   enableLoyalty,
     double? pointsPerBaht,
     double? pointValue,
+    String? promptPayId,
   }) {
     return SettingsState(
       companyName:         companyName         ?? this.companyName,
@@ -64,6 +68,7 @@ class SettingsState {
       enableLoyalty:       enableLoyalty       ?? this.enableLoyalty,
       pointsPerBaht:       pointsPerBaht       ?? this.pointsPerBaht,
       pointValue:          pointValue          ?? this.pointValue,
+      promptPayId:         promptPayId         ?? this.promptPayId,
     );
   }
 }
@@ -74,38 +79,46 @@ class SettingsState {
 class SettingsNotifier extends Notifier<SettingsState> {
   @override
   SettingsState build() {
-    _loadSettings();
+    // ✅ โหลดค่าจาก SharedPreferences หลัง build เสร็จ
+    Future.microtask(() => _loadSettings());
     return SettingsState();
   }
 
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
     state = state.copyWith(
-      companyName:         prefs.getString('company_name'),
-      taxId:               prefs.getString('tax_id'),
-      address:             prefs.getString('address'),
-      phone:               prefs.getString('phone'),
-      vatRate:             prefs.getDouble('vat_rate'),
-      enableVat:           prefs.getBool('enable_vat'),
-      enableLowStockAlert: prefs.getBool('enable_low_stock_alert'),
-      lowStockThreshold:   prefs.getInt('low_stock_threshold'),
-      enableLoyalty:       prefs.getBool('enable_loyalty'),
-      pointsPerBaht:       prefs.getDouble('points_per_baht'),
-      pointValue:          prefs.getDouble('point_value'),
+      // ✅ ใช้ ?? เพื่อไม่ overwrite default ด้วย null
+      companyName:         prefs.getString('company_name')         ?? state.companyName,
+      taxId:               prefs.getString('tax_id')               ?? state.taxId,
+      address:             prefs.getString('address')              ?? state.address,
+      phone:               prefs.getString('phone')                ?? state.phone,
+      vatRate:             prefs.getDouble('vat_rate')             ?? state.vatRate,
+      enableVat:           prefs.getBool('enable_vat')             ?? state.enableVat,
+      enableLowStockAlert: prefs.getBool('enable_low_stock_alert') ?? state.enableLowStockAlert,
+      lowStockThreshold:   prefs.getInt('low_stock_threshold')     ?? state.lowStockThreshold,
+      enableLoyalty:       prefs.getBool('enable_loyalty')         ?? state.enableLoyalty,
+      pointsPerBaht:       prefs.getDouble('points_per_baht')      ?? state.pointsPerBaht,
+      pointValue:          prefs.getDouble('point_value')          ?? state.pointValue,
+      promptPayId:         prefs.getString('promptpay_id')         ?? state.promptPayId,
     );
   }
 
   Future<void> updateCompanyInfo({
     String? companyName, String? taxId,
-    String? address,    String? phone,
+    String? address,     String? phone,
+    String? promptPayId,
   }) async {
     final prefs = await SharedPreferences.getInstance();
-    if (companyName != null) await prefs.setString('company_name', companyName);
-    if (taxId       != null) await prefs.setString('tax_id', taxId);
-    if (address     != null) await prefs.setString('address', address);
-    if (phone       != null) await prefs.setString('phone', phone);
-    state = state.copyWith(companyName: companyName, taxId: taxId,
-        address: address, phone: phone);
+    if (companyName  != null) await prefs.setString('company_name', companyName);
+    if (taxId        != null) await prefs.setString('tax_id', taxId);
+    if (address      != null) await prefs.setString('address', address);
+    if (phone        != null) await prefs.setString('phone', phone);
+    if (promptPayId  != null) await prefs.setString('promptpay_id', promptPayId);
+    state = state.copyWith(
+      companyName: companyName, taxId: taxId,
+      address: address, phone: phone,
+      promptPayId: promptPayId,
+    );
   }
 
   Future<void> updateVatSettings({double? vatRate, bool? enableVat}) async {
@@ -175,19 +188,40 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   late TextEditingController _lowStockThresholdController;
   late TextEditingController _pointsPerBahtController;
   late TextEditingController _pointValueController;
+  late TextEditingController _promptPayController; // ✅
 
   @override
   void initState() {
     super.initState();
-    final s = ref.read(settingsProvider);
-    _companyNameController       = TextEditingController(text: s.companyName);
-    _taxIdController             = TextEditingController(text: s.taxId);
-    _addressController           = TextEditingController(text: s.address);
-    _phoneController             = TextEditingController(text: s.phone);
-    _vatRateController           = TextEditingController(text: s.vatRate.toString());
-    _lowStockThresholdController = TextEditingController(text: s.lowStockThreshold.toString());
-    _pointsPerBahtController     = TextEditingController(text: s.pointsPerBaht.toStringAsFixed(0));
-    _pointValueController        = TextEditingController(text: s.pointValue.toStringAsFixed(2));
+    // init ด้วยค่า default ก่อน (state ยังโหลดไม่เสร็จ)
+    _companyNameController       = TextEditingController();
+    _taxIdController             = TextEditingController();
+    _addressController           = TextEditingController();
+    _phoneController             = TextEditingController();
+    _vatRateController           = TextEditingController();
+    _lowStockThresholdController = TextEditingController();
+    _pointsPerBahtController     = TextEditingController();
+    _pointValueController        = TextEditingController();
+    _promptPayController         = TextEditingController();
+
+    // ✅ รอ state โหลดเสร็จแล้วค่อย sync ค่าเข้า controllers
+    Future.microtask(() {
+      if (!mounted) return;
+      _syncControllers(ref.read(settingsProvider));
+    });
+  }
+
+  /// ✅ Sync ค่าจาก SettingsState เข้า controllers ทั้งหมด
+  void _syncControllers(SettingsState s) {
+    _companyNameController.text       = s.companyName;
+    _taxIdController.text             = s.taxId;
+    _addressController.text           = s.address;
+    _phoneController.text             = s.phone;
+    _vatRateController.text           = s.vatRate.toString();
+    _lowStockThresholdController.text = s.lowStockThreshold.toString();
+    _pointsPerBahtController.text     = s.pointsPerBaht.toStringAsFixed(0);
+    _pointValueController.text        = s.pointValue.toStringAsFixed(2);
+    _promptPayController.text         = s.promptPayId;
   }
 
   @override
@@ -200,6 +234,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     _lowStockThresholdController.dispose();
     _pointsPerBahtController.dispose();
     _pointValueController.dispose();
+    _promptPayController.dispose(); // ✅
     super.dispose();
   }
 
@@ -208,6 +243,23 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final settings   = ref.watch(settingsProvider);
     final themeMode  = ref.watch(themeModeProvider);
     final isDark     = Theme.of(context).brightness == Brightness.dark;
+
+    // ✅ เมื่อ state โหลดเสร็จจาก SharedPreferences → sync controllers
+    ref.listen<SettingsState>(settingsProvider, (previous, next) {
+      // sync เฉพาะรอบแรกที่ข้อมูลโหลดมา (controller ยังว่างอยู่)
+      if (previous != null &&
+          previous.promptPayId != next.promptPayId &&
+          _promptPayController.text.isEmpty) {
+        _syncControllers(next);
+      }
+      // sync ถ้า companyName เปลี่ยนจาก default → ค่าจริง
+      if (previous != null &&
+          previous.companyName == 'บริษัท ทดสอบ POS จำกัด' &&
+          next.companyName != previous.companyName &&
+          _companyNameController.text == 'บริษัท ทดสอบ POS จำกัด') {
+        _syncControllers(next);
+      }
+    });
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF1A1A1A) : const Color(0xFFF5F5F5),
@@ -371,6 +423,19 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         _field(_addressController, 'ที่อยู่', Icons.location_on, style, maxLines: 2),
         const SizedBox(height: 12),
         _field(_phoneController, 'เบอร์โทรศัพท์', Icons.phone, style),
+        const SizedBox(height: 12),
+        // ✅ PromptPay
+        TextField(
+          controller: _promptPayController,
+          keyboardType: TextInputType.number,
+          style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+          decoration: style.copyWith(
+            labelText: 'เลข PromptPay',
+            hintText: 'เบอร์โทร 10 หลัก หรือเลขประจำตัว 13 หลัก',
+            prefixIcon: const Icon(Icons.qr_code),
+            helperText: 'ใช้แสดง QR Code รับชำระเงินในหน้า POS',
+          ),
+        ),
         const SizedBox(height: 16),
         _saveButton(
           label: 'บันทึกข้อมูลบริษัท',
@@ -381,6 +446,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               taxId:       _taxIdController.text,
               address:     _addressController.text,
               phone:       _phoneController.text,
+              promptPayId: _promptPayController.text.trim(), // ✅
             );
             if (mounted) _showSuccess('บันทึกข้อมูลบริษัทสำเร็จ');
           },
@@ -533,7 +599,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     'ทุก ฿${settings.pointsPerBaht.toStringAsFixed(0)} ได้ 1 แต้ม  '
                     '•  1 แต้ม = ฿${settings.pointValue.toStringAsFixed(2)}',
                     style: const TextStyle(
-                        color: AppTheme.primary,
+                        color: Colors.white,
                         fontSize: 13,
                         fontWeight: FontWeight.w500),
                   ),

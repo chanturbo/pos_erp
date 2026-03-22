@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'; // ✅ เพิ่ม
 import 'package:drift/drift.dart' hide Column;
 import 'package:intl/date_symbol_data_local.dart';
 import 'core/config/app_mode.dart';
@@ -124,12 +125,19 @@ class MyApp extends ConsumerWidget {
           themeMode: themeMode,           // 🌙
           debugShowCheckedModeBanner: false,
 
-          // ✅ ใช้ '/' เสมอ — _RootRedirect จะ redirect ตาม auth state
-          // สาเหตุ: MaterialApp push '/' เข้า stack อัตโนมัติเมื่อ
-          // initialRoute ไม่ใช่ '/' ทำให้เกิด "no route defined for /"
-          // เมื่อกด back จาก PosPage
-          initialRoute: AppRouter.root,
+          // ✅ Localization — จำเป็นสำหรับ showDatePicker / DatePickerDialog
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: const [
+            Locale('th', 'TH'),
+            Locale('en', 'US'),
+          ],
+          locale: const Locale('th', 'TH'),
 
+          initialRoute: AppRouter.root,
           onGenerateRoute: AppRouter.generateRoute,
         );
       },

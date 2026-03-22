@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/cart_provider.dart';
 import '../pages/payment_page.dart';
+import '../widgets/discount_dialog.dart';
 import '../../../products/presentation/providers/product_provider.dart'; // ✅ scan เพิ่มสินค้า
 import '../../../../shared/services/mobile_scanner_service.dart';        // ✅ MobileScannerService
 import '../../../../shared/theme/app_theme.dart';
@@ -20,12 +21,49 @@ const _info    = AppTheme.infoColor;
 // ─────────────────────────────────────────────────────────────────
 // CartPanel
 // ─────────────────────────────────────────────────────────────────
-class CartPanel extends ConsumerWidget {
+class CartPanel extends ConsumerStatefulWidget {
   const CartPanel({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CartPanel> createState() => _CartPanelState();
+}
+
+class _CartPanelState extends ConsumerState<CartPanel> {
+  final _scrollController = ScrollController();
+  int _prevItemCount = 0;
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  // ── เลื่อน scroll ไปที่รายการล่าสุด ──────────────────────────
+  void _scrollToBottom() {
+    // ถ้า scroll ไม่ได้ (content ยังไม่เกิน viewport) → ไม่ต้องทำ
+    if (!_scrollController.hasClients) return;
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    if (maxScroll <= 0) return;
+
+    _scrollController.animateTo(
+      maxScroll,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOut,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final cartState = ref.watch(cartProvider);
+
+    // ดักจับเมื่อจำนวน item เพิ่มขึ้น → scroll ลงล่าง
+    // ใช้ addPostFrameCallback เพื่อรอให้ ListView render ก่อน
+    if (cartState.items.length > _prevItemCount) {
+      _prevItemCount = cartState.items.length;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+    } else {
+      _prevItemCount = cartState.items.length;
+    }
 
     return Container(
       decoration: const BoxDecoration(
@@ -33,7 +71,7 @@ class CartPanel extends ConsumerWidget {
         border: Border(left: BorderSide(color: _border)),
         borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
       ),
-      clipBehavior: Clip.antiAlias, // ✅ ตัดมุมของ children ให้มนตาม borderRadius
+      clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
           // ── Header ──────────────────────────────────────────
@@ -44,8 +82,7 @@ class CartPanel extends ConsumerWidget {
                 : () => ref.read(cartProvider.notifier).clear(),
           ),
 
-          // ── Scan Row — Search field + ปุ่มสแกน ─────────────
-          // row แยกข้างบนรายการ: [🔍 barcode input] [🔲 สแกน]
+          // ── Scan Row ─────────────────────────────────────────
           _ScanRow(ref: ref),
 
           // ── Column labels ────────────────────────────────────
@@ -56,6 +93,7 @@ class CartPanel extends ConsumerWidget {
             child: cartState.items.isEmpty
                 ? const _EmptyCart()
                 : ListView.builder(
+                    controller: _scrollController,
                     padding: EdgeInsets.zero,
                     itemCount: cartState.items.length,
                     itemBuilder: (_, i) => _CartRow(
@@ -167,12 +205,23 @@ class _ScanRow extends ConsumerStatefulWidget {
 }
 
 class _ScanRowState extends ConsumerState<_ScanRow> {
-  final _ctrl = TextEditingController();
-  String _query = '';
+  final _ctrl      = TextEditingController();
+  final _focusNode = FocusNode();
+  String _query    = '';
+
+  @override
+  void initState() {
+    super.initState();
+    // Focus ทันทีที่ widget mount (เปิดหน้า POS)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focusNode.requestFocus();
+    });
+  }
 
   @override
   void dispose() {
     _ctrl.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -199,9 +248,10 @@ class _ScanRowState extends ConsumerState<_ScanRow> {
       unitPrice:   match.priceLevel1,
     );
 
-    // ล้าง field หลังเพิ่มสำเร็จ
+    // ล้าง field + focus กลับทันที (พร้อมสแกนชิ้นถัดไป)
     _ctrl.clear();
     setState(() => _query = '');
+    _focusNode.requestFocus();
 
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -247,11 +297,19 @@ class _ScanRowState extends ConsumerState<_ScanRow> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark    = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : const Color(0xFF1A1A1A);
+    final hintColor = isDark ? AppTheme.darkElement.withValues(alpha: 0.6)
+                             : AppTheme.subtextColor;
+    final bgColor   = isDark ? AppTheme.darkCard   : Colors.white;
+    final iconColor = isDark ? Colors.white70       : AppTheme.subtextColor;
+    final borderColor = isDark ? const Color(0xFF333333) : _border;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: _border)),
+      decoration: BoxDecoration(
+        color: bgColor,
+        border: Border(bottom: BorderSide(color: borderColor)),
       ),
       child: Row(
         children: [
@@ -260,15 +318,16 @@ class _ScanRowState extends ConsumerState<_ScanRow> {
             child: SizedBox(
               height: 34,
               child: TextField(
-                controller: _ctrl,
+                controller:  _ctrl,
+                focusNode:   _focusNode,
+                autofocus:   true,
                 decoration: InputDecoration(
                   hintText: 'บาร์โค้ด / รหัสสินค้า...',
-                  hintStyle: const TextStyle(
-                      fontSize: 12, color: AppTheme.subtextColor),
-                  prefixIcon: const Icon(Icons.search, size: 16),
+                  hintStyle: TextStyle(fontSize: 12, color: hintColor),
+                  prefixIcon: Icon(Icons.search, size: 16, color: iconColor),
                   suffixIcon: _query.isNotEmpty
                       ? IconButton(
-                          icon: const Icon(Icons.clear, size: 14),
+                          icon: Icon(Icons.clear, size: 14, color: iconColor),
                           padding: EdgeInsets.zero,
                           onPressed: () {
                             _ctrl.clear();
@@ -278,16 +337,21 @@ class _ScanRowState extends ConsumerState<_ScanRow> {
                       : null,
                   isDense: true,
                   contentPadding: EdgeInsets.zero,
+                  filled: true,
+                  fillColor: isDark ? AppTheme.darkElement : Colors.white,
                   border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(6)),
+                      borderRadius: BorderRadius.circular(6),
+                      borderSide: BorderSide(color: borderColor)),
+                  enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(6),
+                      borderSide: BorderSide(color: borderColor)),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(6),
                     borderSide:
                         const BorderSide(color: _orange, width: 1.5),
                   ),
                 ),
-                style: const TextStyle(
-                    fontSize: 12, color: Color(0xFF1A1A1A)),
+                style: TextStyle(fontSize: 12, color: textColor),
                 onChanged: (v) => setState(() => _query = v),
                 onSubmitted: (v) async {
                   try {
@@ -673,12 +737,18 @@ class _CartSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark        = Theme.of(context).brightness == Brightness.dark;
     final totalFontSize = context.isMobile ? 18.0 : 20.0;
+    final bgColor       = isDark ? AppTheme.darkCard    : Colors.white;
+    final textColor     = isDark ? Colors.white         : const Color(0xFF1A1A1A);
+    final subTextColor  = isDark ? AppTheme.darkElement.withValues(alpha: 0.8) : Colors.grey;
+    final dividerColor  = isDark ? const Color(0xFF333333) : _border;
+    final disabledColor = isDark ? const Color(0xFF2A2A2A) : Colors.grey[300];
 
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: _border)),
+      decoration: BoxDecoration(
+        color: bgColor,
+        border: Border(top: BorderSide(color: dividerColor)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -687,39 +757,40 @@ class _CartSummary extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
             child: Column(
               children: [
-                // ✅ รักษา subtotal จากไฟล์เดิม
                 _SummaryRow(
                     label: 'รวม',
-                    value:
-                        '฿${cartState.subtotal.toStringAsFixed(2)}',
-                    valueColor: const Color(0xFF1A1A1A)), // ✅
+                    value: '฿${cartState.subtotal.toStringAsFixed(2)}',
+                    valueColor: textColor),
 
-                // ✅ รักษา totalDiscount จากไฟล์เดิม
                 if (cartState.totalDiscount > 0) ...[
                   const SizedBox(height: 3),
                   _SummaryRow(
                     label: 'ส่วนลด',
-                    value:
-                        '-฿${cartState.totalDiscount.toStringAsFixed(2)}',
+                    value: '-฿${cartState.totalDiscount.toStringAsFixed(2)}',
                     valueColor: _error,
                   ),
                 ],
 
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 6),
-                  child: Divider(height: 1, color: _border),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Divider(height: 1, color: dividerColor),
                 ),
 
-                // ✅ รักษา total จากไฟล์เดิม
                 Row(
-                  mainAxisAlignment:
-                      MainAxisAlignment.spaceBetween,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('ยอดชำระ',
+                    Text('ยอดชำระ',
                         style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF1A1A1A))), // ✅
+                            color: textColor)),
+
+                    // ── ปุ่มส่วนลด ─────────────────────────────
+                    _DiscountButton(
+                      cartState:  cartState,
+                      isDark:     isDark,
+                    ),
+
                     Text(
                       '฿${cartState.total.toStringAsFixed(2)}',
                       style: TextStyle(
@@ -742,29 +813,28 @@ class _CartSummary extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(
                     horizontal: 10, vertical: 3),
                 decoration: BoxDecoration(
-                  color: _navy.withValues(alpha: 0.06),
+                  color: isDark
+                      ? AppTheme.darkElement.withValues(alpha: 0.5)
+                      : _navy.withValues(alpha: 0.06),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Row(
-                  mainAxisAlignment:
-                      MainAxisAlignment.spaceBetween,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
                       '${cartState.itemCount} รายการ',
-                      style: const TextStyle(
-                          fontSize: 10, color: Colors.grey),
+                      style: TextStyle(fontSize: 10, color: subTextColor),
                     ),
                     Text(
                       'รวม ${cartState.items.fold<double>(0, (s, i) => s + i.quantity).toStringAsFixed(0)} ชิ้น',
-                      style: const TextStyle(
-                          fontSize: 10, color: Colors.grey),
+                      style: TextStyle(fontSize: 10, color: subTextColor),
                     ),
                   ],
                 ),
               ),
             ),
 
-          // ✅ ปุ่มชำระเงิน รักษา PaymentPage navigate จากไฟล์เดิม
+          // ปุ่มชำระเงิน
           Padding(
             padding: const EdgeInsets.all(10),
             child: SizedBox(
@@ -773,9 +843,12 @@ class _CartSummary extends StatelessWidget {
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: cartState.items.isEmpty
-                      ? Colors.grey[300]
+                      ? disabledColor
                       : _success,
                   foregroundColor: Colors.white,
+                  disabledForegroundColor: isDark
+                      ? Colors.white30
+                      : Colors.grey[500],
                   elevation: 0,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
@@ -839,6 +912,109 @@ class _SummaryRow extends StatelessWidget {
                 fontWeight: FontWeight.w500,
                 color: valueColor)),
       ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// _DiscountButton — ปุ่มส่วนลดในแถวยอดชำระ
+// • ตะกร้าว่าง           → ซ่อน
+// • ยังไม่มีส่วนลด       → ปุ่ม outline สีเทา "🏷 ส่วนลด"
+// • มีส่วนลดแล้ว         → badge สีส้ม แสดงค่า กดเพื่อแก้ไข/ลบ
+// ─────────────────────────────────────────────────────────────────
+class _DiscountButton extends ConsumerWidget {
+  final CartState cartState;
+  final bool      isDark;
+
+  const _DiscountButton({
+    required this.cartState,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // ตะกร้าว่าง → ซ่อนปุ่ม
+    if (cartState.items.isEmpty) return const SizedBox.shrink();
+
+    final hasDiscount = cartState.totalDiscount > 0;
+
+    // label แสดงค่าส่วนลดปัจจุบัน
+    String label;
+    if (!hasDiscount) {
+      label = 'ส่วนลด';
+    } else if (cartState.discountPercent != null &&
+        cartState.discountPercent! > 0) {
+      label = '${cartState.discountPercent!.toStringAsFixed(0)}%';
+    } else {
+      label = '-฿${cartState.totalDiscount.toStringAsFixed(0)}';
+    }
+
+    return Tooltip(
+      message: hasDiscount ? 'แก้ไข / ลบส่วนลด' : 'ตั้งส่วนลด',
+      child: InkWell(
+        onTap: () async {
+          final result = await showDialog<Map<String, double>>(
+            context: context,
+            builder: (_) => DiscountDialog(
+              currentPercent: cartState.discountPercent,
+              currentAmount:  cartState.discountAmount,
+            ),
+          );
+          if (result != null) {
+            ref.read(cartProvider.notifier).setDiscount(
+              percent: result['percent'],
+              amount:  result['amount'],
+            );
+          }
+        },
+        borderRadius: BorderRadius.circular(8),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: hasDiscount
+                ? _orange.withValues(alpha: 0.12)
+                : (isDark
+                    ? AppTheme.darkElement
+                    : const Color(0xFFF5F5F5)),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: hasDiscount
+                  ? _orange.withValues(alpha: 0.6)
+                  : (isDark
+                      ? const Color(0xFF444444)
+                      : AppTheme.borderColor),
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                hasDiscount
+                    ? Icons.local_offer
+                    : Icons.local_offer_outlined,
+                size: 13,
+                color: hasDiscount
+                    ? _orange
+                    : (isDark ? Colors.white54 : AppTheme.subtextColor),
+              ),
+              const SizedBox(width: 5),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: hasDiscount
+                      ? FontWeight.w700
+                      : FontWeight.w500,
+                  color: hasDiscount
+                      ? _orange
+                      : (isDark ? Colors.white54 : AppTheme.subtextColor),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

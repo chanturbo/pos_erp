@@ -21,6 +21,7 @@ class CustomerRoutes {
     router.get('/code/<code>', _getCustomerByCodeHandler);
     router.get('/member/<memberNo>', _getCustomerByMemberNoHandler);
     router.put('/<id>/points', _updatePointsHandler);
+    router.get('/<id>/orders', _getCustomerOrdersHandler); // ✅ ประวัติการซื้อ
 
     return router;
   }
@@ -544,6 +545,76 @@ class CustomerRoutes {
             'previous_points': currentPoints,
             'delta': action == 'add' ? delta : -delta,
             'new_points': newPoints,
+          },
+        }),
+        headers: {'Content-Type': 'application/json'},
+      );
+    } catch (e) {
+      return Response.internalServerError(
+        body: jsonEncode({'success': false, 'message': 'เกิดข้อผิดพลาด: $e'}),
+      );
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // GET /api/customers/:id/orders — ประวัติการซื้อของลูกค้า
+  // ─────────────────────────────────────────────────────────────
+  Future<Response> _getCustomerOrdersHandler(
+      Request request, String id) async {
+    try {
+      // ดึง orders เรียงจากใหม่ไปเก่า
+      final orders = await (db.select(db.salesOrders)
+            ..where((t) => t.customerId.equals(id))
+            ..orderBy([(t) => OrderingTerm.desc(t.orderDate)]))
+          .get();
+
+      final orderIds = orders.map((o) => o.orderId).toList();
+
+      // ดึง items ของทุก order พร้อมกัน
+      final Map<String, List<Map<String, dynamic>>> itemsMap = {};
+      if (orderIds.isNotEmpty) {
+        final allItems = await (db.select(db.salesOrderItems)
+              ..where((t) => t.orderId.isIn(orderIds))
+              ..orderBy([(t) => OrderingTerm.asc(t.lineNo)]))
+            .get();
+
+        for (final item in allItems) {
+          itemsMap.putIfAbsent(item.orderId, () => []);
+          itemsMap[item.orderId]!.add({
+            'item_id':         item.itemId,
+            'line_no':         item.lineNo,
+            'product_name':    item.productName,
+            'unit':            item.unit,
+            'quantity':        item.quantity,
+            'unit_price':      item.unitPrice,
+            'discount_amount': item.discountAmount,
+            'amount':          item.amount,
+          });
+        }
+      }
+
+      final totalSpent = orders.fold<double>(
+          0, (sum, o) => sum + o.totalAmount);
+
+      final data = orders.map((o) => {
+        'order_id':        o.orderId,
+        'order_no':        o.orderNo,
+        'order_date':      o.orderDate.toIso8601String(),
+        'payment_type':    o.paymentType,
+        'subtotal':        o.subtotal,
+        'discount_amount': o.discountAmount,
+        'total_amount':    o.totalAmount,
+        'status':          o.status,
+        'items':           itemsMap[o.orderId] ?? [],
+      }).toList();
+
+      return Response.ok(
+        jsonEncode({
+          'success': true,
+          'data': {
+            'orders':       data,
+            'total_orders': orders.length,
+            'total_spent':  totalSpent,
           },
         }),
         headers: {'Content-Type': 'application/json'},

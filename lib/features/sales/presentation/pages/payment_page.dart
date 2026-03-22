@@ -2,9 +2,12 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import '../../../../core/client/api_client.dart';
-
+import '../../../../core/utils/promptpay_utils.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../customers/presentation/providers/customer_provider.dart'; // ✅
+import '../../../settings/presentation/pages/settings_page.dart';
 import '../providers/cart_provider.dart';
 
 class PaymentPage extends ConsumerStatefulWidget {
@@ -41,7 +44,10 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
 
   @override
   Widget build(BuildContext context) {
-    final cartState = ref.watch(cartProvider);
+    final cartState   = ref.watch(cartProvider);
+    final settings    = ref.watch(settingsProvider);
+    final promptPayId = settings.promptPayId.trim();
+    final hasPromptPay = PromptPayUtils.isValidPromptPayId(promptPayId);
 
     return Scaffold(
       appBar: AppBar(title: const Text('ชำระเงิน')),
@@ -102,7 +108,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                       ButtonSegment(
                         value: 'TRANSFER',
                         label: Text('โอน'),
-                        icon: Icon(Icons.account_balance),
+                        icon: Icon(Icons.qr_code),
                       ),
                     ],
                     selected: {_paymentType},
@@ -192,6 +198,72 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                     ),
                   ],
 
+                  // ── โอน: QR PromptPay ──────────────────────────
+                  if (_paymentType == 'TRANSFER') ...[
+                    const SizedBox(height: 8),
+                    if (hasPromptPay)
+                      _PromptPayQrSection(
+                        promptPayId: promptPayId,
+                        amount: cartState.total,
+                      )
+                    else
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.orange[50],
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.orange.shade200),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.warning_amber_rounded,
+                                color: Colors.orange[700], size: 24),
+                            const SizedBox(width: 12),
+                            const Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('ยังไม่ได้ตั้งค่าเลข PromptPay',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13)),
+                                  SizedBox(height: 4),
+                                  Text(
+                                    'ไปที่ ตั้งค่า → ข้อมูลบริษัท → เลข PromptPay',
+                                    style: TextStyle(
+                                        fontSize: 11, color: Colors.black54),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // ── บัตร ───────────────────────────────────────────
+                  if (_paymentType == 'CARD') ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.blue[50],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.blue.shade200),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.credit_card, color: Colors.blue, size: 24),
+                          SizedBox(width: 12),
+                          Text('รูดบัตรที่เครื่อง EDC แล้วกดยืนยัน',
+                              style: TextStyle(fontSize: 13)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
                   const SizedBox(height: 32),
 
                   // ปุ่มชำระเงิน
@@ -212,9 +284,11 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                                 color: Colors.white,
                               ),
                             )
-                          : const Text(
-                              'ชำระเงิน',
-                              style: TextStyle(fontSize: 20),
+                          : Text(
+                              _paymentType == 'TRANSFER'
+                                  ? 'ยืนยันรับเงินโอนแล้ว'
+                                  : 'ชำระเงิน',
+                              style: const TextStyle(fontSize: 20),
                             ),
                     ),
                   ),
@@ -281,7 +355,11 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
             response.data is Map ? response.data as Map : {};
         final dataMap =
             responseData['data'] is Map ? responseData['data'] as Map : {};
-        final orderNo = dataMap['order_no'] as String? ?? '-';
+        final orderNo      = dataMap['order_no'] as String? ?? '-';
+        final earnedPoints = dataMap['earned_points'] as int? ?? 0;
+
+        // ✅ refresh customer list เพื่อให้ points อัพเดททันที
+        ref.read(customerListProvider.notifier).refresh();
 
         if (mounted) {
           await showDialog(
@@ -300,10 +378,27 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('เลขที่: $orderNo'),
-                  Text(
-                      'ยอดชำระ: ฿${cartState.total.toStringAsFixed(2)}'),
+                  Text('ยอดชำระ: ฿${cartState.total.toStringAsFixed(2)}'),
                   if (_paymentType == 'CASH')
                     Text('เงินทอน: ฿${_change.toStringAsFixed(2)}'),
+                  // ✅ แสดงแต้มที่ได้รับ
+                  if (earnedPoints > 0) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Icon(Icons.star,
+                            color: Colors.amber, size: 16),
+                        const SizedBox(width: 4),
+                        Text(
+                          'ได้รับ $earnedPoints แต้ม',
+                          style: const TextStyle(
+                            color: Colors.amber,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
               actions: [
@@ -382,5 +477,136 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
 
     // Fallback — generic message ไม่หลุด internal details
     return 'เกิดข้อผิดพลาด กรุณาลองใหม่หรือติดต่อผู้ดูแลระบบ';
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// _PromptPayQrSection — แสดง QR Code PromptPay แบบ Inline
+// ─────────────────────────────────────────────────────────────────
+class _PromptPayQrSection extends StatelessWidget {
+  final String promptPayId;
+  final double amount;
+
+  const _PromptPayQrSection({
+    required this.promptPayId,
+    required this.amount,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final qrData    = PromptPayUtils.generatePayload(promptPayId, amount);
+    final displayId = PromptPayUtils.formatDisplayId(promptPayId);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            decoration: const BoxDecoration(
+              color: Color(0xFF1565C0),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+            ),
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.qr_code_2, color: Colors.white, size: 20),
+                SizedBox(width: 8),
+                Text('PromptPay QR Code',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
+
+          // QR Image
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: QrImageView(
+              data: qrData,
+              version: QrVersions.auto,
+              size: 220,
+              backgroundColor: Colors.white,
+              errorCorrectionLevel: QrErrorCorrectLevel.M,
+            ),
+          ),
+
+          // Amount
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.blue[50],
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              children: [
+                const Text('ยอดที่ต้องชำระ',
+                    style: TextStyle(fontSize: 12, color: Colors.black54)),
+                const SizedBox(height: 4),
+                Text(
+                  '฿${amount.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1565C0)),
+                ),
+              ],
+            ),
+          ),
+
+          // PromptPay ID
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.phone, size: 14, color: Colors.black45),
+                const SizedBox(width: 6),
+                Text('PromptPay: $displayId',
+                    style: const TextStyle(fontSize: 13, color: Colors.black54)),
+              ],
+            ),
+          ),
+
+          // คำแนะนำ
+          Container(
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.grey[50],
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.info_outline, size: 14, color: Colors.black38),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'สแกน QR ด้วยแอปธนาคาร แล้วกด "ยืนยันรับเงินโอนแล้ว"',
+                    style: TextStyle(fontSize: 11, color: Colors.black45),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

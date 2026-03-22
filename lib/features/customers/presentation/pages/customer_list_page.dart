@@ -4,6 +4,7 @@ import 'package:pos_erp/features/customers/data/models/customer_model.dart';
 import '../../../../shared/pdf/pdf_report_button.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
 import '../providers/customer_provider.dart';
+import 'customer_detail_page.dart'; // ✅
 import 'customer_form_page.dart';
 import 'customer_pdf_report.dart';
 
@@ -86,6 +87,10 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
                 context,
                 MaterialPageRoute(builder: (_) => const CustomerFormPage()),
               );
+              // ✅ refresh หลังเพิ่มลูกค้าใหม่
+              if (context.mounted) {
+                ref.read(customerListProvider.notifier).refresh();
+              }
             },
           ),
 
@@ -234,6 +239,15 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
                                                   : _avatarColor(
                                                       c.customerName,
                                                     ),
+                                              // ✅ กดเพื่อดูรายละเอียด
+                                              onTap: () => Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (_) =>
+                                                      CustomerDetailPage(
+                                                          customer: c),
+                                                ),
+                                              ),
                                               onEdit: isSystem
                                                   ? null
                                                   : () async {
@@ -246,6 +260,10 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
                                                               ),
                                                         ),
                                                       );
+                                                      // ✅ refresh หลังแก้ไข
+                                                      if (context.mounted) {
+                                                        ref.read(customerListProvider.notifier).refresh();
+                                                      }
                                                     },
                                               onDelete: isSystem
                                                   ? null
@@ -524,6 +542,10 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
                               builder: (_) => CustomerFormPage(customer: c),
                             ),
                           );
+                          // ✅ refresh หลังแก้ไข
+                          if (context.mounted) {
+                            ref.read(customerListProvider.notifier).refresh();
+                          }
                         },
                       ),
                       const SizedBox(width: 4),
@@ -683,6 +705,10 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
                 context,
                 MaterialPageRoute(builder: (_) => const CustomerFormPage()),
               );
+              // ✅ refresh หลังเพิ่มลูกค้าใหม่
+              if (context.mounted) {
+                ref.read(customerListProvider.notifier).refresh();
+              }
             },
             icon: const Icon(Icons.add),
             label: const Text('เพิ่มลูกค้า'),
@@ -958,6 +984,7 @@ class _CustomerRow extends StatefulWidget {
   final bool isSystem;
   final List<double> colWidths; // ✅ รับความกว้างจาก parent
   final Color avatarColor;
+  final VoidCallback? onTap;   // ✅ เปิดหน้า detail
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
 
@@ -967,6 +994,7 @@ class _CustomerRow extends StatefulWidget {
     required this.isSystem,
     required this.colWidths,
     required this.avatarColor,
+    this.onTap,
     required this.onEdit,
     required this.onDelete,
   });
@@ -988,13 +1016,16 @@ class _CustomerRowState extends State<_CustomerRow> {
     final w = widget.colWidths;
 
     return MouseRegion(
+      cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 120),
-        color: _hovered ? AppTheme.primaryLight : Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Row(
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          color: _hovered ? AppTheme.primaryLight : Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
           children: [
             // ลำดับ (fixed)
             SizedBox(
@@ -1269,7 +1300,8 @@ class _CustomerRowState extends State<_CustomerRow> {
             ),
           ],
         ),
-      ),
+        ),  // AnimatedContainer
+      ),  // GestureDetector
     );
   }
 }

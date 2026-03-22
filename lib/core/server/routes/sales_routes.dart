@@ -297,11 +297,48 @@ class SalesRoutes {
 
       print('✅ Transaction committed: $orderNo');
 
+      // ✅ คำนวณและ update loyalty points (นอก transaction เพราะไม่ต้อง rollback)
+      final customerId = data['customer_id'] as String?;
+      final totalAmount = (data['total_amount'] as num?)?.toDouble() ?? 0;
+      int earnedPoints = 0;
+
+      if (customerId != null &&
+          customerId != 'WALK_IN' &&
+          customerId.isNotEmpty &&
+          totalAmount > 0) {
+        final customer = await (db.select(db.customers)
+              ..where((t) => t.customerId.equals(customerId)))
+            .getSingleOrNull();
+
+        // ✅ ได้แต้มเฉพาะลูกค้าที่มี memberNo เท่านั้น
+        if (customer != null && customer.memberNo != null) {
+          // pointsPerBaht = 100 (ทุก 100 บาท ได้ 1 แต้ม)
+          // TODO: ดึงจาก system_settings table เมื่อมีในอนาคต
+          const double pointsPerBaht = 100.0;
+          earnedPoints = (totalAmount / pointsPerBaht).floor();
+
+          if (earnedPoints > 0) {
+            final newPoints = customer.points + earnedPoints;
+            await (db.update(db.customers)
+                  ..where((t) => t.customerId.equals(customerId)))
+                .write(CustomersCompanion(
+              points: Value(newPoints),
+              updatedAt: Value(DateTime.now()),
+            ));
+            print('⭐ Points: $customerId +$earnedPoints → $newPoints pts');
+          }
+        }
+      }
+
       return Response.ok(
         jsonEncode({
           'success': true,
           'message': 'สร้างใบขายสำเร็จ',
-          'data': {'order_id': orderId, 'order_no': orderNo},
+          'data': {
+            'order_id': orderId,
+            'order_no': orderNo,
+            'earned_points': earnedPoints, // ✅ แจ้ง client ว่าได้กี่แต้ม
+          },
         }),
         headers: {'Content-Type': 'application/json'},
       );
