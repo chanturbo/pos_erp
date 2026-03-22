@@ -4,10 +4,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:pos_erp/shared/theme/app_theme.dart';
 import '../../../../shared/theme/theme_provider.dart';
-import '../../../../shared/theme/app_colors.dart';
 
-// ── Colors → AppColors ──────────────────────────────────────────
 
 // ─────────────────────────────────────────────────────────────────
 // SettingsState
@@ -317,7 +316,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 : currentMode == ThemeMode.dark
                     ? 'ปัจจุบัน: มืด'
                     : 'ปัจจุบัน: สว่าง',
-            style: TextStyle(color: isDark ? Colors.white70 : AppColors.textSub),
+            style: TextStyle(color: isDark ? Colors.white70 : AppTheme.textSub),
           ),
           secondary: Icon(
             currentMode == ThemeMode.dark
@@ -325,10 +324,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 : currentMode == ThemeMode.light
                     ? Icons.light_mode
                     : Icons.brightness_auto,
-            color: AppColors.primary,
+            color: AppTheme.primary,
           ),
           value: currentMode == ThemeMode.dark,
-          activeColor: AppColors.primary,
+          activeColor: AppTheme.primary,
           onChanged: (isDark) {
             ref.read(themeModeProvider.notifier).toggleDarkMode(isDark);
           },
@@ -337,7 +336,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         Text('เลือกธีม',
             style: TextStyle(
                 fontSize: 13,
-                color: isDark ? Colors.white70 : AppColors.textSub)),
+                color: isDark ? Colors.white70 : AppTheme.textSub)),
         const SizedBox(height: 8),
         SegmentedButton<ThemeMode>(
           segments: const [
@@ -404,9 +403,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   color: isDark ? Colors.white : Colors.black87,
                   fontWeight: FontWeight.w500)),
           subtitle: Text('คำนวณภาษีมูลค่าเพิ่มในใบเสร็จ',
-              style: TextStyle(color: isDark ? Colors.white70 : AppColors.textSub)),
+              style: TextStyle(color: isDark ? Colors.white70 : AppTheme.textSub)),
           value: settings.enableVat,
-          activeColor: AppColors.primary,
+          activeColor: AppTheme.primary,
           onChanged: (v) =>
               ref.read(settingsProvider.notifier).updateVatSettings(enableVat: v),
         ),
@@ -454,9 +453,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   color: isDark ? Colors.white : Colors.black87,
                   fontWeight: FontWeight.w500)),
           subtitle: Text('แสดงการแจ้งเตือนเมื่อสต๊อกต่ำกว่าที่กำหนด',
-              style: TextStyle(color: isDark ? Colors.white70 : AppColors.textSub)),
+              style: TextStyle(color: isDark ? Colors.white70 : AppTheme.textSub)),
           value: settings.enableLowStockAlert,
-          activeColor: AppColors.primary,
+          activeColor: AppTheme.primary,
           onChanged: (v) => ref.read(settingsProvider.notifier)
               .updateStockSettings(enableLowStockAlert: v),
         ),
@@ -505,10 +504,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   color: isDark ? Colors.white : Colors.black87,
                   fontWeight: FontWeight.w500)),
           subtitle: Text('สะสมแต้มสำหรับลูกค้าที่มีรหัสสมาชิก',
-              style: TextStyle(color: isDark ? Colors.white70 : AppColors.textSub)),
-          secondary: Icon(Icons.star_outline, color: AppColors.primary),
+              style: TextStyle(color: isDark ? Colors.white70 : AppTheme.textSub)),
+          secondary: Icon(Icons.star_outline, color: AppTheme.primary),
           value: settings.enableLoyalty,
-          activeColor: AppColors.primary,
+          activeColor: AppTheme.primary,
           onChanged: (v) => ref.read(settingsProvider.notifier)
               .updateLoyaltySettings(enableLoyalty: v),
         ),
@@ -521,20 +520,20 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: AppColors.primaryLight,
+              color: AppTheme.primaryLight,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+              border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
             ),
             child: Row(
               children: [
-                const Icon(Icons.info_outline, color: AppColors.primary, size: 18),
+                const Icon(Icons.info_outline, color: AppTheme.primary, size: 18),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     'ทุก ฿${settings.pointsPerBaht.toStringAsFixed(0)} ได้ 1 แต้ม  '
                     '•  1 แต้ม = ฿${settings.pointValue.toStringAsFixed(2)}',
                     style: const TextStyle(
-                        color: AppColors.primary,
+                        color: AppTheme.primary,
                         fontSize: 13,
                         fontWeight: FontWeight.w500),
                   ),
@@ -555,7 +554,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                         style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
-                            color: isDark ? Colors.white70 : AppColors.textSub)),
+                            color: isDark ? Colors.white70 : AppTheme.textSub)),
                     const SizedBox(height: 6),
                     TextField(
                       controller: _pointsPerBahtController,
@@ -581,7 +580,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                         style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
-                            color: isDark ? Colors.white70 : AppColors.textSub)),
+                            color: isDark ? Colors.white70 : AppTheme.textSub)),
                     const SizedBox(height: 6),
                     TextField(
                       controller: _pointValueController,
@@ -606,7 +605,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           Text('ตัวอย่างค่าที่นิยมใช้',
               style: TextStyle(
                   fontSize: 12,
-                  color: isDark ? Colors.white54 : AppColors.textSub)),
+                  color: isDark ? Colors.white54 : AppTheme.textSub)),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
@@ -646,8 +645,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           style: TextStyle(
               fontSize: 12,
               color: isDark ? Colors.white : Colors.black87)),
-      backgroundColor: isDark ? const Color(0xFF2A2A2A) : AppColors.headerBg,
-      side: BorderSide(color: isDark ? Colors.white24 : AppColors.border),
+      backgroundColor: isDark ? const Color(0xFF2A2A2A) : AppTheme.headerBg,
+      side: BorderSide(color: isDark ? Colors.white24 : AppTheme.border),
       onPressed: () {
         setState(() {
           _pointsPerBahtController.text = ppb.toStringAsFixed(0);
@@ -685,10 +684,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF2A2A2A) : AppColors.headerBg,
+              color: isDark ? const Color(0xFF2A2A2A) : AppTheme.headerBg,
               borderRadius: BorderRadius.circular(6),
               border: Border.all(
-                  color: isDark ? Colors.white24 : AppColors.border),
+                  color: isDark ? Colors.white24 : AppTheme.border),
             ),
             child: Text(key,
                 style: TextStyle(
@@ -715,17 +714,17 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     return InputDecoration(
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: isDark ? Colors.white24 : AppColors.border),
+        borderSide: BorderSide(color: isDark ? Colors.white24 : AppTheme.border),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: isDark ? Colors.white24 : AppColors.border),
+        borderSide: BorderSide(color: isDark ? Colors.white24 : AppTheme.border),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: AppColors.primary, width: 2),
+        borderSide: const BorderSide(color: AppTheme.primary, width: 2),
       ),
-      labelStyle: TextStyle(color: isDark ? Colors.white70 : AppColors.textSub),
+      labelStyle: TextStyle(color: isDark ? Colors.white70 : AppTheme.textSub),
       filled: true,
       fillColor: isDark ? const Color(0xFF2A2A2A) : Colors.white,
     );
@@ -765,7 +764,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         icon: Icon(icon, size: 18),
         label: Text(label),
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primary,
+          backgroundColor: AppTheme.primary,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 14),
           shape: RoundedRectangleBorder(
@@ -782,7 +781,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         const SizedBox(width: 8),
         Text(msg),
       ]),
-      backgroundColor: AppColors.success,
+      backgroundColor: AppTheme.success,
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
     ));
@@ -807,11 +806,11 @@ class _SettingsTopBar extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AppColors.primaryLight,
+              color: AppTheme.primaryLight,
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Icon(Icons.settings_outlined,
-                color: AppColors.primary, size: 20),
+                color: AppTheme.primary, size: 20),
           ),
           const SizedBox(width: 12),
           Column(
@@ -821,11 +820,11 @@ class _SettingsTopBar extends StatelessWidget {
                   style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: isDark ? Colors.white : AppColors.navy)),
+                      color: isDark ? Colors.white : AppTheme.navy)),
               Text('จัดการการตั้งค่าทั้งหมด',
                   style: TextStyle(
                       fontSize: 12,
-                      color: isDark ? Colors.white54 : AppColors.textSub)),
+                      color: isDark ? Colors.white54 : AppTheme.textSub)),
             ],
           ),
         ],
@@ -857,7 +856,7 @@ class _SectionCard extends StatelessWidget {
         color: isDark ? const Color(0xFF252525) : Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-            color: isDark ? Colors.white12 : AppColors.border),
+            color: isDark ? Colors.white12 : AppTheme.border),
         boxShadow: isDark
             ? []
             : [
@@ -874,22 +873,22 @@ class _SectionCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF2A2A2A) : AppColors.headerBg,
+              color: isDark ? const Color(0xFF2A2A2A) : AppTheme.headerBg,
               borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(12)),
               border: Border(
                   bottom: BorderSide(
-                      color: isDark ? Colors.white12 : AppColors.border)),
+                      color: isDark ? Colors.white12 : AppTheme.border)),
             ),
             child: Row(
               children: [
-                Icon(icon, size: 18, color: AppColors.primary),
+                Icon(icon, size: 18, color: AppTheme.primary),
                 const SizedBox(width: 10),
                 Text(title,
                     style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
-                        color: isDark ? Colors.white : AppColors.navy)),
+                        color: isDark ? Colors.white : AppTheme.navy)),
               ],
             ),
           ),

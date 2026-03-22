@@ -147,11 +147,14 @@ class SalesRoutes {
         );
       }
 
-      // Generate Order ID & No
-      final orderId = 'SO${DateTime.now().millisecondsSinceEpoch}';
-      final orderNo =
-          'SO-${DateTime.now().year}${DateTime.now().month.toString().padLeft(2, '0')}${DateTime.now().day.toString().padLeft(2, '0')}-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}';
+      // ✅ ใช้ timestamp เดียวตลอด request เพื่อความ consistent และ unique
+      final ts = DateTime.now().millisecondsSinceEpoch;
+      final now = DateTime.fromMillisecondsSinceEpoch(ts);
+      final datePart =
+          '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
 
+      final orderId = 'SO$ts';
+      final orderNo = 'SO-$datePart-$ts';
       final warehouseId = data['warehouse_id'] as String? ?? 'WH001';
 
       print('🆔 Generated order: $orderNo');
@@ -164,7 +167,6 @@ class SalesRoutes {
 
         print('🔍 Checking stock for $productId: $quantity');
 
-        // เช็คว่าสินค้ามีการควบคุมสต๊อกหรือไม่
         final product = await (db.select(
           db.products,
         )..where((t) => t.productId.equals(productId))).getSingleOrNull();
@@ -206,7 +208,7 @@ class SalesRoutes {
       final orderCompanion = SalesOrdersCompanion(
         orderId: Value(orderId),
         orderNo: Value(orderNo),
-        orderDate: Value(DateTime.now()),
+        orderDate: Value(now),
         orderType: const Value('SALE'),
         customerId: Value(data['customer_id'] as String?),
         customerName: Value(data['customer_name'] as String?),
@@ -236,7 +238,8 @@ class SalesRoutes {
 
       for (var i = 0; i < items.length; i++) {
         final item = items[i] as Map<String, dynamic>;
-        final itemId = '${orderId}_${i + 1}';
+        final lineNo = i + 1;
+        final itemId = '${orderId}_$lineNo';
         final productId = item['product_id'] as String;
         final quantity = (item['quantity'] as num).toDouble();
 
@@ -244,7 +247,7 @@ class SalesRoutes {
         final itemCompanion = SalesOrderItemsCompanion(
           itemId: Value(itemId),
           orderId: Value(orderId),
-          lineNo: Value(i + 1),
+          lineNo: Value(lineNo),
           productId: Value(productId),
           productCode: Value(item['product_code'] as String),
           productName: Value(item['product_name'] as String),
@@ -269,24 +272,26 @@ class SalesRoutes {
         )..where((t) => t.productId.equals(productId))).getSingleOrNull();
 
         if (product != null && product.isStockControl) {
-          await db
-              .into(db.stockMovements)
-              .insert(
+          // ✅ movementId ใช้ itemId (unique อยู่แล้ว)
+          // ✅ movementNo = SM-{date}-{ts}-{lineNo} → unique ทุก row ทุก order
+          final movementNo = 'SM-$datePart-$ts-$lineNo';
+
+          await db.into(db.stockMovements).insert(
                 StockMovementsCompanion(
-                  movementId: Value('${orderId}_${i + 1}'),
-                  movementNo: Value(orderNo), // ✅ เพิ่ม
-                  movementDate: Value(DateTime.now()),
+                  movementId: Value(itemId),
+                  movementNo: Value(movementNo),
+                  movementDate: Value(now),
                   movementType: const Value('SALE'),
                   productId: Value(productId),
                   warehouseId: Value(warehouseId),
-                  userId: Value(
-                    data['user_id'] as String? ?? 'USR001',
-                  ), // ✅ เพิ่ม
+                  userId: Value(data['user_id'] as String? ?? 'USR001'),
                   quantity: Value(-quantity),
                   referenceNo: Value(orderNo),
                   remark: const Value('ขายสินค้า'),
                 ),
               );
+
+          print('✅ Stock movement: $movementNo');
         }
       }
 

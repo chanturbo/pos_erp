@@ -13,16 +13,10 @@ import '../widgets/hold_orders_dialog.dart';
 import '../../../../shared/services/mobile_scanner_service.dart'; // ✅ Phase 5
 import '../../../../shared/widgets/barcode_listener.dart';        // ✅ USB Scanner
 import '../../../../shared/theme/app_theme.dart';
+
 import '../../../../shared/utils/responsive_utils.dart';           // ✅ Responsive
 
-// ── OAG Identity tokens ──────────────────────────────────────────
-const _navy    = AppTheme.navyColor;
-const _orange  = AppTheme.primaryColor;
-const _surface = AppTheme.surfaceColor;
-const _border  = AppTheme.borderColor;
-const _success = AppTheme.successColor;
-const _error   = AppTheme.errorColor;
-const _info    = AppTheme.infoColor;
+
 
 class PosPage extends ConsumerStatefulWidget {
   /// isCashierMode = true  → Cashier login โดยตรง
@@ -129,7 +123,7 @@ class _PosPageState extends ConsumerState<PosPage> {
           }
         },
         child: Scaffold(
-          backgroundColor: _surface,
+          backgroundColor: AppTheme.surface,
           appBar: AppBar(
             // ── Leading ────────────────────────────────────
             automaticallyImplyLeading: !widget.isCashierMode,
@@ -151,10 +145,10 @@ class _PosPageState extends ConsumerState<PosPage> {
                         horizontal: 8, vertical: 3),
                     margin: const EdgeInsets.only(right: 8),
                     decoration: BoxDecoration(
-                      color: _orange.withValues(alpha: 0.20),
+                      color: AppTheme.primary.withValues(alpha: 0.20),
                       borderRadius: BorderRadius.circular(6),
                       border: Border.all(
-                          color: _orange.withValues(alpha: 0.5)),
+                          color: AppTheme.primary.withValues(alpha: 0.5)),
                     ),
                     child: Text(
                       user.fullName,
@@ -205,6 +199,7 @@ class _PosPageState extends ConsumerState<PosPage> {
                     ref.read(cartProvider.notifier).setCustomer(
                       result.customerId,
                       result.customerName,
+                      priceLevel: result.priceLevel, // ✅ ส่ง priceLevel
                     );
                   }
                 },
@@ -220,8 +215,8 @@ class _PosPageState extends ConsumerState<PosPage> {
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
                       color: hasCustomer
-                          ? _info.withValues(alpha: 0.5)
-                          : AppTheme.navyBorder,
+                          ? AppTheme.info.withValues(alpha: 0.5)
+                          : AppTheme.navy,
                     ),
                   ),
                   child: Row(
@@ -229,7 +224,7 @@ class _PosPageState extends ConsumerState<PosPage> {
                     children: [
                       Icon(Icons.person,
                           size: 14,
-                          color: hasCustomer ? _info : Colors.white60),
+                          color: hasCustomer ? AppTheme.info : Colors.white60),
                       const SizedBox(width: 5),
                       Flexible(
                         child: Text(
@@ -237,7 +232,7 @@ class _PosPageState extends ConsumerState<PosPage> {
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: hasCustomer ? _info : Colors.white70,
+                            color: hasCustomer ? AppTheme.info : Colors.white70,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -249,7 +244,7 @@ class _PosPageState extends ConsumerState<PosPage> {
                               .read(cartProvider.notifier)
                               .setCustomer('WALK_IN', 'ลูกค้าทั่วไป'),
                           child: Icon(Icons.close,
-                              size: 13, color: _info),
+                              size: 13, color: AppTheme.info),
                         ),
                       ],
                     ],
@@ -266,7 +261,7 @@ class _PosPageState extends ConsumerState<PosPage> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: _orange,
+                        color: AppTheme.primary,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
@@ -317,7 +312,7 @@ class _PosPageState extends ConsumerState<PosPage> {
                       child: Container(
                         padding: const EdgeInsets.all(4),
                         decoration: const BoxDecoration(
-                          color: _orange, // Orange แทน red
+                          color: AppTheme.primary, // Orange แทน red
                           shape: BoxShape.circle,
                         ),
                         constraints: const BoxConstraints(
@@ -358,9 +353,11 @@ class _PosPageState extends ConsumerState<PosPage> {
         // ── Toolbar: Search + Hold button ─────────────────────
         Container(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            border: Border(bottom: BorderSide(color: _border)),
+          decoration: BoxDecoration(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? AppTheme.darkTopBar
+                : Colors.white,
+            border: Border(bottom: BorderSide(color: AppTheme.border)),
           ),
           child: Row(
             children: [
@@ -395,7 +392,7 @@ class _PosPageState extends ConsumerState<PosPage> {
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                         borderSide:
-                            const BorderSide(color: _orange, width: 1.5),
+                            const BorderSide(color: AppTheme.primary, width: 1.5),
                       ),
                     ),
                     onChanged: (v) => setState(() => _searchQuery = v),
@@ -437,7 +434,7 @@ class _PosPageState extends ConsumerState<PosPage> {
 
               // Divider
               const VerticalDivider(
-                  width: 1, thickness: 1, color: _border),
+                  width: 1, thickness: 1, color: AppTheme.border),
 
               // Cart Panel (40%)
               const Expanded(flex: 40, child: CartPanel()),
@@ -459,9 +456,11 @@ class _PosPageState extends ConsumerState<PosPage> {
         Container(
           padding: const EdgeInsets.symmetric(
               horizontal: 12, vertical: 8),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            border: Border(bottom: BorderSide(color: _border)),
+          decoration: BoxDecoration(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? AppTheme.darkTopBar
+                : Colors.white,
+            border: Border(bottom: BorderSide(color: AppTheme.border)),
           ),
           child: Row(
             children: [
@@ -496,9 +495,9 @@ class _PosPageState extends ConsumerState<PosPage> {
             width: 80,
             height: 80,
             decoration: BoxDecoration(
-              color: _surface,
+              color: AppTheme.surface,
               shape: BoxShape.circle,
-              border: Border.all(color: _border),
+              border: Border.all(color: AppTheme.border),
             ),
             child: const Icon(Icons.inventory_2_outlined,
                 size: 38, color: Colors.grey),
@@ -515,7 +514,7 @@ class _PosPageState extends ConsumerState<PosPage> {
                 ? 'กรุณาเพิ่มสินค้าในระบบก่อน'
                 : 'ลองค้นหาด้วยคำอื่น',
             style: const TextStyle(
-                fontSize: 13, color: AppTheme.subtextColor),
+                fontSize: 13, color: AppTheme.textSub),
           ),
           const SizedBox(height: 16),
           ElevatedButton.icon(
@@ -535,7 +534,7 @@ class _PosPageState extends ConsumerState<PosPage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.error_outline, size: 64, color: _error),
+          const Icon(Icons.error_outline, size: 64, color: AppTheme.error),
           const SizedBox(height: 12),
           Text('เกิดข้อผิดพลาด: $e'),
           const SizedBox(height: 12),
@@ -573,7 +572,7 @@ class _HoldButton extends ConsumerWidget {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                     content: Text('พักบิล: $result'),
-                    backgroundColor: _orange,
+                    backgroundColor: AppTheme.primary,
                     behavior: SnackBarBehavior.floating,
                   ));
                 }
@@ -582,7 +581,7 @@ class _HoldButton extends ConsumerWidget {
       icon: const Icon(Icons.bookmark_add_outlined, size: 16),
       label: const Text('พักบิล'),
       style: ElevatedButton.styleFrom(
-        backgroundColor: _orange,
+        backgroundColor: AppTheme.primary,
         foregroundColor: Colors.white,
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         elevation: 0,
@@ -637,19 +636,33 @@ class _ProductSearchSheetState
         (p.barcode?.toLowerCase().contains(q) ?? false)).toList();
   }
 
+  // ✅ Helper: เลือกราคาตาม priceLevel (1-5), fallback = priceLevel1
+  double _getPriceByLevel(ProductModel product, int level) {
+    switch (level) {
+      case 2: return product.priceLevel2 > 0 ? product.priceLevel2 : product.priceLevel1;
+      case 3: return product.priceLevel3 > 0 ? product.priceLevel3 : product.priceLevel1;
+      case 4: return product.priceLevel4 > 0 ? product.priceLevel4 : product.priceLevel1;
+      case 5: return product.priceLevel5 > 0 ? product.priceLevel5 : product.priceLevel1;
+      default: return product.priceLevel1;
+    }
+  }
+
   void _addProduct(ProductModel product) {
+    // ✅ ใช้ราคาตาม priceLevel ของลูกค้าที่เลือกไว้ใน cart
+    final priceLevel = ref.read(cartProvider).customerPriceLevel;
+    final unitPrice  = _getPriceByLevel(product, priceLevel);
     ref.read(cartProvider.notifier).addItem(
       productId: product.productId,
       productCode: product.productCode,
       productName: product.productName,
       unit: product.baseUnit,
-      unitPrice: product.priceLevel1,
+      unitPrice: unitPrice,
     );
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text('เพิ่ม ${product.productName} แล้ว'),
       duration: const Duration(milliseconds: 600),
       behavior: SnackBarBehavior.floating,
-      backgroundColor: AppTheme.successColor,
+      backgroundColor: AppTheme.success,
       width: 280,
     ));
     // ไม่ปิด sheet — เพิ่มต่อได้เรื่อยๆ
@@ -662,10 +675,12 @@ class _ProductSearchSheetState
 
     return Container(
       height: sheetHeight,
-      decoration: const BoxDecoration(
-        color: Colors.white,
+      decoration: BoxDecoration(
+        color: Theme.of(context).brightness == Brightness.dark
+            ? AppTheme.darkCard
+            : Colors.white,
         borderRadius:
-            BorderRadius.vertical(top: Radius.circular(16)),
+            const BorderRadius.vertical(top: Radius.circular(16)),
       ),
       child: Column(
         children: [
@@ -686,14 +701,16 @@ class _ProductSearchSheetState
             padding: const EdgeInsets.fromLTRB(16, 4, 8, 8),
             child: Row(
               children: [
-                const Icon(Icons.search, color: _navy, size: 18),
+                const Icon(Icons.search, color: AppTheme.navy, size: 18),
                 const SizedBox(width: 8),
-                const Text(
+                Text(
                   'ค้นหาสินค้า',
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF1A1A1A),
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.white
+                        : const Color(0xFF1A1A1A),
                   ),
                 ),
                 const Spacer(),
@@ -701,13 +718,13 @@ class _ProductSearchSheetState
                   padding: const EdgeInsets.symmetric(
                       horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: _navy.withValues(alpha: 0.08),
+                    color: AppTheme.navy.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
                     '${filtered.length} รายการ',
                     style: const TextStyle(
-                        fontSize: 11, color: _navy),
+                        fontSize: 11, color: AppTheme.navy),
                   ),
                 ),
                 IconButton(
@@ -751,7 +768,7 @@ class _ProductSearchSheetState
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                     borderSide: const BorderSide(
-                        color: _orange, width: 1.5),
+                        color: AppTheme.primary, width: 1.5),
                   ),
                 ),
                 onChanged: (v) => setState(() => _query = v),
@@ -759,7 +776,7 @@ class _ProductSearchSheetState
             ),
           ),
 
-          const Divider(height: 1, color: AppTheme.borderColor),
+          const Divider(height: 1, color: AppTheme.border),
 
           // Product list
           Expanded(
@@ -785,11 +802,17 @@ class _ProductSearchSheetState
                     padding: const EdgeInsets.symmetric(
                         horizontal: 12, vertical: 4),
                     itemCount: filtered.length,
-                    itemBuilder: (_, i) => _SheetProductRow(
-                      product: filtered[i],
-                      isEven: i.isEven,
-                      onAdd: () => _addProduct(filtered[i]),
-                    ),
+                    itemBuilder: (_, i) {
+                      final priceLevel =
+                          ref.read(cartProvider).customerPriceLevel;
+                      final price = _getPriceByLevel(filtered[i], priceLevel);
+                      return _SheetProductRow(
+                        product: filtered[i],
+                        isEven: i.isEven,
+                        displayPrice: price, // ✅
+                        onAdd: () => _addProduct(filtered[i]),
+                      );
+                    },
                   ),
           ),
         ],
@@ -804,11 +827,13 @@ class _ProductSearchSheetState
 class _SheetProductRow extends StatelessWidget {
   final ProductModel product;
   final bool isEven;
+  final double displayPrice; // ✅ ราคาตาม priceLevel
   final VoidCallback onAdd;
 
   const _SheetProductRow({
     required this.product,
     required this.isEven,
+    required this.displayPrice,
     required this.onAdd,
   });
 
@@ -823,10 +848,16 @@ class _SheetProductRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(
             horizontal: 10, vertical: 10),
         decoration: BoxDecoration(
-          color: isEven ? Colors.white : const Color(0xFFF9F9F7),
+          color: isEven
+              ? (Theme.of(context).brightness == Brightness.dark
+                  ? AppTheme.darkCard
+                  : Colors.white)
+              : (Theme.of(context).brightness == Brightness.dark
+                  ? AppTheme.darkElement
+                  : const Color(0xFFF9F9F7)),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-              color: AppTheme.borderColor.withValues(alpha: 0.6)),
+              color: AppTheme.border.withValues(alpha: 0.6)),
         ),
         child: Row(
           children: [
@@ -834,10 +865,10 @@ class _SheetProductRow extends StatelessWidget {
             Container(
               width: 38, height: 38,
               decoration: BoxDecoration(
-                color: _orange.withValues(alpha: 0.10),
+                color: AppTheme.primary.withValues(alpha: 0.10),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                    color: _orange.withValues(alpha: 0.2)),
+                    color: AppTheme.primary.withValues(alpha: 0.2)),
               ),
               child: Center(
                 child: Text(
@@ -847,7 +878,7 @@ class _SheetProductRow extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
-                    color: _orange,
+                    color: AppTheme.primary,
                   ),
                 ),
               ),
@@ -861,10 +892,12 @@ class _SheetProductRow extends StatelessWidget {
                 children: [
                   Text(
                     p.productName,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
-                      color: Color(0xFF1A1A1A),
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.white
+                          : const Color(0xFF1A1A1A),
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -872,7 +905,7 @@ class _SheetProductRow extends StatelessWidget {
                     p.productCode,
                     style: const TextStyle(
                         fontSize: 11,
-                        color: AppTheme.subtextColor),
+                        color: AppTheme.textSub),
                   ),
                 ],
               ),
@@ -880,11 +913,11 @@ class _SheetProductRow extends StatelessWidget {
 
             // Price
             Text(
-              '฿${p.priceLevel1.toStringAsFixed(2)}',
+              '฿${displayPrice.toStringAsFixed(2)}',
               style: const TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.bold,
-                color: _info,
+                color: AppTheme.info,
               ),
             ),
             const SizedBox(width: 10),
@@ -893,7 +926,7 @@ class _SheetProductRow extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(7),
               decoration: BoxDecoration(
-                color: _orange,
+                color: AppTheme.primary,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Icon(Icons.add,
@@ -941,7 +974,7 @@ class _HoldOrderNameDialogState extends State<_HoldOrderNameDialog> {
             width: 4,
             height: 18,
             decoration: BoxDecoration(
-              color: AppTheme.primaryColor,
+              color: AppTheme.primary,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -959,7 +992,7 @@ class _HoldOrderNameDialogState extends State<_HoldOrderNameDialog> {
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
             borderSide: const BorderSide(
-                color: AppTheme.primaryColor, width: 1.5),
+                color: AppTheme.primary, width: 1.5),
           ),
         ),
       ),
@@ -970,7 +1003,7 @@ class _HoldOrderNameDialogState extends State<_HoldOrderNameDialog> {
         ),
         ElevatedButton(
           style: ElevatedButton.styleFrom(
-            backgroundColor: AppTheme.primaryColor,
+            backgroundColor: AppTheme.primary,
             foregroundColor: Colors.white,
             elevation: 0,
           ),

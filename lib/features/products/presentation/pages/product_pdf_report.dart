@@ -21,7 +21,9 @@ import 'package:printing/printing.dart';
 import '../../data/models/product_model.dart';
 
 // ─────────────────────────────────────────────────────────────────
-// PDF Colors
+// PDF Colors — ใช้ PdfColor (pdf package) ไม่ใช่ Flutter Color
+// ไม่สามารถใช้ AppColors ได้โดยตรงเพราะ AppColors เป็น Flutter Color
+// ค่าสีตรงกับ AppColors palette ของ app
 // ─────────────────────────────────────────────────────────────────
 const _kPrimary    = PdfColor.fromInt(0xFFE8622A);
 const _kNavy       = PdfColor.fromInt(0xFF16213E);

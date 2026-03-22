@@ -2,12 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pos_erp/features/customers/data/models/customer_model.dart';
 import '../../../../shared/pdf/pdf_report_button.dart';
+import 'package:pos_erp/shared/theme/app_theme.dart';
 import '../providers/customer_provider.dart';
 import 'customer_form_page.dart';
 import 'customer_pdf_report.dart';
-import '../../../../shared/theme/app_colors.dart';
 
-// ── Colors → AppColors ──────────────────────────────────────────
 
 class CustomerListPage extends ConsumerStatefulWidget {
   const CustomerListPage({super.key});
@@ -94,7 +93,7 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
           Expanded(
             child: customerAsync.when(
               loading: () => const Center(
-                child: CircularProgressIndicator(color: AppColors.primary),
+                child: CircularProgressIndicator(color: AppTheme.primary),
               ),
               error: (e, _) => _buildError(e),
               data: (customers) {
@@ -161,7 +160,7 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.border),
+                        border: Border.all(color: AppTheme.border),
                       ),
                       // ✅ แนวตั้ง scroll ด้านนอก, แนวนอน scroll ด้านใน
                       child: Column(
@@ -207,7 +206,7 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
                                       ),
                                       const Divider(
                                         height: 1,
-                                        color: AppColors.border,
+                                        color: AppTheme.border,
                                       ),
                                       // Rows — ใช้ shrinkWrap ภายใน Column ที่รู้ขนาดแล้ว
                                       Expanded(
@@ -216,7 +215,7 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
                                           separatorBuilder: (_, __) =>
                                               const Divider(
                                                 height: 1,
-                                                color: AppColors.border,
+                                                color: AppTheme.border,
                                               ),
                                           itemBuilder: (context, i) {
                                             final c = filtered[i];
@@ -271,7 +270,7 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
                               vertical: 10,
                             ),
                             decoration: const BoxDecoration(
-                              color: AppColors.headerBg,
+                              color: AppTheme.headerBg,
                               borderRadius: BorderRadius.only(
                                 bottomLeft: Radius.circular(12),
                                 bottomRight: Radius.circular(12),
@@ -283,7 +282,7 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
                                   'ทั้งหมด ${filtered.length} รายการ',
                                   style: const TextStyle(
                                     fontSize: 12,
-                                    color: AppColors.textSub,
+                                    color: AppTheme.textSub,
                                   ),
                                 ),
                               ],
@@ -335,7 +334,7 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
-            side: const BorderSide(color: AppColors.border),
+            side: const BorderSide(color: AppTheme.border),
           ),
           color: Colors.white,
           child: Padding(
@@ -448,7 +447,7 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
                         'รหัส: \${c.customerCode}',
                         style: const TextStyle(
                           fontSize: 11,
-                          color: AppColors.textSub,
+                          color: AppTheme.textSub,
                         ),
                       ),
                       if (c.phone != null)
@@ -456,7 +455,7 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
                           'โทร: \${c.phone}',
                           style: const TextStyle(
                             fontSize: 11,
-                            color: AppColors.textSub,
+                            color: AppTheme.textSub,
                           ),
                         ),
                       if (isMember)
@@ -688,7 +687,7 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
             icon: const Icon(Icons.add),
             label: const Text('เพิ่มลูกค้า'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
+              backgroundColor: AppTheme.primary,
               foregroundColor: Colors.white,
             ),
           ),
@@ -755,7 +754,7 @@ class _ResizableTableHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: AppColors.navy,
+      color: AppTheme.navy,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
       child: Row(
         children: [
@@ -993,7 +992,7 @@ class _CustomerRowState extends State<_CustomerRow> {
       onExit: (_) => setState(() => _hovered = false),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 120),
-        color: _hovered ? AppColors.primaryLight : Colors.white,
+        color: _hovered ? AppTheme.primaryLight : Colors.white,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Row(
           children: [
@@ -1004,7 +1003,7 @@ class _CustomerRowState extends State<_CustomerRow> {
                 c.customerCode.length > 6
                     ? c.customerCode.substring(c.customerCode.length - 4)
                     : c.customerCode,
-                style: const TextStyle(fontSize: 11, color: AppColors.textSub),
+                style: const TextStyle(fontSize: 11, color: AppTheme.textSub),
               ),
             ),
             const SizedBox(width: 16),
@@ -1075,7 +1074,7 @@ class _CustomerRowState extends State<_CustomerRow> {
               child: Text(
                 c.customerCode,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 13, color: AppColors.textSub),
+                style: const TextStyle(fontSize: 13, color: AppTheme.textSub),
               ),
             ),
 
@@ -1085,7 +1084,7 @@ class _CustomerRowState extends State<_CustomerRow> {
               child: Text(
                 c.phone ?? '-',
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 13, color: AppColors.textSub),
+                style: const TextStyle(fontSize: 13, color: AppTheme.textSub),
               ),
             ),
 
@@ -1116,7 +1115,7 @@ class _CustomerRowState extends State<_CustomerRow> {
                     )
                   : const Text(
                       '-',
-                      style: TextStyle(fontSize: 13, color: AppColors.textSub),
+                      style: TextStyle(fontSize: 13, color: AppTheme.textSub),
                     ),
             ),
 
@@ -1156,7 +1155,7 @@ class _CustomerRowState extends State<_CustomerRow> {
                     )
                   : const Text(
                       '-',
-                      style: TextStyle(fontSize: 13, color: AppColors.textSub),
+                      style: TextStyle(fontSize: 13, color: AppTheme.textSub),
                     ),
             ),
 
@@ -1173,7 +1172,7 @@ class _CustomerRowState extends State<_CustomerRow> {
                     )
                   : const Text(
                       '-',
-                      style: TextStyle(fontSize: 13, color: AppColors.textSub),
+                      style: TextStyle(fontSize: 13, color: AppTheme.textSub),
                     ),
             ),
 
@@ -1367,14 +1366,14 @@ class _CustomerListTopBar extends StatelessWidget {
               decoration: BoxDecoration(
                 color: const Color(0xFFF5F5F5),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.border),
+                border: Border.all(color: AppTheme.border),
               ),
               child: Icon(
                 isTableView
                     ? Icons.view_agenda_outlined
                     : Icons.table_rows_outlined,
                 size: 17,
-                color: AppColors.textSub,
+                color: AppTheme.textSub,
               ),
             ),
           ),
@@ -1424,14 +1423,14 @@ class _CustomerListTopBar extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: const Color(0xFFF5F5F5),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.border),
+                    border: Border.all(color: AppTheme.border),
                   ),
                   child: Icon(
                     isTableView
                         ? Icons.view_agenda_outlined
                         : Icons.table_rows_outlined,
                     size: 17,
-                    color: AppColors.textSub,
+                    color: AppTheme.textSub,
                   ),
                 ),
               ),
@@ -1470,12 +1469,12 @@ class _BackBtn extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFFF5F5F5),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppTheme.border),
       ),
       child: const Icon(
         Icons.arrow_back_ios_new,
         size: 15,
-        color: AppColors.textSub,
+        color: AppTheme.textSub,
       ),
     ),
   );
@@ -1486,10 +1485,10 @@ class _PageIcon extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(7),
     decoration: BoxDecoration(
-      color: AppColors.primaryLight,
+      color: AppTheme.primaryLight,
       borderRadius: BorderRadius.circular(8),
     ),
-    child: const Icon(Icons.people, color: AppColors.primary, size: 18),
+    child: const Icon(Icons.people, color: AppTheme.primary, size: 18),
   );
 }
 
@@ -1514,11 +1513,11 @@ class _SearchField extends StatelessWidget {
       style: const TextStyle(fontSize: 13),
       decoration: InputDecoration(
         hintText: 'ค้นหาลูกค้า...',
-        hintStyle: const TextStyle(fontSize: 13, color: AppColors.textSub),
+        hintStyle: const TextStyle(fontSize: 13, color: AppTheme.textSub),
         prefixIcon: const Icon(
           Icons.search,
           size: 17,
-          color: AppColors.textSub,
+          color: AppTheme.textSub,
         ),
         suffixIcon: query.isNotEmpty
             ? IconButton(
@@ -1529,15 +1528,15 @@ class _SearchField extends StatelessWidget {
         contentPadding: EdgeInsets.zero,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppColors.border),
+          borderSide: const BorderSide(color: AppTheme.border),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppColors.border),
+          borderSide: const BorderSide(color: AppTheme.border),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+          borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
         ),
         filled: true,
         fillColor: Colors.white,
@@ -1564,13 +1563,13 @@ class _MemberToggle extends StatelessWidget {
           color: active ? const Color(0xFFFFF8E1) : const Color(0xFFF5F5F5),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: active ? const Color(0xFFFFE082) : AppColors.border,
+            color: active ? const Color(0xFFFFE082) : AppTheme.border,
           ),
         ),
         child: Icon(
           Icons.card_membership,
           size: 17,
-          color: active ? const Color(0xFFFFB300) : AppColors.textSub,
+          color: active ? const Color(0xFFFFB300) : AppTheme.textSub,
         ),
       ),
     ),
@@ -1592,9 +1591,9 @@ class _RefreshBtn extends StatelessWidget {
         decoration: BoxDecoration(
           color: const Color(0xFFF5F5F5),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: AppTheme.border),
         ),
-        child: const Icon(Icons.refresh, size: 17, color: AppColors.textSub),
+        child: const Icon(Icons.refresh, size: 17, color: AppTheme.textSub),
       ),
     ),
   );
@@ -1616,7 +1615,7 @@ class _AddBtn extends StatelessWidget {
             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
           ),
     style: ElevatedButton.styleFrom(
-      backgroundColor: AppColors.primary,
+      backgroundColor: AppTheme.primary,
       foregroundColor: Colors.white,
       // ✅ เพิ่มความสูง: vertical 9 → 13
       padding: EdgeInsets.symmetric(
@@ -1643,7 +1642,7 @@ class _ToolbarButton extends StatelessWidget {
     required this.label,
     required this.onTap,
     this.active = false,
-    this.activeColor = AppColors.primary,
+    this.activeColor = AppTheme.primary,
   });
 
   @override
@@ -1656,21 +1655,21 @@ class _ToolbarButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: active ? activeColor.withValues(alpha: 0.1) : Colors.white,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: active ? activeColor : AppColors.border),
+          border: Border.all(color: active ? activeColor : AppTheme.border),
         ),
         child: Row(
           children: [
             Icon(
               icon,
               size: 16,
-              color: active ? activeColor : AppColors.textSub,
+              color: active ? activeColor : AppTheme.textSub,
             ),
             const SizedBox(width: 6),
             Text(
               label,
               style: TextStyle(
                 fontSize: 12,
-                color: active ? activeColor : AppColors.textSub,
+                color: active ? activeColor : AppTheme.textSub,
                 fontWeight: FontWeight.w500,
               ),
             ),

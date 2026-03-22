@@ -13,6 +13,31 @@ import 'package:google_fonts/google_fonts.dart';
 /// ║  07 · Surface    #F4F4F0  Neutral Background                    ║
 /// ║  08 · Font       IBM Plex Sans Thai → Sarabun (fallback)        ║
 /// ╚══════════════════════════════════════════════════════════════════╝
+///
+/// AppColors has been merged into AppTheme.
+/// Migration mapping:
+///   AppColors.primary        → AppTheme.primaryColor  (or AppTheme.primary)
+///   AppColors.primaryDark    → AppTheme.primaryDark
+///   AppColors.primaryLight   → AppTheme.primaryContainer
+///   AppColors.navy           → AppTheme.navyColor      (or AppTheme.navy)
+///   AppColors.border         → AppTheme.borderColor    (or AppTheme.border)
+///   AppColors.borderDark     → AppTheme.borderColor    (or AppTheme.border)
+///   AppColors.surface        → AppTheme.surfaceColor   (or AppTheme.surface)
+///   AppColors.textSub        → AppTheme.subtextColor   (or AppTheme.textSub)
+///   AppColors.success        → AppTheme.successColor   (or AppTheme.success)
+///   AppColors.successBg      → AppTheme.successContainer
+///   AppColors.error          → AppTheme.errorColor     (or AppTheme.error)
+///   AppColors.errorBg        → AppTheme.errorContainer
+///   AppColors.info           → AppTheme.infoColor      (or AppTheme.info)
+///   AppColors.infoBg         → AppTheme.infoContainer
+///   AppColors.amber          → AppTheme.warningColor   (or AppTheme.warning)
+///   AppColors.amberBg        → AppTheme.warningContainer
+///   AppColors.headerBg       → AppTheme.headerBg
+///   AppColors.darkBg         → AppTheme.darkBg
+///   AppColors.darkCard       → AppTheme.darkCard
+///   AppColors.darkElement    → AppTheme.darkElement
+///   AppColors.darkTopBar     → AppTheme.darkTopBar
+
 class AppTheme {
   AppTheme._();
 
@@ -66,20 +91,54 @@ class AppTheme {
   // 03 · Neutral / Surface
   // ─────────────────────────────────────────────────────────────────
 
-  static const Color surfaceColor       = Color(0xFFF4F4F0); // Neutral Background
+  static const Color surfaceColor       = Color(0xFFF4F4F0);
   static const Color cardWhite          = Color(0xFFFFFFFF);
   static const Color borderColor        = Color(0xFFE0E0E0);
   static const Color subtextColor       = Color(0xFF757575);
+  static const Color headerBg           = Color(0xFFF9F9F9);
 
   // ─────────────────────────────────────────────────────────────────
-  // 04 · Typography helper — IBM Plex Sans Thai → Sarabun fallback
+  // 04 · Shorthand aliases
+  //      ใช้ชื่อสั้นได้เลยใน widget code เช่น AppTheme.primary
+  //      ค่าเหมือนกันทุกอย่าง — เลือกใช้แบบไหนก็ได้
+  // ─────────────────────────────────────────────────────────────────
+
+  static const Color primary  = primaryColor;
+  static const Color navy     = navyColor;
+  static const Color success  = successColor;
+  static const Color error    = errorColor;
+  static const Color warning  = warningColor;
+  static const Color info     = infoColor;
+  static const Color textSub  = subtextColor;   // ← AppColors.textSub
+  static const Color border   = borderColor;    // ← AppColors.border
+  static const Color surface  = surfaceColor;   // ← AppColors.surface
+
+  // ─────────────────────────────────────────────────────────────────
+  // 05 · Dark Mode Surface (public)
+  // ─────────────────────────────────────────────────────────────────
+
+  static const Color darkBg       = Color(0xFF121212);
+  static const Color darkCard     = Color(0xFF1E1E1E);
+  static const Color darkElement  = Color(0xFF2A2A2A);
+  static const Color darkTopBar   = Color(0xFF1E1E1E);
+
+  // internal aliases ใช้ใน ThemeData ด้านล่าง
+  static const _darkSurface  = darkCard;
+  static const _darkSurface2 = darkElement;
+  static const _darkBorder   = Color(0xFF333333);
+  static const _darkText     = Color(0xFFE0E0E0);
+  static const _darkSubtext  = Color(0xFF9E9E9E);
+  static const _darkPrimary  = primaryLight; // #FF9D45 — contrast บน dark bg
+
+  // ─────────────────────────────────────────────────────────────────
+  // 06 · Typography helper — IBM Plex Sans Thai → Sarabun fallback
   // ─────────────────────────────────────────────────────────────────
 
   static TextTheme _buildTextTheme(TextTheme base) =>
       GoogleFonts.ibmPlexSansThaiTextTheme(base);
 
   // ─────────────────────────────────────────────────────────────────
-  // 05 · Light Theme
+  // 07 · Light Theme
   // ─────────────────────────────────────────────────────────────────
   static ThemeData lightTheme = ThemeData(
     useMaterial3: true,
@@ -104,7 +163,7 @@ class AppTheme {
       centerTitle: true,
       elevation: 0,
       scrolledUnderElevation: 1,
-      backgroundColor: navyColor,           // ← Navy AppBar
+      backgroundColor: navyColor,
       foregroundColor: Colors.white,
       surfaceTintColor: Colors.transparent,
       iconTheme: IconThemeData(color: Colors.white),
@@ -126,11 +185,11 @@ class AppTheme {
       ),
     ),
     drawerTheme: const DrawerThemeData(
-      backgroundColor: navyColor,           // ← Navy Sidebar/Drawer
+      backgroundColor: navyColor,
       surfaceTintColor: Colors.transparent,
     ),
     navigationRailTheme: NavigationRailThemeData(
-      backgroundColor: navyColor,           // ← Navy Navigation Rail
+      backgroundColor: navyColor,
       selectedIconTheme: const IconThemeData(color: primaryColor),
       unselectedIconTheme: const IconThemeData(color: Color(0xFF8A9BC0)),
       selectedLabelTextStyle: const TextStyle(
@@ -156,7 +215,7 @@ class AppTheme {
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: primaryColor,     // ← Primary Button = Orange
+        backgroundColor: primaryColor,
         foregroundColor: Colors.white,
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -165,7 +224,7 @@ class AppTheme {
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
-        foregroundColor: primaryColor,     // ← Secondary Button = Outlined Orange
+        foregroundColor: primaryColor,
         side: const BorderSide(color: primaryColor),
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -225,18 +284,8 @@ class AppTheme {
   );
 
   // ─────────────────────────────────────────────────────────────────
-  // 06 · Dark Theme
+  // 08 · Dark Theme
   // ─────────────────────────────────────────────────────────────────
-  static const _darkBg       = Color(0xFF121212);
-  static const _darkSurface  = Color(0xFF1E1E1E);
-  static const _darkSurface2 = Color(0xFF2A2A2A);
-  static const _darkBorder   = Color(0xFF333333);
-  static const _darkText     = Color(0xFFE0E0E0);
-  static const _darkSubtext  = Color(0xFF9E9E9E);
-
-  /// Dark mode: ใช้ primaryLight (#FF9D45) เพื่อ contrast บน dark bg
-  static const _darkPrimary  = Color(0xFFFF9D45);
-
   static ThemeData darkTheme = ThemeData(
     useMaterial3: true,
     brightness: Brightness.dark,
@@ -253,12 +302,12 @@ class AppTheme {
     ),
     textTheme: _buildTextTheme(ThemeData.dark().textTheme)
         .apply(bodyColor: _darkText, displayColor: _darkText),
-    scaffoldBackgroundColor: _darkBg,
+    scaffoldBackgroundColor: darkBg,
     appBarTheme: const AppBarTheme(
       centerTitle: true,
       elevation: 0,
       scrolledUnderElevation: 1,
-      backgroundColor: navyDark,           // ← Darker Navy for dark mode
+      backgroundColor: navyDark,
       foregroundColor: _darkText,
       surfaceTintColor: Colors.transparent,
       iconTheme: IconThemeData(color: _darkText),
@@ -412,21 +461,25 @@ class AppTheme {
   );
 
   // ─────────────────────────────────────────────────────────────────
-  // 07 · Context-aware Helpers (รักษา API เดิม)
+  // 09 · Context-aware Helpers
   // ─────────────────────────────────────────────────────────────────
-
-  static Color cardColor(BuildContext context) =>
-      isDark(context) ? _darkSurface : cardWhite;
-
-  static Color surfaceColorOf(BuildContext context) =>
-      isDark(context) ? _darkSurface2 : Colors.grey.shade50;
-
-  static Color borderColorOf(BuildContext context) =>
-      isDark(context) ? _darkBorder : borderColor;
-
-  static Color subtextColorOf(BuildContext context) =>
-      isDark(context) ? _darkSubtext : subtextColor;
 
   static bool isDark(BuildContext context) =>
       Theme.of(context).brightness == Brightness.dark;
+
+  /// Card background — white in light, darkCard in dark
+  static Color cardColor(BuildContext context) =>
+      isDark(context) ? darkCard : cardWhite;
+
+  /// Input / secondary surface — grey50 in light, darkElement in dark
+  static Color surfaceColorOf(BuildContext context) =>
+      isDark(context) ? darkElement : Colors.grey.shade50;
+
+  /// Border color — borderColor in light, dark border in dark
+  static Color borderColorOf(BuildContext context) =>
+      isDark(context) ? const Color(0xFF333333) : borderColor;
+
+  /// Subtext color — subtextColor in light, muted in dark
+  static Color subtextColorOf(BuildContext context) =>
+      isDark(context) ? const Color(0xFF9E9E9E) : subtextColor;
 }

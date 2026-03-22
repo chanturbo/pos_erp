@@ -6,7 +6,7 @@ import '../providers/cart_provider.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/responsive_utils.dart';
 
-// ── OAG Tokens ────────────────────────────────────────────────────
+// ── Color Tokens ──────────────────────────────────────────────────
 const _navy    = AppTheme.navyColor;
 const _orange  = AppTheme.primaryColor;
 const _surface = AppTheme.surfaceColor;
@@ -27,9 +27,32 @@ class _ViewModeNotifier extends Notifier<ProductViewMode> {
 
 enum ProductViewMode { grid, list }
 
+// ── Helper: เลือกราคาตาม priceLevel (1-5), fallback = priceLevel1 ──
+double getPriceByLevel(ProductModel product, int level) {
+  switch (level) {
+    case 2:
+      return product.priceLevel2 > 0
+          ? product.priceLevel2
+          : product.priceLevel1;
+    case 3:
+      return product.priceLevel3 > 0
+          ? product.priceLevel3
+          : product.priceLevel1;
+    case 4:
+      return product.priceLevel4 > 0
+          ? product.priceLevel4
+          : product.priceLevel1;
+    case 5:
+      return product.priceLevel5 > 0
+          ? product.priceLevel5
+          : product.priceLevel1;
+    default:
+      return product.priceLevel1;
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────
-// ProductGrid — Grid/List toggle + responsive
-// รักษา addItem + SnackBar logic จากไฟล์เดิม
+// ProductGrid — Grid/List toggle + responsive + priceLevel
 // ─────────────────────────────────────────────────────────────────
 class ProductGrid extends ConsumerWidget {
   final List<ProductModel> products;
@@ -55,7 +78,7 @@ class ProductGrid extends ConsumerWidget {
 
     return Column(
       children: [
-        // ── Toolbar: count + toggle ─────────────────────────
+        // ── Toolbar: count + toggle ──────────────────────────
         _ProductToolbar(
           viewMode: viewMode,
           productCount: products.length,
@@ -86,6 +109,11 @@ class _ProductToolbar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // ✅ แสดง price level badge เมื่อลูกค้ามี priceLevel > 1
+    final priceLevel = ref.watch(cartProvider).customerPriceLevel;
+    final customerName = ref.watch(cartProvider).customerName;
+    final hasSpecialPrice = priceLevel > 1;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: const BoxDecoration(
@@ -111,6 +139,38 @@ class _ProductToolbar extends ConsumerWidget {
               ),
             ),
           ),
+
+          // ✅ Price level badge — แสดงเมื่อลูกค้าเป็นสมาชิก
+          if (hasSpecialPrice) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: _success.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                    color: _success.withValues(alpha: 0.4)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.loyalty,
+                      size: 11,
+                      color: _success.withValues(alpha: 0.8)),
+                  const SizedBox(width: 4),
+                  Text(
+                    'ราคา Lv.$priceLevel · ${customerName ?? ''}',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: _success.withValues(alpha: 0.9),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
 
           const Spacer(),
 
@@ -190,12 +250,11 @@ class _ToggleBtn extends StatelessWidget {
 
 // ─────────────────────────────────────────────────────────────────
 // _ProductImage — แสดงรูปจาก path หรือ placeholder ถ้าไม่มีรูป
-// size = 0 → ขยายเต็ม parent (ใช้กับ Grid card ภายใน Expanded)
-// size > 0 → กำหนดขนาดตายตัว (ใช้กับ List row)
+// size = 0 → ขยายเต็ม parent / size > 0 → fixed
 // ─────────────────────────────────────────────────────────────────
 class _ProductImage extends StatelessWidget {
   final String? imagePath;
-  final double size;       // 0 = expand, >0 = fixed
+  final double size;
   final BorderRadius borderRadius;
 
   const _ProductImage({
@@ -259,8 +318,6 @@ class _GridView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Responsive columns — คิดจาก screen width ทั้งหมด
-    // แต่ product grid อยู่ใน 60% ของหน้า จึงลด break point ลง
     final w = context.screenWidth;
     int cols;
     if (w < 900) {
@@ -288,7 +345,7 @@ class _GridView extends ConsumerWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// LIST VIEW — compact row เหมาะสินค้าเยอะ
+// LIST VIEW — compact row
 // ─────────────────────────────────────────────────────────────────
 class _ListViewContent extends ConsumerWidget {
   final List<ProductModel> products;
@@ -308,7 +365,7 @@ class _ListViewContent extends ConsumerWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Grid Card — รักษา addItem + SnackBar จากไฟล์เดิม
+// Grid Card
 // ─────────────────────────────────────────────────────────────────
 class _ProductGridCard extends ConsumerWidget {
   final ProductModel product;
@@ -316,15 +373,17 @@ class _ProductGridCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // ── ใช้สีขาวเสมอ ไม่ว่าจะ light/dark mode ──
-    // เพราะ Card บน POS page มี background สีอ่อน (white/surface)
-    // ไม่ได้ใช้ dark theme background
-    const nameColor  = Color(0xFF1A1A1A); // เข้มเสมอ
-    const codeColor  = AppTheme.subtextColor;
+    // ✅ watch priceLevel → rebuild เมื่อลูกค้าเปลี่ยน
+    final priceLevel  = ref.watch(cartProvider).customerPriceLevel;
+    final unitPrice   = getPriceByLevel(product, priceLevel);
+    final hasDiscount = priceLevel > 1 && unitPrice < product.priceLevel1;
+
+    const nameColor = Color(0xFF1A1A1A);
+    const codeColor = AppTheme.subtextColor;
 
     return Card(
       elevation: 0,
-      color: Colors.white, // Card สีขาวเสมอในหน้า POS
+      color: Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
         side: const BorderSide(color: _border),
@@ -333,11 +392,11 @@ class _ProductGridCard extends ConsumerWidget {
         borderRadius: BorderRadius.circular(10),
         hoverColor: _orange.withValues(alpha: 0.06),
         splashColor: _orange.withValues(alpha: 0.12),
-        onTap: () => _addToCart(context, ref),
+        onTap: () => _addToCart(context, ref, unitPrice),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // รูปสินค้า — size=0 → expand เต็ม Expanded area
+            // รูปสินค้า
             Expanded(
               child: _ProductImage(
                 imagePath: product.imagePath,
@@ -356,8 +415,7 @@ class _ProductGridCard extends ConsumerWidget {
                   Text(
                     product.productCode,
                     style: const TextStyle(
-                        fontSize: 10,
-                        color: codeColor),
+                        fontSize: 10, color: codeColor),
                   ),
                   const SizedBox(height: 2),
                   Text(
@@ -365,7 +423,7 @@ class _ProductGridCard extends ConsumerWidget {
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
-                      color: nameColor, // ✅ กำหนดสีเข้มเสมอ
+                      color: nameColor,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -375,13 +433,32 @@ class _ProductGridCard extends ConsumerWidget {
                     mainAxisAlignment:
                         MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        '฿${product.priceLevel1.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: _info,
-                        ),
+                      // ✅ แสดงราคาเดิมขีดทับถ้ามีราคาพิเศษ
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (hasDiscount)
+                            Text(
+                              '฿${product.priceLevel1.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: AppTheme.textSub,
+                                decoration:
+                                    TextDecoration.lineThrough,
+                              ),
+                            ),
+                          Text(
+                            '฿${unitPrice.toStringAsFixed(2)}',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              // ✅ สีเขียวถ้าราคาพิเศษ, สีปกติถ้าไม่มี
+                              color: hasDiscount
+                                  ? _success
+                                  : _info,
+                            ),
+                          ),
+                        ],
                       ),
                       Container(
                         padding: const EdgeInsets.all(4),
@@ -403,13 +480,14 @@ class _ProductGridCard extends ConsumerWidget {
     );
   }
 
-  void _addToCart(BuildContext context, WidgetRef ref) {
+  void _addToCart(
+      BuildContext context, WidgetRef ref, double unitPrice) {
     ref.read(cartProvider.notifier).addItem(
       productId: product.productId,
       productCode: product.productCode,
       productName: product.productName,
       unit: product.baseUnit,
-      unitPrice: product.priceLevel1,
+      unitPrice: unitPrice, // ✅ ราคาตาม priceLevel
     );
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -437,15 +515,19 @@ class _ProductListRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // ✅ watch priceLevel → rebuild เมื่อลูกค้าเปลี่ยน
+    final priceLevel  = ref.watch(cartProvider).customerPriceLevel;
+    final unitPrice   = getPriceByLevel(product, priceLevel);
+    final hasDiscount = priceLevel > 1 && unitPrice < product.priceLevel1;
+
     return InkWell(
-      onTap: () => _addToCart(context, ref),
+      onTap: () => _addToCart(context, ref, unitPrice),
       hoverColor: _orange.withValues(alpha: 0.05),
       child: Container(
         margin: const EdgeInsets.only(bottom: 2),
         padding: const EdgeInsets.symmetric(
             horizontal: 12, vertical: 9),
         decoration: BoxDecoration(
-          // ✅ สีขาวเสมอใน POS — ไม่ใช้ dark mode color
           color: isEven ? Colors.white : const Color(0xFFF9F9F7),
           borderRadius: BorderRadius.circular(6),
           border: Border.all(
@@ -453,7 +535,7 @@ class _ProductListRow extends ConsumerWidget {
         ),
         child: Row(
           children: [
-            // รูปสินค้า (40x40) — หรือ initials ถ้าไม่มีรูป
+            // รูปสินค้า
             _ProductImage(
               imagePath: product.imagePath,
               size: 40,
@@ -471,7 +553,7 @@ class _ProductListRow extends ConsumerWidget {
                     style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
-                      color: Color(0xFF1A1A1A), // ✅ เข้มเสมอ
+                      color: Color(0xFF1A1A1A),
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -485,20 +567,34 @@ class _ProductListRow extends ConsumerWidget {
               ),
             ),
 
-            // Price
-            Text(
-              '฿${product.priceLevel1.toStringAsFixed(2)}',
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: _info,
-              ),
+            // ✅ Price — แสดงราคาเดิมขีดทับถ้ามีราคาพิเศษ
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                if (hasDiscount)
+                  Text(
+                    '฿${product.priceLevel1.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: AppTheme.textSub,
+                      decoration: TextDecoration.lineThrough,
+                    ),
+                  ),
+                Text(
+                  '฿${unitPrice.toStringAsFixed(2)}',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: hasDiscount ? _success : _info,
+                  ),
+                ),
+              ],
             ),
             const SizedBox(width: 10),
 
             // Add button
             InkWell(
-              onTap: () => _addToCart(context, ref),
+              onTap: () => _addToCart(context, ref, unitPrice),
               borderRadius: BorderRadius.circular(6),
               child: Container(
                 padding: const EdgeInsets.all(6),
@@ -516,14 +612,14 @@ class _ProductListRow extends ConsumerWidget {
     );
   }
 
-  // ✅ รักษา addItem + SnackBar จากไฟล์เดิม
-  void _addToCart(BuildContext context, WidgetRef ref) {
+  void _addToCart(
+      BuildContext context, WidgetRef ref, double unitPrice) {
     ref.read(cartProvider.notifier).addItem(
       productId: product.productId,
       productCode: product.productCode,
       productName: product.productName,
       unit: product.baseUnit,
-      unitPrice: product.priceLevel1,
+      unitPrice: unitPrice, // ✅ ราคาตาม priceLevel
     );
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

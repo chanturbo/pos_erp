@@ -5,10 +5,8 @@ import 'package:file_picker/file_picker.dart';
 import '../providers/product_provider.dart';
 import '../../data/models/product_model.dart';
 import '../../../../shared/services/mobile_scanner_service.dart';
-import '../../../../shared/theme/app_theme.dart';
-import '../../../../shared/theme/app_colors.dart';
+import 'package:pos_erp/shared/theme/app_theme.dart';
 
-// ── Colors → AppColors ──────────────────────────────────────────
 
 // ─────────────────────────────────────────────────────────────────
 // ProductFormPage
@@ -206,7 +204,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
 
     return Scaffold(
       backgroundColor: Theme.of(context).brightness == Brightness.dark
-          ? AppColors.darkBg
+          ? AppTheme.darkBg
           : const Color(0xFFF5F5F5),
       body: Column(
         children: [
@@ -226,7 +224,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                       final isWide = bc.maxWidth >= 880;
                       final c1 = _SectionCard(
                               icon: Icons.inventory_2_outlined,
-                              iconColor: AppColors.primary,
+                              iconColor: AppTheme.primary,
                               title: 'ข้อมูลสินค้า',
                               child: Column(
                                 children: [
@@ -285,41 +283,47 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                             );
                       final c2 = _SectionCard(
                               icon: Icons.sell_outlined,
-                              iconColor: AppColors.info,
+                              iconColor: AppTheme.info,
                               title: 'ราคาขาย',
                               child: Column(
                                 children: [
-                                  // Level 1 (หลัก - required)
+                                  // ── Level 1 — ราคาปกติ (required) ────
                                   _FormField(
                                     controller: _price1Controller,
-                                    label: 'ราคาปกติ (Level 1)',
+                                    label: 'Level 1 — ราคาปกติ / ลูกค้าทั่วไป',
                                     icon: Icons.monetization_on_outlined,
                                     required: true,
                                     keyboardType: TextInputType.number,
                                     enabled: !_isLoading,
-                                    prefixText: '฿',
+                                    prefixText: '฿',                                    
                                     validator: (v) => (v == null || v.isEmpty)
                                         ? 'กรุณากรอกราคา'
                                         : null,
                                   ),
                                   const SizedBox(height: 14),
+                                  // ── Level 2 & 3 ───────────────────────
                                   _PriceRow(
                                     c1: _price2Controller,
                                     l1: 'Level 2',
+                                    h1: 'ราคาสมาชิก',
                                     c2: _price3Controller,
                                     l2: 'Level 3',
+                                    h2: 'ราคาส่ง',
                                     enabled: !_isLoading,
                                   ),
                                   const SizedBox(height: 10),
+                                  // ── Level 4 & 5 ───────────────────────
                                   _PriceRow(
                                     c1: _price4Controller,
                                     l1: 'Level 4',
+                                    h1: 'ราคาตัวแทน',
                                     c2: _price5Controller,
                                     l2: 'Level 5',
+                                    h2: 'ราคา VIP / พิเศษ',
                                     enabled: !_isLoading,
                                   ),
                                   const SizedBox(height: 14),
-                                  // ต้นทุน
+                                  // ── ต้นทุน ────────────────────────────
                                   _FormField(
                                     controller: _costController,
                                     label: 'ต้นทุนมาตรฐาน',
@@ -327,6 +331,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                                     keyboardType: TextInputType.number,
                                     enabled: !_isLoading,
                                     prefixText: '฿',
+                                    helperText: 'ใช้คำนวณกำไรขั้นต้น',
                                   ),
                                 ],
                               ),
@@ -349,7 +354,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                                 // ตั้งค่าสต๊อก
                                 _SectionCard(
                                   icon: Icons.warehouse_outlined,
-                                  iconColor: AppColors.success,
+                                  iconColor: AppTheme.success,
                                   title: 'ตั้งค่าสต๊อก',
                                   child: Column(
                                     children: [
@@ -357,13 +362,13 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                                         label: 'ควบคุมสต๊อก',
                                         subLabel: 'ติดตามการเคลื่อนไหว',
                                         value: _isStockControl,
-                                        activeColor: AppColors.success,
+                                        activeColor: AppTheme.success,
                                         onChanged: (v) => setState(
                                             () => _isStockControl = v),
                                       ),
                                       if (_isStockControl) ...[
                                         const Divider(
-                                            height: 16, color: AppColors.borderDark),
+                                            height: 16, color: AppTheme.border),
                                         _SwitchRow(
                                           label: 'อนุญาตติดลบ',
                                           subLabel: 'ขายได้แม้สต๊อกหมด',
@@ -412,7 +417,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
           Builder(builder: (context) {
             final isDark = Theme.of(context).brightness == Brightness.dark;
             return Container(
-            color: isDark ? AppColors.darkTopBar : Colors.white,
+            color: isDark ? AppTheme.darkTopBar : Colors.white,
             padding:
                 const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
             child: Row(
@@ -424,12 +429,12 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 24, vertical: 12),
-                    side: const BorderSide(color: AppColors.borderDark),
+                    side: const BorderSide(color: AppTheme.border),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8)),
                   ),
                   child: const Text('ยกเลิก',
-                      style: TextStyle(color: AppColors.textSub)),
+                      style: TextStyle(color: AppTheme.textSub)),
                 ),
                 const SizedBox(width: 12),
                 ElevatedButton.icon(
@@ -445,7 +450,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                   label: Text(isEdit ? 'บันทึก' : 'เพิ่มสินค้า',
                       style: const TextStyle(fontSize: 14)),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
+                    backgroundColor: AppTheme.primary,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(
                         horizontal: 24, vertical: 12),
@@ -475,18 +480,18 @@ class _TitleBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      color: isDark ? AppColors.darkTopBar : Colors.white,
+      color: isDark ? AppTheme.darkTopBar : Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AppColors.primaryLight,
+              color: AppTheme.primaryLight,
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Icon(Icons.inventory_2_outlined,
-                color: AppColors.primary, size: 20),
+                color: AppTheme.primary, size: 20),
           ),
           const SizedBox(width: 12),
           Text(
@@ -504,7 +509,7 @@ class _TitleBar extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.all(4),
                 child: Icon(Icons.close, size: 20,
-                    color: isDark ? Colors.white54 : AppColors.textSub),
+                    color: isDark ? Colors.white54 : AppTheme.textSub),
               ),
             ),
         ],
@@ -570,13 +575,13 @@ class _BarcodeField extends StatelessWidget {
           style: const TextStyle(fontSize: 13),
           decoration: InputDecoration(
             labelText: 'บาร์โค้ด',
-            labelStyle: const TextStyle(fontSize: 13, color: AppColors.textSub),
+            labelStyle: const TextStyle(fontSize: 13, color: AppTheme.textSub),
             hintText: 'กรอกหรือสแกนบาร์โค้ด',
-            hintStyle: const TextStyle(fontSize: 12, color: AppColors.textSub),
-            prefixIcon: const Icon(Icons.qr_code, size: 17, color: AppColors.textSub),
+            hintStyle: const TextStyle(fontSize: 12, color: AppTheme.textSub),
+            prefixIcon: const Icon(Icons.qr_code, size: 17, color: AppTheme.textSub),
             suffixIcon: IconButton(
               icon: const Icon(Icons.qr_code_scanner,
-                  size: 18, color: AppColors.info),
+                  size: 18, color: AppTheme.info),
               tooltip: 'สแกน',
               onPressed: enabled
                   ? () async {
@@ -594,17 +599,17 @@ class _BarcodeField extends StatelessWidget {
                 const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: AppColors.borderDark)),
+                borderSide: const BorderSide(color: AppTheme.border)),
             enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: AppColors.borderDark)),
+                borderSide: const BorderSide(color: AppTheme.border)),
             focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
                 borderSide:
-                    const BorderSide(color: AppColors.primary, width: 1.5)),
+                    const BorderSide(color: AppTheme.primary, width: 1.5)),
             filled: true,
             fillColor: Theme.of(context).brightness == Brightness.dark
-                ? AppColors.darkElement
+                ? AppTheme.darkElement
                 : Colors.white,
           ),
         ),
@@ -642,21 +647,21 @@ class _ProductCodeField extends StatelessWidget {
         Row(
           children: [
             const Text('รหัสสินค้า *',
-                style: TextStyle(fontSize: 12, color: AppColors.textSub)),
+                style: TextStyle(fontSize: 12, color: AppTheme.textSub)),
             const SizedBox(width: 6),
             if (isAutoGenerated)
               Container(
                 padding: const EdgeInsets.symmetric(
                     horizontal: 7, vertical: 2),
                 decoration: BoxDecoration(
-                  color: AppColors.successBg,
+                  color: AppTheme.successContainer,
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: const Color(0xFF81C784)),
                 ),
                 child: const Text('สร้างอัตโนมัติ',
                     style: TextStyle(
                         fontSize: 10,
-                        color: AppColors.success,
+                        color: AppTheme.success,
                         fontWeight: FontWeight.w600)),
               ),
             const Spacer(),
@@ -669,21 +674,21 @@ class _ProductCodeField extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(
                       horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: AppColors.primaryLight,
+                    color: AppTheme.primaryLight,
                     borderRadius: BorderRadius.circular(6),
                     border: Border.all(
-                        color: AppColors.primary.withValues(alpha: 0.3)),
+                        color: AppTheme.primary.withValues(alpha: 0.3)),
                   ),
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(Icons.auto_awesome,
-                          size: 12, color: AppColors.primary),
+                          size: 12, color: AppTheme.primary),
                       SizedBox(width: 4),
                       Text('สร้างรหัส',
                           style: TextStyle(
                               fontSize: 11,
-                              color: AppColors.primary,
+                              color: AppTheme.primary,
                               fontWeight: FontWeight.w500)),
                     ],
                   ),
@@ -703,30 +708,30 @@ class _ProductCodeField extends StatelessWidget {
               (v == null || v.isEmpty) ? 'กรุณากรอกรหัสสินค้า' : null,
           decoration: InputDecoration(
             hintText: 'เช่น PRD-250321-001 หรือเท่ากับบาร์โค้ด',
-            hintStyle: const TextStyle(fontSize: 12, color: AppColors.textSub),
+            hintStyle: const TextStyle(fontSize: 12, color: AppTheme.textSub),
             prefixIcon:
-                const Icon(Icons.tag, size: 17, color: AppColors.textSub),
+                const Icon(Icons.tag, size: 17, color: AppTheme.textSub),
             contentPadding: const EdgeInsets.symmetric(
                 horizontal: 12, vertical: 12),
             border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: AppColors.borderDark)),
+                borderSide: const BorderSide(color: AppTheme.border)),
             enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
                 borderSide: BorderSide(
                     color: isAutoGenerated
                         ? const Color(0xFF81C784)
-                        : AppColors.borderDark)),
+                        : AppTheme.border)),
             focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
                 borderSide:
-                    const BorderSide(color: AppColors.primary, width: 1.5)),
+                    const BorderSide(color: AppTheme.primary, width: 1.5)),
             errorBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
                 borderSide: const BorderSide(color: Colors.red)),
             filled: true,
             fillColor: isAutoGenerated
-                ? AppColors.successBg.withValues(alpha: 0.4)
+                ? AppTheme.successContainer.withValues(alpha: 0.4)
                 : Colors.white,
           ),
         ),
@@ -737,7 +742,7 @@ class _ProductCodeField extends StatelessWidget {
             isEdit
                 ? 'รหัสสินค้า (ไม่แนะนำให้เปลี่ยน)'
                 : 'ปล่อยว่างระบบจะสร้างให้อัตโนมัติ หรือใช้บาร์โค้ดเป็นรหัส',
-            style: const TextStyle(fontSize: 10, color: AppColors.textSub),
+            style: const TextStyle(fontSize: 10, color: AppTheme.textSub),
           ),
         ),
       ],
@@ -751,15 +756,19 @@ class _ProductCodeField extends StatelessWidget {
 class _PriceRow extends StatelessWidget {
   final TextEditingController c1;
   final String l1;
+  final String h1; // helper text field 1
   final TextEditingController c2;
   final String l2;
+  final String h2; // helper text field 2
   final bool enabled;
 
   const _PriceRow({
     required this.c1,
     required this.l1,
+    required this.h1,
     required this.c2,
     required this.l2,
+    required this.h2,
     required this.enabled,
   });
 
@@ -770,7 +779,7 @@ class _PriceRow extends StatelessWidget {
         Expanded(
           child: _FormField(
             controller: c1,
-            label: 'ราคา $l1',
+            label: '$l1 — $h1',
             icon: Icons.attach_money,
             keyboardType: TextInputType.number,
             prefixText: '฿',
@@ -781,7 +790,7 @@ class _PriceRow extends StatelessWidget {
         Expanded(
           child: _FormField(
             controller: c2,
-            label: 'ราคา $l2',
+            label: '$l2 — $h2',
             icon: Icons.attach_money,
             keyboardType: TextInputType.number,
             prefixText: '฿',
@@ -831,7 +840,7 @@ class _SwitchRow extends StatelessWidget {
                       fontSize: 11,
                       color: Theme.of(context).brightness == Brightness.dark
                           ? Colors.white54
-                          : AppColors.textSub)),
+                          : AppTheme.textSub)),
             ],
           ),
         ),
@@ -867,10 +876,10 @@ class _SectionCard extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? AppColors.darkCard : Colors.white,
+        color: isDark ? AppTheme.darkCard : Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-            color: isDark ? Colors.white12 : AppColors.borderDark),
+            color: isDark ? Colors.white12 : AppTheme.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -879,14 +888,14 @@ class _SectionCard extends StatelessWidget {
             padding:
                 const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: isDark ? AppColors.darkElement : AppColors.headerBg,
+              color: isDark ? AppTheme.darkElement : AppTheme.headerBg,
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(12),
                 topRight: Radius.circular(12),
               ),
               border: Border(
                   bottom: BorderSide(
-                      color: isDark ? Colors.white12 : AppColors.borderDark)),
+                      color: isDark ? Colors.white12 : AppTheme.border)),
             ),
             child: Row(
               children: [
@@ -965,23 +974,23 @@ class _FormField extends StatelessWidget {
             fontSize: 13,
             color: Theme.of(context).brightness == Brightness.dark
                 ? Colors.white60
-                : AppColors.textSub),
+                : AppTheme.textSub),
         helperText: helperText,
         helperStyle: TextStyle(
             fontSize: 11,
             color: Theme.of(context).brightness == Brightness.dark
                 ? Colors.white54
-                : AppColors.textSub),
+                : AppTheme.textSub),
         prefixIcon: Icon(icon, size: 17,
             color: Theme.of(context).brightness == Brightness.dark
                 ? Colors.white54
-                : AppColors.textSub),
+                : AppTheme.textSub),
         prefixText: prefixText,
         prefixStyle: TextStyle(
             fontSize: 13,
             color: Theme.of(context).brightness == Brightness.dark
                 ? Colors.white70
-                : AppColors.textSub),
+                : AppTheme.textSub),
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         border: OutlineInputBorder(
@@ -989,26 +998,26 @@ class _FormField extends StatelessWidget {
             borderSide: BorderSide(
                 color: Theme.of(context).brightness == Brightness.dark
                     ? Colors.white24
-                    : AppColors.borderDark)),
+                    : AppTheme.border)),
         enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
             borderSide: BorderSide(
                 color: Theme.of(context).brightness == Brightness.dark
                     ? Colors.white24
-                    : AppColors.borderDark)),
+                    : AppTheme.border)),
         focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
+            borderSide: const BorderSide(color: AppTheme.primary, width: 1.5)),
         errorBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
             borderSide: const BorderSide(color: Colors.red)),
         filled: true,
         fillColor: enabled
             ? (Theme.of(context).brightness == Brightness.dark
-                ? AppColors.darkElement
+                ? AppTheme.darkElement
                 : Colors.white)
             : (Theme.of(context).brightness == Brightness.dark
-                ? AppColors.darkCard
+                ? AppTheme.darkCard
                 : const Color(0xFFF5F5F5)),
       ),
     );
@@ -1044,12 +1053,12 @@ class _ImagePickerWidget extends StatelessWidget {
             width: double.infinity,
             height: 120,
             decoration: BoxDecoration(
-              color: AppColors.primaryLight,
+              color: AppTheme.primaryLight,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
                 color: hasImage && fileExists
-                    ? AppColors.primary.withValues(alpha: 0.4)
-                    : AppColors.borderDark,
+                    ? AppTheme.primary.withValues(alpha: 0.4)
+                    : AppTheme.border,
                 width: hasImage && fileExists ? 1.5 : 1,
               ),
             ),
@@ -1075,7 +1084,7 @@ class _ImagePickerWidget extends StatelessWidget {
                 label: Text(hasImage ? 'เปลี่ยนรูป' : 'เลือกรูป',
                     style: const TextStyle(fontSize: 12)),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
+                  backgroundColor: AppTheme.primary,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   shape: RoundedRectangleBorder(
@@ -1103,7 +1112,7 @@ class _ImagePickerWidget extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         const Text('JPG, PNG, WEBP',
-            style: TextStyle(fontSize: 10, color: AppColors.textSub)),
+            style: TextStyle(fontSize: 10, color: AppTheme.textSub)),
       ],
     );
   }
@@ -1112,12 +1121,12 @@ class _ImagePickerWidget extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.add_photo_alternate_outlined,
-              size: 32, color: AppColors.primary.withValues(alpha: 0.4)),
+              size: 32, color: AppTheme.primary.withValues(alpha: 0.4)),
           const SizedBox(height: 6),
           Text('กดเพื่อเลือกรูป',
               style: TextStyle(
                   fontSize: 11,
-                  color: AppColors.primary.withValues(alpha: 0.6))),
+                  color: AppTheme.primary.withValues(alpha: 0.6))),
         ],
       );
 }

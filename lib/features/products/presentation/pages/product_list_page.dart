@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pos_erp/shared/theme/app_theme.dart';
 import '../providers/product_provider.dart';
 import '../../data/models/product_model.dart';
 import 'product_form_page.dart';
 import 'product_pdf_report.dart'; // ✅ PDF report
-import '../../../../shared/theme/app_colors.dart';
 import '../../../../shared/pdf/pdf_report_button.dart';
 
-// ── Colors → AppColors ──────────────────────────────────────────
 
 class ProductListPage extends ConsumerStatefulWidget {
   const ProductListPage({super.key});
@@ -97,7 +96,7 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
             child: const Text('ยกเลิก'),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
             onPressed: () => Navigator.pop(context, true),
             child: const Text('ลบ'),
           ),
@@ -113,7 +112,7 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(ok ? 'ลบสินค้าสำเร็จ' : 'ลบสินค้าไม่สำเร็จ'),
-      backgroundColor: ok ? AppColors.success : AppColors.error,
+      backgroundColor: ok ? AppTheme.success : AppTheme.error,
       behavior: SnackBarBehavior.floating,
     ));
   }
@@ -203,15 +202,15 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
           child: Row(
             children: [
-              _SummaryChip('ทั้งหมด', all.length, AppColors.navy),
+              _SummaryChip('ทั้งหมด', all.length, AppTheme.navy),
               const SizedBox(width: 8),
-              _SummaryChip('กรองแล้ว', filtered.length, AppColors.primaryDark),
+              _SummaryChip('กรองแล้ว', filtered.length, AppTheme.primaryDark),
               const SizedBox(width: 8),
               _SummaryChip('ใช้งาน',
-                  all.where((p) => p.isActive).length, AppColors.success),
+                  all.where((p) => p.isActive).length, AppTheme.success),
               const SizedBox(width: 8),
               _SummaryChip('ปิดใช้',
-                  all.where((p) => !p.isActive).length, AppColors.error),
+                  all.where((p) => !p.isActive).length, AppTheme.error),
             ],
           ),
         );
@@ -363,7 +362,7 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
-            side: const BorderSide(color: AppColors.borderDark),
+            side: const BorderSide(color: AppTheme.border),
           ),
           child: ListTile(
             contentPadding:
@@ -372,10 +371,10 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
             leading: Container(
               width: 44, height: 44,
               decoration: BoxDecoration(
-                color: AppColors.primaryDark.withValues(alpha: 0.10),
+                color: AppTheme.primaryDark.withValues(alpha: 0.10),
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
-                    color: AppColors.primaryDark.withValues(alpha: 0.25)),
+                    color: AppTheme.primaryDark.withValues(alpha: 0.25)),
               ),
               child: Center(
                 child: Text(
@@ -384,7 +383,7 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
                       : p.productCode,
                   style: const TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: AppColors.primaryDark,
+                      color: AppTheme.primaryDark,
                       fontSize: 13),
                 ),
               ),
@@ -411,7 +410,7 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
                         style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
-                            color: AppColors.info)),
+                            color: AppTheme.info)),
                     _StatusBadge(active: p.isActive),
                   ],
                 ),
@@ -419,7 +418,7 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
                 // Edit button
                 IconButton(
                   icon: const Icon(Icons.edit_outlined,
-                      size: 18, color: AppColors.info),
+                      size: 18, color: AppTheme.info),
                   tooltip: 'แก้ไข',
                   constraints:
                       const BoxConstraints(minWidth: 36, minHeight: 36),
@@ -432,7 +431,7 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
                 // Delete button
                 IconButton(
                   icon: const Icon(Icons.delete_outline,
-                      size: 18, color: AppColors.error),
+                      size: 18, color: AppTheme.error),
                   tooltip: 'ลบ',
                   constraints:
                       const BoxConstraints(minWidth: 36, minHeight: 36),
@@ -489,7 +488,7 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline, size: 72, color: AppColors.error),
+            const Icon(Icons.error_outline, size: 72, color: AppTheme.error),
             const SizedBox(height: 12),
             Text('เกิดข้อผิดพลาด: $e'),
             const SizedBox(height: 12),
@@ -580,7 +579,7 @@ class _ProductListTopBar extends StatelessWidget {
           icon: Icons.check_circle_outline,
           tooltip: isActiveOnly ? 'แสดงทั้งหมด' : 'เฉพาะที่ใช้งาน',
           active: isActiveOnly,
-          activeColor: AppColors.success,
+          activeColor: AppTheme.success,
           onTap: onToggleActive,
         ),
         const SizedBox(width: 6),
@@ -591,7 +590,7 @@ class _ProductListTopBar extends StatelessWidget {
               : Icons.table_rows_outlined,
           tooltip: isTableView ? 'Card View' : 'Table View',
           active: false,
-          activeColor: AppColors.navy,
+          activeColor: AppTheme.navy,
           onTap: onToggleView,
         ),
         const SizedBox(width: 6),
@@ -628,7 +627,7 @@ class _ProductListTopBar extends StatelessWidget {
               icon: Icons.check_circle_outline,
               tooltip: isActiveOnly ? 'แสดงทั้งหมด' : 'เฉพาะที่ใช้งาน',
               active: isActiveOnly,
-              activeColor: AppColors.success,
+              activeColor: AppTheme.success,
               onTap: onToggleActive,
             ),
             const SizedBox(width: 4),
@@ -638,7 +637,7 @@ class _ProductListTopBar extends StatelessWidget {
                   : Icons.table_rows_outlined,
               tooltip: isTableView ? 'Card View' : 'Table View',
               active: false,
-              activeColor: AppColors.navy,
+              activeColor: AppTheme.navy,
               onTap: onToggleView,
             ),
             const SizedBox(width: 4),
@@ -673,7 +672,7 @@ class _PBackBtn extends StatelessWidget {
           decoration: BoxDecoration(
             color: const Color(0xFFF5F5F5),
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppColors.borderDark),
+            border: Border.all(color: AppTheme.border),
           ),
           child: const Icon(Icons.arrow_back_ios_new,
               size: 15, color: Color(0xFF8A8A8A)),
@@ -686,11 +685,11 @@ class _PPageIcon extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.all(7),
         decoration: BoxDecoration(
-          color: AppColors.primaryLight,
+          color: AppTheme.primaryLight,
           borderRadius: BorderRadius.circular(8),
         ),
         child: const Icon(Icons.inventory_2_outlined,
-            color: AppColors.primary, size: 18),
+            color: AppTheme.primary, size: 18),
       );
 }
 
@@ -733,7 +732,7 @@ class _PSearchField extends StatelessWidget {
             focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
                 borderSide:
-                    const BorderSide(color: AppColors.primary, width: 1.5)),
+                    const BorderSide(color: AppTheme.primary, width: 1.5)),
             filled: true,
             fillColor: Colors.white,
           ),
@@ -769,7 +768,7 @@ class _PToggleBtn extends StatelessWidget {
                   : const Color(0xFFF5F5F5),
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                  color: active ? activeColor : AppColors.borderDark),
+                  color: active ? activeColor : AppTheme.border),
             ),
             child: Icon(icon,
                 size: 17,
@@ -793,7 +792,7 @@ class _PRefreshBtn extends StatelessWidget {
             decoration: BoxDecoration(
               color: const Color(0xFFF5F5F5),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppColors.borderDark),
+              border: Border.all(color: AppTheme.border),
             ),
             child: const Icon(Icons.refresh,
                 size: 17, color: Color(0xFF8A8A8A)),
@@ -816,7 +815,7 @@ class _PAddBtn extends StatelessWidget {
                 style: TextStyle(
                     fontSize: 13, fontWeight: FontWeight.w600)),
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primary,
+          backgroundColor: AppTheme.primary,
           foregroundColor: Colors.white,
           padding: EdgeInsets.symmetric(
               horizontal: compact ? 12 : 18, vertical: 13),
@@ -832,7 +831,7 @@ class _PAddBtn extends StatelessWidget {
 // ════════════════════════════════════════════════════════════════
 // _ProductTableRow — แยก widget เพื่อให้ rebuild เฉพาะ row ที่เปลี่ยน
 // ════════════════════════════════════════════════════════════════
-class _ProductTableRow extends StatelessWidget {
+class _ProductTableRow extends StatefulWidget {
   final ProductModel product;
   final int no;
   final bool isEven;
@@ -850,26 +849,38 @@ class _ProductTableRow extends StatelessWidget {
   });
 
   @override
+  State<_ProductTableRow> createState() => _ProductTableRowState();
+}
+
+class _ProductTableRowState extends State<_ProductTableRow> {
+  bool _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
-    final p = product;
+    final p = widget.product;
     // ── สีที่คงที่ไม่ขึ้นกับ dark mode ─────────────────────────
     // Table/Card ใช้พื้นหลังขาว → ตัวหนังสือต้องเข้มเสมอ
     const nameColor = Color(0xFF1A1A1A);
     const codeColor = Color(0xFF555555);
 
-    final w = colWidths;
-    return InkWell(
-      onDoubleTap: onEdit,
-      hoverColor: AppColors.primaryDark.withValues(alpha: 0.05),
-      child: Container(
-        color: isEven ? Colors.white : const Color(0xFFF9F9F7),
-        child: Row(
-          children: [
+    final w = widget.colWidths;
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onDoubleTap: widget.onEdit,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          color: _hovered
+              ? AppTheme.primaryLight
+              : (widget.isEven ? Colors.white : const Color(0xFFF9F9F7)),
+          child: Row(
+            children: [
             // No. (fixed)
             SizedBox(
               width: 48,
               child: Center(
-                child: Text('$no',
+                child: Text('${widget.no}',
                     style: const TextStyle(
                         fontSize: 12, color: Color(0xFFBBBBBB))),
               ),
@@ -930,7 +941,7 @@ class _ProductTableRow extends StatelessWidget {
                       style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.info)),
+                          color: AppTheme.info)),
                 ),
               ),
             ),
@@ -954,7 +965,7 @@ class _ProductTableRow extends StatelessWidget {
                 child: Icon(
                   p.isStockControl ? Icons.inventory_2 : Icons.remove,
                   size: 16,
-                  color: p.isStockControl ? AppColors.success : Colors.grey[400],
+                  color: p.isStockControl ? AppTheme.success : Colors.grey[400],
                 ),
               ),
             ),
@@ -971,18 +982,19 @@ class _ProductTableRow extends StatelessWidget {
                 children: [
                   _ActionIconBtn(
                       icon: Icons.edit_outlined,
-                      color: AppColors.info,
+                      color: AppTheme.info,
                       tooltip: 'แก้ไข',
-                      onTap: onEdit),
+                      onTap: widget.onEdit),
                   _ActionIconBtn(
                       icon: Icons.delete_outline,
-                      color: AppColors.error,
+                      color: AppTheme.error,
                       tooltip: 'ลบ',
-                      onTap: onDelete),
+                      onTap: widget.onDelete),
                 ],
               ),
             ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1032,7 +1044,7 @@ class _ProductResizableHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: AppColors.navy,
+      color: AppTheme.navy,
       child: Row(
         children: [
           // No. fixed

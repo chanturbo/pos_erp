@@ -18,7 +18,6 @@ class CustomerRoutes {
     router.put('/<id>', _updateCustomerHandler);
     router.delete('/<id>', _deleteCustomerHandler);
     router.get('/code/<code>', _getCustomerByCodeHandler);
-    // ✅ Week 5: Member endpoints
     router.get('/member/<memberNo>', _getCustomerByMemberNoHandler);
     router.put('/<id>/points', _updatePointsHandler);
 
@@ -26,24 +25,39 @@ class CustomerRoutes {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // Helpers
+  // Helpers — JOIN กับ customer_groups เพื่อดึง price_level
   // ─────────────────────────────────────────────────────────────
-  Map<String, dynamic> _toMap(Customer c) => {
-        'customer_id': c.customerId,
-        'customer_code': c.customerCode,
-        'customer_name': c.customerName,
-        'customer_group_id': c.customerGroupId,
-        'address': c.address,
-        'phone': c.phone,
-        'email': c.email,
-        'tax_id': c.taxId,
-        'credit_limit': c.creditLimit,
-        'credit_days': c.creditDays,
-        'current_balance': c.currentBalance,
-        'member_no': c.memberNo,
-        'points': c.points,
-        'is_active': c.isActive,
-      };
+
+  /// ดึง priceLevel จาก customer_groups โดยใช้ customerGroupId
+  Future<int> _getPriceLevel(String? customerGroupId) async {
+    if (customerGroupId == null) return 1;
+    final group = await (db.select(db.customerGroups)
+          ..where((t) => t.customerGroupId.equals(customerGroupId)))
+        .getSingleOrNull();
+    return group?.priceLevel ?? 1;
+  }
+
+  /// แปลง Customer → Map พร้อม price_level
+  Future<Map<String, dynamic>> _toMapWithPriceLevel(Customer c) async {
+    final priceLevel = await _getPriceLevel(c.customerGroupId);
+    return {
+      'customer_id': c.customerId,
+      'customer_code': c.customerCode,
+      'customer_name': c.customerName,
+      'customer_group_id': c.customerGroupId,
+      'address': c.address,
+      'phone': c.phone,
+      'email': c.email,
+      'tax_id': c.taxId,
+      'credit_limit': c.creditLimit,
+      'credit_days': c.creditDays,
+      'current_balance': c.currentBalance,
+      'member_no': c.memberNo,
+      'points': c.points,
+      'price_level': priceLevel, // ✅ ดึงจาก customer_groups
+      'is_active': c.isActive,
+    };
+  }
 
   // ─────────────────────────────────────────────────────────────
   // GET /api/customers
@@ -51,8 +65,10 @@ class CustomerRoutes {
   Future<Response> _getCustomersHandler(Request request) async {
     try {
       final customers = await db.select(db.customers).get();
+      // ดึง priceLevel ทุกรายการพร้อมกัน
+      final data = await Future.wait(customers.map(_toMapWithPriceLevel));
       return Response.ok(
-        jsonEncode({'success': true, 'data': customers.map(_toMap).toList()}),
+        jsonEncode({'success': true, 'data': data}),
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
@@ -71,11 +87,11 @@ class CustomerRoutes {
             ..where((t) => t.customerId.equals(id)))
           .getSingleOrNull();
       if (customer == null) {
-        return Response.notFound(jsonEncode(
-            {'success': false, 'message': 'ไม่พบลูกค้า'}));
+        return Response.notFound(
+            jsonEncode({'success': false, 'message': 'ไม่พบลูกค้า'}));
       }
       return Response.ok(
-        jsonEncode({'success': true, 'data': _toMap(customer)}),
+        jsonEncode({'success': true, 'data': await _toMapWithPriceLevel(customer)}),
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
@@ -95,11 +111,22 @@ class CustomerRoutes {
 
       final customerId = 'CUS${DateTime.now().millisecondsSinceEpoch}';
 
+      // ✅ Resolve customer_group_id จาก price_level (ถ้าส่งมา)
+      String? resolvedGroupId = data['customer_group_id'] as String?;
+      final requestedLevel = data['price_level'] as int?;
+      if (requestedLevel != null) {
+        final groups = await db.select(db.customerGroups).get();
+        final matched = groups.where((g) => g.priceLevel == requestedLevel).firstOrNull;
+        if (matched != null) {
+          resolvedGroupId = matched.customerGroupId;
+        }
+      }
+
       await db.into(db.customers).insert(CustomersCompanion.insert(
             customerId: customerId,
             customerCode: data['customer_code'] as String,
             customerName: data['customer_name'] as String,
-            customerGroupId: Value(data['customer_group_id'] as String?),
+            customerGroupId: Value(resolvedGroupId), // ✅
             address: Value(data['address'] as String?),
             phone: Value(data['phone'] as String?),
             email: Value(data['email'] as String?),
@@ -107,7 +134,6 @@ class CustomerRoutes {
             creditLimit: Value((data['credit_limit'] as num?)?.toDouble() ?? 0),
             creditDays: Value(data['credit_days'] as int? ?? 0),
             memberNo: Value(data['member_no'] as String?),
-            // ✅ รองรับ points ตอนสร้าง (optional)
             points: Value(data['points'] as int? ?? 0),
           ));
 
@@ -130,7 +156,6 @@ class CustomerRoutes {
   // PUT /api/customers/:id
   // ─────────────────────────────────────────────────────────────
   Future<Response> _updateCustomerHandler(Request request, String id) async {
-    // ✅ ป้องกันแก้ไขลูกค้าระบบ
     if (id == 'WALK_IN') {
       return Response.forbidden(
         jsonEncode({'success': false, 'message': 'ไม่สามารถแก้ไขลูกค้าระบบได้'}),
@@ -141,11 +166,26 @@ class CustomerRoutes {
       final payload = await request.readAsString();
       final data = jsonDecode(payload) as Map<String, dynamic>;
 
+      // ✅ ถ้า client ส่ง price_level มา → lookup customer_group_id ที่ตรงกัน
+      // ถ้าไม่ส่ง → ใช้ customer_group_id จาก body ตามเดิม
+      String? resolvedGroupId = data['customer_group_id'] as String?;
+
+      final requestedLevel = data['price_level'] as int?;
+      if (requestedLevel != null) {
+        // หา group ที่มี priceLevel ตรงกัน
+        final groups = await db.select(db.customerGroups).get();
+        final matched = groups.where((g) => g.priceLevel == requestedLevel).firstOrNull;
+        if (matched != null) {
+          resolvedGroupId = matched.customerGroupId;
+        }
+        // ถ้าหาไม่เจอ group ที่ตรงกัน ยังคง resolvedGroupId เดิม (ไม่เปลี่ยน)
+      }
+
       await (db.update(db.customers)..where((t) => t.customerId.equals(id)))
           .write(CustomersCompanion(
         customerCode: Value(data['customer_code'] as String),
         customerName: Value(data['customer_name'] as String),
-        customerGroupId: Value(data['customer_group_id'] as String?),
+        customerGroupId: Value(resolvedGroupId), // ✅ ใช้ resolved group
         address: Value(data['address'] as String?),
         phone: Value(data['phone'] as String?),
         email: Value(data['email'] as String?),
@@ -171,7 +211,6 @@ class CustomerRoutes {
   // DELETE /api/customers/:id
   // ─────────────────────────────────────────────────────────────
   Future<Response> _deleteCustomerHandler(Request request, String id) async {
-    // ✅ ป้องกันลบลูกค้าระบบ
     if (id == 'WALK_IN') {
       return Response.forbidden(
         jsonEncode({'success': false, 'message': 'ไม่สามารถลบลูกค้าระบบได้'}),
@@ -179,9 +218,7 @@ class CustomerRoutes {
       );
     }
     try {
-      await (db.delete(db.customers)
-            ..where((t) => t.customerId.equals(id)))
-          .go();
+      await (db.delete(db.customers)..where((t) => t.customerId.equals(id))).go();
       return Response.ok(
         jsonEncode({'success': true, 'message': 'ลบลูกค้าสำเร็จ'}),
         headers: {'Content-Type': 'application/json'},
@@ -207,7 +244,7 @@ class CustomerRoutes {
             jsonEncode({'success': false, 'message': 'ไม่พบลูกค้า'}));
       }
       return Response.ok(
-        jsonEncode({'success': true, 'data': _toMap(customer)}),
+        jsonEncode({'success': true, 'data': await _toMapWithPriceLevel(customer)}),
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
@@ -218,7 +255,7 @@ class CustomerRoutes {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // ✅ Week 5: GET /api/customers/member/:memberNo
+  // GET /api/customers/member/:memberNo
   // ─────────────────────────────────────────────────────────────
   Future<Response> _getCustomerByMemberNoHandler(
       Request request, String memberNo) async {
@@ -231,7 +268,7 @@ class CustomerRoutes {
             jsonEncode({'success': false, 'message': 'ไม่พบสมาชิก'}));
       }
       return Response.ok(
-        jsonEncode({'success': true, 'data': _toMap(customer)}),
+        jsonEncode({'success': true, 'data': await _toMapWithPriceLevel(customer)}),
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
@@ -242,8 +279,7 @@ class CustomerRoutes {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // ✅ Week 5: PUT /api/customers/:id/points
-  // Body: { "action": "add"|"deduct", "points": 10, "remark": "..." }
+  // PUT /api/customers/:id/points
   // ─────────────────────────────────────────────────────────────
   Future<Response> _updatePointsHandler(Request request, String id) async {
     try {
@@ -260,7 +296,6 @@ class CustomerRoutes {
             headers: {'Content-Type': 'application/json'});
       }
 
-      // ดึงค่า points ปัจจุบัน
       final customer = await (db.select(db.customers)
             ..where((t) => t.customerId.equals(id)))
           .getSingleOrNull();
@@ -290,9 +325,7 @@ class CustomerRoutes {
             headers: {'Content-Type': 'application/json'});
       }
 
-      // อัปเดต points
-      await (db.update(db.customers)
-            ..where((t) => t.customerId.equals(id)))
+      await (db.update(db.customers)..where((t) => t.customerId.equals(id)))
           .write(CustomersCompanion(
         points: Value(newPoints),
         updatedAt: Value(DateTime.now()),

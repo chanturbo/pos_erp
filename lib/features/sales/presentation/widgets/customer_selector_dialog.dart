@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pos_erp/shared/theme/app_theme.dart';
 import '../../../customers/presentation/providers/customer_provider.dart';
 import '../../../customers/data/models/customer_model.dart';
 
-const _kPrimary = Color(0xFFE8622A);
-const _kPrimaryLight = Color(0xFFFFF3EE);
-const _kBorder = Color(0xFFE0E0E0);
-const _kTextSub = Color(0xFF8A8A8A);
 
 class CustomerSelectorDialog extends ConsumerStatefulWidget {
   final CustomerModel? currentCustomer;
@@ -32,7 +29,7 @@ class _CustomerSelectorDialogState
 
   Color _avatarColor(String name) {
     final colors = [
-      _kPrimary,
+      AppTheme.primary,
       const Color(0xFF4CAF50),
       const Color(0xFF2196F3),
       const Color(0xFF9C27B0),
@@ -46,7 +43,9 @@ class _CustomerSelectorDialogState
     final customerAsync = ref.watch(customerListProvider);
 
     return Dialog(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).brightness == Brightness.dark
+          ? AppTheme.darkCard
+          : Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: SizedBox(
         width: 620,
@@ -56,30 +55,34 @@ class _CustomerSelectorDialogState
             // ── Header ──────────────────────────────────────────
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-              decoration: const BoxDecoration(
-                color: Color(0xFFF9F9F9),
+              decoration: BoxDecoration(
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? AppTheme.darkElement
+                    : const Color(0xFFF9F9F9),
                 borderRadius:
-                    BorderRadius.vertical(top: Radius.circular(16)),
-                border: Border(bottom: BorderSide(color: _kBorder)),
+                    const BorderRadius.vertical(top: Radius.circular(16)),
+                border: const Border(bottom: BorderSide(color: AppTheme.border)),
               ),
               child: Row(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(7),
                     decoration: BoxDecoration(
-                      color: _kPrimaryLight,
+                      color: AppTheme.primaryLight,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Icon(Icons.people_outline,
-                        color: _kPrimary, size: 18),
+                        color: AppTheme.primary, size: 18),
                   ),
                   const SizedBox(width: 10),
-                  const Text(
+                  Text(
                     'เลือกลูกค้า',
                     style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF1A1A1A)),
+                        color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.white
+                        : const Color(0xFF1A1A1A)),
                   ),
                   const Spacer(),
                   // Toggle member
@@ -96,7 +99,7 @@ class _CustomerSelectorDialogState
                     borderRadius: BorderRadius.circular(6),
                     child: const Padding(
                       padding: EdgeInsets.all(4),
-                      child: Icon(Icons.close, size: 18, color: _kTextSub),
+                      child: Icon(Icons.close, size: 18, color: AppTheme.textSub),
                     ),
                   ),
                 ],
@@ -160,13 +163,18 @@ class _CustomerSelectorDialogState
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
               child: TextField(
                 controller: _searchController,
-                style: const TextStyle(fontSize: 13),
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.white
+                      : Colors.black87,
+                ),
                 decoration: InputDecoration(
                   hintText: 'ค้นหา (ชื่อ, รหัส, เบอร์โทร, เลขสมาชิก)',
                   hintStyle:
-                      const TextStyle(fontSize: 13, color: _kTextSub),
+                      const TextStyle(fontSize: 13, color: AppTheme.textSub),
                   prefixIcon:
-                      const Icon(Icons.search, size: 18, color: _kTextSub),
+                      const Icon(Icons.search, size: 18, color: AppTheme.textSub),
                   suffixIcon: _searchQuery.isNotEmpty
                       ? IconButton(
                           icon: const Icon(Icons.clear, size: 16),
@@ -179,32 +187,34 @@ class _CustomerSelectorDialogState
                   contentPadding: EdgeInsets.zero,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: _kBorder),
+                    borderSide: const BorderSide(color: AppTheme.border),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: _kBorder),
+                    borderSide: const BorderSide(color: AppTheme.border),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                     borderSide:
-                        const BorderSide(color: _kPrimary, width: 1.5),
+                        const BorderSide(color: AppTheme.primary, width: 1.5),
                   ),
                   filled: true,
-                  fillColor: const Color(0xFFF9F9F9),
+                  fillColor: Theme.of(context).brightness == Brightness.dark
+                    ? AppTheme.darkElement
+                    : const Color(0xFFF9F9F9),
                 ),
                 onChanged: (v) => setState(() => _searchQuery = v),
               ),
             ),
             const SizedBox(height: 8),
 
-            const Divider(height: 1, color: _kBorder),
+            const Divider(height: 1, color: AppTheme.border),
 
             // ── List ─────────────────────────────────────────────
             Expanded(
               child: customerAsync.when(
                 loading: () => const Center(
-                  child: CircularProgressIndicator(color: _kPrimary),
+                  child: CircularProgressIndicator(color: AppTheme.primary),
                 ),
                 error: (e, _) => Center(
                   child: Column(
@@ -292,13 +302,13 @@ class _CustomerSelectorDialogState
                               horizontal: 12, vertical: 10),
                           decoration: BoxDecoration(
                             color: isSelected
-                                ? _kPrimaryLight
+                                ? AppTheme.primaryLight
                                 : Colors.white,
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(
                               color: isSelected
-                                  ? _kPrimary.withValues(alpha: 0.4)
-                                  : _kBorder,
+                                  ? AppTheme.primary.withValues(alpha: 0.4)
+                                  : AppTheme.border,
                             ),
                           ),
                           child: Row(
@@ -310,7 +320,7 @@ class _CustomerSelectorDialogState
                                   CircleAvatar(
                                     radius: 18,
                                     backgroundColor: isSelected
-                                        ? _kPrimary
+                                        ? AppTheme.primary
                                         : (isMember
                                             ? const Color(0xFFFFB300)
                                             : color),
@@ -354,7 +364,9 @@ class _CustomerSelectorDialogState
                                           fontWeight: isSelected
                                               ? FontWeight.bold
                                               : FontWeight.w500,
-                                          color: const Color(0xFF1A1A1A),
+                                          color: Theme.of(context).brightness == Brightness.dark
+                                          ? Colors.white
+                                          : const Color(0xFF1A1A1A),
                                         )),
                                     const SizedBox(height: 2),
                                     Row(
@@ -362,15 +374,15 @@ class _CustomerSelectorDialogState
                                         Text(c.customerCode,
                                             style: const TextStyle(
                                                 fontSize: 11,
-                                                color: _kTextSub)),
+                                                color: AppTheme.textSub)),
                                         if (c.phone != null) ...[
                                           const Text(' · ',
                                               style: TextStyle(
-                                                  color: _kTextSub)),
+                                                  color: AppTheme.textSub)),
                                           Text(c.phone!,
                                               style: const TextStyle(
                                                   fontSize: 11,
-                                                  color: _kTextSub)),
+                                                  color: AppTheme.textSub)),
                                         ],
                                       ],
                                     ),
@@ -411,10 +423,10 @@ class _CustomerSelectorDialogState
                               // Trailing
                               if (isSelected)
                                 const Icon(Icons.check_circle,
-                                    color: _kPrimary, size: 18)
+                                    color: AppTheme.primary, size: 18)
                               else
                                 const Icon(Icons.chevron_right,
-                                    color: _kTextSub, size: 18),
+                                    color: AppTheme.textSub, size: 18),
                             ],
                           ),
                         ),
@@ -429,11 +441,13 @@ class _CustomerSelectorDialogState
             Container(
               padding: const EdgeInsets.symmetric(
                   horizontal: 16, vertical: 12),
-              decoration: const BoxDecoration(
-                color: Color(0xFFF9F9F9),
+              decoration: BoxDecoration(
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? AppTheme.darkElement
+                    : const Color(0xFFF9F9F9),
                 borderRadius:
-                    BorderRadius.vertical(bottom: Radius.circular(16)),
-                border: Border(top: BorderSide(color: _kBorder)),
+                    const BorderRadius.vertical(bottom: Radius.circular(16)),
+                border: const Border(top: BorderSide(color: AppTheme.border)),
               ),
               child: SizedBox(
                 width: double.infinity,
@@ -441,13 +455,13 @@ class _CustomerSelectorDialogState
                 child: OutlinedButton(
                   onPressed: () => Navigator.pop(context),
                   style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: _kBorder),
+                    side: const BorderSide(color: AppTheme.border),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8)),
                   ),
                   child: const Text('ปิด',
                       style:
-                          TextStyle(fontSize: 13, color: _kTextSub)),
+                          TextStyle(fontSize: 13, color: AppTheme.textSub)),
                 ),
               ),
             ),
@@ -489,16 +503,16 @@ class _HeaderChip extends StatelessWidget {
               : const Color(0xFFF0F0F0),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-              color: active ? amber : _kBorder),
+              color: active ? amber : AppTheme.border),
         ),
         child: Row(
           children: [
-            Icon(icon, size: 14, color: active ? amber : _kTextSub),
+            Icon(icon, size: 14, color: active ? amber : AppTheme.textSub),
             const SizedBox(width: 5),
             Text(label,
                 style: TextStyle(
                     fontSize: 12,
-                    color: active ? amber : _kTextSub,
+                    color: active ? amber : AppTheme.textSub,
                     fontWeight: FontWeight.w500)),
           ],
         ),

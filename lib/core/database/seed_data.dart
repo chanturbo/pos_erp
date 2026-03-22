@@ -10,6 +10,7 @@ class SeedData {
     await seedBranches(db);
     await seedWarehouses(db);
     await seedUsers(db);
+    await seedCustomerGroups(db); // ✅ ต้องอยู่ก่อน seedCustomers
     await seedCustomers(db);
     await seedSuppliers(db); // ✅ เพิ่ม
     await seedProductGroups(db);
@@ -123,6 +124,53 @@ class SeedData {
         // User exists
       }
     }
+  }
+
+  /// Seed Customer Groups (ระดับราคา 1-5)
+  static Future<void> seedCustomerGroups(AppDatabase db) async {
+    final groups = [
+      CustomerGroupsCompanion.insert(
+        customerGroupId: 'CG001',
+        groupName: 'ลูกค้าทั่วไป',
+        discountRate: const Value(0),
+        priceLevel: const Value(1),
+      ),
+      CustomerGroupsCompanion.insert(
+        customerGroupId: 'CG002',
+        groupName: 'สมาชิก',
+        discountRate: const Value(0),
+        priceLevel: const Value(2),
+      ),
+      CustomerGroupsCompanion.insert(
+        customerGroupId: 'CG003',
+        groupName: 'ลูกค้าส่ง',
+        discountRate: const Value(0),
+        priceLevel: const Value(3),
+      ),
+      CustomerGroupsCompanion.insert(
+        customerGroupId: 'CG004',
+        groupName: 'ตัวแทน',
+        discountRate: const Value(0),
+        priceLevel: const Value(4),
+      ),
+      CustomerGroupsCompanion.insert(
+        customerGroupId: 'CG005',
+        groupName: 'VIP',
+        discountRate: const Value(0),
+        priceLevel: const Value(5),
+      ),
+    ];
+
+    for (var group in groups) {
+      try {
+        await db
+            .into(db.customerGroups)
+            .insert(group, mode: InsertMode.insertOrIgnore);
+      } catch (e) {
+        // Group exists
+      }
+    }
+    print('✅ Seeded customer groups (price levels 1-5)');
   }
 
   /// Seed Customers
