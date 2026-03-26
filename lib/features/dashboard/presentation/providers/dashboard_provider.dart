@@ -2,6 +2,7 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/client/api_client.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 
 // Dashboard Stats Model
 class DashboardStats {
@@ -31,7 +32,15 @@ final dashboardProvider =
 class DashboardNotifier extends AsyncNotifier<DashboardStats> {
   @override
   Future<DashboardStats> build() async {
-    // ✅ โหลดข้อมูลทันทีเมื่อ build
+    // ✅ รอ token ก่อน — ป้องกัน 401
+    final authState = ref.watch(authProvider);
+    if (authState.isRestoring || !authState.isAuthenticated) {
+      return DashboardStats(
+        totalOrders: 0, totalSales: 0,
+        totalProducts: 0, totalCustomers: 0,
+        todaySales: 0, todayOrders: 0,
+      );
+    }
     return await loadStats();
   }
 
@@ -47,9 +56,9 @@ class DashboardNotifier extends AsyncNotifier<DashboardStats> {
       final productsResponse = await apiClient.get('/api/products');
       final customersResponse = await apiClient.get('/api/customers');
 
-      final orders = salesResponse.data['data'] as List;
-      final products = productsResponse.data['data'] as List;
-      final customers = customersResponse.data['data'] as List;
+      final orders = (salesResponse.data['data'] as List?) ?? [];
+      final products = (productsResponse.data['data'] as List?) ?? [];
+      final customers = (customersResponse.data['data'] as List?) ?? [];
 
       // คำนวณยอดขาย
       double totalSales = 0;

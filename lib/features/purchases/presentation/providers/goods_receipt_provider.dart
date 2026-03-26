@@ -3,6 +3,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/client/api_client.dart';
 import '../../data/models/goods_receipt_model.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 
 // ✅ Provider
 final goodsReceiptListProvider =
@@ -15,6 +16,9 @@ final goodsReceiptListProvider =
 class GoodsReceiptListNotifier extends AsyncNotifier<List<GoodsReceiptModel>> {
   @override
   Future<List<GoodsReceiptModel>> build() async {
+    // ✅ รอ token ก่อน — ป้องกัน 401
+    final authState = ref.watch(authProvider);
+    if (authState.isRestoring || !authState.isAuthenticated) return [];
     return await loadGoodsReceipts();
   }
 

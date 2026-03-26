@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import '../../data/models/branch_model.dart';
 import '../../../../core/client/api_client.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../../core/config/app_mode.dart';
 
 // ── Branch Provider ───────────────────────────────────────────────────────────
@@ -15,7 +16,12 @@ final branchListProvider =
 
 class BranchNotifier extends AsyncNotifier<List<BranchModel>> {
   @override
-  Future<List<BranchModel>> build() => _load();
+  Future<List<BranchModel>> build() async {
+    // ✅ รอ token ก่อน — ป้องกัน 401
+    final authState = ref.watch(authProvider);
+    if (authState.isRestoring || !authState.isAuthenticated) return [];
+    return _load();
+  }
 
   Future<List<BranchModel>> _load() async {
     try {
@@ -95,7 +101,12 @@ final warehouseListProvider =
 
 class WarehouseNotifier extends AsyncNotifier<List<WarehouseModel>> {
   @override
-  Future<List<WarehouseModel>> build() => _load();
+  Future<List<WarehouseModel>> build() async {
+    // ✅ รอ token ก่อน — ป้องกัน 401
+    final authState = ref.watch(authProvider);
+    if (authState.isRestoring || !authState.isAuthenticated) return [];
+    return _load();
+  }
 
   Future<List<WarehouseModel>> _load() async {
     try {

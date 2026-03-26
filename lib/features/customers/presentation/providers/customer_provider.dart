@@ -3,6 +3,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/client/api_client.dart';
 import '../../data/models/customer_model.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 
 // ─────────────────────────────────────────────────────────────
 // Provider
@@ -25,6 +26,9 @@ class CustomerListNotifier extends AsyncNotifier<List<CustomerModel>> {
 
   @override
   Future<List<CustomerModel>> build() async {
+    // ✅ รอ token ก่อน — ป้องกัน 401
+    final authState = ref.watch(authProvider);
+    if (authState.isRestoring || !authState.isAuthenticated) return [];
     return await loadCustomers();
   }
 
@@ -59,7 +63,7 @@ class CustomerListNotifier extends AsyncNotifier<List<CustomerModel>> {
       final response = await apiClient.get(path);
 
       if (response.statusCode == 200) {
-        final rawList = response.data['data'] as List;
+        final rawList = (response.data['data'] as List?) ?? [];
         var customers =
             rawList.map((json) => CustomerModel.fromJson(json)).toList();
 

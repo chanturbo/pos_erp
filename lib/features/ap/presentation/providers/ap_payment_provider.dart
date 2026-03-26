@@ -2,6 +2,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/ap_payment_model.dart';
 import '../../../../core/client/api_client.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 
 /// Provider สำหรับจัดการ AP Payment List
 final apPaymentListProvider = AsyncNotifierProvider<ApPaymentNotifier, List<ApPaymentModel>>(
@@ -11,6 +12,9 @@ final apPaymentListProvider = AsyncNotifierProvider<ApPaymentNotifier, List<ApPa
 class ApPaymentNotifier extends AsyncNotifier<List<ApPaymentModel>> {
   @override
   Future<List<ApPaymentModel>> build() async {
+    // ✅ รอ token ก่อน — ป้องกัน 401
+    final authState = ref.watch(authProvider);
+    if (authState.isRestoring || !authState.isAuthenticated) return [];
     return loadPayments();
   }
 

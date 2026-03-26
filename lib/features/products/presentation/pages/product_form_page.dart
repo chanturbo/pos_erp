@@ -155,11 +155,11 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
           ? null
           : _barcodeController.text.trim(),
       'base_unit': _unitController.text.trim(),
-      'price_level_1': _d(_price1Controller),
-      'price_level_2': _d(_price2Controller),
-      'price_level_3': _d(_price3Controller),
-      'price_level_4': _d(_price4Controller),
-      'price_level_5': _d(_price5Controller),
+      'price_level1': _d(_price1Controller),
+      'price_level2': _d(_price2Controller),
+      'price_level3': _d(_price3Controller),
+      'price_level4': _d(_price4Controller),
+      'price_level5': _d(_price5Controller),
       'standard_cost': _d(_costController),
       'is_stock_control': _isStockControl,
       'allow_negative_stock': _allowNegativeStock,
@@ -1053,12 +1053,14 @@ class _ImagePickerWidget extends StatelessWidget {
             width: double.infinity,
             height: 120,
             decoration: BoxDecoration(
-              color: AppTheme.primaryLight,
+              color: hasImage && fileExists
+                  ? AppTheme.primaryLight
+                  : Colors.grey[400],
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
                 color: hasImage && fileExists
                     ? AppTheme.primary.withValues(alpha: 0.4)
-                    : AppTheme.border,
+                    : Colors.grey[400]!,
                 width: hasImage && fileExists ? 1.5 : 1,
               ),
             ),
@@ -1117,16 +1119,14 @@ class _ImagePickerWidget extends StatelessWidget {
     );
   }
 
-  Widget _placeholder() => Column(
+  Widget _placeholder() => const Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.add_photo_alternate_outlined,
-              size: 32, color: AppTheme.primary.withValues(alpha: 0.4)),
-          const SizedBox(height: 6),
+              size: 32, color: Colors.white),
+          SizedBox(height: 6),
           Text('กดเพื่อเลือกรูป',
-              style: TextStyle(
-                  fontSize: 11,
-                  color: AppTheme.primary.withValues(alpha: 0.6))),
+              style: TextStyle(fontSize: 11, color: Colors.white)),
         ],
       );
 }

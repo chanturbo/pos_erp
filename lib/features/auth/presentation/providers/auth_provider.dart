@@ -4,19 +4,22 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/client/api_client.dart';
+import '../../../../core/utils/jwt_utils.dart';
 import '../../data/models/user_model.dart';
 
 // Auth State
 class AuthState {
   final bool isAuthenticated;
   final bool isLoading;
+  final bool isRestoring; // ✅ true ขณะกำลัง restore token จาก storage
   final UserModel? user;
   final String? token;
   final String? error;
   
   AuthState({
     this.isAuthenticated = false,
-    this.isLoading = false,
+    this.isLoading       = false,
+    this.isRestoring     = true,  // ✅ default true — รอจนกว่าจะ restore เสร็จ
     this.user,
     this.token,
     this.error,
@@ -29,6 +32,7 @@ class AuthState {
   AuthState copyWith({
     bool? isAuthenticated,
     bool? isLoading,
+    bool? isRestoring,
     UserModel? user,
     String? token,
     String? error,
@@ -36,10 +40,11 @@ class AuthState {
   }) {
     return AuthState(
       isAuthenticated: isAuthenticated ?? this.isAuthenticated,
-      isLoading: isLoading ?? this.isLoading,
-      user: user ?? this.user,
-      token: token ?? this.token,
-      error: clearError ? null : (error ?? this.error),
+      isLoading:       isLoading       ?? this.isLoading,
+      isRestoring:     isRestoring     ?? this.isRestoring,
+      user:            user            ?? this.user,
+      token:           token           ?? this.token,
+      error:           clearError ? null : (error ?? this.error),
     );
   }
 }
@@ -52,8 +57,20 @@ final authProvider = NotifierProvider<AuthNotifier, AuthState>(() {
 class AuthNotifier extends Notifier<AuthState> {
   @override
   AuthState build() {
-    // โหลด saved auth ตอนเริ่มต้น
-    _loadSavedAuth();
+    // ✅ ใช้ Future.microtask เพื่อให้ provider tree พร้อมก่อน
+    // แล้วค่อย restore token — ป้องกัน race condition กับ provider อื่น
+    Future.microtask(_loadSavedAuth);
+
+    // ✅ ถ้า apiClientProvider สร้าง instance ใหม่ → sync token ทันที
+    // ป้องกัน instance ใหม่ไม่มี token ทำให้ 401
+    ref.listen(apiClientProvider, (_, client) {
+      final token = state.token;
+      if (token != null) {
+        client.setToken(token);
+        print('🔄 Token re-synced to new ApiClient instance');
+      }
+    });
+
     return AuthState.initial();
   }
   
@@ -67,30 +84,46 @@ class AuthNotifier extends Notifier<AuthState> {
       final userJson = prefs.getString('user_data');
       
       if (token != null && userJson != null) {
+        // ✅ ตรวจ token ก่อนว่ายังไม่หมดอายุ
+        final payload = JwtUtils.verifyToken(token);
+        if (payload == null) {
+          print('⚠️ Saved token expired — clearing auth');
+          await prefs.remove('auth_token');
+          await prefs.remove('user_data');
+          state = state.copyWith(isRestoring: false);
+          return;
+        }
+
         print('✅ Found saved auth');
-        
+
         // Decode user
         final userMap = Map<String, dynamic>.from(
           jsonDecode(userJson) as Map,
         );
         final user = UserModel.fromJson(userMap);
         
-        // Set token to API Client
+        // ✅ set token ก่อน update state
         ref.read(apiClientProvider).setToken(token);
-        
-        // Update state
+
+        // ✅ รอให้ Dio header flush ก่อน trigger Riverpod rebuild
+        // ป้องกัน provider อื่น rebuild และยิง API ในขณะที่ header ยังไม่พร้อม
+        await Future.delayed(Duration.zero);
+
         state = state.copyWith(
           isAuthenticated: true,
-          user: user,
-          token: token,
+          isRestoring:     false, // ✅ restore เสร็จ → provider อื่น rebuild พร้อม token แล้ว
+          user:            user,
+          token:           token,
         );
         
         print('✅ Auth restored: ${user.fullName}');
       } else {
         print('ℹ️ No saved auth found');
+        state = state.copyWith(isRestoring: false); // ✅ ไม่มี token → redirect login
       }
     } catch (e) {
       print('❌ Load saved auth error: $e');
+      state = state.copyWith(isRestoring: false); // ✅ error → ก็ต้อง redirect login
     }
   }
   

@@ -5,6 +5,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/ar_receipt_model.dart';
 import '../../../../core/client/api_client.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 
 /// Provider สำหรับจัดการ AR Receipt List
 final arReceiptListProvider =
@@ -15,6 +16,9 @@ final arReceiptListProvider =
 class ArReceiptNotifier extends AsyncNotifier<List<ArReceiptModel>> {
   @override
   Future<List<ArReceiptModel>> build() async {
+    // ✅ รอ token ก่อน — ป้องกัน 401
+    final authState = ref.watch(authProvider);
+    if (authState.isRestoring || !authState.isAuthenticated) return [];
     return loadReceipts();
   }
 

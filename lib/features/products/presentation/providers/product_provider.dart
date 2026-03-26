@@ -3,6 +3,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/client/api_client.dart';
 import '../../data/models/product_model.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 
 // ─────────────────────────────────────────────────────────────
 // State class สำหรับ pagination
@@ -69,6 +70,11 @@ class ProductListNotifier extends AsyncNotifier<List<ProductModel>> {
 
   @override
   Future<List<ProductModel>> build() async {
+    // ✅ รอจนกว่า token restore เสร็จก่อน — ป้องกัน 401
+    final authState = ref.watch(authProvider);
+    if (authState.isRestoring || !authState.isAuthenticated) {
+      return []; // คืน list ว่าง รอ rebuild เมื่อ auth พร้อม
+    }
     return await loadProducts();
   }
 

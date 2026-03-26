@@ -5,6 +5,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/promotion_model.dart';
 import '../../../../core/client/api_client.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 
 // ─── Promotion List Provider ──────────────────────────────────────────────────
 final promotionListProvider =
@@ -15,6 +16,9 @@ final promotionListProvider =
 class PromotionNotifier extends AsyncNotifier<List<PromotionModel>> {
   @override
   Future<List<PromotionModel>> build() async {
+    // ✅ รอ token ก่อน — ป้องกัน 401
+    final authState = ref.watch(authProvider);
+    if (authState.isRestoring || !authState.isAuthenticated) return [];
     return _load();
   }
 
@@ -118,6 +122,9 @@ final couponListProvider =
 class CouponNotifier extends AsyncNotifier<List<CouponModel>> {
   @override
   Future<List<CouponModel>> build() async {
+    // ✅ รอ token ก่อน — ป้องกัน 401
+    final authState = ref.watch(authProvider);
+    if (authState.isRestoring || !authState.isAuthenticated) return [];
     return _load();
   }
 

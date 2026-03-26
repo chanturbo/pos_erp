@@ -8,6 +8,9 @@ class ApiClient {
   final Dio _dio;
   final String baseUrl;
   String? _token;
+
+  /// ✅ Callback เมื่อ server ตอบ 401 — ใช้ redirect ไป login page
+  void Function()? onUnauthorized;
   
   ApiClient({String? baseUrl}) 
       : baseUrl = baseUrl ?? AppConfig.apiBaseUrl,
@@ -31,7 +34,23 @@ class ApiClient {
           return handler.next(response);
         },
         onError: (error, handler) {
-          print('❌ Error [${error.response?.statusCode}]: ${error.message}');
+          final statusCode = error.response?.statusCode;
+          print('❌ Error [$statusCode]: ${error.message}');
+
+          // ✅ 401 — token หมดอายุ / ไม่มี token
+          // resolve แทน throw ไม่ให้ app crash
+          if (statusCode == 401) {
+            print('🔒 401 Unauthorized — token may be expired or missing');
+            onUnauthorized?.call();
+            return handler.resolve(
+              Response(
+                requestOptions: error.requestOptions,
+                statusCode: 401,
+                data: {'success': false, 'message': 'Unauthorized'},
+              ),
+            );
+          }
+
           return handler.next(error);
         },
       ),

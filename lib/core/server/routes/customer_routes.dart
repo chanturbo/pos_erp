@@ -348,6 +348,9 @@ class CustomerRoutes {
           creditDays:
               Value((data['credit_days'] as num?)?.toInt() ?? 0),
           memberNo: Value(data['member_no'] as String?),
+          isActive: data.containsKey('is_active')
+              ? Value(data['is_active'] as bool)
+              : const Value.absent(),
           updatedAt: Value(DateTime.now()),
         ),
       );

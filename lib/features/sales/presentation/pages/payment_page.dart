@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:intl/intl.dart';
 import '../../../../core/client/api_client.dart';
 import '../../../../core/utils/promptpay_utils.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -61,29 +62,69 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // ยอดที่ต้องชำระ
-                  Card(
-                    color: Colors.blue[50],
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        children: [
-                          const Text(
-                            'ยอดที่ต้องชำระ',
-                            style: TextStyle(fontSize: 18),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            '฿${cartState.total.toStringAsFixed(2)}',
-                            style: const TextStyle(
-                              fontSize: 48,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.blue,
-                            ),
+                  Builder(builder: (context) {
+                    final isDark = Theme.of(context).brightness == Brightness.dark;
+                    return Container(
+                      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: isDark
+                              ? [const Color(0xFF0D2137), const Color(0xFF0D3354)]
+                              : [const Color(0xFF1565C0), const Color(0xFF1976D2)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF1565C0).withValues(alpha: 0.3),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
                           ),
                         ],
                       ),
-                    ),
-                  ),
+                      child: Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.receipt_long,
+                                  color: Colors.white70, size: 16),
+                              const SizedBox(width: 6),
+                              Text(
+                                'ยอดที่ต้องชำระ',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  color: Colors.white.withValues(alpha: 0.85),
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            '฿${cartState.total.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                              fontSize: 52,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                          if (cartState.totalDiscount > 0) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              'ส่วนลด ฿${cartState.totalDiscount.toStringAsFixed(2)}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.white.withValues(alpha: 0.7),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    );
+                  }),
                   const SizedBox(height: 24),
 
                   // วิธีชำระเงิน
@@ -148,54 +189,169 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                     ),
                     const SizedBox(height: 16),
 
-                    // ปุ่มจำนวนเงินด่วน
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [cartState.total, 100, 200, 500, 1000]
-                          .map((amount) {
-                        return ActionChip(
-                          label: Text('฿${amount.toStringAsFixed(0)}'),
-                          onPressed: () {
-                            setState(() {
-                              _receivedAmount = amount.toDouble();
+                    // ปุ่มจำนวนเงินด่วน — คำนวณอัตโนมัติจากยอดขาย
+                    Builder(builder: (context) {
+                      final isDark = Theme.of(context).brightness == Brightness.dark;
+                      // สร้าง list จากยอดจริง: พอดียอด → กลมขึ้นไปเรื่อย ๆ
+                      final total = cartState.total;
+                      final amounts = _buildQuickAmounts(total);
+                      return Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: amounts.map((amount) {
+                          final isExact = amount == total;
+                          final isSelected = _receivedAmount == amount;
+                          return InkWell(
+                            onTap: () => setState(() {
+                              _receivedAmount = amount;
                               _receivedController.text =
                                   amount.toStringAsFixed(2);
-                            });
-                          },
-                        );
-                      }).toList(),
-                    ),
+                            }),
+                            borderRadius: BorderRadius.circular(8),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 150),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? const Color(0xFF1565C0)
+                                    : isExact
+                                        ? (isDark
+                                            ? const Color(0xFF0D3354)
+                                            : const Color(0xFFE3F2FD))
+                                        : (isDark
+                                            ? const Color(0xFF2A2A2A)
+                                            : const Color(0xFFF5F5F5)),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: isSelected
+                                      ? const Color(0xFF1565C0)
+                                      : isExact
+                                          ? const Color(0xFF90CAF9)
+                                          : (isDark
+                                              ? const Color(0xFF444444)
+                                              : const Color(0xFFE0E0E0)),
+                                ),
+                              ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    '฿${amount.toStringAsFixed(0)}',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: isSelected
+                                          ? Colors.white
+                                          : isExact
+                                              ? const Color(0xFF1565C0)
+                                              : (isDark
+                                                  ? Colors.white
+                                                  : const Color(0xFF1A1A1A)),
+                                    ),
+                                  ),
+                                  if (isExact)
+                                    Text(
+                                      'พอดี',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: isSelected
+                                            ? Colors.white70
+                                            : const Color(0xFF1565C0),
+                                      ),
+                                    ),
+                                  if (!isExact && amount > total)
+                                    Text(
+                                      'ทอน ฿${(amount - total).toStringAsFixed(0)}',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: isSelected
+                                            ? Colors.white70
+                                            : (isDark
+                                                ? Colors.white54
+                                                : Colors.grey[600]),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      );
+                    }),
                     const SizedBox(height: 24),
 
                     // เงินทอน
-                    Card(
-                      color: _change >= 0
-                          ? Colors.green[50]
-                          : Colors.red[50],
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
+                    Builder(builder: (context) {
+                      final isDark = Theme.of(context).brightness == Brightness.dark;
+                      final isOk = _change >= 0;
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 16, horizontal: 24),
+                        decoration: BoxDecoration(
+                          // dark: bg มืดตาม isOk, border บาง
+                          // light: เขียวอ่อน/แดงอ่อน ตาม isOk
+                          color: isDark
+                              ? (isOk
+                                  ? const Color(0xFF1A2E1A)  // เขียวมืด
+                                  : const Color(0xFF2A1A1A)) // แดงมืด (อ่อนกว่าเดิม)
+                              : (isOk
+                                  ? const Color(0xFFE8F5E9)
+                                  : const Color(0xFFFFEBEE)),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isDark
+                                ? (isOk
+                                    ? const Color(0xFF4CAF50).withValues(alpha: 0.25)
+                                    : const Color(0xFFF44336).withValues(alpha: 0.25))
+                                : (isOk
+                                    ? const Color(0xFF4CAF50).withValues(alpha: 0.3)
+                                    : const Color(0xFFF44336).withValues(alpha: 0.3)),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              _change >= 0 ? 'เงินทอน' : 'ยอดขาด',
-                              style: const TextStyle(fontSize: 18),
+                            Row(
+                              children: [
+                                Icon(
+                                  isOk
+                                      ? Icons.check_circle_outline
+                                      : Icons.remove_circle_outline,
+                                  color: isOk
+                                      ? const Color(0xFF4CAF50)
+                                      : const Color(0xFFEF5350),
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  isOk ? 'เงินทอน' : 'ยอดขาด',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: isDark
+                                        ? Colors.white70
+                                        : (isOk
+                                            ? const Color(0xFF2E7D32)
+                                            : const Color(0xFFC62828)),
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 8),
                             Text(
                               '฿${_change.abs().toStringAsFixed(2)}',
                               style: TextStyle(
-                                fontSize: 36,
+                                fontSize: 32,
                                 fontWeight: FontWeight.bold,
-                                color: _change >= 0
-                                    ? Colors.green
-                                    : Colors.red,
+                                color: isOk
+                                    ? const Color(0xFF4CAF50)
+                                    : const Color(0xFFEF5350),
                               ),
                             ),
                           ],
                         ),
-                      ),
-                    ),
+                      );
+                    }),
                   ],
 
                   // ── โอน: QR PromptPay ──────────────────────────
@@ -266,32 +422,94 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
 
                   const SizedBox(height: 32),
 
-                  // ปุ่มชำระเงิน
-                  SizedBox(
-                    height: 60,
-                    child: ElevatedButton(
-                      onPressed:
-                          (_paymentType == 'CASH' && _change < 0) ||
-                              _isProcessing
-                          ? null
-                          : _handlePayment,
-                      child: _isProcessing
-                          ? const SizedBox(
-                              height: 24,
-                              width: 24,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
+                  // ── ปุ่มชำระเงิน ──────────────────────────────────
+                  Builder(builder: (context) {
+                    final isDisabled =
+                        (_paymentType == 'CASH' && _change < 0) ||
+                            _isProcessing;
+                    final cartState = ref.watch(cartProvider);
+
+                    final isDark =
+                        Theme.of(context).brightness == Brightness.dark;
+
+                    return SizedBox(
+                      height: 64,
+                      child: ElevatedButton(
+                        onPressed: isDisabled ? null : _handlePayment,
+                        style: ElevatedButton.styleFrom(
+                          // dark: ส้มเข้ม #E57200 ชัดบน dark bg
+                          // light: ใช้สีจาก AppTheme (default)
+                          backgroundColor: isDisabled
+                              ? null
+                              : (isDark
+                                  ? const Color(0xFFE57200)
+                                  : null),
+                          foregroundColor: Colors.white,
+                          disabledBackgroundColor: isDark
+                              ? const Color(0xFF2A2A2A)
+                              : Colors.grey[300],
+                          disabledForegroundColor: isDark
+                              ? Colors.white30
+                              : Colors.grey[500],
+                          elevation: isDisabled ? 0 : 3,
+                          shadowColor: isDark
+                              ? const Color(0xFFE57200).withValues(alpha: 0.5)
+                              : null,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: _isProcessing
+                            ? const SizedBox(
+                                height: 26,
+                                width: 26,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    _paymentType == 'TRANSFER'
+                                        ? Icons.check_circle_outline
+                                        : Icons.payments_outlined,
+                                    size: 22,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        _paymentType == 'TRANSFER'
+                                            ? 'ยืนยันรับเงินโอนแล้ว'
+                                            : 'ชำระเงิน',
+                                        style: const TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
+                                      if (_paymentType == 'CASH' &&
+                                          !isDisabled)
+                                        Text(
+                                          '฿${cartState.total.toStringAsFixed(2)}',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.white70,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ],
                               ),
-                            )
-                          : Text(
-                              _paymentType == 'TRANSFER'
-                                  ? 'ยืนยันรับเงินโอนแล้ว'
-                                  : 'ชำระเงิน',
-                              style: const TextStyle(fontSize: 20),
-                            ),
-                    ),
-                  ),
+                      ),
+                    );
+                  }),
                 ],
               ),
             ),
@@ -299,6 +517,33 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
         ),
       ),
     );
+  }
+
+  /// สร้างปุ่มจำนวนเงินด่วนอัตโนมัติจากยอดขาย
+  /// เริ่มจากพอดียอด → กลมขึ้นไปเรื่อย ๆ ตามลำดับ
+  List<double> _buildQuickAmounts(double total) {
+    final result = <double>[total]; // พอดียอดเสมอ
+
+    // ระดับการปัด: 10, 20, 50, 100, 200, 500, 1000
+    const steps = [10, 20, 50, 100, 200, 500, 1000];
+
+    for (final step in steps) {
+      // หาค่าที่มากกว่า total และหารด้วย step ลงตัว
+      final rounded = ((total / step).ceil()) * step.toDouble();
+      if (rounded > total && !result.contains(rounded)) {
+        result.add(rounded);
+      }
+      if (result.length >= 6) break;
+    }
+
+    // ถ้ายังไม่ครบ 6 ให้เพิ่ม +500, +1000 จากค่าสุดท้าย
+    while (result.length < 6) {
+      final last = result.last;
+      final next = last + (last >= 1000 ? 1000 : 500);
+      result.add(next);
+    }
+
+    return result;
   }
 
   Future<void> _handlePayment() async {
@@ -361,67 +606,28 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
         // ✅ refresh customer list เพื่อให้ points อัพเดททันที
         ref.read(customerListProvider.notifier).refresh();
 
+        // ✅ คำนวณค่าทั้งหมดก่อน navigate — ป้องกัน ref ถูกเรียกหลัง unmount
+        final paidAmount   = _paymentType == 'CASH' ? _receivedAmount : cartState.total;
+        final changeAmount = _paymentType == 'CASH' ? _change : 0.0;
+
         if (mounted) {
-          await showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (context) => AlertDialog(
-              title: const Row(
-                children: [
-                  Icon(Icons.check_circle, color: Colors.green, size: 32),
-                  SizedBox(width: 8),
-                  Text('ชำระเงินสำเร็จ'),
-                ],
+          // ✅ ไปหน้าใบเสร็จแทน dialog
+          await Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ReceiptPage(
+                orderNo:      orderNo,
+                orderDate:    DateTime.now(),
+                customerName: cartState.customerName,
+                items:        cartState.items,
+                subtotal:     cartState.subtotal,
+                discount:     cartState.totalDiscount,
+                total:        cartState.total,
+                paymentType:  _paymentType,
+                paidAmount:   paidAmount,
+                changeAmount: changeAmount,
+                earnedPoints: earnedPoints,
               ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('เลขที่: $orderNo'),
-                  Text('ยอดชำระ: ฿${cartState.total.toStringAsFixed(2)}'),
-                  if (_paymentType == 'CASH')
-                    Text('เงินทอน: ฿${_change.toStringAsFixed(2)}'),
-                  // ✅ แสดงแต้มที่ได้รับ
-                  if (earnedPoints > 0) ...[
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        const Icon(Icons.star,
-                            color: Colors.amber, size: 16),
-                        const SizedBox(width: 4),
-                        Text(
-                          'ได้รับ $earnedPoints แต้ม',
-                          style: const TextStyle(
-                            color: Colors.amber,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    Navigator.pop(context);
-                  },
-                  child: const Text('ปิด'),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('ฟีเจอร์พิมพ์ใบเสร็จกำลังพัฒนา'),
-                      ),
-                    );
-                  },
-                  child: const Text('พิมพ์ใบเสร็จ'),
-                ),
-              ],
             ),
           );
         }
@@ -606,6 +812,415 @@ class _PromptPayQrSection extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// ReceiptPage — หน้าใบเสร็จ thermal style
+// แสดงหลังชำระเงินสำเร็จ กดกลับไปหน้าขาย
+// ─────────────────────────────────────────────────────────────────
+class ReceiptPage extends ConsumerWidget {
+  final String   orderNo;
+  final DateTime orderDate;
+  final String?  customerName;
+  final List<CartItem> items;
+  final double   subtotal;
+  final double   discount;
+  final double   total;
+  final String   paymentType;
+  final double   paidAmount;
+  final double   changeAmount;
+  final int      earnedPoints;
+
+  const ReceiptPage({
+    super.key,
+    required this.orderNo,
+    required this.orderDate,
+    required this.items,
+    required this.subtotal,
+    required this.discount,
+    required this.total,
+    required this.paymentType,
+    required this.paidAmount,
+    required this.changeAmount,
+    this.customerName,
+    this.earnedPoints = 0,
+  });
+
+  static String _paymentLabel(String type) => switch (type) {
+        'CASH'     => 'เงินสด',
+        'CARD'     => 'บัตรเครดิต/เดบิต',
+        'TRANSFER' => 'โอนเงิน',
+        _          => type,
+      };
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(settingsProvider);
+    final dateFmt  = DateFormat('dd/MM/yyyy HH:mm');
+    final numFmt   = NumberFormat('#,##0.00');
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFEEEEEE),
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        title: const Text('ใบเสร็จรับเงิน'),
+        actions: [
+          TextButton.icon(
+            onPressed: () =>
+                Navigator.of(context).pop(),
+            icon: const Icon(Icons.storefront, color: Colors.white),
+            label: const Text('กลับหน้าขาย',
+                style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+          child: Column(
+            children: [
+              // ── ใบเสร็จ ─────────────────────────────────────────
+              _ThermalReceipt(
+                companyName:  settings.companyName,
+                address:      settings.address,
+                phone:        settings.phone,
+                taxId:        settings.taxId,
+                orderNo:      orderNo,
+                orderDate:    dateFmt.format(orderDate),
+                customerName: customerName,
+                items:        items,
+                subtotal:     subtotal,
+                discount:     discount,
+                total:        total,
+                paymentLabel: _paymentLabel(paymentType),
+                paymentType:  paymentType,
+                paidAmount:   paidAmount,
+                changeAmount: changeAmount,
+                earnedPoints: earnedPoints,
+                numFmt:       numFmt,
+              ),
+
+              const SizedBox(height: 32),
+
+              // ── ปุ่มกลับ ─────────────────────────────────────────
+              SizedBox(
+                width: 340,
+                height: 52,
+                child: ElevatedButton.icon(
+                  onPressed: () =>
+                      Navigator.of(context).pop(),
+                  icon: const Icon(Icons.storefront, size: 20),
+                  label: const Text(
+                    'กลับหน้าขาย',
+                    style: TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// _ThermalReceipt — ใบเสร็จ thermal printer style
+// ─────────────────────────────────────────────────────────────────
+class _ThermalReceipt extends StatelessWidget {
+  final String   companyName;
+  final String   address;
+  final String   phone;
+  final String   taxId;
+  final String   orderNo;
+  final String   orderDate;
+  final String?  customerName;
+  final List<CartItem> items;
+  final double   subtotal;
+  final double   discount;
+  final double   total;
+  final String   paymentLabel;
+  final String   paymentType;
+  final double   paidAmount;
+  final double   changeAmount;
+  final int      earnedPoints;
+  final NumberFormat numFmt;
+
+  const _ThermalReceipt({
+    required this.companyName,
+    required this.address,
+    required this.phone,
+    required this.taxId,
+    required this.orderNo,
+    required this.orderDate,
+    required this.items,
+    required this.subtotal,
+    required this.discount,
+    required this.total,
+    required this.paymentLabel,
+    required this.paymentType,
+    required this.paidAmount,
+    required this.changeAmount,
+    required this.numFmt,
+    this.customerName,
+    this.earnedPoints = 0,
+  });
+
+  // ── shared text style ────────────────────────────────────────
+  static const _mono    = TextStyle(fontFamily: 'monospace', fontSize: 13, color: Colors.black87);
+  static const _monoSm  = TextStyle(fontFamily: 'monospace', fontSize: 11, color: Colors.black54);
+  static const _monoBd  = TextStyle(fontFamily: 'monospace', fontSize: 13,
+      fontWeight: FontWeight.bold, color: Colors.black87);
+  static const _monoLg  = TextStyle(fontFamily: 'monospace', fontSize: 18,
+      fontWeight: FontWeight.bold, color: Colors.black);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 340,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(4),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // ── รอยปรุ ด้านบน ──────────────────────────────────────
+          _PerforatedEdge(top: true),
+
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // ── ข้อมูลร้าน ─────────────────────────────────
+                Text(companyName,
+                    style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black),
+                    textAlign: TextAlign.center),
+                if (address.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(address,
+                      style: _monoSm, textAlign: TextAlign.center),
+                ],
+                if (phone.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text('โทร: $phone', style: _monoSm),
+                ],
+                if (taxId.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text('เลขภาษี: $taxId', style: _monoSm),
+                ],
+
+                _dashed(),
+
+                // ── หัวใบเสร็จ ─────────────────────────────────
+                const Text('ใบเสร็จรับเงิน',
+                    style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87)),
+                const SizedBox(height: 6),
+                _row('เลขที่', orderNo),
+                _row('วันที่', orderDate),
+                if (customerName != null && customerName != 'ลูกค้าทั่วไป')
+                  _row('ลูกค้า', customerName!),
+
+                _dashed(),
+
+                // ── รายการสินค้า ────────────────────────────────
+                ...items.map((item) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 3),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(item.productName, style: _monoBd,
+                              overflow: TextOverflow.ellipsis),
+                          Row(
+                            mainAxisAlignment:
+                                MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                '  ${item.quantity.toStringAsFixed(0)} x '
+                                '${numFmt.format(item.unitPrice)}',
+                                style: _monoSm,
+                              ),
+                              Text(numFmt.format(item.amount),
+                                  style: _mono),
+                            ],
+                          ),
+                        ],
+                      ),
+                    )),
+
+                _dashed(),
+
+                // ── สรุปยอด ────────────────────────────────────
+                _row('รวม', '฿${numFmt.format(subtotal)}'),
+                if (discount > 0)
+                  _row('ส่วนลด', '-฿${numFmt.format(discount)}',
+                      valueColor: Colors.red[700]),
+
+                const SizedBox(height: 4),
+                _solidLine(),
+                const SizedBox(height: 4),
+
+                // ยอดชำระ — ใหญ่
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('ยอดชำระ', style: _monoBd),
+                    Text('฿${numFmt.format(total)}', style: _monoLg),
+                  ],
+                ),
+
+                const SizedBox(height: 4),
+                _solidLine(),
+                const SizedBox(height: 6),
+
+                // วิธีชำระ / รับเงิน / ทอน
+                _row('ชำระด้วย', paymentLabel),
+                if (paymentType == 'CASH') ...[
+                  _row('รับเงิน', '฿${numFmt.format(paidAmount)}'),
+                  _row('เงินทอน', '฿${numFmt.format(changeAmount)}',
+                      valueColor: Colors.green[700]),
+                ],
+
+                // แต้มสะสม
+                if (earnedPoints > 0) ...[
+                  _dashed(),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.stars,
+                          size: 14, color: Colors.amber),
+                      const SizedBox(width: 4),
+                      Text('ได้รับ $earnedPoints แต้มสะสม',
+                          style: const TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 12,
+                              color: Colors.amber,
+                              fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ],
+
+                _dashed(),
+
+                // ── ขอบคุณ ─────────────────────────────────────
+                const SizedBox(height: 4),
+                const Text('ขอบคุณที่ใช้บริการ',
+                    style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87)),
+                const Text('(THANK YOU)',
+                    style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 11,
+                        color: Colors.black45)),
+                const Text('โปรดเก็บใบเสร็จไว้เป็นหลักฐาน',
+                    style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 10,
+                        color: Colors.black38)),
+                const SizedBox(height: 4),
+              ],
+            ),
+          ),
+
+          // ── รอยปรุ ด้านล่าง ────────────────────────────────────
+          _PerforatedEdge(top: false),
+        ],
+      ),
+    );
+  }
+
+  // helpers
+  Widget _row(String label, String value, {Color? valueColor}) =>
+      Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label, style: _mono),
+            Text(value,
+                style: valueColor != null
+                    ? _mono.copyWith(color: valueColor)
+                    : _mono),
+          ],
+        ),
+      );
+
+  Widget _dashed() => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          children: List.generate(
+            38,
+            (_) => Expanded(
+              child: Container(
+                height: 1,
+                color: Colors.grey[300],
+                margin: const EdgeInsets.symmetric(horizontal: 1),
+              ),
+            ),
+          ),
+        ),
+      );
+
+  Widget _solidLine() => Container(height: 1.5, color: Colors.black87);
+}
+
+// ─────────────────────────────────────────────────────────────────
+// _PerforatedEdge — รอยปรุกระดาษ thermal
+// ─────────────────────────────────────────────────────────────────
+class _PerforatedEdge extends StatelessWidget {
+  final bool top;
+  const _PerforatedEdge({required this.top});
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRect(
+      child: SizedBox(
+        height: 12,
+        child: Row(
+          children: List.generate(28, (i) {
+            return Expanded(
+              child: Container(
+                height: 12,
+                margin: EdgeInsets.only(
+                  left: i == 0 ? 0 : 2,
+                  right: i == 27 ? 0 : 0,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEEEEEE),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+              ),
+            );
+          }),
+        ),
       ),
     );
   }

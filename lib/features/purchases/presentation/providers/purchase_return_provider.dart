@@ -2,6 +2,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/purchase_return_model.dart';
 import '../../../../core/client/api_client.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 
 /// Provider สำหรับจัดการ Purchase Return List
 final purchaseReturnListProvider = AsyncNotifierProvider<PurchaseReturnNotifier, List<PurchaseReturnModel>>(
@@ -11,6 +12,9 @@ final purchaseReturnListProvider = AsyncNotifierProvider<PurchaseReturnNotifier,
 class PurchaseReturnNotifier extends AsyncNotifier<List<PurchaseReturnModel>> {
   @override
   Future<List<PurchaseReturnModel>> build() async {
+    // ✅ รอ token ก่อน — ป้องกัน 401
+    final authState = ref.watch(authProvider);
+    if (authState.isRestoring || !authState.isAuthenticated) return [];
     return loadReturns();
   }
 

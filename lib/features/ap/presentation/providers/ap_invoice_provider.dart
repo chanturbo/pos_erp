@@ -2,6 +2,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/ap_invoice_model.dart';
 import '../../../../core/client/api_client.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 
 /// Provider สำหรับจัดการ AP Invoice List
 final apInvoiceListProvider = AsyncNotifierProvider<ApInvoiceNotifier, List<ApInvoiceModel>>(
@@ -11,6 +12,9 @@ final apInvoiceListProvider = AsyncNotifierProvider<ApInvoiceNotifier, List<ApIn
 class ApInvoiceNotifier extends AsyncNotifier<List<ApInvoiceModel>> {
   @override
   Future<List<ApInvoiceModel>> build() async {
+    // ✅ รอ token ก่อน — ป้องกัน 401
+    final authState = ref.watch(authProvider);
+    if (authState.isRestoring || !authState.isAuthenticated) return [];
     return loadInvoices();
   }
 

@@ -91,14 +91,18 @@ class _RootRedirect extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authProvider);
 
-    // ยังโหลด auth อยู่ — รอก่อน
-    if (authState.isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+    // ✅ ยังกำลัง restore token จาก storage — แสดง Splash ก่อน
+    // ป้องกัน race condition: provider อื่น call API ก่อนมี token → 401
+    if (authState.isRestoring) {
+      return const _SplashScreen();
     }
 
-    // redirect หลัง frame แรก render เสร็จ
+    // ยัง login อยู่ — รอก่อน
+    if (authState.isLoading) {
+      return const _SplashScreen();
+    }
+
+    // ✅ Restore เสร็จแล้ว → redirect ตาม auth state
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!context.mounted) return;
 
@@ -117,9 +121,38 @@ class _RootRedirect extends ConsumerWidget {
       }
     });
 
-    // Splash ระหว่างรอ redirect
+    return const _SplashScreen();
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// _SplashScreen — แสดงขณะรอ token restore
+// ─────────────────────────────────────────────────────────────────
+class _SplashScreen extends StatelessWidget {
+  const _SplashScreen();
+
+  @override
+  Widget build(BuildContext context) {
     return const Scaffold(
-      body: Center(child: CircularProgressIndicator()),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.point_of_sale, size: 64, color: Color(0xFFE57200)),
+            SizedBox(height: 20),
+            Text(
+              'DEE POS',
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF16213E),
+              ),
+            ),
+            SizedBox(height: 32),
+            CircularProgressIndicator(color: Color(0xFFE57200)),
+          ],
+        ),
+      ),
     );
   }
 }

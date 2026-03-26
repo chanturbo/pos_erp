@@ -3,6 +3,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/supplier_model.dart';
 import '../../../../core/client/api_client.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 
 /// Provider สำหรับจัดการ Supplier List
 final supplierListProvider = AsyncNotifierProvider<SupplierNotifier, List<SupplierModel>>(
@@ -12,6 +13,9 @@ final supplierListProvider = AsyncNotifierProvider<SupplierNotifier, List<Suppli
 class SupplierNotifier extends AsyncNotifier<List<SupplierModel>> {
   @override
   Future<List<SupplierModel>> build() async {
+    // ✅ รอ token ก่อน — ป้องกัน 401
+    final authState = ref.watch(authProvider);
+    if (authState.isRestoring || !authState.isAuthenticated) return [];
     return loadSuppliers();
   }
 

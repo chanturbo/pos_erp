@@ -3,6 +3,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/client/api_client.dart';
 import '../../data/models/sales_order_model.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 
 // ── Points Config ────────────────────────────────────────────────
 // ✅ Week 5: ทุก 100 บาท ได้ 1 คะแนน (ปรับได้)
@@ -24,6 +25,9 @@ final salesHistoryProvider =
 class SalesHistoryNotifier extends AsyncNotifier<List<SalesOrderModel>> {
   @override
   Future<List<SalesOrderModel>> build() async {
+    // ✅ รอ token ก่อน — ป้องกัน 401
+    final authState = ref.watch(authProvider);
+    if (authState.isRestoring || !authState.isAuthenticated) return [];
     return await loadOrders();
   }
 

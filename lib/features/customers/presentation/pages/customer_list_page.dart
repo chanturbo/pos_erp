@@ -462,7 +462,7 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
                       ),
                       const SizedBox(height: 3),
                       Text(
-                        'รหัส: \${c.customerCode}',
+                        'รหัส: ${c.customerCode}',
                         style: const TextStyle(
                           fontSize: 11,
                           color: AppTheme.textSub,
@@ -470,7 +470,7 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
                       ),
                       if (c.phone != null)
                         Text(
-                          'โทร: \${c.phone}',
+                          'โทร: ${c.phone}',
                           style: const TextStyle(
                             fontSize: 11,
                             color: AppTheme.textSub,
@@ -486,7 +486,7 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
                             ),
                             const SizedBox(width: 3),
                             Text(
-                              '\${c.memberNo}  ·  \${c.points} pt',
+                              '${c.memberNo}  ·  ${c.points} pt',
                               style: TextStyle(
                                 fontSize: 11,
                                 color: Colors.amber[700],
@@ -497,7 +497,7 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
                         ),
                       if (c.creditLimit > 0)
                         Text(
-                          'วงเงิน: ฿\${c.creditLimit.toStringAsFixed(0)}',
+                          'วงเงิน: ฿${c.creditLimit.toStringAsFixed(0)}',
                           style: const TextStyle(
                             fontSize: 11,
                             color: Color(0xFF1565C0),

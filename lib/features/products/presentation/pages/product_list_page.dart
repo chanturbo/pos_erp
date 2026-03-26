@@ -352,90 +352,209 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
   // CARD VIEW — ใช้ ListTile pattern เดิมจากไฟล์ที่แนบมา + ปรับ style
   // ─────────────────────────────────────────────────────────────
   Widget _buildCardView(List<ProductModel> products) {
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    return ListView.separated(
+      padding: const EdgeInsets.all(12),
       itemCount: products.length,
-      itemBuilder: (_, i) {
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (context, i) {
         final p = products[i];
+        final initial = p.productName.isNotEmpty
+            ? p.productName.substring(0, 1).toUpperCase()
+            : '?';
+        // สีตาม initial เหมือน customer card
+        final colors = [
+          AppTheme.primary, AppTheme.info, AppTheme.success,
+          AppTheme.warning, AppTheme.purpleColor, AppTheme.tealColor,
+        ];
+        final avatarColor = colors[p.productName.codeUnitAt(0) % colors.length];
+
         return Card(
-          margin: const EdgeInsets.only(bottom: 8),
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
             side: const BorderSide(color: AppTheme.border),
           ),
-          child: ListTile(
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            // Avatar — รหัสย่อแทน CircleAvatar เดิม
-            leading: Container(
-              width: 44, height: 44,
-              decoration: BoxDecoration(
-                color: AppTheme.primaryDark.withValues(alpha: 0.10),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                    color: AppTheme.primaryDark.withValues(alpha: 0.25)),
-              ),
-              child: Center(
-                child: Text(
-                  p.productCode.length >= 2
-                      ? p.productCode.substring(0, 2)
-                      : p.productCode,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.primaryDark,
-                      fontSize: 13),
-                ),
-              ),
-            ),
-            title: Text(p.productName,
-                style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF1A1A1A))), // ✅ เข้มเสมอ
-            subtitle: Text(
-              'รหัส: ${p.productCode}  ·  หน่วย: ${p.baseUnit}',
-              style: const TextStyle(
-                  fontSize: 12,
-                  color: Color(0xFF666666))), // ✅ เข้มเสมอ
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
+          color: Colors.white,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
               children: [
-                // ราคา + สถานะ
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.end,
+                // ── Avatar ──────────────────────────────────────
+                Stack(
+                  clipBehavior: Clip.none,
                   children: [
-                    Text('฿${p.priceLevel1.toStringAsFixed(2)}',
+                    CircleAvatar(
+                      radius: 20,
+                      backgroundColor: avatarColor,
+                      child: Text(
+                        initial,
                         style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.info)),
-                    _StatusBadge(active: p.isActive),
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    // badge เมื่อไม่ได้ควบคุมสต๊อก
+                    if (!p.isStockControl)
+                      Positioned(
+                        right: -2,
+                        bottom: -2,
+                        child: Container(
+                          width: 14,
+                          height: 14,
+                          decoration: BoxDecoration(
+                            color: AppTheme.textSub,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                                color: Colors.white, width: 1.5),
+                          ),
+                          child: const Icon(
+                            Icons.remove_circle_outline,
+                            size: 8,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
                   ],
                 ),
-                const SizedBox(width: 4),
-                // Edit button
-                IconButton(
-                  icon: const Icon(Icons.edit_outlined,
-                      size: 18, color: AppTheme.info),
-                  tooltip: 'แก้ไข',
-                  constraints:
-                      const BoxConstraints(minWidth: 36, minHeight: 36),
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => ProductFormPage(product: p)),
+                const SizedBox(width: 12),
+
+                // ── Info ─────────────────────────────────────────
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // ชื่อ + status badge
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              p.productName,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF1A1A1A),
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: p.isActive
+                                  ? const Color(0xFFE8F5E9)
+                                  : const Color(0xFFFFEBEE),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 5,
+                                  height: 5,
+                                  decoration: BoxDecoration(
+                                    color: p.isActive
+                                        ? const Color(0xFF4CAF50)
+                                        : const Color(0xFFF44336),
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  p.isActive ? 'ใช้งาน' : 'ปิดใช้',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: p.isActive
+                                        ? const Color(0xFF2E7D32)
+                                        : const Color(0xFFC62828),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+
+                      // รหัสสินค้า
+                      Text(
+                        'รหัส: ${p.productCode}',
+                        style: const TextStyle(
+                            fontSize: 11, color: AppTheme.textSub),
+                      ),
+
+                      // barcode (ถ้ามี)
+                      if (p.barcode != null && p.barcode!.isNotEmpty)
+                        Row(
+                          children: [
+                            const Icon(Icons.qr_code,
+                                size: 11, color: AppTheme.textSub),
+                            const SizedBox(width: 3),
+                            Text(
+                              p.barcode!,
+                              style: const TextStyle(
+                                  fontSize: 11, color: AppTheme.textSub),
+                            ),
+                          ],
+                        ),
+
+                      // ราคา + หน่วย
+                      Row(
+                        children: [
+                          Text(
+                            '฿${p.priceLevel1.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.info,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '/ ${p.baseUnit}',
+                            style: const TextStyle(
+                                fontSize: 11, color: AppTheme.textSub),
+                          ),
+                          if (p.standardCost > 0) ...[
+                            const SizedBox(width: 8),
+                            Text(
+                              'ต้นทุน: ฿${p.standardCost.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                  fontSize: 11, color: AppTheme.textSub),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-                // Delete button
-                IconButton(
-                  icon: const Icon(Icons.delete_outline,
-                      size: 18, color: AppTheme.error),
-                  tooltip: 'ลบ',
-                  constraints:
-                      const BoxConstraints(minWidth: 36, minHeight: 36),
-                  onPressed: () => _confirmDelete(p),
+
+                // ── Actions ──────────────────────────────────────
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _ActionIconBtn(
+                      icon: Icons.edit_outlined,
+                      color: AppTheme.info,
+                      tooltip: 'แก้ไข',
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => ProductFormPage(product: p)),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    _ActionIconBtn(
+                      icon: Icons.delete_outline,
+                      color: AppTheme.error,
+                      tooltip: 'ลบ',
+                      onTap: () => _confirmDelete(p),
+                    ),
+                  ],
                 ),
               ],
             ),

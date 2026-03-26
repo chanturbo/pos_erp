@@ -302,13 +302,17 @@ class _CustomerSelectorDialogState
                               horizontal: 12, vertical: 10),
                           decoration: BoxDecoration(
                             color: isSelected
-                                ? AppTheme.primaryLight
-                                : Colors.white,
+                                ? AppTheme.primary.withValues(alpha: 0.07)
+                                : (Theme.of(context).brightness == Brightness.dark
+                                    ? AppTheme.darkElement
+                                    : Colors.white),
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(
                               color: isSelected
-                                  ? AppTheme.primary.withValues(alpha: 0.4)
-                                  : AppTheme.border,
+                                  ? AppTheme.primary.withValues(alpha: 0.5)
+                                  : (Theme.of(context).brightness == Brightness.dark
+                                      ? const Color(0xFF333333)
+                                      : AppTheme.border),
                             ),
                           ),
                           child: Row(
@@ -417,6 +421,15 @@ class _CustomerSelectorDialogState
                                           ],
                                         ),
                                       ),
+                                    // ✅ วงเงินเครดิต
+                                    if (c.creditLimit > 0)
+                                      Text(
+                                        'วงเงิน: ฿${c.creditLimit.toStringAsFixed(0)}',
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          color: AppTheme.info,
+                                        ),
+                                      ),
                                   ],
                                 ),
                               ),
@@ -425,8 +438,11 @@ class _CustomerSelectorDialogState
                                 const Icon(Icons.check_circle,
                                     color: AppTheme.primary, size: 18)
                               else
-                                const Icon(Icons.chevron_right,
-                                    color: AppTheme.textSub, size: 18),
+                                Icon(Icons.chevron_right,
+                                    color: Theme.of(context).brightness == Brightness.dark
+                                        ? Colors.white38
+                                        : AppTheme.textSub,
+                                    size: 18),
                             ],
                           ),
                         ),
