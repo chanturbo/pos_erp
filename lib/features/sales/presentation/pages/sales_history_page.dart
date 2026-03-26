@@ -38,12 +38,9 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
   final List<double> _colWidths = [140, 130, 180, 100, 110, 100, 70];
   static const List<double> _colMinW = [110, 100, 120, 80, 90, 80, 70];
   static const List<double> _colMaxW = [200, 200, 320, 140, 160, 130, 70];
-  bool _userResized = false;
-
   final _hScroll = ScrollController();
   final _fmt = NumberFormat('#,##0.00');
   final _dateFmt = DateFormat('dd/MM/yyyy HH:mm');
-  final _shortDateFmt = DateFormat('dd/MM/yy');
 
   @override
   void dispose() {
@@ -103,10 +100,6 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
       return _sortAsc ? cmp : -cmp;
     });
     return list;
-  }
-
-  void _autoFitColWidths(List<SalesOrderModel> orders, double screenW) {
-    // ไม่ทำอะไรถ้า user เคย resize แล้ว
   }
 
   // ── Date picker ──────────────────────────────────────────────────
@@ -259,13 +252,11 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                                         }),
                                         onResize: (i, w) => setState(() {
                                           _colWidths[i] = w;
-                                          _userResized = true;
                                         }),
                                         onReset: () => setState(() {
                                           _colWidths.setAll(0, [
                                             140, 130, 180, 100, 110, 100, 70,
                                           ]);
-                                          _userResized = false;
                                         }),
                                       ),
                                       const Divider(
@@ -273,7 +264,7 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                                       Expanded(
                                         child: ListView.separated(
                                           itemCount: filtered.length,
-                                          separatorBuilder: (_, __) =>
+                                          separatorBuilder: (_, _) =>
                                               const Divider(
                                                   height: 1,
                                                   color: AppTheme.border),
@@ -1228,9 +1219,6 @@ class _DropdownChip<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isActive = items.first.$1 != value;
-    final currentLabel =
-        items.firstWhere((e) => e.$1 == value, orElse: () => items.first).$2;
-
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(

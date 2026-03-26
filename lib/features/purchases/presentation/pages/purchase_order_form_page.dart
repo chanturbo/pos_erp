@@ -566,7 +566,7 @@ class _ProductSelectionDialogState
           children: [
             DropdownButtonFormField<String>(
               decoration: const InputDecoration(labelText: 'สินค้า'),
-              value: _selectedProductId,
+              initialValue: _selectedProductId,
               items: filteredProducts.map<DropdownMenuItem<String>>((product) {
                 return DropdownMenuItem<String>(
                   value: product.productId,

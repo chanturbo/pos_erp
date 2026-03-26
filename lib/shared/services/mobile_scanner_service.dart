@@ -180,7 +180,7 @@ class _ScannerSheetState extends State<_ScannerSheet> {
         BarcodeFormat.code39,
         BarcodeFormat.upcA,
         BarcodeFormat.upcE,
-        BarcodeFormat.itf,
+        BarcodeFormat.itf14,
       ],
     );
   }
@@ -252,7 +252,7 @@ class _ScannerSheetState extends State<_ScannerSheet> {
                       IconButton(
                         icon: ValueListenableBuilder(
                           valueListenable: _controller,
-                          builder: (_, state, __) => Icon(
+                          builder: (_, state, _) => Icon(
                             state.torchState == TorchState.on
                                 ? Icons.flash_on
                                 : Icons.flash_off,
@@ -413,7 +413,7 @@ class _ScannerPageState extends State<_ScannerPage> {
         BarcodeFormat.code39,
         BarcodeFormat.upcA,
         BarcodeFormat.upcE,
-        BarcodeFormat.itf,
+        BarcodeFormat.itf14,
       ],
     );
   }
@@ -459,7 +459,7 @@ class _ScannerPageState extends State<_ScannerPage> {
           if (!_isDesktop)
             ValueListenableBuilder(
               valueListenable: _controller,
-              builder: (_, state, __) => IconButton(
+              builder: (_, state, _) => IconButton(
                 icon: Icon(
                   state.torchState == TorchState.on
                       ? Icons.flash_on

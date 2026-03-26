@@ -145,11 +145,11 @@ class _BarcodeListenerState extends State<BarcodeListener> {
 
     // ตัวอักษร A-Z
     final label = key.keyLabel;
-    if (label.length == 1) return label.toUpperCase();
+    if (label.length == 1) { return label.toUpperCase(); }
 
     // hyphen, dash (พบใน barcode บางประเภท)
     if (key == LogicalKeyboardKey.minus ||
-        key == LogicalKeyboardKey.numpadSubtract) return '-';
+        key == LogicalKeyboardKey.numpadSubtract) { return '-'; }
 
     return null;
   }

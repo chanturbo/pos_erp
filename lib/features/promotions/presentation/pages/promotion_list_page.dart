@@ -364,32 +364,26 @@ class _PromotionListPageState extends ConsumerState<PromotionListPage> {
   Widget _typeIcon(String type) {
     IconData icon;
     Color color;
-    String label;
     switch (type) {
       case 'DISCOUNT_PERCENT':
         icon = Icons.percent;
         color = Colors.purple;
-        label = '%';
         break;
       case 'DISCOUNT_AMOUNT':
         icon = Icons.money;
         color = Colors.green;
-        label = '฿';
         break;
       case 'BUY_X_GET_Y':
         icon = Icons.card_giftcard;
         color = Colors.red;
-        label = 'B1G1';
         break;
       case 'FREE_ITEM':
         icon = Icons.free_breakfast;
         color = Colors.teal;
-        label = 'ฟรี';
         break;
       default:
         icon = Icons.local_offer;
         color = Colors.orange;
-        label = '';
     }
     return Container(
       width: 44,

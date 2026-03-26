@@ -200,6 +200,7 @@ class _PosPageState extends ConsumerState<PosPage> {
 
                     // ✅ ถ้ามีสินค้าในตะกร้าและ priceLevel เปลี่ยน → ถามก่อน
                     if (notifier.hasItemsWithDifferentLevel(newLevel)) {
+                      if (!context.mounted) return;
                       final confirm = await showDialog<bool>(
                         context: context,
                         builder: (_) => AlertDialog(

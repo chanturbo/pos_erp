@@ -1,8 +1,6 @@
 import 'dart:convert';
 
 class JwtUtils {
-  static const String _secret = 'your-secret-key-change-in-production';
-  
   /// สร้าง Token
   static String generateToken({
     required String userId,

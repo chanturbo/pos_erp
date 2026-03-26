@@ -274,7 +274,7 @@ class _ScanRowState extends ConsumerState<_ScanRow> {
       onScanned: (result) {
         if (result.value.isEmpty) return;
         _addByBarcode(context, result.value).catchError((_) {
-          _notFound(context, result.value);
+          if (context.mounted) _notFound(context, result.value);
         });
       },
     );
@@ -357,7 +357,7 @@ class _ScanRowState extends ConsumerState<_ScanRow> {
                   try {
                     await _addByBarcode(context, v);
                   } on _NotFoundError {
-                    _notFound(context, v);
+                    if (context.mounted) _notFound(context, v);
                   }
                 },
               ),
@@ -942,9 +942,8 @@ class _DiscountButton extends ConsumerWidget {
     String label;
     if (!hasDiscount) {
       label = 'ส่วนลด';
-    } else if (cartState.discountPercent != null &&
-        cartState.discountPercent! > 0) {
-      label = '${cartState.discountPercent!.toStringAsFixed(0)}%';
+    } else if (cartState.discountPercent > 0) {
+      label = '${cartState.discountPercent.toStringAsFixed(0)}%';
     } else {
       label = '-฿${cartState.totalDiscount.toStringAsFixed(0)}';
     }

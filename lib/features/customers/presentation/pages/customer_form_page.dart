@@ -119,18 +119,18 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
 
     setState(() => _isLoading = true);
 
-    String? _nul(String v) => v.trim().isEmpty ? null : v.trim();
+    String? nul(String v) => v.trim().isEmpty ? null : v.trim();
 
     final data = {
       'customer_code': _customerCodeController.text.trim(),
       'customer_name': _customerNameController.text.trim(),
-      'address': _nul(_addressController.text),
-      'phone': _nul(_phoneController.text),
-      'email': _nul(_emailController.text),
-      'tax_id': _nul(_taxIdController.text),
+      'address': nul(_addressController.text),
+      'phone': nul(_phoneController.text),
+      'email': nul(_emailController.text),
+      'tax_id': nul(_taxIdController.text),
       'credit_limit': double.tryParse(_creditLimitController.text) ?? 0,
       'credit_days': int.tryParse(_creditDaysController.text) ?? 0,
-      'member_no': _nul(_memberNoController.text),
+      'member_no': nul(_memberNoController.text),
       // ✅ ส่ง price_level ให้ server หา customer_group_id ที่ตรงกัน
       'price_level': _priceLevel,
       'is_active': _isActive,

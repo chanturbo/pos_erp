@@ -279,7 +279,7 @@ class _CustomerSelectorDialogState
                     padding: const EdgeInsets.symmetric(
                         horizontal: 12, vertical: 8),
                     itemCount: filtered.length,
-                    separatorBuilder: (_, __) =>
+                    separatorBuilder: (_, _) =>
                         const SizedBox(height: 4),
                     itemBuilder: (context, i) {
                       final c = filtered[i];

@@ -307,9 +307,9 @@ class _ProductImage extends StatelessWidget {
       content = ClipRRect(
         borderRadius: borderRadius,
         child: Image.file(
-          file!,
+          file,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => _placeholder(),
+          errorBuilder: (_, _, _) => _placeholder(),
         ),
       );
     } else {

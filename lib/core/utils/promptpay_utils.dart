@@ -37,18 +37,14 @@ class PromptPayUtils {
         : '';
 
     // ประกอบ payload ก่อนคำนวณ CRC
-    final payload = _payloadFormatIndicator +
-        _pointOfInitiationMethod +
-        tag29 +
-        _merchantCategoryCode +
-        _transactionCurrency +
-        amountStr +
-        _countryCode +
-        '6304'; // Tag 63 header (CRC จะต่อท้าย)
+    final payload =
+        '$_payloadFormatIndicator$_pointOfInitiationMethod$tag29'
+        '$_merchantCategoryCode$_transactionCurrency$amountStr'
+        '${_countryCode}6304'; // Tag 63 header (CRC จะต่อท้าย)
 
     // คำนวณ CRC16 และต่อท้าย
     final crc = _crc16(payload);
-    return payload + crc;
+    return '$payload$crc';
   }
 
   // ─────────────────────────────────────────────────────────────

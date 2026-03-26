@@ -47,8 +47,8 @@ class _PdfPreviewDialogState extends State<PdfPreviewDialog> {
   void _applyScale(double newScale) {
     final center = _transform.value.getTranslation();
     _transform.value = Matrix4.identity()
-      ..translate(center.x, center.y)
-      ..scale(newScale);
+      ..translateByDouble(center.x, center.y, 0.0, 1.0)
+      ..scaleByDouble(newScale, newScale, 1.0, 1.0);
     setState(() => _scale = newScale);
   }
 

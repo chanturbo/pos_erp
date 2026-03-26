@@ -23,7 +23,6 @@ class OfflineSyncService {
   bool _isSyncing = false;
 
   static const _syncIntervalSeconds = 30;
-  static const _maxRetries = 3;
 
   OfflineSyncService(this._ref);
 

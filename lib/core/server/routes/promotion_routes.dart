@@ -268,7 +268,6 @@ class PromotionRoutes {
       final data = jsonDecode(payload) as Map<String, dynamic>;
 
       final subtotal = (data['subtotal'] as num).toDouble();
-      final customerId = data['customer_id'] as String?;
       final now = DateTime.now();
 
       // ดึง Active Promotions

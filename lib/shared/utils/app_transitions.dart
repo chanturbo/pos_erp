@@ -8,10 +8,10 @@ import 'package:flutter/material.dart';
 class FadeSlideRoute<T> extends PageRouteBuilder<T> {
   FadeSlideRoute({required Widget page, super.settings})
       : super(
-          pageBuilder: (_, __, ___) => page,
+          pageBuilder: (_, _, _) => page,
           transitionDuration: const Duration(milliseconds: 220),
           reverseTransitionDuration: const Duration(milliseconds: 180),
-          transitionsBuilder: (_, animation, __, child) {
+          transitionsBuilder: (_, animation, _, child) {
             final fade = CurvedAnimation(
               parent: animation,
               curve: Curves.easeOut,
@@ -33,10 +33,10 @@ class FadeSlideRoute<T> extends PageRouteBuilder<T> {
 class SlideRightRoute<T> extends PageRouteBuilder<T> {
   SlideRightRoute({required Widget page, super.settings})
       : super(
-          pageBuilder: (_, __, ___) => page,
+          pageBuilder: (_, _, _) => page,
           transitionDuration: const Duration(milliseconds: 250),
           reverseTransitionDuration: const Duration(milliseconds: 200),
-          transitionsBuilder: (_, animation, __, child) {
+          transitionsBuilder: (_, animation, _, child) {
             final slide = Tween<Offset>(
               begin: const Offset(1.0, 0),
               end: Offset.zero,
@@ -52,10 +52,10 @@ class SlideRightRoute<T> extends PageRouteBuilder<T> {
 class ScaleFadeRoute<T> extends PageRouteBuilder<T> {
   ScaleFadeRoute({required Widget page, super.settings})
       : super(
-          pageBuilder: (_, __, ___) => page,
+          pageBuilder: (_, _, _) => page,
           transitionDuration: const Duration(milliseconds: 250),
           reverseTransitionDuration: const Duration(milliseconds: 180),
-          transitionsBuilder: (_, animation, __, child) {
+          transitionsBuilder: (_, animation, _, child) {
             final curved = CurvedAnimation(
               parent: animation,
               curve: Curves.easeOutBack,
@@ -286,7 +286,7 @@ class _AnimatedCounterState extends State<AnimatedCounter>
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _anim,
-      builder: (_, __) {
+      builder: (_, _) {
         final val = _anim.value;
         final text = widget.decimals > 0
             ? val.toStringAsFixed(widget.decimals)
@@ -348,7 +348,7 @@ class _ShimmerBoxState extends State<ShimmerBox>
 
     return AnimatedBuilder(
       animation: _anim,
-      builder: (_, __) => Container(
+      builder: (_, _) => Container(
         width: widget.width,
         height: widget.height,
         decoration: BoxDecoration(

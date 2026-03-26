@@ -145,7 +145,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
 
-    double _d(TextEditingController c) =>
+    double d(TextEditingController c) =>
         double.tryParse(c.text.isEmpty ? '0' : c.text) ?? 0;
 
     final data = {
@@ -155,12 +155,12 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
           ? null
           : _barcodeController.text.trim(),
       'base_unit': _unitController.text.trim(),
-      'price_level1': _d(_price1Controller),
-      'price_level2': _d(_price2Controller),
-      'price_level3': _d(_price3Controller),
-      'price_level4': _d(_price4Controller),
-      'price_level5': _d(_price5Controller),
-      'standard_cost': _d(_costController),
+      'price_level1': d(_price1Controller),
+      'price_level2': d(_price2Controller),
+      'price_level3': d(_price3Controller),
+      'price_level4': d(_price4Controller),
+      'price_level5': d(_price5Controller),
+      'standard_cost': d(_costController),
       'is_stock_control': _isStockControl,
       'allow_negative_stock': _allowNegativeStock,
       'image_path': _imagePath,
@@ -847,7 +847,7 @@ class _SwitchRow extends StatelessWidget {
         Switch(
           value: value,
           onChanged: onChanged,
-          activeColor: activeColor,
+          activeThumbColor: activeColor,
           materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
         ),
       ],
@@ -936,7 +936,6 @@ class _FormField extends StatelessWidget {
   final bool required;
   final bool enabled;
   final TextInputType? keyboardType;
-  final int maxLines;
   final String? prefixText;
   final String? helperText;
   final String? Function(String?)? validator;
@@ -948,7 +947,6 @@ class _FormField extends StatelessWidget {
     this.required = false,
     this.enabled = true,
     this.keyboardType,
-    this.maxLines = 1,
     this.prefixText,
     this.helperText,
     this.validator,
@@ -960,7 +958,7 @@ class _FormField extends StatelessWidget {
       controller: controller,
       enabled: enabled,
       keyboardType: keyboardType,
-      maxLines: maxLines,
+      maxLines: 1,
       validator: validator,
       style: TextStyle(
         fontSize: 13,
@@ -1067,9 +1065,9 @@ class _ImagePickerWidget extends StatelessWidget {
             child: hasImage && fileExists
                 ? ClipRRect(
                     borderRadius: BorderRadius.circular(9),
-                    child: Image.file(file!,
+                    child: Image.file(file,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => _placeholder()),
+                        errorBuilder: (_, e, s) => _placeholder()),
                   )
                 : _placeholder(),
           ),

@@ -217,7 +217,7 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
                                       Expanded(
                                         child: ListView.separated(
                                           itemCount: filtered.length,
-                                          separatorBuilder: (_, __) =>
+                                          separatorBuilder: (_, _) =>
                                               const Divider(
                                                 height: 1,
                                                 color: AppTheme.border,
@@ -338,7 +338,7 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
     return ListView.separated(
       padding: const EdgeInsets.all(12),
       itemCount: customers.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      separatorBuilder: (_, _) => const SizedBox(height: 8),
       itemBuilder: (context, i) {
         final c = customers[i];
         final isMember = c.memberNo != null && c.memberNo!.isNotEmpty;
@@ -1660,56 +1660,6 @@ class _AddBtn extends StatelessWidget {
       elevation: 0,
     ),
   );
-}
-
-class _ToolbarButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool active;
-  final Color activeColor;
-  final VoidCallback onTap;
-
-  const _ToolbarButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.active = false,
-    this.activeColor = AppTheme.primary,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: active ? activeColor.withValues(alpha: 0.1) : Colors.white,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: active ? activeColor : AppTheme.border),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              size: 16,
-              color: active ? activeColor : AppTheme.textSub,
-            ),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                color: active ? activeColor : AppTheme.textSub,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 class _ActionIcon extends StatelessWidget {

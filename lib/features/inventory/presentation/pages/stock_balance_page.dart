@@ -14,7 +14,6 @@ import '../../data/models/stock_balance_model.dart';
 // ── Color aliases → AppTheme ──────────────────────────────────────
 const _navy    = AppTheme.navyColor;
 const _orange  = AppTheme.primaryColor;
-const _surface = AppTheme.surfaceColor;
 const _border  = AppTheme.borderColor;
 const _success = AppTheme.successColor;
 const _error   = AppTheme.errorColor;
@@ -206,7 +205,7 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
               ),
               data: (stocks) {
                 final filtered = _applyFilters(
-                  stocks as List<StockBalanceModel>,
+                  stocks,
                   settings.lowStockThreshold,
                   settings.enableLowStockAlert,
                 );
@@ -294,7 +293,7 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
           stockAsync.whenOrNull(
                 data: (stocks) {
                   final filtered = _applyFilters(
-                    stocks as List<StockBalanceModel>,
+                    stocks,
                     settings.lowStockThreshold,
                     settings.enableLowStockAlert,
                   );

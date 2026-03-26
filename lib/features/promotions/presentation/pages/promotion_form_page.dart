@@ -33,7 +33,6 @@ class _PromotionFormPageState extends ConsumerState<PromotionFormPage> {
 
   // State
   String _promotionType = 'DISCOUNT_PERCENT';
-  String _discountType = 'PERCENT';
   String _applyTo = 'ALL';
   bool _isExclusive = false;
   bool _isActive = true;
@@ -72,7 +71,6 @@ class _PromotionFormPageState extends ConsumerState<PromotionFormPage> {
 
     if (p != null) {
       _promotionType = p.promotionType;
-      _discountType = p.discountType ?? 'PERCENT';
       _applyTo = p.applyTo;
       _isExclusive = p.isExclusive;
       _isActive = p.isActive;

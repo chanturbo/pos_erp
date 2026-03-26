@@ -379,7 +379,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             color: AppTheme.primary,
           ),
           value: currentMode == ThemeMode.dark,
-          activeColor: AppTheme.primary,
+          activeThumbColor: AppTheme.primary,
           onChanged: (isDark) {
             ref.read(themeModeProvider.notifier).toggleDarkMode(isDark);
           },
@@ -471,7 +471,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           subtitle: Text('คำนวณภาษีมูลค่าเพิ่มในใบเสร็จ',
               style: TextStyle(color: isDark ? Colors.white70 : AppTheme.textSub)),
           value: settings.enableVat,
-          activeColor: AppTheme.primary,
+          activeThumbColor: AppTheme.primary,
           onChanged: (v) =>
               ref.read(settingsProvider.notifier).updateVatSettings(enableVat: v),
         ),
@@ -521,7 +521,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           subtitle: Text('แสดงการแจ้งเตือนเมื่อสต๊อกต่ำกว่าที่กำหนด',
               style: TextStyle(color: isDark ? Colors.white70 : AppTheme.textSub)),
           value: settings.enableLowStockAlert,
-          activeColor: AppTheme.primary,
+          activeThumbColor: AppTheme.primary,
           onChanged: (v) => ref.read(settingsProvider.notifier)
               .updateStockSettings(enableLowStockAlert: v),
         ),
@@ -573,7 +573,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               style: TextStyle(color: isDark ? Colors.white70 : AppTheme.textSub)),
           secondary: Icon(Icons.star_outline, color: AppTheme.primary),
           value: settings.enableLoyalty,
-          activeColor: AppTheme.primary,
+          activeThumbColor: AppTheme.primary,
           onChanged: (v) => ref.read(settingsProvider.notifier)
               .updateLoyaltySettings(enableLoyalty: v),
         ),

@@ -107,11 +107,13 @@ class AppConfig {
   /// ที่เก็บ database แยกตาม platform
   static String get databaseDescription {
     if (kIsWeb) return 'IndexedDB (browser)';
-    if (Platform.isAndroid)
+    if (Platform.isAndroid) {
       return '/data/data/<package>/databases/$databaseName';
+    }
     if (Platform.isIOS) return 'Documents/$databaseName';
-    if (Platform.isMacOS)
+    if (Platform.isMacOS) {
       return '~/Library/Application Support/<bundle>/$databaseName';
+    }
     if (Platform.isWindows) return '%APPDATA%\\pos_erp\\$databaseName';
     return databaseName;
   }

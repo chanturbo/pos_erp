@@ -70,10 +70,10 @@ class PdfExportService {
     final file = File('${dir.path}/$filename');
     await file.writeAsBytes(bytes);
 
-    await Share.shareXFiles(
-      [XFile(file.path, mimeType: 'application/pdf')],
+    await SharePlus.instance.share(ShareParams(
+      files: [XFile(file.path, mimeType: 'application/pdf')],
       subject: title,
-    );
+    ));
   }
 
   // ── บันทึกลง Documents และเปิดด้วย OS ───────────────────────────

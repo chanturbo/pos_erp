@@ -88,7 +88,6 @@ void main() {
 
   // ─── fromJson / toJson ────────────────
   group('fromJson / toJson', () {
-    final now = DateTime(2024, 6, 15, 10, 30);
     final jsonData = {
       'invoice_id':    'INV001',
       'invoice_no':    'AP2024001',

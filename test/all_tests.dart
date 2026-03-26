@@ -4,16 +4,16 @@
 // ─────────────────────────────────────────
 
 // Models
-import 'models/product_model_test.dart'    as productModel;
-import 'models/ap_invoice_model_test.dart' as apInvoiceModel;
+import 'models/product_model_test.dart'    as product_model;
+import 'models/ap_invoice_model_test.dart' as ap_invoice_model;
 
 // Utils
-import 'utils/crypto_utils_test.dart'      as cryptoUtils;
-import 'utils/responsive_utils_test.dart'  as responsiveUtils;
+import 'utils/crypto_utils_test.dart'      as crypto_utils;
+import 'utils/responsive_utils_test.dart'  as responsive_utils;
 
 void main() {
-  productModel.main();
-  apInvoiceModel.main();
-  cryptoUtils.main();
-  responsiveUtils.main();
+  product_model.main();
+  ap_invoice_model.main();
+  crypto_utils.main();
+  responsive_utils.main();
 }

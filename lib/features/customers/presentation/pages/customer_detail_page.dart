@@ -623,8 +623,7 @@ class _CustomerDetailPageState extends ConsumerState<CustomerDetailPage> {
           )
         else
           ..._orders
-              .map((order) => _buildOrderCard(isDark, order))
-              .toList(),
+              .map((order) => _buildOrderCard(isDark, order)),
       ],
     );
   }
