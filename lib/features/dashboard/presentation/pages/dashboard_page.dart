@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import '../providers/dashboard_provider.dart';
 import '../../../sales/presentation/pages/sales_history_page.dart';
 import '../../../products/presentation/pages/product_list_page.dart';
@@ -8,7 +9,16 @@ import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/responsive_utils.dart';
 
 class DashboardPage extends ConsumerWidget {
-  const DashboardPage({super.key});
+  final VoidCallback? onGoToProducts;
+  final VoidCallback? onGoToCustomers;
+  final VoidCallback? onGoToSalesHistory;
+
+  const DashboardPage({
+    super.key,
+    this.onGoToProducts,
+    this.onGoToCustomers,
+    this.onGoToSalesHistory,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -61,7 +71,12 @@ class DashboardPage extends ConsumerWidget {
             ],
           ),
         ),
-        data: (stats) => _DashboardBody(stats: stats),
+        data: (stats) => _DashboardBody(
+          stats: stats,
+          onGoToProducts: onGoToProducts,
+          onGoToCustomers: onGoToCustomers,
+          onGoToSalesHistory: onGoToSalesHistory,
+        ),
       ),
     );
   }
@@ -72,7 +87,16 @@ class DashboardPage extends ConsumerWidget {
 // ─────────────────────────────────────────────────────────────────
 class _DashboardBody extends StatelessWidget {
   final DashboardStats stats;
-  const _DashboardBody({required this.stats});
+  final VoidCallback? onGoToProducts;
+  final VoidCallback? onGoToCustomers;
+  final VoidCallback? onGoToSalesHistory;
+
+  const _DashboardBody({
+    required this.stats,
+    this.onGoToProducts,
+    this.onGoToCustomers,
+    this.onGoToSalesHistory,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -90,14 +114,22 @@ class _DashboardBody extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(child: _QuickActionsCard()),
+                Expanded(child: _QuickActionsCard(
+          onGoToProducts: onGoToProducts,
+          onGoToCustomers: onGoToCustomers,
+          onGoToSalesHistory: onGoToSalesHistory,
+        )),
                 const SizedBox(width: 16),
                 Expanded(child: _TodayCard(stats: stats)),
               ],
             ),
           ] else ...[
             // ── Mobile/Tablet: เมนูด่วนก่อน → Stats → Overview ─────────
-            _QuickActionsCard(),
+            _QuickActionsCard(
+              onGoToProducts: onGoToProducts,
+              onGoToCustomers: onGoToCustomers,
+              onGoToSalesHistory: onGoToSalesHistory,
+            ),
             SizedBox(height: context.isMobile ? 12 : 16),
             _buildStatsGrid(context),
             SizedBox(height: context.isMobile ? 12 : 16),
@@ -108,44 +140,57 @@ class _DashboardBody extends StatelessWidget {
     );
   }
 
+  void _openTodaySales(BuildContext context) {
+    final today = DateTime.now();
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SalesHistoryPage(
+          initialDateFrom: DateTime(today.year, today.month, today.day),
+          initialDateTo: DateTime(today.year, today.month, today.day),
+        ),
+      ),
+    );
+  }
+
   // ── Stats Cards Grid ───────────────────────────────────────────
   Widget _buildStatsGrid(BuildContext context) {
     final cards = [
       _StatCardData(
         label: 'สินค้าทั้งหมด',
-        value: '${stats.totalProducts}',
+        value: NumberFormat('#,##0').format(stats.totalProducts),
         icon: Icons.inventory_2_outlined,
         iconBg: const Color(0xFFFFF3E0),
         iconColor: AppTheme.primaryColor,
-        onTap: () => Navigator.push(context,
-            MaterialPageRoute(builder: (_) => const ProductListPage())),
+        onTap: onGoToProducts ??
+            () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const ProductListPage())),
       ),
       _StatCardData(
         label: 'ลูกค้าทั้งหมด',
-        value: '${stats.totalCustomers}',
+        value: NumberFormat('#,##0').format(stats.totalCustomers),
         icon: Icons.people_outline,
         iconBg: const Color(0xFFE8F5E9),
         iconColor: AppTheme.successColor,
-        onTap: () => Navigator.push(context,
-            MaterialPageRoute(builder: (_) => const CustomerListPage())),
+        onTap: onGoToCustomers ??
+            () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const CustomerListPage())),
       ),
       _StatCardData(
         label: 'ยอดขายวันนี้',
-        value: '฿${stats.todaySales.toStringAsFixed(0)}',
+        value: '฿${NumberFormat('#,##0.00').format(stats.todaySales)}',
         icon: Icons.attach_money,
         iconBg: const Color(0xFFE3F2FD),
         iconColor: AppTheme.infoColor,
-        onTap: () => Navigator.push(context,
-            MaterialPageRoute(builder: (_) => const SalesHistoryPage())),
+        onTap: () => _openTodaySales(context),
       ),
       _StatCardData(
         label: 'ออเดอร์วันนี้',
-        value: '${stats.todayOrders}',
+        value: NumberFormat('#,##0').format(stats.todayOrders),
         icon: Icons.shopping_cart_outlined,
         iconBg: const Color(0xFFFFEBEE),
         iconColor: AppTheme.errorColor,
-        onTap: () => Navigator.push(context,
-            MaterialPageRoute(builder: (_) => const SalesHistoryPage())),
+        onTap: () => _openTodaySales(context),
       ),
     ];
 
@@ -282,19 +327,19 @@ class _TodayCard extends StatelessWidget {
             _CardHeader(title: 'ภาพรวมทั้งหมด'),
             const SizedBox(height: 16),
             _OverviewRow('ยอดขายทั้งหมด',
-                '฿${stats.totalSales.toStringAsFixed(2)}',
+                '฿${NumberFormat('#,##0.00').format(stats.totalSales)}',
                 AppTheme.successColor),
             const Divider(height: 18, color: AppTheme.borderColor),
             _OverviewRow('ออเดอร์ทั้งหมด',
-                '${stats.totalOrders} ออเดอร์',
+                '${NumberFormat('#,##0').format(stats.totalOrders)} ออเดอร์',
                 AppTheme.infoColor),
             const Divider(height: 18, color: AppTheme.borderColor),
             _OverviewRow('ยอดขายวันนี้',
-                '฿${stats.todaySales.toStringAsFixed(2)}',
+                '฿${NumberFormat('#,##0.00').format(stats.todaySales)}',
                 AppTheme.primaryColor),
             const Divider(height: 18, color: AppTheme.borderColor),
             _OverviewRow('ออเดอร์วันนี้',
-                '${stats.todayOrders} ออเดอร์',
+                '${NumberFormat('#,##0').format(stats.todayOrders)} ออเดอร์',
                 AppTheme.warningColor),
           ],
         ),
@@ -307,7 +352,15 @@ class _TodayCard extends StatelessWidget {
 // Quick Actions Card
 // ─────────────────────────────────────────────────────────────────
 class _QuickActionsCard extends StatelessWidget {
-  const _QuickActionsCard();
+  final VoidCallback? onGoToProducts;
+  final VoidCallback? onGoToCustomers;
+  final VoidCallback? onGoToSalesHistory;
+
+  const _QuickActionsCard({
+    this.onGoToProducts,
+    this.onGoToCustomers,
+    this.onGoToSalesHistory,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -322,22 +375,25 @@ class _QuickActionsCard extends StatelessWidget {
         icon: Icons.add_box_outlined,
         label: 'เพิ่มสินค้า',
         color: AppTheme.infoColor,
-        onTap: () => Navigator.push(context,
-            MaterialPageRoute(builder: (_) => const ProductListPage())),
+        onTap: onGoToProducts ??
+            () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const ProductListPage())),
       ),
       _QuickAction(
         icon: Icons.person_add_outlined,
         label: 'เพิ่มลูกค้า',
         color: AppTheme.successColor,
-        onTap: () => Navigator.push(context,
-            MaterialPageRoute(builder: (_) => const CustomerListPage())),
+        onTap: onGoToCustomers ??
+            () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const CustomerListPage())),
       ),
       _QuickAction(
         icon: Icons.receipt_long_outlined,
         label: 'รายงานการขาย',
         color: const Color(0xFFAD1457),
-        onTap: () => Navigator.push(context,
-            MaterialPageRoute(builder: (_) => const SalesHistoryPage())),
+        onTap: onGoToSalesHistory ??
+            () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const SalesHistoryPage())),
       ),
     ];
 

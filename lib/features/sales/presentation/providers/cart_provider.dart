@@ -1,5 +1,22 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+// ─── Applied Coupon ───────────────────────────────────────────────
+class AppliedCoupon {
+  final String code;
+  final double discount;
+  final String promotionId;
+  final String? promotionName;
+  final bool isExclusive;
+
+  const AppliedCoupon({
+    required this.code,
+    required this.discount,
+    required this.promotionId,
+    this.promotionName,
+    this.isExclusive = false,
+  });
+}
+
 // Cart Item Model
 class CartItem {
   final String productId;
@@ -73,14 +90,16 @@ class CartState {
   final int customerPriceLevel; // ✅ เพิ่ม: ระดับราคาของลูกค้า (1-5)
   final double discountPercent;
   final double discountAmount;
+  final List<AppliedCoupon> appliedCoupons; // คูปองที่ใช้งาน (หลายใบ)
 
   CartState({
     this.items = const [],
     this.customerId = 'WALK_IN',
     this.customerName = 'ลูกค้าทั่วไป',
-    this.customerPriceLevel = 1, // ✅ Default = ราคาปกติ
+    this.customerPriceLevel = 1,
     this.discountPercent = 0,
     this.discountAmount = 0,
+    this.appliedCoupons = const [],
   });
 
   // Calculated values
@@ -93,7 +112,10 @@ class CartState {
     return discountAmount;
   }
 
-  double get total => subtotal - totalDiscount;
+  double get totalCouponDiscount =>
+      appliedCoupons.fold(0.0, (sum, c) => sum + c.discount);
+
+  double get total => subtotal - totalDiscount - totalCouponDiscount;
 
   int get itemCount => items.length;
 
@@ -104,6 +126,7 @@ class CartState {
     int? customerPriceLevel,
     double? discountPercent,
     double? discountAmount,
+    List<AppliedCoupon>? appliedCoupons,
     bool clearCustomer = false,
   }) {
     return CartState(
@@ -115,6 +138,7 @@ class CartState {
           clearCustomer ? 1 : (customerPriceLevel ?? this.customerPriceLevel),
       discountPercent: discountPercent ?? this.discountPercent,
       discountAmount: discountAmount ?? this.discountAmount,
+      appliedCoupons: appliedCoupons ?? this.appliedCoupons,
     );
   }
 }
@@ -276,6 +300,26 @@ class CartNotifier extends Notifier<CartState> {
       discountPercent: percent ?? 0,
       discountAmount: amount ?? 0,
     );
+  }
+
+  /// เพิ่มคูปอง
+  void applyCoupon(AppliedCoupon coupon) {
+    state = state.copyWith(
+      appliedCoupons: [...state.appliedCoupons, coupon],
+    );
+  }
+
+  /// ลบคูปองรายใบ
+  void removeCoupon(String code) {
+    state = state.copyWith(
+      appliedCoupons:
+          state.appliedCoupons.where((c) => c.code != code).toList(),
+    );
+  }
+
+  /// ล้างคูปองทั้งหมด
+  void clearAllCoupons() {
+    state = state.copyWith(appliedCoupons: const []);
   }
 
   /// เคลียร์ตะกร้า

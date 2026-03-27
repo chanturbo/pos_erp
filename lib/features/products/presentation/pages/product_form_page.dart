@@ -6,6 +6,7 @@ import '../providers/product_provider.dart';
 import '../../data/models/product_model.dart';
 import '../../../../shared/services/mobile_scanner_service.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
+import '../../../../shared/utils/responsive_utils.dart';
 
 
 // ─────────────────────────────────────────────────────────────────
@@ -479,19 +480,34 @@ class _TitleBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final canPop = Navigator.of(context).canPop();
+    final isLarge = context.hasPermanentSidebar;
     return Container(
       color: isDark ? AppTheme.darkTopBar : Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
       child: Row(
         children: [
+          if (isLarge && canPop) ...[
+            InkWell(
+              onTap: () => Navigator.pop(context),
+              borderRadius: BorderRadius.circular(6),
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: Icon(Icons.arrow_back,
+                    size: 20,
+                    color: isDark ? Colors.white70 : AppTheme.textSub),
+              ),
+            ),
+            const SizedBox(width: 10),
+          ],
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AppTheme.primaryLight,
+              color: AppTheme.infoContainer,
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Icon(Icons.inventory_2_outlined,
-                color: AppTheme.primary, size: 20),
+                color: AppTheme.infoColor, size: 20),
           ),
           const SizedBox(width: 12),
           Text(
@@ -502,7 +518,7 @@ class _TitleBar extends StatelessWidget {
                 color: isDark ? Colors.white : const Color(0xFF1A1A1A)),
           ),
           const Spacer(),
-          if (Navigator.of(context).canPop())
+          if (canPop)
             InkWell(
               onTap: () => Navigator.pop(context),
               borderRadius: BorderRadius.circular(6),

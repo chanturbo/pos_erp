@@ -9,7 +9,9 @@ import '../../../../core/utils/promptpay_utils.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../customers/presentation/providers/customer_provider.dart'; // ✅
 import '../../../settings/presentation/pages/settings_page.dart';
+import '../../../promotions/presentation/providers/promotion_provider.dart';
 import '../providers/cart_provider.dart';
+import '../../../../shared/services/mobile_scanner_service.dart';
 
 class PaymentPage extends ConsumerStatefulWidget {
   const PaymentPage({super.key});
@@ -24,6 +26,11 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
   double _receivedAmount = 0;
   bool _isProcessing = false;
 
+  // ── Coupon ──────────────────────────────────────────────────────
+  final TextEditingController _couponController = TextEditingController();
+  bool _isValidatingCoupon = false;
+  String? _couponError;
+
   @override
   void initState() {
     super.initState();
@@ -35,12 +42,117 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
   @override
   void dispose() {
     _receivedController.dispose();
+    _couponController.dispose();
     super.dispose();
   }
 
   double get _change {
     final cartState = ref.read(cartProvider);
     return _receivedAmount - cartState.total;
+  }
+
+  // ── Validate & apply coupon ─────────────────────────────────────
+  Future<void> _applyCoupon() async {
+    final code = _couponController.text.trim().toUpperCase();
+    if (code.isEmpty) return;
+
+    setState(() {
+      _isValidatingCoupon = true;
+      _couponError = null;
+    });
+
+    try {
+      final result =
+          await ref.read(couponListProvider.notifier).validateCoupon(code);
+
+      if (!mounted) return;
+
+      if (result == null) {
+        setState(() => _couponError = 'คูปองไม่ถูกต้อง หรือหมดอายุ/ถูกใช้แล้ว');
+        return;
+      }
+
+      final cartState = ref.read(cartProvider);
+      final existing = cartState.appliedCoupons;
+
+      // ── ตรวจสอบคูปองซ้ำ ──────────────────────────────────────
+      if (existing.any((c) => c.code == code)) {
+        setState(() => _couponError = 'ใช้คูปองนี้แล้ว');
+        return;
+      }
+
+      // ── ตรวจสอบโปรโมชั่นซ้ำ ──────────────────────────────────
+      final promoId = result['promotion_id'] as String? ?? '';
+      if (existing.any((c) => c.promotionId == promoId)) {
+        setState(() => _couponError = 'โปรโมชั่นนี้ถูกใช้คูปองไปแล้ว');
+        return;
+      }
+
+      // ── ตรวจสอบ Exclusive ─────────────────────────────────────
+      final isExclusive = result['is_exclusive'] as bool? ?? false;
+      if (existing.isNotEmpty && isExclusive) {
+        setState(() => _couponError = 'คูปองนี้ไม่สามารถใช้ร่วมกับคูปองอื่นได้');
+        return;
+      }
+      if (existing.any((c) => c.isExclusive)) {
+        setState(() => _couponError = 'มีคูปอง Exclusive อยู่แล้ว ไม่สามารถเพิ่มคูปองอื่นได้');
+        return;
+      }
+
+      // ── คำนวณส่วนลด ───────────────────────────────────────────
+      final discountType = result['discount_type'] as String? ?? 'AMOUNT';
+      final discountValue = (result['discount_value'] as num?)?.toDouble() ?? 0;
+      final maxDiscount = (result['max_discount_amount'] as num?)?.toDouble();
+
+      double couponDiscount = 0;
+      if (discountType == 'PERCENT') {
+        couponDiscount = cartState.subtotal * discountValue / 100;
+        if (maxDiscount != null) {
+          couponDiscount = couponDiscount.clamp(0, maxDiscount);
+        }
+      } else {
+        couponDiscount = discountValue;
+      }
+      couponDiscount = couponDiscount.clamp(0, cartState.subtotal);
+
+      ref.read(cartProvider.notifier).applyCoupon(AppliedCoupon(
+            code: code,
+            discount: couponDiscount,
+            promotionId: promoId,
+            promotionName: result['promotion_name'] as String?,
+            isExclusive: isExclusive,
+          ));
+
+      _couponController.clear();
+      setState(() => _couponError = null);
+
+      // อัปเดตยอดรับ (CASH)
+      final newTotal = ref.read(cartProvider).total;
+      setState(() {
+        _receivedAmount = newTotal;
+        _receivedController.text = newTotal.toStringAsFixed(2);
+      });
+    } finally {
+      if (mounted) setState(() => _isValidatingCoupon = false);
+    }
+  }
+
+  void _removeCoupon(String code) {
+    ref.read(cartProvider.notifier).removeCoupon(code);
+    setState(() => _couponError = null);
+    final newTotal = ref.read(cartProvider).total;
+    setState(() {
+      _receivedAmount = newTotal;
+      _receivedController.text = newTotal.toStringAsFixed(2);
+    });
+  }
+
+  Future<void> _scanCoupon() async {
+    final result = await MobileScannerService.scan(context);
+    if (result == null || !mounted) return;
+    _couponController.text = result.value.toUpperCase();
+    setState(() => _couponError = null);
+    await _applyCoupon();
   }
 
   @override
@@ -125,7 +237,19 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                       ),
                     );
                   }),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
+
+                  // ── คูปองส่วนลด ────────────────────────────────
+                  _CouponSection(
+                    controller: _couponController,
+                    isValidating: _isValidatingCoupon,
+                    errorText: _couponError,
+                    appliedCoupons: cartState.appliedCoupons,
+                    onApply: _applyCoupon,
+                    onRemove: _removeCoupon,
+                    onScan: _scanCoupon,
+                  ),
+                  const SizedBox(height: 16),
 
                   // วิธีชำระเงิน
                   const Text(
@@ -561,7 +685,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
         'branch_id': 'BR001',
         'warehouse_id': 'WH001',
         'subtotal': cartState.subtotal,
-        'discount_amount': cartState.totalDiscount,
+        'discount_amount': cartState.totalDiscount + cartState.totalCouponDiscount,
         'amount_before_vat': cartState.total,
         'vat_amount': 0.0,
         'total_amount': cartState.total,
@@ -569,6 +693,9 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
         'paid_amount':
             _paymentType == 'CASH' ? _receivedAmount : cartState.total,
         'change_amount': _paymentType == 'CASH' ? _change : 0.0,
+        if (cartState.appliedCoupons.isNotEmpty)
+          'coupon_codes':
+              cartState.appliedCoupons.map((c) => c.code).toList(),
         'items': cartState.items
             .map(
               (item) => {
@@ -593,6 +720,21 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
       print('✅ Response: ${response.statusCode}');
 
       if (response.statusCode == 200) {
+        // ── Mark all coupons as used ──────────────────────────────
+        for (final coupon in cartState.appliedCoupons) {
+          try {
+            await apiClient.put(
+              '/api/promotions/coupons/${coupon.code.toUpperCase()}/use',
+              data: {'customer_id': cartState.customerId},
+            );
+          } catch (e) {
+            print('⚠️ Could not mark coupon ${coupon.code} as used: $e');
+          }
+        }
+        if (cartState.appliedCoupons.isNotEmpty) {
+          ref.read(couponListProvider.notifier).refresh();
+        }
+
         ref.read(cartProvider.notifier).clear();
 
         // ✅ อ่านค่าแบบ null-safe ป้องกัน crash ถ้า API response ผิดรูปแบบ
@@ -683,6 +825,260 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
 
     // Fallback — generic message ไม่หลุด internal details
     return 'เกิดข้อผิดพลาด กรุณาลองใหม่หรือติดต่อผู้ดูแลระบบ';
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// _CouponSection — กรอกคูปองได้หลายใบ
+// ─────────────────────────────────────────────────────────────────
+class _CouponSection extends StatelessWidget {
+  final TextEditingController controller;
+  final bool isValidating;
+  final String? errorText;
+  final List<AppliedCoupon> appliedCoupons;
+  final VoidCallback onApply;
+  final ValueChanged<String> onRemove;
+  final VoidCallback onScan;
+
+  const _CouponSection({
+    required this.controller,
+    required this.isValidating,
+    required this.errorText,
+    required this.appliedCoupons,
+    required this.onApply,
+    required this.onRemove,
+    required this.onScan,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final fmt = NumberFormat('#,##0.00', 'th_TH');
+    final hasApplied = appliedCoupons.isNotEmpty;
+    final totalDiscount =
+        appliedCoupons.fold(0.0, (s, c) => s + c.discount);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: hasApplied
+            ? (isDark ? const Color(0xFF1A2E1A) : const Color(0xFFE8F5E9))
+            : (isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF9F9F9)),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: hasApplied
+              ? const Color(0xFF4CAF50)
+              : errorText != null
+                  ? const Color(0xFFEF5350)
+                  : Colors.grey.shade300,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Header ──────────────────────────────────────────
+          Row(
+            children: [
+              const Icon(Icons.confirmation_number_outlined,
+                  size: 18, color: Color(0xFF1565C0)),
+              const SizedBox(width: 8),
+              const Text(
+                'คูปองส่วนลด',
+                style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1565C0)),
+              ),
+              if (hasApplied) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF4CAF50),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '${appliedCoupons.length} ใบ',
+                    style: const TextStyle(
+                        fontSize: 11,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600),
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  'ส่วนลดรวม ฿${fmt.format(totalDiscount)}',
+                  style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF2E7D32)),
+                ),
+              ],
+            ],
+          ),
+
+          // ── Applied coupon chips ─────────────────────────────
+          if (hasApplied) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: appliedCoupons.map((c) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF4CAF50).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                        color: const Color(0xFF4CAF50).withValues(alpha: 0.4)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.check_circle,
+                          size: 13, color: Color(0xFF2E7D32)),
+                      const SizedBox(width: 5),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            c.code,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 1,
+                              color: Color(0xFF1B5E20),
+                            ),
+                          ),
+                          if (c.promotionName != null)
+                            Text(
+                              c.promotionName!,
+                              style: const TextStyle(
+                                  fontSize: 10,
+                                  color: Color(0xFF388E3C)),
+                            ),
+                          Text(
+                            'ลด ฿${fmt.format(c.discount)}',
+                            style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF2E7D32)),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(width: 6),
+                      InkWell(
+                        onTap: () => onRemove(c.code),
+                        borderRadius: BorderRadius.circular(4),
+                        child: const Padding(
+                          padding: EdgeInsets.all(2),
+                          child: Icon(Icons.close,
+                              size: 14, color: Color(0xFFEF5350)),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+
+          // ── Input row (always visible) ────────────────────────
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  textCapitalization: TextCapitalization.characters,
+                  style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 1.5),
+                  decoration: InputDecoration(
+                    hintText: hasApplied
+                        ? 'เพิ่มคูปองอีกใบ...'
+                        : 'กรอกรหัสคูปอง',
+                    hintStyle: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.normal,
+                        letterSpacing: 0,
+                        color: Colors.grey.shade500),
+                    errorText: errorText,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(
+                        color: errorText != null
+                            ? const Color(0xFFEF5350)
+                            : Colors.grey.shade300,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(
+                          color: Color(0xFF1565C0), width: 1.5),
+                    ),
+                    isDense: true,
+                  ),
+                  onSubmitted: (_) => onApply(),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // ── ปุ่มสแกน QR ──────────────────────────────
+              SizedBox(
+                height: 42,
+                width: 42,
+                child: Tooltip(
+                  message: 'สแกน QR คูปอง',
+                  child: OutlinedButton(
+                    onPressed: isValidating ? null : onScan,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF1565C0),
+                      side: const BorderSide(color: Color(0xFF1565C0)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
+                      padding: EdgeInsets.zero,
+                    ),
+                    child: const Icon(Icons.qr_code_scanner, size: 20),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                height: 42,
+                child: ElevatedButton(
+                  onPressed: isValidating ? null : onApply,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1565C0),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16),
+                  ),
+                  child: isValidating
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Text('ใช้งาน',
+                          style: TextStyle(fontSize: 13)),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }
 

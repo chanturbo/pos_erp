@@ -173,8 +173,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.blue.shade50,
+                          color: Colors.white,
                           borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.blue.shade200),
                         ),
                         child: const Row(
                           children: [
@@ -184,7 +185,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                             Expanded(
                               child: Text(
                                 'Admin: admin / admin123\nCashier: cashier / cashier123  (→ เข้า POS โดยตรง)',
-                                style: TextStyle(fontSize: 12),
+                                style: TextStyle(fontSize: 12, color: Colors.black87),
                               ),
                             ),
                           ],

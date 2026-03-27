@@ -67,7 +67,21 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   List<_MenuSection> get _sections => [
         _MenuSection('หลัก', [
-          _MenuItem(icon: Icons.dashboard,    title: 'แดชบอร์ด',     page: const DashboardPage()),
+          _MenuItem(
+            icon: Icons.dashboard,
+            title: 'แดชบอร์ด',
+            page: DashboardPage(
+              onGoToSalesHistory: () => context.hasPermanentSidebar
+                  ? _selectItem(2)
+                  : _push(context, const SalesHistoryPage()),
+              onGoToProducts: () => context.hasPermanentSidebar
+                  ? _selectItem(4)
+                  : _push(context, const ProductListPage()),
+              onGoToCustomers: () => context.hasPermanentSidebar
+                  ? _selectItem(7)
+                  : _push(context, const CustomerListPage()),
+            ),
+          ),
         ]),
         _MenuSection('การขาย', [
           _MenuItem(icon: Icons.shopping_cart,  title: 'หน้าขาย (POS)',  page: const PosPage(), pushAsRoute: true),

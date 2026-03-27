@@ -804,11 +804,11 @@ class _PPageIcon extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.all(7),
         decoration: BoxDecoration(
-          color: AppTheme.primaryLight,
+          color: AppTheme.infoContainer,
           borderRadius: BorderRadius.circular(8),
         ),
         child: const Icon(Icons.inventory_2_outlined,
-            color: AppTheme.primary, size: 18),
+            color: AppTheme.infoColor, size: 18),
       );
 }
 

@@ -16,20 +16,22 @@ class PromotionRoutes {
   Router get router {
     final router = Router();
 
-    // Promotions
+    // Promotions — specific routes ก่อน wildcard /<id>
     router.get('/', _getPromotionsHandler);
     router.get('/active', _getActivePromotionsHandler);
-    router.get('/<id>', _getPromotionHandler);
     router.post('/', _createPromotionHandler);
-    router.put('/<id>', _updatePromotionHandler);
-    router.delete('/<id>', _deletePromotionHandler);
     router.post('/apply', _applyPromotionHandler);
 
-    // Coupons
+    // Coupons — ต้องอยู่ก่อน /<id> เพราะ shelf_router match ตามลำดับ
     router.get('/coupons', _getCouponsHandler);
     router.post('/coupons', _createCouponHandler);
     router.post('/coupons/validate', _validateCouponHandler);
     router.put('/coupons/<code>/use', _useCouponHandler);
+
+    // Wildcard routes — ต้องอยู่หลังสุด
+    router.get('/<id>', _getPromotionHandler);
+    router.put('/<id>', _updatePromotionHandler);
+    router.delete('/<id>', _deletePromotionHandler);
 
     return router;
   }
@@ -463,6 +465,8 @@ class PromotionRoutes {
             'discount_type': promo?.discountType,
             'discount_value': promo?.discountValue,
             'max_discount_amount': promo?.maxDiscountAmount,
+            'is_exclusive': promo?.isExclusive ?? false,
+            'min_amount': promo?.minAmount ?? 0,
           }
         }),
         headers: {'Content-Type': 'application/json'},

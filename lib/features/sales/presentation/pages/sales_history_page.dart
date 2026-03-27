@@ -14,7 +14,10 @@ import 'package:pos_erp/shared/pdf/pdf_report_button.dart';
 // SalesHistoryPage
 // ─────────────────────────────────────────────────────────────────
 class SalesHistoryPage extends ConsumerStatefulWidget {
-  const SalesHistoryPage({super.key});
+  final DateTime? initialDateFrom;
+  final DateTime? initialDateTo;
+
+  const SalesHistoryPage({super.key, this.initialDateFrom, this.initialDateTo});
 
   @override
   ConsumerState<SalesHistoryPage> createState() => _SalesHistoryPageState();
@@ -25,8 +28,8 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
   String _searchQuery = '';
 
   // ── Filters ─────────────────────────────────────────────────────
-  DateTime? _dateFrom;
-  DateTime? _dateTo;
+  late DateTime? _dateFrom = widget.initialDateFrom;
+  late DateTime? _dateTo = widget.initialDateTo;
   String _paymentFilter = 'ALL'; // ALL | CASH | CARD | TRANSFER
   String _statusFilter = 'ALL';  // ALL | COMPLETED | PENDING | CANCELLED
 
@@ -1400,10 +1403,10 @@ class _PageIcon extends StatelessWidget {
         width: 30,
         height: 30,
         decoration: BoxDecoration(
-          color: AppTheme.primary.withValues(alpha: 0.12),
+          color: AppTheme.infoContainer,
           borderRadius: BorderRadius.circular(8),
         ),
         child: const Icon(Icons.history,
-            size: 17, color: AppTheme.primary),
+            size: 17, color: AppTheme.infoColor),
       );
 }

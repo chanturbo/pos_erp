@@ -230,10 +230,10 @@ class _CustomerDetailPageState extends ConsumerState<CustomerDetailPage> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AppTheme.primaryLight,
+              color: AppTheme.infoContainer,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(Icons.person, color: AppTheme.primary, size: 20),
+            child: const Icon(Icons.person, color: AppTheme.infoColor, size: 20),
           ),
           const SizedBox(width: 12),
           Expanded(
