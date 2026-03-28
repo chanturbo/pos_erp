@@ -18,12 +18,16 @@ class PaginationBar extends StatelessWidget {
   final int pageSize;
   final ValueChanged<int> onPageChanged;
 
+  /// Widget แสดงก่อนปุ่มเลขหน้า เช่น ปุ่ม PDF
+  final Widget? trailing;
+
   const PaginationBar({
     super.key,
     required this.currentPage,
     required this.totalItems,
     required this.pageSize,
     required this.onPageChanged,
+    this.trailing,
   });
 
   int get _totalPages => totalItems == 0 ? 1 : (totalItems / pageSize).ceil();
@@ -61,56 +65,96 @@ class PaginationBar extends StatelessWidget {
     final startItem = totalItems == 0 ? 0 : (currentPage - 1) * pageSize + 1;
     final endItem   = (currentPage * pageSize).clamp(0, totalItems);
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: const BoxDecoration(
-        color: AppTheme.headerBg,
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(12),
-          bottomRight: Radius.circular(12),
+    final countText = Text(
+      totalItems == 0
+          ? 'ไม่มีรายการ'
+          : 'แสดง $startItem–$endItem จาก $totalItems รายการ',
+      style: const TextStyle(fontSize: 12, color: AppTheme.textSub),
+    );
+
+    final pageNav = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _NavButton(
+          icon: Icons.chevron_left,
+          enabled: currentPage > 1,
+          onTap: () => onPageChanged(currentPage - 1),
         ),
-      ),
-      child: Row(
-        children: [
-          // Item count text
-          Text(
-            totalItems == 0
-                ? 'ไม่มีรายการ'
-                : 'แสดง $startItem–$endItem จาก $totalItems รายการ',
-            style: const TextStyle(fontSize: 12, color: AppTheme.textSub),
-          ),
-          const Spacer(),
-          // Prev button
-          _NavButton(
-            icon: Icons.chevron_left,
-            enabled: currentPage > 1,
-            onTap: () => onPageChanged(currentPage - 1),
-          ),
-          const SizedBox(width: 4),
-          // Page buttons
-          ...slots.map((slot) {
-            if (slot == -1) {
-              return const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 2),
-                child: Text('...', style: TextStyle(color: AppTheme.textSub)),
-              );
-            }
-            final isActive = slot == currentPage;
-            return _PageButton(
-              page: slot,
-              isActive: isActive,
-              onTap: () => onPageChanged(slot),
+        const SizedBox(width: 4),
+        ...slots.map((slot) {
+          if (slot == -1) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 2),
+              child: Text('...', style: TextStyle(color: AppTheme.textSub)),
             );
-          }),
-          const SizedBox(width: 4),
-          // Next button
-          _NavButton(
-            icon: Icons.chevron_right,
-            enabled: currentPage < total,
-            onTap: () => onPageChanged(currentPage + 1),
+          }
+          final isActive = slot == currentPage;
+          return _PageButton(
+            page: slot,
+            isActive: isActive,
+            onTap: () => onPageChanged(slot),
+          );
+        }),
+        const SizedBox(width: 4),
+        _NavButton(
+          icon: Icons.chevron_right,
+          enabled: currentPage < total,
+          onTap: () => onPageChanged(currentPage + 1),
+        ),
+      ],
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // แบ่ง 2 แถวเมื่อหน้าจอแคบและมี trailing widget
+        final isNarrow = trailing != null && constraints.maxWidth < 480;
+
+        return Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: isNarrow ? 6 : 8,
           ),
-        ],
-      ),
+          decoration: const BoxDecoration(
+            color: AppTheme.headerBg,
+            borderRadius: BorderRadius.only(
+              bottomLeft: Radius.circular(12),
+              bottomRight: Radius.circular(12),
+            ),
+          ),
+          child: isNarrow
+              // ── หน้าจอแคบ: trailing บนสุด, pagination แถวล่าง ──
+              ? Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [trailing!],
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        countText,
+                        const Spacer(),
+                        pageNav,
+                      ],
+                    ),
+                  ],
+                )
+              // ── หน้าจอกว้าง: แถวเดียว ──
+              : Row(
+                  children: [
+                    countText,
+                    const Spacer(),
+                    if (trailing != null) ...[
+                      trailing!,
+                      const SizedBox(width: 8),
+                    ],
+                    pageNav,
+                  ],
+                ),
+        );
+      },
     );
   }
 }

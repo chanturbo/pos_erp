@@ -41,6 +41,7 @@ class SalesOrders extends Table {
   // Coupon
   RealColumn get couponDiscount => real().withDefault(const Constant(0))();
   TextColumn get couponCodes => text().nullable()(); // JSON array e.g. '["CODE1","CODE2"]'
+  IntColumn get pointsUsed => integer().withDefault(const Constant(0))();
 
   // Payment
   TextColumn get paymentType => text().withDefault(const Constant('CASH'))();

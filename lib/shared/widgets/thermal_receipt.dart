@@ -58,6 +58,8 @@ class ThermalReceiptWidget extends StatelessWidget {
   final double         paidAmount;
   final double         changeAmount;
   final int            earnedPoints;
+  final int            pointsUsed;
+  final int?           pointsBalance;
   final NumberFormat   numFmt;
 
   const ThermalReceiptWidget({
@@ -78,8 +80,10 @@ class ThermalReceiptWidget extends StatelessWidget {
     required this.changeAmount,
     required this.numFmt,
     this.customerName,
-    this.coupons      = const [],
-    this.earnedPoints = 0,
+    this.coupons       = const [],
+    this.earnedPoints  = 0,
+    this.pointsUsed    = 0,
+    this.pointsBalance,
   });
 
   // ── text styles ──────────────────────────────────────────────────
@@ -194,6 +198,12 @@ class ThermalReceiptWidget extends StatelessWidget {
                       subLabel: c.promotionName,
                     )),
 
+                // แลกแต้ม (อยู่ก่อนยอดชำระ)
+                if (pointsUsed > 0)
+                  _row('แลกแต้ม $pointsUsed pt',
+                      '-฿${numFmt.format(pointsUsed.toDouble())}',
+                      valueColor: Colors.orange[700]),
+
                 const SizedBox(height: 4),
                 _solidLine(),
                 const SizedBox(height: 4),
@@ -220,23 +230,41 @@ class ThermalReceiptWidget extends StatelessWidget {
                 ],
 
                 // แต้มสะสม
-                if (earnedPoints > 0) ...[
+                if (earnedPoints > 0 || pointsBalance != null) ...[
                   _dashed(),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.stars, size: 14, color: Colors.amber),
-                      const SizedBox(width: 4),
-                      Text(
-                        'ได้รับ $earnedPoints แต้มสะสม',
-                        style: const TextStyle(
-                            fontFamily: 'monospace',
-                            fontSize: 12,
-                            color: Colors.amber,
-                            fontWeight: FontWeight.w600),
-                      ),
-                    ],
-                  ),
+                  if (earnedPoints > 0)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.stars, size: 14, color: Colors.amber),
+                        const SizedBox(width: 4),
+                        Text(
+                          'ได้รับ $earnedPoints แต้มสะสม',
+                          style: const TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 12,
+                              color: Colors.amber,
+                              fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  if (pointsBalance != null)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.account_balance_wallet_outlined,
+                            size: 13, color: Colors.amber[700]),
+                        const SizedBox(width: 4),
+                        Text(
+                          'แต้มคงเหลือ ${NumberFormat('#,##0').format(pointsBalance!)} แต้ม',
+                          style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 12,
+                              color: Colors.amber[700],
+                              fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
                 ],
 
                 _dashed(),

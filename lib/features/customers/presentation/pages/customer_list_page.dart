@@ -4,6 +4,7 @@ import 'package:pos_erp/features/customers/data/models/customer_model.dart';
 import '../../../../shared/pdf/pdf_report_button.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
 import 'package:pos_erp/shared/widgets/pagination_bar.dart';
+import 'package:pos_erp/features/settings/presentation/pages/settings_page.dart';
 import '../providers/customer_provider.dart';
 import 'customer_detail_page.dart'; // ✅
 import 'customer_form_page.dart';
@@ -31,7 +32,6 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
 
   // ── Pagination ──────────────────────────────────────────────────
   int _currentPage = 1;
-  static const int _pageSize = 20;
 
   // ✅ ความกว้างคอลัมน์ (pixel) — auto-fit ตามเนื้อหา + ลากขยาย/ย่อได้
   // ลำดับ: [ชื่อ, รหัส, โทร, สมาชิก, คะแนน, เครดิต, สถานะ, จัดการ]
@@ -67,6 +67,7 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
   @override
   Widget build(BuildContext context) {
     final customerAsync = ref.watch(customerListProvider);
+    final pageSize = ref.watch(settingsProvider).listPageSize;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
@@ -147,10 +148,10 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
                 if (filtered.isEmpty) return _buildEmpty();
 
                 // Pagination
-                final totalPages = (filtered.length / _pageSize).ceil();
+                final totalPages = (filtered.length / pageSize).ceil();
                 final safePage = _currentPage.clamp(1, totalPages);
-                final pageStart = (safePage - 1) * _pageSize;
-                final pageEnd = (pageStart + _pageSize).clamp(0, filtered.length);
+                final pageStart = (safePage - 1) * pageSize;
+                final pageEnd = (pageStart + pageSize).clamp(0, filtered.length);
                 final pageItems = filtered.sublist(pageStart, pageEnd);
 
                 // ✅ Card View เมื่อ user เลือก
@@ -161,7 +162,7 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
                       PaginationBar(
                         currentPage: safePage,
                         totalItems: filtered.length,
-                        pageSize: _pageSize,
+                        pageSize: pageSize,
                         onPageChanged: (p) => setState(() => _currentPage = p),
                       ),
                     ],
@@ -308,24 +309,19 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
                           PaginationBar(
                             currentPage: safePage,
                             totalItems: filtered.length,
-                            pageSize: _pageSize,
+                            pageSize: pageSize,
                             onPageChanged: (p) => setState(() => _currentPage = p),
+                            trailing: PdfReportButton(
+                              emptyMessage: 'ไม่มีข้อมูลลูกค้า',
+                              title: 'รายงานลูกค้า',
+                              filename: () => PdfFilename.generate('customer_report'),
+                              buildPdf: () => CustomerPdfBuilder.build(filtered),
+                              hasData: filtered.isNotEmpty,
+                            ),
                           ),
                         ],
                       ),
                     ), // Container
-                    // ✅ ปุ่ม PDF ลอยมุมขวาล่าง
-                    Positioned(
-                      bottom: 24,
-                      right: 24,
-                      child: PdfReportButton(
-                        emptyMessage: 'ไม่มีข้อมูลลูกค้า',
-                        title: 'รายงานลูกค้า',
-                        filename: () => PdfFilename.generate('customer_report'),
-                        buildPdf: () => CustomerPdfBuilder.build(filtered),
-                        hasData: filtered.isNotEmpty,
-                      ),
-                    ),
                   ],
                 ); // Stack
               },
@@ -653,37 +649,75 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
   }
 
   Future<void> _confirmDelete(String id, String name) async {
-    final confirm = await showDialog<bool>(
+    // ── Pre-check ก่อนแสดง dialog ────────────────────────────────
+    final check = await ref
+        .read(customerListProvider.notifier)
+        .checkDeleteCustomer(id);
+    if (!mounted) return;
+
+    final hasHistory = check['has_history'] == true;
+    final orderCount = (check['order_count'] as int?) ?? 0;
+    final hasPoints = check['has_points'] == true;
+
+    final details = [
+      if (orderCount > 0) 'ประวัติการซื้อ $orderCount รายการ',
+      if (hasPoints) 'ประวัติสะสมแต้ม',
+    ].join(' และ ');
+
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('ยืนยันการลบ'),
-        content: Text('ต้องการลบลูกค้า $name ใช่หรือไม่?'),
+        title: Row(children: [
+          Icon(
+            hasHistory ? Icons.archive_outlined : Icons.delete_outline,
+            color: hasHistory ? AppTheme.warningColor : AppTheme.error,
+            size: 20,
+          ),
+          const SizedBox(width: 8),
+          Text(hasHistory ? 'ปิดการใช้งานลูกค้า' : 'ลบลูกค้าถาวร'),
+        ]),
+        content: hasHistory
+            ? Text(
+                'ลูกค้า "$name" มี$details\n\n'
+                'ไม่สามารถลบได้ ระบบจะปิดการใช้งานแทนเพื่อเก็บประวัติไว้',
+              )
+            : Text(
+                'ต้องการลบลูกค้า "$name" '
+                'ออกจากระบบอย่างถาวรใช่หรือไม่?',
+              ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: const Text('ยกเลิก'),
           ),
-          ElevatedButton(
+          ElevatedButton.icon(
+            icon: Icon(
+              hasHistory ? Icons.pause_circle_outline : Icons.delete_forever,
+              size: 16,
+            ),
+            label: Text(hasHistory ? 'ปิดการใช้งาน' : 'ลบถาวร'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor:
+                  hasHistory ? AppTheme.warningColor : AppTheme.error,
+              foregroundColor: Colors.white,
+            ),
             onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('ลบ'),
           ),
         ],
       ),
     );
-    if (confirm == true && mounted) {
-      final success = await ref
-          .read(customerListProvider.notifier)
-          .deleteCustomer(id);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(success ? 'ลบลูกค้าสำเร็จ' : 'ลบลูกค้าไม่สำเร็จ'),
-            backgroundColor: success ? Colors.green : Colors.red,
-          ),
-        );
-      }
-    }
+    if (confirmed != true || !mounted) return;
+
+    final message = await ref
+        .read(customerListProvider.notifier)
+        .deleteCustomer(id);
+    if (!mounted) return;
+    final success = message != null;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(success ? message : 'ดำเนินการไม่สำเร็จ'),
+      backgroundColor: success ? AppTheme.success : AppTheme.error,
+      behavior: SnackBarBehavior.floating,
+    ));
   }
 
   Widget _buildEmpty() {

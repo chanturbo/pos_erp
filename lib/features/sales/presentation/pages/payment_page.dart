@@ -35,6 +35,11 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
   bool _isValidatingCoupon = false;
   String? _couponError;
 
+  // ── Points redemption ────────────────────────────────────────────
+  int _customerPoints = 0;    // แต้มคงเหลือของลูกค้า (โหลดจาก API)
+  int _pointsUsed = 0;        // แต้มที่เลือกจะใช้ในบิลนี้
+  bool _isLoadingPoints = false;
+
   @override
   void initState() {
     super.initState();
@@ -50,6 +55,34 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
         baseOffset: 0,
         extentOffset: _receivedController.text.length,
       );
+      _loadCustomerPoints();
+    });
+  }
+
+  Future<void> _loadCustomerPoints() async {
+    final cartState = ref.read(cartProvider);
+    final customerId = cartState.customerId;
+    if (customerId == null || customerId == 'WALK_IN' || customerId.isEmpty) return;
+
+    setState(() => _isLoadingPoints = true);
+    final pts = await ref.read(salesHistoryProvider.notifier).getCustomerPoints(customerId);
+    if (mounted) setState(() { _customerPoints = pts; _isLoadingPoints = false; });
+  }
+
+  /// คำนวณยอดหลังหักแต้ม
+  double get _netTotal {
+    final cartState = ref.read(cartProvider);
+    return (cartState.total - _pointsUsed).clamp(0.0, double.infinity);
+  }
+
+  void _applyPoints(int points) {
+    final cartState = ref.read(cartProvider);
+    final maxPoints = cartState.total.floor().clamp(0, _customerPoints);
+    final used = points.clamp(0, maxPoints);
+    setState(() {
+      _pointsUsed = used;
+      _receivedAmount = _netTotal;
+      _receivedController.text = _netTotal.toStringAsFixed(2);
     });
   }
 
@@ -61,10 +94,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
     super.dispose();
   }
 
-  double get _change {
-    final cartState = ref.read(cartProvider);
-    return _receivedAmount - cartState.total;
-  }
+  double get _change => _receivedAmount - _netTotal;
 
   // ── Validate & apply coupon ─────────────────────────────────────
   Future<void> _applyCoupon() async {
@@ -141,11 +171,14 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
       _couponController.clear();
       setState(() => _couponError = null);
 
-      // อัปเดตยอดรับ (CASH)
+      // อัปเดตยอดรับ (CASH) คำนึงถึงแต้มที่ใช้ด้วย
       final newTotal = ref.read(cartProvider).total;
+      final maxPts = newTotal.floor().clamp(0, _customerPoints);
+      _pointsUsed = _pointsUsed.clamp(0, maxPts);
+      final net = (newTotal - _pointsUsed).clamp(0.0, double.infinity);
       setState(() {
-        _receivedAmount = newTotal;
-        _receivedController.text = newTotal.toStringAsFixed(2);
+        _receivedAmount = net;
+        _receivedController.text = net.toStringAsFixed(2);
       });
     } finally {
       if (mounted) setState(() => _isValidatingCoupon = false);
@@ -155,10 +188,14 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
   void _removeCoupon(String code) {
     ref.read(cartProvider.notifier).removeCoupon(code);
     setState(() => _couponError = null);
+    // re-clamp pointsUsed in case total changed
     final newTotal = ref.read(cartProvider).total;
+    final maxPts = newTotal.floor().clamp(0, _customerPoints);
+    _pointsUsed = _pointsUsed.clamp(0, maxPts);
+    final net = (newTotal - _pointsUsed).clamp(0.0, double.infinity);
     setState(() {
-      _receivedAmount = newTotal;
-      _receivedController.text = newTotal.toStringAsFixed(2);
+      _receivedAmount = net;
+      _receivedController.text = net.toStringAsFixed(2);
     });
   }
 
@@ -230,7 +267,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                           ),
                           const SizedBox(height: 10),
                           Text(
-                            '฿${cartState.total.toStringAsFixed(2)}',
+                            '฿${_netTotal.toStringAsFixed(2)}',
                             style: const TextStyle(
                               fontSize: 52,
                               fontWeight: FontWeight.bold,
@@ -245,6 +282,16 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.white.withValues(alpha: 0.7),
+                              ),
+                            ),
+                          ],
+                          if (_pointsUsed > 0) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              'แลกแต้ม $_pointsUsed pt = -฿${_pointsUsed.toStringAsFixed(2)}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.orange[200],
                               ),
                             ),
                           ],
@@ -264,7 +311,24 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                     onRemove: _removeCoupon,
                     onScan: _scanCoupon,
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
+
+                  // ── แลกแต้ม (เฉพาะสมาชิก) ──────────────────────
+                  if (cartState.customerId != null &&
+                      cartState.customerId != 'WALK_IN' &&
+                      cartState.customerId!.isNotEmpty)
+                    _PointsSection(
+                      customerPoints:  _customerPoints,
+                      pointsUsed:      _pointsUsed,
+                      cartTotal:       cartState.total,
+                      isLoading:       _isLoadingPoints,
+                      onApply:         _applyPoints,
+                      onClear:         () => _applyPoints(0),
+                    ),
+                  if (cartState.customerId != null &&
+                      cartState.customerId != 'WALK_IN' &&
+                      cartState.customerId!.isNotEmpty)
+                    const SizedBox(height: 12),
 
                   // วิธีชำระเงิน
                   const Text(
@@ -693,6 +757,8 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
       final cartState = ref.read(cartProvider);
       final authState = ref.read(authProvider);
       final apiClient = ref.read(apiClientProvider);
+      // ✅ เก็บ netTotal ก่อน clear cart — getter _netTotal อ่านจาก cart
+      final netTotal = _netTotal;
 
       final orderData = {
         'customer_id': cartState.customerId,
@@ -703,12 +769,13 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
         'subtotal': cartState.subtotal,
         'discount_amount': cartState.totalDiscount + cartState.totalCouponDiscount,
         'coupon_discount': cartState.totalCouponDiscount,
-        'amount_before_vat': cartState.total,
+        'points_used': _pointsUsed,
+        'amount_before_vat': _netTotal,
         'vat_amount': 0.0,
-        'total_amount': cartState.total,
+        'total_amount': _netTotal,
         'payment_type': _paymentType,
         'paid_amount':
-            _paymentType == 'CASH' ? _receivedAmount : cartState.total,
+            _paymentType == 'CASH' ? _receivedAmount : _netTotal,
         'change_amount': _paymentType == 'CASH' ? _change : 0.0,
         if (cartState.appliedCoupons.isNotEmpty)
           'coupon_codes':
@@ -770,8 +837,8 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
         ref.read(customerListProvider.notifier).refresh();
 
         // ✅ คำนวณค่าทั้งหมดก่อน navigate — ป้องกัน ref ถูกเรียกหลัง unmount
-        final paidAmount   = _paymentType == 'CASH' ? _receivedAmount : cartState.total;
-        final changeAmount = _paymentType == 'CASH' ? _receivedAmount - cartState.total : 0.0;
+        final paidAmount   = _paymentType == 'CASH' ? _receivedAmount : netTotal;
+        final changeAmount = _paymentType == 'CASH' ? _receivedAmount - netTotal : 0.0;
 
         if (mounted) {
           // ✅ ไปหน้าใบเสร็จแทน dialog
@@ -786,11 +853,17 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                 subtotal:       cartState.subtotal,
                 discount:       cartState.totalDiscount,
                 appliedCoupons: cartState.appliedCoupons,
-                total:          cartState.total,
+                total:          netTotal,
                 paymentType:    _paymentType,
                 paidAmount:     paidAmount,
                 changeAmount:   changeAmount,
                 earnedPoints:   earnedPoints,
+                pointsUsed:     _pointsUsed,
+                pointsBalance:  (cartState.customerId != null &&
+                        cartState.customerId != 'WALK_IN' &&
+                        cartState.customerId!.isNotEmpty)
+                    ? _customerPoints - _pointsUsed + earnedPoints
+                    : null,
               ),
             ),
           );
@@ -1252,6 +1325,8 @@ class ReceiptPage extends ConsumerWidget {
   final double   paidAmount;
   final double   changeAmount;
   final int      earnedPoints;
+  final int      pointsUsed;
+  final int?     pointsBalance;
 
   const ReceiptPage({
     super.key,
@@ -1265,8 +1340,10 @@ class ReceiptPage extends ConsumerWidget {
     required this.paidAmount,
     required this.changeAmount,
     this.customerName,
-    this.appliedCoupons = const [],
-    this.earnedPoints = 0,
+    this.appliedCoupons  = const [],
+    this.earnedPoints    = 0,
+    this.pointsUsed      = 0,
+    this.pointsBalance,
   });
 
   static String _paymentLabel(String type) => switch (type) {
@@ -1329,8 +1406,10 @@ class ReceiptPage extends ConsumerWidget {
                 paymentType:  paymentType,
                 paidAmount:   paidAmount,
                 changeAmount: changeAmount,
-                earnedPoints: earnedPoints,
-                numFmt:       numFmt,
+                earnedPoints:  earnedPoints,
+                pointsUsed:    pointsUsed,
+                pointsBalance: pointsBalance,
+                numFmt:        numFmt,
               ),
 
               const SizedBox(height: 32),
@@ -1359,6 +1438,211 @@ class ReceiptPage extends ConsumerWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// _PointsSection — แสดงแต้มและให้เลือกใช้แต้มแลกส่วนลด
+// ─────────────────────────────────────────────────────────────────
+class _PointsSection extends StatefulWidget {
+  final int    customerPoints;
+  final int    pointsUsed;
+  final double cartTotal;
+  final bool   isLoading;
+  final ValueChanged<int> onApply;
+  final VoidCallback onClear;
+
+  const _PointsSection({
+    required this.customerPoints,
+    required this.pointsUsed,
+    required this.cartTotal,
+    required this.isLoading,
+    required this.onApply,
+    required this.onClear,
+  });
+
+  @override
+  State<_PointsSection> createState() => _PointsSectionState();
+}
+
+class _PointsSectionState extends State<_PointsSection> {
+  late final TextEditingController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(
+      text: widget.pointsUsed > 0 ? widget.pointsUsed.toString() : '',
+    );
+  }
+
+  @override
+  void didUpdateWidget(_PointsSection old) {
+    super.didUpdateWidget(old);
+    if (old.pointsUsed != widget.pointsUsed && widget.pointsUsed == 0) {
+      _ctrl.clear();
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  int get _maxPoints =>
+      widget.cartTotal.floor().clamp(0, widget.customerPoints);
+
+  @override
+  Widget build(BuildContext context) {
+    final fmt       = NumberFormat('#,##0', 'th_TH');
+    final hasPoints = widget.pointsUsed > 0;
+    final isDark    = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: hasPoints
+            ? (isDark ? const Color(0xFF2A1F00) : const Color(0xFFFFF8E1))
+            : (isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF9F9F9)),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: hasPoints
+              ? Colors.amber
+              : Colors.grey.shade300,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Header ──────────────────────────────────────────
+          Row(
+            children: [
+              Icon(Icons.stars, size: 18,
+                  color: hasPoints ? Colors.amber : Colors.amber[300]),
+              const SizedBox(width: 8),
+              Text(
+                'ใช้แต้มสะสม',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: hasPoints ? Colors.amber[800] : Colors.amber[700],
+                ),
+              ),
+              const Spacer(),
+              if (widget.isLoading)
+                const SizedBox(
+                  width: 14, height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else
+                Text(
+                  'มี ${fmt.format(widget.customerPoints)} แต้ม'
+                  ' (สูงสุด ${fmt.format(_maxPoints)} pt)',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.amber[700],
+                  ),
+                ),
+            ],
+          ),
+
+          if (hasPoints) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                const Icon(Icons.check_circle,
+                    size: 14, color: Colors.amber),
+                const SizedBox(width: 4),
+                Text(
+                  'ใช้ ${fmt.format(widget.pointsUsed)} แต้ม'
+                  ' = ลด ฿${widget.pointsUsed.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.amber,
+                  ),
+                ),
+                const Spacer(),
+                InkWell(
+                  onTap: widget.onClear,
+                  borderRadius: BorderRadius.circular(4),
+                  child: const Padding(
+                    padding: EdgeInsets.all(2),
+                    child: Icon(Icons.close,
+                        size: 16, color: Colors.red),
+                  ),
+                ),
+              ],
+            ),
+          ],
+
+          // ── Input row ────────────────────────────────────────
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _ctrl,
+                  keyboardType: TextInputType.number,
+                  style: const TextStyle(fontSize: 13),
+                  decoration: InputDecoration(
+                    hintText: 'จำนวนแต้มที่ต้องการใช้',
+                    hintStyle: TextStyle(
+                        fontSize: 12, color: Colors.grey.shade500),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // ใช้ทั้งหมด
+              OutlinedButton(
+                onPressed: widget.isLoading || _maxPoints == 0
+                    ? null
+                    : () {
+                        _ctrl.text = _maxPoints.toString();
+                        widget.onApply(_maxPoints);
+                      },
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.amber[800],
+                  side: BorderSide(color: Colors.amber[400]!),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 12),
+                ),
+                child: const Text('ใช้ทั้งหมด',
+                    style: TextStyle(fontSize: 12)),
+              ),
+              const SizedBox(width: 6),
+              ElevatedButton(
+                onPressed: widget.isLoading
+                    ? null
+                    : () {
+                        final v = int.tryParse(_ctrl.text.trim()) ?? 0;
+                        widget.onApply(v);
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.amber[700],
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 12),
+                ),
+                child: const Text('ใช้แต้ม',
+                    style: TextStyle(fontSize: 12)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '1 แต้ม = ส่วนลด ฿1.00',
+            style: TextStyle(
+                fontSize: 11, color: Colors.amber[600]),
+          ),
+        ],
       ),
     );
   }

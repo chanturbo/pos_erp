@@ -7,6 +7,7 @@ import 'package:pos_erp/shared/theme/app_theme.dart';
 import '../../../../core/client/api_client.dart';
 import '../../data/models/customer_model.dart';
 import 'customer_form_page.dart';
+import 'points_history_page.dart';
 
 // ─────────────────────────────────────────────────────────────────
 // Models
@@ -355,30 +356,45 @@ class _CustomerDetailPageState extends ConsumerState<CustomerDetailPage> {
                       c.memberNo!, 'เลขสมาชิก'),
                 ),
                 const SizedBox(width: 16),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.amber.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                        color: Colors.amber.withValues(alpha: 0.4)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.star,
-                          color: Colors.amber, size: 16),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${_numFmtInt.format(c.points)} แต้ม',
-                        style: const TextStyle(
-                          color: Colors.amber,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
+                GestureDetector(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => PointsHistoryPage(
+                        customerId:    c.customerId,
+                        customerName:  c.customerName,
+                        currentPoints: c.points,
                       ),
-                    ],
+                    ),
+                  ),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                          color: Colors.amber.withValues(alpha: 0.4)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.star,
+                            color: Colors.amber, size: 16),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${_numFmtInt.format(c.points)} แต้ม',
+                          style: const TextStyle(
+                            color: Colors.amber,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(Icons.chevron_right,
+                            color: Colors.amber, size: 16),
+                      ],
+                    ),
                   ),
                 ),
               ],

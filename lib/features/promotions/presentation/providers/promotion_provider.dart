@@ -77,19 +77,31 @@ class PromotionNotifier extends AsyncNotifier<List<PromotionModel>> {
     }
   }
 
-  Future<bool> deletePromotion(String promotionId) async {
+  /// Returns structured result:
+  /// - {success: true, coupons_cancelled: N}  → deleted
+  /// - {success: false, code: 'HAS_ORDERS', order_count: N, used_coupon_count: M} → blocked
+  /// - {success: false, code: 'HAS_UNUSED_COUPONS', coupon_count: N} → needs confirmation
+  Future<Map<String, dynamic>> deletePromotion(
+    String promotionId, {
+    bool forceDeleteCoupons = false,
+  }) async {
     try {
       final api = ref.read(apiClientProvider);
-      final res =
-          await api.delete('/api/promotions/$promotionId');
-      if (res.statusCode == 200 && res.data['success'] == true) {
-        await refresh();
-        return true;
+      final res = await api.delete(
+        '/api/promotions/$promotionId',
+        queryParameters: forceDeleteCoupons
+            ? {'force_delete_coupons': 'true'}
+            : null,
+      );
+      if (res.statusCode == 200) {
+        final data = Map<String, dynamic>.from(res.data as Map);
+        if (data['success'] == true) await refresh();
+        return data;
       }
-      return false;
+      return {'success': false, 'code': 'UNKNOWN'};
     } catch (e) {
       print('❌ Error deleting promotion: $e');
-      return false;
+      return {'success': false, 'code': 'ERROR', 'message': '$e'};
     }
   }
 }
@@ -113,39 +125,109 @@ final activePromotionsProvider =
   }
 });
 
+// ─── Coupon Page State ────────────────────────────────────────────────────────
+class CouponPageState {
+  final List<CouponModel> items;
+  final int page;
+  final int limit;
+  final int total;
+  final int totalPages;
+  final Map<String, int> summary; // {total, valid, used, expired}
+
+  const CouponPageState({
+    required this.items,
+    required this.page,
+    required this.limit,
+    required this.total,
+    required this.totalPages,
+    required this.summary,
+  });
+
+  static CouponPageState empty() => const CouponPageState(
+        items: [],
+        page: 1,
+        limit: 50,
+        total: 0,
+        totalPages: 1,
+        summary: {'total': 0, 'valid': 0, 'used': 0, 'expired': 0},
+      );
+
+  int get startItem => total == 0 ? 0 : (page - 1) * limit + 1;
+  int get endItem   => ((page - 1) * limit + items.length).clamp(0, total);
+}
+
 // ─── Coupon Provider ──────────────────────────────────────────────────────────
 final couponListProvider =
-    AsyncNotifierProvider<CouponNotifier, List<CouponModel>>(
+    AsyncNotifierProvider<CouponNotifier, CouponPageState>(
   CouponNotifier.new,
 );
 
-class CouponNotifier extends AsyncNotifier<List<CouponModel>> {
+class CouponNotifier extends AsyncNotifier<CouponPageState> {
+  static const int _defaultLimit = 50;
+
+  int _page    = 1;
+  String _status = 'ALL';
+  String _search = '';
+
   @override
-  Future<List<CouponModel>> build() async {
+  Future<CouponPageState> build() async {
     // ✅ รอ token ก่อน — ป้องกัน 401
     final authState = ref.watch(authProvider);
-    if (authState.isRestoring || !authState.isAuthenticated) return [];
+    if (authState.isRestoring || !authState.isAuthenticated) {
+      return CouponPageState.empty();
+    }
     return _load();
   }
 
-  Future<List<CouponModel>> _load() async {
+  Future<CouponPageState> _load() async {
     try {
       final api = ref.read(apiClientProvider);
-      final res = await api.get('/api/promotions/coupons');
+      final res = await api.get('/api/promotions/coupons', queryParameters: {
+        'page':   '$_page',
+        'limit':  '$_defaultLimit',
+        'status': _status,
+        'search': _search,
+      });
       if (res.statusCode == 200 && res.data != null) {
-        final list = res.data['data'] as List;
-        return list
+        final d = res.data as Map<String, dynamic>;
+        final items = (d['data'] as List)
             .map((j) => CouponModel.fromJson(j as Map<String, dynamic>))
             .toList();
+        final rawSummary = d['summary'] as Map<String, dynamic>;
+        final summary = rawSummary
+            .map((k, v) => MapEntry(k, (v as num).toInt()));
+        return CouponPageState(
+          items:       items,
+          page:        (d['page']        as num).toInt(),
+          limit:       (d['limit']       as num).toInt(),
+          total:       (d['total']       as num).toInt(),
+          totalPages:  (d['total_pages'] as num).toInt(),
+          summary:     summary,
+        );
       }
-      return [];
+      return CouponPageState.empty();
     } catch (e) {
       print('❌ Error loading coupons: $e');
-      return [];
+      rethrow;
     }
   }
 
   Future<void> refresh() async {
+    _page = 1;
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(_load);
+  }
+
+  Future<void> goToPage(int page) async {
+    _page = page;
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(_load);
+  }
+
+  Future<void> applyFilter({required String status, required String search}) async {
+    _page   = 1;
+    _status = status;
+    _search = search;
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(_load);
   }

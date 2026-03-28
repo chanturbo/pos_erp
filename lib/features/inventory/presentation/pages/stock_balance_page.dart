@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pos_erp/shared/widgets/pagination_bar.dart';
 
 import '../../../settings/presentation/pages/settings_page.dart';
 import '../../../../shared/theme/app_theme.dart';
@@ -35,6 +36,9 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
   bool   _showLowStockOnly  = false;
   String _sortColumn        = 'productCode';
   bool   _sortAsc           = true;
+
+  // ── Pagination ──────────────────────────────────────────────────
+  int _currentPage = 1;
 
   @override
   void dispose() {
@@ -113,6 +117,7 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
         _sortColumn = col;
         _sortAsc = true;
       }
+      _currentPage = 1;
     });
   }
 
@@ -138,7 +143,7 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
                       ? AppTheme.primaryLight
                       : null),
               onPressed: () =>
-                  setState(() => _showLowStockOnly = !_showLowStockOnly),
+                  setState(() { _showLowStockOnly = !_showLowStockOnly; _currentPage = 1; }),
             ),
           ),
           // Toggle view
@@ -212,48 +217,34 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
                   settings.enableLowStockAlert,
                 );
                 if (filtered.isEmpty) return _buildEmpty();
+                final totalPages = (filtered.length / settings.listPageSize).ceil();
+                final safePage = _currentPage.clamp(1, totalPages);
+                final pageStart = (safePage - 1) * settings.listPageSize;
+                final pageEnd = (pageStart + settings.listPageSize).clamp(0, filtered.length);
+                final pageItems = filtered.sublist(pageStart, pageEnd);
                 return Column(
                   children: [
                     Expanded(
-                      child: Stack(
-                        children: [
-                          _isTableView
-                              ? _buildTableView(filtered, settings)
-                              : _buildCardView(filtered, settings),
-                          // ── PDF Button ──────────────────────────
-                          Positioned(
-                            bottom: 16,
-                            right: 16,
-                            child: PdfReportButton(
-                              emptyMessage: 'ไม่มีข้อมูลสต๊อก',
-                              title: 'รายงานสต๊อกสินค้า',
-                              filename: () =>
-                                  PdfFilename.generate('stock_report'),
-                              buildPdf: () => StockBalancePdfBuilder.build(
-                                filtered,
-                                lowStockThreshold: settings.lowStockThreshold,
-                                highlightLowStock: settings.enableLowStockAlert,
-                              ),
-                              hasData: filtered.isNotEmpty,
-                            ),
-                          ),
-                        ],
-                      ),
+                      child: _isTableView
+                          ? _buildTableView(pageItems, settings)
+                          : _buildCardView(pageItems, settings),
                     ),
-                    // ── Footer ──────────────────────────────────
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 10),
-                      color: Colors.white,
-                      child: Row(
-                        children: [
-                          Text(
-                            'แสดง ${filtered.length} จาก ${stocks.length} รายการ',
-                            style: const TextStyle(
-                                fontSize: 12,
-                                color: Color(0xFF8A8A8A)),
-                          ),
-                        ],
+                    // ── Footer / Pagination ──────────────────────
+                    PaginationBar(
+                      currentPage: safePage,
+                      totalItems: filtered.length,
+                      pageSize: settings.listPageSize,
+                      onPageChanged: (p) => setState(() => _currentPage = p),
+                      trailing: PdfReportButton(
+                        emptyMessage: 'ไม่มีข้อมูลสต๊อก',
+                        title: 'รายงานสต๊อกสินค้า',
+                        filename: () => PdfFilename.generate('stock_report'),
+                        buildPdf: () => StockBalancePdfBuilder.build(
+                          filtered,
+                          lowStockThreshold: settings.lowStockThreshold,
+                          highlightLowStock: settings.enableLowStockAlert,
+                        ),
+                        hasData: filtered.isNotEmpty,
                       ),
                     ),
                   ],
@@ -299,7 +290,7 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
                                   size: 15, color: subColor),
                               onPressed: () {
                                 _searchController.clear();
-                                setState(() => _searchQuery = '');
+                                setState(() { _searchQuery = ''; _currentPage = 1; });
                               },
                             )
                           : null,
@@ -317,7 +308,7 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
                       filled: true,
                       fillColor: fillClr,
                     ),
-                    onChanged: (v) => setState(() => _searchQuery = v),
+                    onChanged: (v) => setState(() { _searchQuery = v; _currentPage = 1; }),
                   ),
                 ),
               ),
@@ -347,7 +338,7 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
                           value: 'WH002', child: Text('คลังสยาม')),
                     ],
                     onChanged: (v) =>
-                        setState(() => _selectedWarehouse = v!),
+                        setState(() { _selectedWarehouse = v!; _currentPage = 1; }),
                   ),
                 ),
               ),

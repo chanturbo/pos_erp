@@ -196,21 +196,36 @@ class ProductListNotifier extends AsyncNotifier<List<ProductModel>> {
     }
   }
 
-  /// ลบสินค้า
-  Future<bool> deleteProduct(String productId) async {
+  /// ตรวจก่อนลบ — คืน {has_history, has_sales, sales_count, has_movements, movement_count}
+  Future<Map<String, dynamic>> checkDeleteProduct(String productId) async {
+    try {
+      final api = ref.read(apiClientProvider);
+      final res = await api.get('/api/products/$productId/check-delete');
+      if (res.statusCode == 200) {
+        return Map<String, dynamic>.from(res.data as Map);
+      }
+      return {'success': false};
+    } catch (e) {
+      print('❌ Error checking product delete: $e');
+      return {'success': false, 'message': '$e'};
+    }
+  }
+
+  /// ลบสินค้า (Soft Delete) — คืนค่า message จาก server หรือ null ถ้าเกิดข้อผิดพลาด
+  Future<String?> deleteProduct(String productId) async {
     try {
       final apiClient = ref.read(apiClientProvider);
-      final response =
-          await apiClient.delete('/api/products/$productId');
+      final response = await apiClient.delete('/api/products/$productId');
 
       if (response.statusCode == 200) {
         await refresh();
-        return true;
+        final data = response.data is Map ? response.data as Map : {};
+        return data['message'] as String? ?? 'ดำเนินการสำเร็จ';
       }
-      return false;
+      return null;
     } catch (e) {
       print('❌ Error deleting product: $e');
-      return false;
+      return null;
     }
   }
 }

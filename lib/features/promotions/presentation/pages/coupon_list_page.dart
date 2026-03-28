@@ -1,4 +1,5 @@
 // coupon_list_page.dart
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,9 +8,11 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../providers/promotion_provider.dart';
 import '../../data/models/promotion_model.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
+import 'package:pdf/widgets.dart' as pw;
 import 'coupon_pdf_report.dart';
 import 'package:pos_erp/shared/pdf/pdf_report_button.dart';
 import 'package:pos_erp/shared/pdf/pdf_export_service.dart';
+import 'package:pos_erp/shared/widgets/pagination_bar.dart';
 
 class CouponListPage extends ConsumerStatefulWidget {
   const CouponListPage({super.key});
@@ -22,6 +25,7 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
   final _searchController = TextEditingController();
   String _filter = 'ALL'; // ALL, VALID, USED, EXPIRED
   String _searchQuery = '';
+  Timer? _debounce;
   final _dateFmt = DateFormat('dd/MM/yyyy HH:mm', 'th_TH');
 
   // ── Multi-select ───────────────────────────────────────────────
@@ -46,9 +50,11 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
   void _selectAll(List<CouponModel> list) =>
       setState(() => _selectedIds.addAll(list.map((c) => c.couponCode)));
 
+  List<CouponModel> _getSelected(List<CouponModel> all) =>
+      all.where((c) => _selectedIds.contains(c.couponCode)).toList();
+
   Future<void> _printSelected(List<CouponModel> all) async {
-    final selected =
-        all.where((c) => _selectedIds.contains(c.couponCode)).toList();
+    final selected = _getSelected(all);
     if (selected.isEmpty) return;
     try {
       await PdfExportService.showPreview(
@@ -70,34 +76,62 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
     }
   }
 
+  Future<void> _shareSelected(List<CouponModel> all) async {
+    final selected = _getSelected(all);
+    if (selected.isEmpty) return;
+    try {
+      await PdfExportService.shareFile(
+        title: 'คูปองส่วนลด (${selected.length} ใบ)',
+        filename: PdfFilename.generate('coupons_batch'),
+        buildPdf: () => CouponCardPdfBuilder.buildMultiple(
+          selected,
+          paperSize: _batchPaperSize,
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('เกิดข้อผิดพลาด: $e'),
+          backgroundColor: AppTheme.errorColor,
+        ));
+      }
+    }
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
+    _debounce?.cancel();
     super.dispose();
   }
 
   // ── Filter ─────────────────────────────────────────────────────
-  List<CouponModel> _applyFilter(List<CouponModel> list) {
-    return list.where((c) {
-      if (_searchQuery.isNotEmpty) {
-        if (!c.couponCode.toLowerCase().contains(_searchQuery.toLowerCase())) {
-          return false;
-        }
-      }
-      switch (_filter) {
-        case 'VALID':
-          return c.isValid;
-        case 'USED':
-          return c.isUsed;
-        case 'EXPIRED':
-          return c.isExpired && !c.isUsed;
-        default:
-          return true;
-      }
-    }).toList();
+  bool get _hasFilter => _filter != 'ALL' || _searchQuery.isNotEmpty;
+
+  void _onSearchChanged(String v) {
+    setState(() {
+      _searchQuery = v;
+      _selectedIds.clear();
+    });
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 400), () {
+      ref.read(couponListProvider.notifier).applyFilter(
+            status: _filter,
+            search: v,
+          );
+    });
   }
 
-  bool get _hasFilter => _filter != 'ALL' || _searchQuery.isNotEmpty;
+  void _onFilterChanged(String v) {
+    setState(() {
+      _filter = v;
+      _selectedIds.clear();
+    });
+    ref.read(couponListProvider.notifier).applyFilter(
+          status: v,
+          search: _searchQuery,
+        );
+  }
 
   void _clearFilters() {
     _searchController.clear();
@@ -106,21 +140,7 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
       _filter = 'ALL';
       _selectedIds.clear();
     });
-  }
-
-  // ── Summary ────────────────────────────────────────────────────
-  Map<String, int> _calcSummary(List<CouponModel> list) {
-    int valid = 0, used = 0, expired = 0;
-    for (final c in list) {
-      if (c.isUsed) {
-        used++;
-      } else if (c.isExpired) {
-        expired++;
-      } else {
-        valid++;
-      }
-    }
-    return {'total': list.length, 'valid': valid, 'used': used, 'expired': expired};
+    ref.read(couponListProvider.notifier).applyFilter(status: 'ALL', search: '');
   }
 
   @override
@@ -137,16 +157,10 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
             searchController: _searchController,
             searchQuery: _searchQuery,
             hasFilter: _hasFilter,
-            onSearchChanged: (v) => setState(() {
-              _searchQuery = v;
-              _selectedIds.clear();
-            }),
+            onSearchChanged: _onSearchChanged,
             onSearchCleared: () {
               _searchController.clear();
-              setState(() {
-                _searchQuery = '';
-                _selectedIds.clear();
-              });
+              _onSearchChanged('');
             },
             onRefresh: () => ref.read(couponListProvider.notifier).refresh(),
             onClearFilter: _hasFilter ? _clearFilters : null,
@@ -155,10 +169,7 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
           // ── Filter Bar ────────────────────────────────────────
           _FilterBar(
             filter: _filter,
-            onFilterChanged: (v) => setState(() {
-              _filter = v;
-              _selectedIds.clear();
-            }),
+            onFilterChanged: _onFilterChanged,
           ),
 
           // ── Body ──────────────────────────────────────────────
@@ -168,135 +179,87 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
                 child: CircularProgressIndicator(color: AppTheme.primary),
               ),
               error: (e, _) => _buildError(e),
-              data: (coupons) {
-                final filtered = _applyFilter(coupons);
-                final summary = _calcSummary(coupons);
-
-                if (filtered.isEmpty) {
-                  return _buildEmpty(coupons.isEmpty, promotionsAsync);
+              data: (pageState) {
+                if (pageState.items.isEmpty) {
+                  return _buildEmpty(pageState.total == 0, promotionsAsync);
                 }
 
-                return Stack(
+                final items = pageState.items;
+
+                return Column(
                   children: [
-                    Container(
-                      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppTheme.border),
-                      ),
-                      child: Column(
-                        children: [
-                          _SummaryBar(summary: summary),
-                          const Divider(height: 1, color: AppTheme.border),
-                          Expanded(
-                            child: ListView.separated(
-                              padding: const EdgeInsets.only(bottom: 80),
-                              itemCount: filtered.length,
-                              separatorBuilder: (_, _) =>
-                                  const Divider(height: 1, color: AppTheme.border),
-                              itemBuilder: (ctx, i) => _CouponRow(
-                                coupon: filtered[i],
-                                dateFmt: _dateFmt,
-                                selectionMode: _selectionMode,
-                                isSelected: _selectedIds.contains(filtered[i].couponCode),
-                                onTap: _selectionMode
-                                    ? () => _toggleSelect(filtered[i].couponCode)
-                                    : () => _showDetailDialog(context, filtered[i]),
-                                onCopy: () {
-                                  Clipboard.setData(
-                                      ClipboardData(text: filtered[i].couponCode));
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                        content: Text(
-                                            'คัดลอก ${filtered[i].couponCode} แล้ว')),
-                                  );
-                                },
-                                onPrint: () => _showPrintDialog(context, filtered[i]),
-                              ),
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 10),
-                            decoration: const BoxDecoration(
-                              color: AppTheme.headerBg,
-                              borderRadius: BorderRadius.only(
-                                bottomLeft: Radius.circular(12),
-                                bottomRight: Radius.circular(12),
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Text(
-                                  'แสดง ${filtered.length} จาก ${coupons.length} รายการ',
-                                  style: const TextStyle(
-                                      fontSize: 12, color: AppTheme.textSub),
+                    Expanded(
+                      child: Container(
+                        margin: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppTheme.border),
+                        ),
+                        child: Column(
+                          children: [
+                            _SummaryBar(summary: pageState.summary),
+                            const Divider(height: 1, color: AppTheme.border),
+                            Expanded(
+                              child: ListView.separated(
+                                itemCount: items.length,
+                                separatorBuilder: (_, _) =>
+                                    const Divider(height: 1, color: AppTheme.border),
+                                itemBuilder: (ctx, i) => _CouponRow(
+                                  coupon: items[i],
+                                  dateFmt: _dateFmt,
+                                  selectionMode: _selectionMode,
+                                  isSelected: _selectedIds.contains(items[i].couponCode),
+                                  onTap: _selectionMode
+                                      ? () => _toggleSelect(items[i].couponCode)
+                                      : () => _showDetailDialog(context, items[i]),
+                                  onCopy: () {
+                                    Clipboard.setData(
+                                        ClipboardData(text: items[i].couponCode));
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                          content: Text(
+                                              'คัดลอก ${items[i].couponCode} แล้ว')),
+                                    );
+                                  },
+                                  onPrint: () => _showPrintDialog(context, items[i]),
                                 ),
-                              ],
+                              ),
                             ),
-                          ),
-                        ],
+                            // ── Footer: pagination + action buttons ──
+                            if (!_selectionMode)
+                              PaginationBar(
+                                currentPage: pageState.page,
+                                totalItems: pageState.total,
+                                pageSize: pageState.limit,
+                                onPageChanged: (p) => ref
+                                    .read(couponListProvider.notifier)
+                                    .goToPage(p),
+                                trailing: _buildActionButtons(items, promotionsAsync),
+                              ),
+                          ],
+                        ),
                       ),
                     ),
-                    if (!_selectionMode) ...[
-                      Positioned(
-                        bottom: 88,
-                        right: 24,
-                        child: PdfReportButton(
-                          emptyMessage: 'ไม่มีข้อมูลคูปอง',
-                          title: 'รายงานคูปอง',
-                          filename: () => PdfFilename.generate('coupon_report'),
-                          buildPdf: () => CouponPdfBuilder.build(filtered),
-                          hasData: filtered.isNotEmpty,
-                        ),
-                      ),
-                      Positioned(
-                        bottom: 24,
-                        right: 24,
-                        child: FloatingActionButton.extended(
-                          onPressed: () => _showGenerateDialog(promotionsAsync),
-                          backgroundColor: AppTheme.primaryColor,
-                          foregroundColor: Colors.white,
-                          icon: const Icon(Icons.add),
-                          label: const Text('สร้างคูปอง'),
-                        ),
-                      ),
-                      Positioned(
-                        bottom: 152,
-                        right: 24,
-                        child: Tooltip(
-                          message: 'เลือกพิมพ์หลายรายการ',
-                          child: FloatingActionButton(
-                            heroTag: 'select_fab',
-                            onPressed: _enterSelectionMode,
-                            backgroundColor: AppTheme.infoColor,
-                            foregroundColor: Colors.white,
-                            mini: true,
-                            child: const Icon(Icons.checklist, size: 20),
-                          ),
-                        ),
-                      ),
-                    ] else
-                      Positioned(
-                        bottom: 0,
-                        left: 0,
-                        right: 0,
-                        child: _SelectionBar(
-                          selectedCount: _selectedIds.length,
-                          totalCount: filtered.length,
-                          allSelected: _selectedIds.length == filtered.length,
-                          paperSize: _batchPaperSize,
-                          onPaperSizeChanged: (s) =>
-                              setState(() => _batchPaperSize = s),
-                          onSelectAll: () => _selectAll(filtered),
-                          onDeselectAll: () =>
-                              setState(() => _selectedIds.clear()),
-                          onPrint: _selectedIds.isEmpty
-                              ? null
-                              : () => _printSelected(filtered),
-                          onCancel: _exitSelectionMode,
-                        ),
+                    // ── Selection bar (แสดงเมื่อ selection mode) ──
+                    if (_selectionMode)
+                      _SelectionBar(
+                        selectedCount: _selectedIds.length,
+                        totalCount: items.length,
+                        allSelected: _selectedIds.length == items.length,
+                        paperSize: _batchPaperSize,
+                        onPaperSizeChanged: (s) =>
+                            setState(() => _batchPaperSize = s),
+                        onSelectAll: () => _selectAll(items),
+                        onDeselectAll: () =>
+                            setState(() => _selectedIds.clear()),
+                        onPrint: _selectedIds.isEmpty
+                            ? null
+                            : () => _printSelected(items),
+                        onShare: _selectedIds.isEmpty
+                            ? null
+                            : () => _shareSelected(items),
+                        onCancel: _exitSelectionMode,
                       ),
                   ],
                 );
@@ -309,39 +272,53 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
   }
 
   Widget _buildEmpty(bool noData, AsyncValue<List<PromotionModel>> promotionsAsync) {
-    return Stack(
+    return Column(
       children: [
-        Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.confirmation_number_outlined,
-                  size: 80, color: Colors.grey.withValues(alpha: 0.4)),
-              const SizedBox(height: 16),
-              Text(
-                noData ? 'ยังไม่มีคูปอง' : 'ไม่พบคูปองที่ตรงกับเงื่อนไข',
-                style: const TextStyle(fontSize: 15, color: AppTheme.textSub),
-              ),
-              if (_hasFilter) ...[
-                const SizedBox(height: 12),
-                TextButton.icon(
-                  onPressed: _clearFilters,
-                  icon: const Icon(Icons.filter_alt_off, size: 16),
-                  label: const Text('ล้างตัวกรอง'),
+        Expanded(
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.confirmation_number_outlined,
+                    size: 80, color: Colors.grey.withValues(alpha: 0.4)),
+                const SizedBox(height: 16),
+                Text(
+                  noData ? 'ยังไม่มีคูปอง' : 'ไม่พบคูปองที่ตรงกับเงื่อนไข',
+                  style: const TextStyle(fontSize: 15, color: AppTheme.textSub),
                 ),
+                if (_hasFilter) ...[
+                  const SizedBox(height: 12),
+                  TextButton.icon(
+                    onPressed: _clearFilters,
+                    icon: const Icon(Icons.filter_alt_off, size: 16),
+                    label: const Text('ล้างตัวกรอง'),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
-        Positioned(
-          bottom: 24,
-          right: 24,
-          child: FloatingActionButton.extended(
-            onPressed: () => _showGenerateDialog(promotionsAsync),
-            backgroundColor: AppTheme.primaryColor,
-            foregroundColor: Colors.white,
-            icon: const Icon(Icons.add),
-            label: const Text('สร้างคูปอง'),
+        // Footer bar เหมือน PaginationBar — มีปุ่ม +สร้างคูปอง
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: const BoxDecoration(
+            color: AppTheme.headerBg,
+            borderRadius: BorderRadius.only(
+              bottomLeft: Radius.circular(12),
+              bottomRight: Radius.circular(12),
+            ),
+          ),
+          child: Row(
+            children: [
+              const Spacer(),
+              _CompactBtn(
+                icon: Icons.add,
+                label: 'สร้างคูปอง',
+                color: Colors.white,
+                bgColor: AppTheme.primaryColor,
+                onTap: () => _showGenerateDialog(promotionsAsync),
+              ),
+            ],
           ),
         ),
       ],
@@ -368,7 +345,9 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
 
   // ── Generate Dialog ────────────────────────────────────────────
   void _showGenerateDialog(AsyncValue<List<PromotionModel>> promotionsAsync) async {
-    final promotions = promotionsAsync.hasValue ? promotionsAsync.value! : <PromotionModel>[];
+    final promotions = (promotionsAsync.hasValue ? promotionsAsync.value! : <PromotionModel>[])
+        .where((p) => p.isActive && !p.isExpired)
+        .toList();
 
     if (promotions.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -538,6 +517,44 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
     showDialog(
       context: context,
       builder: (_) => _CouponPrintDialog(coupon: coupon, dateFmt: _dateFmt),
+    );
+  }
+
+  // ── Action buttons ใน PaginationBar trailing ─────────────────
+  Widget _buildActionButtons(
+    List<CouponModel> items,
+    AsyncValue<List<PromotionModel>> promotionsAsync,
+  ) {
+    return IntrinsicHeight(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _CompactBtn(
+            icon: Icons.checklist,
+            label: 'เลือก',
+            color: Colors.white,
+            bgColor: AppTheme.infoColor,
+            onTap: _enterSelectionMode,
+          ),
+          const SizedBox(width: 6),
+          PdfReportButton(
+            emptyMessage: 'ไม่มีข้อมูลคูปอง',
+            title: 'รายงานคูปอง',
+            filename: () => PdfFilename.generate('coupon_report'),
+            buildPdf: () => CouponPdfBuilder.build(items),
+            hasData: items.isNotEmpty,
+          ),
+          const SizedBox(width: 6),
+          _CompactBtn(
+            icon: Icons.add,
+            label: 'สร้างคูปอง',
+            color: Colors.white,
+            bgColor: AppTheme.primaryColor,
+            onTap: () => _showGenerateDialog(promotionsAsync),
+          ),
+        ],
+      ),
     );
   }
 
@@ -750,6 +767,57 @@ class _SummaryBar extends StatelessWidget {
             _Chip(icon: Icons.cancel_outlined,
                 label: '${summary['expired']} หมดอายุ', color: AppTheme.errorColor),
         ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Compact action button — ใช้ใน PaginationBar trailing
+// ─────────────────────────────────────────────────────────────────
+class _CompactBtn extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final Color? bgColor;
+  final VoidCallback onTap;
+
+  const _CompactBtn({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+    this.bgColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = bgColor ?? color;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: color),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                color: color,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1168,19 +1236,25 @@ class _CouponPrintDialog extends StatefulWidget {
 
 class _CouponPrintDialogState extends State<_CouponPrintDialog> {
   bool _printing = false;
+  bool _sharing = false;
   CouponPaperSize _paperSize = CouponPaperSize.a6;
 
-  Future<void> _printCard() async {
+  Future<pw.Document> _buildPdf() => CouponCardPdfBuilder.build(
+        widget.coupon,
+        paperSize: _paperSize,
+      );
+
+  String get _filename =>
+      PdfFilename.generate('coupon_${widget.coupon.couponCode}');
+
+  Future<void> _previewCard() async {
     setState(() => _printing = true);
     try {
       await PdfExportService.showPreview(
         context,
         title: 'คูปองส่วนลด ${widget.coupon.couponCode}',
-        filename: PdfFilename.generate('coupon_${widget.coupon.couponCode}'),
-        buildPdf: () => CouponCardPdfBuilder.build(
-          widget.coupon,
-          paperSize: _paperSize,
-        ),
+        filename: _filename,
+        buildPdf: _buildPdf,
       );
     } catch (e) {
       if (mounted) {
@@ -1191,6 +1265,26 @@ class _CouponPrintDialogState extends State<_CouponPrintDialog> {
       }
     } finally {
       if (mounted) setState(() => _printing = false);
+    }
+  }
+
+  Future<void> _shareCard() async {
+    setState(() => _sharing = true);
+    try {
+      await PdfExportService.shareFile(
+        title: 'คูปองส่วนลด ${widget.coupon.couponCode}',
+        filename: _filename,
+        buildPdf: _buildPdf,
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('เกิดข้อผิดพลาด: $e'),
+              backgroundColor: AppTheme.errorColor),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _sharing = false);
     }
   }
 
@@ -1371,28 +1465,56 @@ class _CouponPrintDialogState extends State<_CouponPrintDialog> {
               ),
               const SizedBox(height: 16),
 
-              // ── Print button ──────────────────────────────────
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: _printing ? null : _printCard,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primaryColor,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
+              // ── Action buttons ────────────────────────────────
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  // แสดง / พิมพ์ PDF
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: (_printing || _sharing) ? null : _previewCard,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryColor,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                      ),
+                      icon: _printing
+                          ? const SizedBox(
+                              width: 14, height: 14,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white),
+                            )
+                          : const Icon(Icons.picture_as_pdf_outlined, size: 17),
+                      label: Text(_printing ? 'กำลังเตรียม...' : 'แสดง PDF',
+                          style: const TextStyle(fontSize: 13)),
+                    ),
                   ),
-                  icon: _printing
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white),
-                        )
-                      : const Icon(Icons.print_outlined, size: 18),
-                  label: Text(_printing ? 'กำลังเตรียม...' : 'พิมพ์ / บันทึก PDF'),
-                ),
+                  const SizedBox(width: 8),
+                  // แชร์ PDF
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: (_printing || _sharing) ? null : _shareCard,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.teal,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                      ),
+                      icon: _sharing
+                          ? const SizedBox(
+                              width: 14, height: 14,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white),
+                            )
+                          : const Icon(Icons.share_outlined, size: 17),
+                      label: Text(_sharing ? 'กำลังแชร์...' : 'แชร์ PDF',
+                          style: const TextStyle(fontSize: 13)),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -1414,6 +1536,7 @@ class _SelectionBar extends StatelessWidget {
   final VoidCallback onSelectAll;
   final VoidCallback onDeselectAll;
   final VoidCallback? onPrint;
+  final VoidCallback? onShare;
   final VoidCallback onCancel;
 
   const _SelectionBar({
@@ -1425,6 +1548,7 @@ class _SelectionBar extends StatelessWidget {
     required this.onSelectAll,
     required this.onDeselectAll,
     required this.onPrint,
+    required this.onShare,
     required this.onCancel,
   });
 
@@ -1496,22 +1620,38 @@ class _SelectionBar extends StatelessWidget {
                 style: TextStyle(fontSize: 13, color: AppTheme.textSub)),
           ),
           const SizedBox(width: 8),
-          // Print button
+          // Preview/Print button
           ElevatedButton.icon(
             onPressed: onPrint,
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primaryColor,
               foregroundColor: Colors.white,
               padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8)),
             ),
-            icon: const Icon(Icons.print_outlined, size: 16),
+            icon: const Icon(Icons.picture_as_pdf_outlined, size: 16),
             label: Text(
-              selectedCount == 0
-                  ? 'พิมพ์'
-                  : 'พิมพ์ $selectedCount ใบ',
+              selectedCount == 0 ? 'แสดง PDF' : 'แสดง $selectedCount ใบ',
+              style: const TextStyle(fontSize: 13),
+            ),
+          ),
+          const SizedBox(width: 6),
+          // Share button
+          ElevatedButton.icon(
+            onPressed: onShare,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.teal,
+              foregroundColor: Colors.white,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+            ),
+            icon: const Icon(Icons.share_outlined, size: 16),
+            label: Text(
+              selectedCount == 0 ? 'แชร์ PDF' : 'แชร์ $selectedCount ใบ',
               style: const TextStyle(fontSize: 13),
             ),
           ),

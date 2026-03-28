@@ -15,6 +15,7 @@ class ProductRoutes {
     final router = Router();
 
     router.get('/', _getProductsHandler);
+    router.get('/<id>/check-delete', _checkDeleteProductHandler);
     router.get('/<id>', _getProductHandler);
     router.post('/', _createProductHandler);
     router.put('/<id>', _updateProductHandler);
@@ -308,16 +309,88 @@ class ProductRoutes {
     }
   }
 
-  /// DELETE /api/products/:id - ลบสินค้า
-  Future<Response> _deleteProductHandler(Request request, String id) async {
+  // ─── GET /:id/check-delete ────────────────────────────────────────────────
+  /// ตรวจก่อนลบ — คืนข้อมูลว่ามีประวัติการขาย/สต๊อกไหม ไม่มีผลต่อข้อมูล
+  Future<Response> _checkDeleteProductHandler(
+      Request request, String id) async {
     try {
-      await (db.delete(db.products)..where((t) => t.productId.equals(id)))
-          .go();
+      final salesRow = await db.customSelect(
+        'SELECT COUNT(*) AS cnt FROM sales_order_items WHERE product_id = ?',
+        variables: [Variable.withString(id)],
+      ).getSingle();
+      final salesCount = (salesRow.data['cnt'] as int?) ?? 0;
+
+      final movRow = await db.customSelect(
+        'SELECT COUNT(*) AS cnt FROM stock_movements WHERE product_id = ?',
+        variables: [Variable.withString(id)],
+      ).getSingle();
+      final movCount = (movRow.data['cnt'] as int?) ?? 0;
 
       return Response.ok(
-        jsonEncode({'success': true, 'message': 'ลบสินค้าสำเร็จ'}),
+        jsonEncode({
+          'success': true,
+          'has_history': salesCount > 0 || movCount > 0,
+          'has_sales': salesCount > 0,
+          'sales_count': salesCount,
+          'has_movements': movCount > 0,
+          'movement_count': movCount,
+        }),
         headers: {'Content-Type': 'application/json'},
       );
+    } catch (e) {
+      return Response.internalServerError(
+        body: jsonEncode({'success': false, 'message': '$e'}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+  }
+
+  /// DELETE /api/products/:id - ลบสินค้า (Soft Delete — ตรวจก่อนลบ)
+  Future<Response> _deleteProductHandler(Request request, String id) async {
+    try {
+      // ── ตรวจสอบประวัติการใช้งาน ──────────────────────────────
+      final hasSales = await (db.select(db.salesOrderItems)
+            ..where((t) => t.productId.equals(id))
+            ..limit(1))
+          .getSingleOrNull() != null;
+
+      final hasMovements = await (db.select(db.stockMovements)
+            ..where((t) => t.productId.equals(id))
+            ..limit(1))
+          .getSingleOrNull() != null;
+
+      final hasHistory = hasSales || hasMovements;
+
+      if (hasHistory) {
+        // ── Soft Delete — มีประวัติ → ปิดการใช้งานแทน ────────
+        await (db.update(db.products)
+              ..where((t) => t.productId.equals(id)))
+            .write(ProductsCompanion(
+          isActive: const Value(false),
+          updatedAt: Value(DateTime.now()),
+        ));
+        return Response.ok(
+          jsonEncode({
+            'success': true,
+            'soft_delete': true,
+            'message': 'ปิดการใช้งานสินค้าสำเร็จ\n(มีประวัติการขาย จึงเก็บข้อมูลไว้)',
+          }),
+          headers: {'Content-Type': 'application/json'},
+        );
+      } else {
+        // ── Hard Delete — ไม่มีประวัติ ลบได้เลย ──────────────
+        await (db.delete(db.products)
+              ..where((t) => t.productId.equals(id)))
+            .go();
+        return Response.ok(
+          jsonEncode({
+            'success': true,
+            'soft_delete': false,
+            'message': 'ลบสินค้าสำเร็จ',
+          }),
+          headers: {'Content-Type': 'application/json'},
+        );
+      }
     } catch (e) {
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': 'เกิดข้อผิดพลาด: $e'}),

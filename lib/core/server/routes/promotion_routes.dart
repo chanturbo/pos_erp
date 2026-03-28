@@ -244,14 +244,78 @@ class PromotionRoutes {
   }
 
   // ─── DELETE /:id ──────────────────────────────────────────────────────────
+  // Logic:
+  //   1. ถ้าเคยมีออเดอร์หรือคูปองที่ใช้แล้ว → block (HAS_ORDERS)
+  //   2. ถ้ามีคูปองที่ยังไม่ใช้ และไม่ได้ส่ง force_delete_coupons=true → ถามก่อน
+  //   3. ลบได้ทันที (+ ลบคูปองที่ยังไม่ใช้ถ้า force_delete_coupons=true)
   Future<Response> _deletePromotionHandler(Request request, String id) async {
     try {
+      final params = request.url.queryParameters;
+      final forceDeleteCoupons = params['force_delete_coupons'] == 'true';
+
+      // ── Step 1: ตรวจสอบการใช้งานจริง ──────────────────────────────────
+      final usageRow = await db.customSelect(
+        'SELECT COUNT(*) AS cnt FROM promotion_usages WHERE promotion_id = ?',
+        variables: [Variable.withString(id)],
+      ).getSingle();
+      final usageCount = (usageRow.data['cnt'] as int?) ?? 0;
+
+      final usedCouponRow = await db.customSelect(
+        'SELECT COUNT(*) AS cnt FROM coupons WHERE promotion_id = ? AND is_used = 1',
+        variables: [Variable.withString(id)],
+      ).getSingle();
+      final usedCouponCount = (usedCouponRow.data['cnt'] as int?) ?? 0;
+
+      final totalUsageCount = usageCount + usedCouponCount;
+
+      if (totalUsageCount > 0) {
+        return Response.ok(
+          jsonEncode({
+            'success': false,
+            'code': 'HAS_ORDERS',
+            'order_count': usageCount,
+            'used_coupon_count': usedCouponCount,
+          }),
+          headers: {'Content-Type': 'application/json'},
+        );
+      }
+
+      // ── Step 2: ตรวจสอบคูปองที่ยังไม่ถูกใช้ ───────────────────────────
+      final unusedCouponRow = await db.customSelect(
+        'SELECT COUNT(*) AS cnt FROM coupons WHERE promotion_id = ? AND is_used = 0',
+        variables: [Variable.withString(id)],
+      ).getSingle();
+      final unusedCount = (unusedCouponRow.data['cnt'] as int?) ?? 0;
+
+      if (unusedCount > 0 && !forceDeleteCoupons) {
+        return Response.ok(
+          jsonEncode({
+            'success': false,
+            'code': 'HAS_UNUSED_COUPONS',
+            'coupon_count': unusedCount,
+          }),
+          headers: {'Content-Type': 'application/json'},
+        );
+      }
+
+      // ── Step 3: ลบคูปองที่ยังไม่ใช้ (ถ้า force) แล้วลบโปรโมชั่น ───────
+      if (forceDeleteCoupons && unusedCount > 0) {
+        await db.customStatement(
+          'DELETE FROM coupons WHERE promotion_id = ? AND is_used = 0',
+          [id],
+        );
+      }
+
       await (db.delete(db.promotions)
             ..where((p) => p.promotionId.equals(id)))
           .go();
 
       return Response.ok(
-        jsonEncode({'success': true, 'message': 'Promotion deleted'}),
+        jsonEncode({
+          'success': true,
+          'message': 'Promotion deleted',
+          'coupons_cancelled': forceDeleteCoupons ? unusedCount : 0,
+        }),
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
@@ -340,31 +404,101 @@ class PromotionRoutes {
   }
 
   // ─── GET /coupons ─────────────────────────────────────────────────────────
+  // Query params: page (int), limit (int), status (ALL|VALID|USED|EXPIRED), search (string)
   Future<Response> _getCouponsHandler(Request request) async {
     try {
-      final results = await db.customSelect(
-        '''
+      final params = request.url.queryParameters;
+      final page  = (int.tryParse(params['page']  ?? '1')  ?? 1).clamp(1, 99999);
+      final limit = (int.tryParse(params['limit'] ?? '50') ?? 50).clamp(1, 500);
+      final status = params['status'] ?? 'ALL';
+      // Sanitize search: strip single-quotes to prevent SQL injection
+      final search = (params['search'] ?? '').trim().replaceAll("'", "''").toUpperCase();
+      final offset = (page - 1) * limit;
+
+      // Unix seconds ณ ปัจจุบัน (Drift เก็บเป็น seconds)
+      final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+
+      // Build filter WHERE clause for paginated query
+      final filterParts = <String>[];
+      if (search.isNotEmpty) {
+        filterParts.add("c.coupon_code LIKE '%$search%'");
+      }
+      switch (status) {
+        case 'VALID':
+          filterParts.add(
+              "c.is_used = 0 AND (c.expires_at IS NULL OR c.expires_at > $nowSec)");
+          break;
+        case 'USED':
+          filterParts.add("c.is_used = 1");
+          break;
+        case 'EXPIRED':
+          filterParts.add(
+              "c.is_used = 0 AND c.expires_at IS NOT NULL AND c.expires_at <= $nowSec");
+          break;
+      }
+      final filterWhere =
+          filterParts.isEmpty ? '' : 'WHERE ${filterParts.join(' AND ')}';
+
+      // Drift เก็บ DateTime เป็น integer SECONDS → ต้อง ×1000 ก่อน
+      String? secToIso(int? sec) => sec != null
+          ? DateTime.fromMillisecondsSinceEpoch(sec * 1000).toIso8601String()
+          : null;
+
+      // Count total (filtered)
+      final countRow = await db.customSelect(
+        'SELECT COUNT(*) AS cnt FROM coupons c $filterWhere',
+      ).getSingle();
+      final total = countRow.read<int>('cnt');
+      final totalPages = total == 0 ? 1 : ((total + limit - 1) ~/ limit);
+
+      // Summary counts (always over ALL coupons, not filtered)
+      final sumRow = await db.customSelect('''
+        SELECT
+          COUNT(*) AS total,
+          SUM(CASE WHEN is_used = 1 THEN 1 ELSE 0 END) AS used,
+          SUM(CASE WHEN is_used = 0 AND (expires_at IS NULL OR expires_at > $nowSec) THEN 1 ELSE 0 END) AS valid,
+          SUM(CASE WHEN is_used = 0 AND expires_at IS NOT NULL AND expires_at <= $nowSec THEN 1 ELSE 0 END) AS expired
+        FROM coupons
+      ''').getSingle();
+      final summary = {
+        'total':   sumRow.read<int>('total'),
+        'valid':   sumRow.read<int>('valid'),
+        'used':    sumRow.read<int>('used'),
+        'expired': sumRow.read<int>('expired'),
+      };
+
+      // Paginated data
+      final results = await db.customSelect('''
         SELECT c.*, p.promotion_name
         FROM coupons c
         LEFT JOIN promotions p ON c.promotion_id = p.promotion_id
+        $filterWhere
         ORDER BY c.created_at DESC
-        ''',
-      ).get();
+        LIMIT $limit OFFSET $offset
+      ''').get();
 
       final data = results.map((row) => {
-            'coupon_id': row.read<String>('coupon_id'),
-            'coupon_code': row.read<String>('coupon_code'),
-            'promotion_id': row.read<String>('promotion_id'),
+            'coupon_id':      row.read<String>('coupon_id'),
+            'coupon_code':    row.read<String>('coupon_code'),
+            'promotion_id':   row.read<String>('promotion_id'),
             'promotion_name': row.read<String?>('promotion_name'),
-            'is_used': row.read<bool>('is_used'),
-            'used_by': row.read<String?>('used_by'),
-            'used_at': row.read<String?>('used_at'),
-            'expires_at': row.read<String?>('expires_at'),
-            'created_at': row.read<String>('created_at'),
+            'is_used':        row.read<bool>('is_used'),
+            'used_by':        row.read<String?>('used_by'),
+            'used_at':        secToIso(row.read<int?>('used_at')),
+            'expires_at':     secToIso(row.read<int?>('expires_at')),
+            'created_at':     secToIso(row.read<int?>('created_at')),
           }).toList();
 
       return Response.ok(
-        jsonEncode({'success': true, 'data': data}),
+        jsonEncode({
+          'success': true,
+          'data': data,
+          'page': page,
+          'limit': limit,
+          'total': total,
+          'total_pages': totalPages,
+          'summary': summary,
+        }),
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {

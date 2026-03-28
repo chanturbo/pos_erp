@@ -1,6 +1,7 @@
 // promotion_form_page.dart
 // Day 41-45: Promotion Create / Edit Form
 
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -45,11 +46,22 @@ class _PromotionFormPageState extends ConsumerState<PromotionFormPage> {
 
   bool get isEdit => widget.promotion != null;
 
+  String _buildCode() {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    final rng = Random();
+    final suffix = List.generate(6, (_) => chars[rng.nextInt(chars.length)]).join();
+    return 'PROMO$suffix';
+  }
+
+  void _generateCode() {
+    setState(() => _codeCtrl.text = _buildCode());
+  }
+
   @override
   void initState() {
     super.initState();
     final p = widget.promotion;
-    _codeCtrl = TextEditingController(text: p?.promotionCode ?? '');
+    _codeCtrl = TextEditingController(text: p?.promotionCode ?? _buildCode());
     _nameCtrl = TextEditingController(text: p?.promotionName ?? '');
     _discountValueCtrl = TextEditingController(
         text: p?.discountValue != null && p!.discountValue > 0
@@ -146,7 +158,14 @@ class _PromotionFormPageState extends ConsumerState<PromotionFormPage> {
         children: [
           TextFormField(
             controller: _codeCtrl,
-            decoration: _inputDeco(label: 'รหัสโปรโมชั่น *', icon: Icons.tag),
+            textCapitalization: TextCapitalization.characters,
+            decoration: _inputDeco(label: 'รหัสโปรโมชั่น *', icon: Icons.tag).copyWith(
+              suffixIcon: IconButton(
+                icon: const Icon(Icons.auto_awesome, size: 20),
+                tooltip: 'สร้างรหัสอัตโนมัติ',
+                onPressed: isEdit ? null : _generateCode,
+              ),
+            ),
             validator: (v) => v == null || v.isEmpty ? 'กรุณากรอกรหัส' : null,
           ),
           const SizedBox(height: 12),

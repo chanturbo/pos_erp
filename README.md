@@ -6,7 +6,7 @@
 ![Dart](https://img.shields.io/badge/Dart-0175C2?style=flat&logo=dart&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-07405E?style=flat&logo=sqlite&logoColor=white)
 ![Tests](https://img.shields.io/badge/Tests-47%20passed-brightgreen)
-![Version](https://img.shields.io/badge/Version-1.1.0-blue)
+![Version](https://img.shields.io/badge/Version-1.2.0-blue)
 
 ---
 
@@ -45,6 +45,8 @@
 - Customer Database พร้อม **WALK-IN Customer** (ลูกค้าระบบ — ลบ/แก้ไขไม่ได้)
 - Credit Terms & Credit Limit Tracking
 - Member/Loyalty System — เลขสมาชิก + สะสมคะแนน (กำหนด ฿/แต้มได้ใน Settings)
+- **Points Redemption** — แลกแต้มลดราคาในหน้าชำระเงิน (1 แต้ม = ฿1)
+- **Points History** — ประวัติการสะสม/แลกแต้มรายลูกค้า
 - **Price Level per Customer** — กำหนดระดับราคา 1–5 ต่อลูกค้า
 - **Auto Customer Code** — สร้างรหัสอัตโนมัติ `CUS-YYMMDD-XXX`
 - Filter เฉพาะสมาชิก
@@ -274,8 +276,8 @@ dependencies:
 |---|---|
 | System | companies, branches, users, roles |
 | Products | products, product_groups, product_units |
-| Customers | customers (`price_level` field เพิ่มใหม่) |
-| Sales | sales_orders, sales_order_items |
+| Customers | customers (`price_level`, `points`), **points_transactions** |
+| Sales | sales_orders (`points_used`), sales_order_items |
 | Inventory | warehouses, stock_movements, stock_balances |
 | Procurement | suppliers, purchase_orders, purchase_order_items, goods_receipts, purchase_returns |
 | AP | ap_invoices, ap_invoice_items, ap_payments, ap_payment_allocations |
@@ -311,15 +313,18 @@ lib/
 │   └── settings/        # App Settings
 ├── shared/
 │   ├── theme/
-│   │   ├── app_colors.dart    # ✅ Centralized color palette (ใหม่)
+│   │   ├── app_colors.dart    # ✅ Centralized color palette
 │   │   ├── app_theme.dart     # AppTheme
 │   │   └── theme_provider.dart
-│   ├── pdf/                   # ✅ Shared PDF module (ใหม่)
+│   ├── pdf/                   # ✅ Shared PDF module
 │   │   ├── pdf_export_service.dart
-│   │   ├── pdf_preview_dialog.dart
+│   │   ├── pdf_preview_dialog.dart  # + ปุ่มพิมพ์ (desktop/mobile)
 │   │   └── pdf_report_button.dart
+│   ├── widgets/
+│   │   ├── cart_toast.dart          # ✅ Stacked toast overlay (POS)
+│   │   ├── thermal_receipt.dart     # ✅ Shared receipt widget
+│   │   └── ...
 │   ├── utils/           # ResponsiveUtils, AppTransitions
-│   ├── widgets/         # LoadingOverlay, AsyncStateWidgets
 │   └── services/        # OfflineSyncService
 ├── routes/              # AppRouter
 └── main.dart
@@ -417,6 +422,8 @@ flutter test --coverage               # With coverage
 | Promotions & Discounts | ✅ |
 | Coupon System | ✅ |
 | Member / Loyalty Points (configurable ฿/pt) | ✅ |
+| **Points Redemption** (แลกแต้มลดราคา ณ จุดขาย) | ✅ |
+| **Points Transaction History** (ประวัติสะสม/แลกแต้มรายลูกค้า) | ✅ |
 | Multi-Branch Management | ✅ |
 | Offline Sync Service | ✅ |
 
@@ -437,11 +444,15 @@ flutter test --coverage               # With coverage
 | Back Button (แสดงเฉพาะเมื่อ canPop) | ✅ |
 | **Shared PDF Module** (`PdfExportService`, `PdfPreviewDialog`, `PdfReportButton`) | ✅ |
 | PDF Export — Product & Customer List | ✅ |
-| PDF Preview Dialog + Pinch-to-zoom | ✅ |
-| PDF แสดง / แชร์ / บันทึก (3 เมนู) | ✅ |
+| PDF Preview Dialog + Pinch-to-zoom + ปุ่มพิมพ์ | ✅ |
+| PDF แสดง / แชร์ / บันทึก / พิมพ์ | ✅ |
 | **Auto Customer Code** (`CUS-YYMMDD-XXX`) | ✅ |
 | **Price Level per Customer** (Level 1–5) | ✅ |
 | **Loyalty Points Config** (กำหนด ฿/แต้มใน Settings) | ✅ |
+| **Cart Toast Overlay** — stacked animated notifications ใน POS | ✅ |
+| **Shared Thermal Receipt** (`ThermalReceiptWidget`) — ใช้ร่วมกัน payment + history | ✅ |
+| **Stock Balance** — hardcoded light colors, list/card view, dropdown สีขาว | ✅ |
+| **Stock Movement History** — list/card toggle, search, type filter, summary chips | ✅ |
 | Unit / Integration Tests (47 passed) | ✅ |
 
 ### ✅ Phase 5: Mobile & Deployment
@@ -463,11 +474,53 @@ Phase 4  ████████████████████  100% ✅ 
 Phase 5  ████████████████████  100% ✅ Mobile & Deployment
 ```
 
-**🎉 v1.1.0 — Production Ready**
+**🎉 v1.2.0 — Production Ready**
 
 ---
 
 ## 📋 Changelog
+
+### v1.2.0
+
+#### 🌟 ระบบแต้มสะสมสมบูรณ์ (Loyalty Points — Full Cycle)
+
+**Points Redemption ในหน้าชำระเงิน**
+- แสดง section "ใช้แต้มสะสม" เฉพาะลูกค้าที่มีเลขสมาชิก
+- โหลดยอดแต้มจาก API ณ ขณะเปิดหน้าชำระเงิน
+- กรอกจำนวนแต้มที่ต้องการใช้ หรือกด "ใช้ทั้งหมด" (จำกัดที่ยอดบิลและแต้มที่มี)
+- **1 แต้ม = ลด ฿1.00** — ยอดชำระปรับทันทีทั้งตัวเลขใหญ่และช่องรับเงิน
+- บนใบเสร็จจะแสดง "แลกแต้ม X pt = -฿X" แยกบรรทัดชัดเจน
+
+**ตาราง `points_transactions` (ใหม่)**
+- บันทึกทุก event ทั้ง EARN และ REDEEM พร้อม referenceNo (เลขออเดอร์)
+- Schema version เพิ่มจาก 2 → 3 (migration อัตโนมัติ)
+- ฟิลด์ `points_used` ใน `sales_orders` — เก็บว่าบิลนี้แลกแต้มไปเท่าไร
+
+**API ใหม่**
+- `GET /api/customers/:id/points-history` — ดึงประวัติแต้มรายลูกค้า เรียงจากใหม่ไปเก่า
+- `POST /api/sales` รับ `points_used` — หักแต้ม (REDEEM) + บวกแต้ม (EARN) พร้อมกันใน handler เดียว
+
+**หน้าประวัติแต้ม (`PointsHistoryPage`)**
+- เปิดจากหน้ารายละเอียดลูกค้า — กดที่ badge แต้ม (มีลูกศร `>`)
+- Summary bar: แต้มคงเหลือ / สะสมทั้งหมด / แลกไปทั้งหมด
+- Card list: สีเขียว = EARN, สีส้ม = REDEEM พร้อมเลขอ้างอิงออเดอร์และหมายเหตุ
+
+**Receipt แสดงครบ**
+- `ThermalReceiptWidget` — เพิ่ม `pointsUsed` parameter แสดงบรรทัด "แลกแต้ม"
+- `order_details_page.dart` — ใบเสร็จย้อนหลังแสดงแต้มที่ใช้และแต้มที่ได้รับ
+
+---
+
+#### 🛠️ UI & UX Improvements (v1.2.0)
+- **Cart Toast Overlay** — Stacked animated notifications ใน POS แทน SnackBar
+- **Shared Thermal Receipt** — `lib/shared/widgets/thermal_receipt.dart` ใช้ร่วมกัน payment page และ order history
+- **PDF Print Button** — ปุ่มพิมพ์ใน PDF preview dialog (desktop: system print dialog, mobile: native sheet)
+- **Payment Page Auto-focus** — cursor โฟกัสและเลือกทั้งหมดในช่อง "จำนวนเงินที่รับ" ทันทีที่เปิด
+- **Stock Balance** — ปรับสี hardcoded light mode (background, toolbar, dropdown, card/list rows)
+- **Stock Movement History** — UI ใหม่: list/card toggle, search, type filter, summary chips
+- **Sales History Tooltip** — แก้ crash `RenderBox was not laid out` ด้วย `waitDuration: 600ms`
+
+---
 
 ### v1.1.0
 - **`AppColors`** — Centralized color palette ใน `shared/theme/app_colors.dart`
@@ -553,4 +606,4 @@ For support, email support@example.com or open an issue.
 
 ---
 
-**🎉 v1.1.0 — Production Ready!**
+**🎉 v1.2.0 — Production Ready!**

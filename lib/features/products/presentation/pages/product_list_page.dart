@@ -7,7 +7,7 @@ import '../../data/models/product_model.dart';
 import 'product_form_page.dart';
 import 'product_pdf_report.dart'; // ✅ PDF report
 import '../../../../shared/pdf/pdf_report_button.dart';
-
+import '../../../../features/settings/presentation/pages/settings_page.dart';
 
 class ProductListPage extends ConsumerStatefulWidget {
   const ProductListPage({super.key});
@@ -27,7 +27,6 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
 
   // ── Pagination ──────────────────────────────────────────────────
   int _currentPage = 1;
-  static const int _pageSize = 20;
 
   // ✅ ความกว้างคอลัมน์ที่ resize ได้ (ค่าเริ่มต้นก่อน auto-fit)
   // ลำดับ: [รหัส, ชื่อ, หน่วย, ราคา, ต้นทุน, สต๊อก, สถานะ, จัดการ]
@@ -91,33 +90,74 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
   // Delete — ใช้ pattern เดียวกับไฟล์ที่แนบมา
   // ─────────────────────────────────────────────────────────────
   Future<void> _confirmDelete(ProductModel product) async {
+    // ── Pre-check ก่อนแสดง dialog ────────────────────────────────
+    final check = await ref
+        .read(productListProvider.notifier)
+        .checkDeleteProduct(product.productId);
+    if (!mounted) return;
+
+    final hasHistory = check['has_history'] == true;
+    final salesCount = (check['sales_count'] as int?) ?? 0;
+    final movCount = (check['movement_count'] as int?) ?? 0;
+
+    // ── สร้าง detail text ─────────────────────────────────────────
+    final details = [
+      if (salesCount > 0) 'ประวัติการขาย $salesCount รายการ',
+      if (movCount > 0) 'ความเคลื่อนไหวสต๊อก $movCount รายการ',
+    ].join(' และ ');
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('ยืนยันการลบ'),
-        content: Text('ต้องการลบสินค้า "${product.productName}" ใช่หรือไม่?'),
+        title: Row(children: [
+          Icon(
+            hasHistory ? Icons.archive_outlined : Icons.delete_outline,
+            color: hasHistory ? AppTheme.warningColor : AppTheme.error,
+            size: 20,
+          ),
+          const SizedBox(width: 8),
+          Text(hasHistory ? 'ปิดการใช้งานสินค้า' : 'ลบสินค้าถาวร'),
+        ]),
+        content: hasHistory
+            ? Text(
+                'สินค้า "${product.productName}" มี$details\n\n'
+                'ไม่สามารถลบได้ ระบบจะปิดการใช้งานแทนเพื่อเก็บประวัติไว้',
+              )
+            : Text(
+                'ต้องการลบสินค้า "${product.productName}" '
+                'ออกจากระบบอย่างถาวรใช่หรือไม่?',
+              ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: const Text('ยกเลิก'),
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+          ElevatedButton.icon(
+            icon: Icon(
+              hasHistory ? Icons.pause_circle_outline : Icons.delete_forever,
+              size: 16,
+            ),
+            label: Text(hasHistory ? 'ปิดการใช้งาน' : 'ลบถาวร'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor:
+                  hasHistory ? AppTheme.warningColor : AppTheme.error,
+              foregroundColor: Colors.white,
+            ),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('ลบ'),
           ),
         ],
       ),
     );
     if (confirmed != true || !mounted) return;
 
-    final ok = await ref
+    final message = await ref
         .read(productListProvider.notifier)
         .deleteProduct(product.productId);
 
     if (!mounted) return;
+    final ok = message != null;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(ok ? 'ลบสินค้าสำเร็จ' : 'ลบสินค้าไม่สำเร็จ'),
+      content: Text(ok ? message : 'ดำเนินการไม่สำเร็จ'),
       backgroundColor: ok ? AppTheme.success : AppTheme.error,
       behavior: SnackBarBehavior.floating,
     ));
@@ -129,6 +169,7 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
   @override
   Widget build(BuildContext context) {
     final productAsync = ref.watch(productListProvider);
+    final pageSize = ref.watch(settingsProvider).listPageSize;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
@@ -169,40 +210,31 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
                 final filtered = _filter(products);
                 if (filtered.isEmpty) return _buildEmpty();
                 final sorted = _sort(filtered);
-                final totalPages = (sorted.length / _pageSize).ceil();
+                final totalPages = (sorted.length / pageSize).ceil();
                 final safePage = _currentPage.clamp(1, totalPages);
-                final pageStart = (safePage - 1) * _pageSize;
-                final pageEnd = (pageStart + _pageSize).clamp(0, sorted.length);
+                final pageStart = (safePage - 1) * pageSize;
+                final pageEnd = (pageStart + pageSize).clamp(0, sorted.length);
                 final pageItems = sorted.sublist(pageStart, pageEnd);
                 return Column(
                   children: [
                     Expanded(
-                      child: Stack(
-                        children: [
-                          _isTableView
-                              ? _buildTableView(pageItems)
-                              : _buildCardView(pageItems),
-                          // ปุ่ม PDF
-                          Positioned(
-                            bottom: 16,
-                            right: 16,
-                            child: PdfReportButton(
-                              emptyMessage: 'ไม่มีข้อมูลสินค้า',
-                              title:    'รายงานสินค้า',
-                              filename: () => PdfFilename.generate('product_report'),
-                              buildPdf: () => ProductPdfBuilder.build(filtered),
-                              hasData:  filtered.isNotEmpty,
-                            ),
-                          ),
-                        ],
-                      ),
+                      child: _isTableView
+                          ? _buildTableView(pageItems)
+                          : _buildCardView(pageItems),
                     ),
                     // ── Footer / Pagination ──────────────────────
                     PaginationBar(
                       currentPage: safePage,
                       totalItems: sorted.length,
-                      pageSize: _pageSize,
+                      pageSize: pageSize,
                       onPageChanged: (p) => setState(() => _currentPage = p),
+                      trailing: PdfReportButton(
+                        emptyMessage: 'ไม่มีข้อมูลสินค้า',
+                        title:    'รายงานสินค้า',
+                        filename: () => PdfFilename.generate('product_report'),
+                        buildPdf: () => ProductPdfBuilder.build(filtered),
+                        hasData:  filtered.isNotEmpty,
+                      ),
                     ),
                   ],
                 );

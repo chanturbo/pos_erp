@@ -15,6 +15,7 @@ class CustomerRoutes {
     final router = Router();
 
     router.get('/', _getCustomersHandler);
+    router.get('/<id>/check-delete', _checkDeleteCustomerHandler);
     router.get('/<id>', _getCustomerHandler);
     router.post('/', _createCustomerHandler);
     router.put('/<id>', _updateCustomerHandler);
@@ -22,6 +23,7 @@ class CustomerRoutes {
     router.get('/code/<code>', _getCustomerByCodeHandler);
     router.get('/member/<memberNo>', _getCustomerByMemberNoHandler);
     router.put('/<id>/points', _updatePointsHandler);
+    router.get('/<id>/points-history', _getPointsHistoryHandler); // ✅ ประวัติแต้ม
     router.get('/<id>/orders', _getCustomerOrdersHandler); // ✅ ประวัติการซื้อ
 
     return router;
@@ -369,7 +371,41 @@ class CustomerRoutes {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // DELETE /api/customers/:id
+  // ─── GET /:id/check-delete ────────────────────────────────────────────────
+  Future<Response> _checkDeleteCustomerHandler(
+      Request request, String id) async {
+    try {
+      final orderRow = await db.customSelect(
+        'SELECT COUNT(*) AS cnt FROM sales_orders WHERE customer_id = ?',
+        variables: [Variable.withString(id)],
+      ).getSingle();
+      final orderCount = (orderRow.data['cnt'] as int?) ?? 0;
+
+      final pointsRow = await db.customSelect(
+        'SELECT COUNT(*) AS cnt FROM points_transactions WHERE customer_id = ?',
+        variables: [Variable.withString(id)],
+      ).getSingle();
+      final hasPoints = ((pointsRow.data['cnt'] as int?) ?? 0) > 0;
+
+      return Response.ok(
+        jsonEncode({
+          'success': true,
+          'has_history': orderCount > 0 || hasPoints,
+          'has_orders': orderCount > 0,
+          'order_count': orderCount,
+          'has_points': hasPoints,
+        }),
+        headers: {'Content-Type': 'application/json'},
+      );
+    } catch (e) {
+      return Response.internalServerError(
+        body: jsonEncode({'success': false, 'message': '$e'}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+  }
+
+  // DELETE /api/customers/:id  (Soft Delete — ตรวจก่อนลบ)
   // ─────────────────────────────────────────────────────────────
   Future<Response> _deleteCustomerHandler(Request request, String id) async {
     if (id == 'WALK_IN') {
@@ -379,12 +415,49 @@ class CustomerRoutes {
       );
     }
     try {
-      await (db.delete(db.customers)..where((t) => t.customerId.equals(id)))
-          .go();
-      return Response.ok(
-        jsonEncode({'success': true, 'message': 'ลบลูกค้าสำเร็จ'}),
-        headers: {'Content-Type': 'application/json'},
-      );
+      // ── ตรวจสอบประวัติการใช้งาน ──────────────────────────────
+      final hasOrders = await (db.select(db.salesOrders)
+            ..where((t) => t.customerId.equals(id))
+            ..limit(1))
+          .getSingleOrNull() != null;
+
+      final hasPoints = await (db.select(db.pointsTransactions)
+            ..where((t) => t.customerId.equals(id))
+            ..limit(1))
+          .getSingleOrNull() != null;
+
+      final hasHistory = hasOrders || hasPoints;
+
+      if (hasHistory) {
+        // ── Soft Delete — มีประวัติ → ปิดการใช้งานแทน ────────
+        await (db.update(db.customers)
+              ..where((t) => t.customerId.equals(id)))
+            .write(CustomersCompanion(
+          isActive: const Value(false),
+          updatedAt: Value(DateTime.now()),
+        ));
+        return Response.ok(
+          jsonEncode({
+            'success': true,
+            'soft_delete': true,
+            'message': 'ปิดการใช้งานลูกค้าสำเร็จ\n(มีประวัติการซื้อ จึงเก็บข้อมูลไว้)',
+          }),
+          headers: {'Content-Type': 'application/json'},
+        );
+      } else {
+        // ── Hard Delete — ไม่มีประวัติ ลบได้เลย ──────────────
+        await (db.delete(db.customers)
+              ..where((t) => t.customerId.equals(id)))
+            .go();
+        return Response.ok(
+          jsonEncode({
+            'success': true,
+            'soft_delete': false,
+            'message': 'ลบลูกค้าสำเร็จ',
+          }),
+          headers: {'Content-Type': 'application/json'},
+        );
+      }
     } catch (e) {
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': 'เกิดข้อผิดพลาด: $e'}),
@@ -538,6 +611,19 @@ class CustomerRoutes {
         ),
       );
 
+      // ── บันทึก PointsTransaction ─────────────────────────────
+      final txId = 'PTX-${DateTime.now().millisecondsSinceEpoch}';
+      await db.into(db.pointsTransactions).insert(
+        PointsTransactionsCompanion(
+          transactionId: Value(txId),
+          customerId:    Value(id),
+          type:          Value(action == 'add' ? 'EARN' : 'REDEEM'),
+          points:        Value(delta),
+          referenceNo:   Value(data['reference_no'] as String?),
+          remark:        Value(data['remark'] as String?),
+        ),
+      );
+
       return Response.ok(
         jsonEncode({
           'success': true,
@@ -550,6 +636,39 @@ class CustomerRoutes {
             'delta': action == 'add' ? delta : -delta,
             'new_points': newPoints,
           },
+        }),
+        headers: {'Content-Type': 'application/json'},
+      );
+    } catch (e) {
+      return Response.internalServerError(
+        body: jsonEncode({'success': false, 'message': 'เกิดข้อผิดพลาด: $e'}),
+      );
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // GET /api/customers/:id/points-history — ประวัติแต้มสะสม
+  // ─────────────────────────────────────────────────────────────
+  Future<Response> _getPointsHistoryHandler(
+      Request request, String id) async {
+    try {
+      final txs = await (db.select(db.pointsTransactions)
+            ..where((t) => t.customerId.equals(id))
+            ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+          .get();
+
+      return Response.ok(
+        jsonEncode({
+          'success': true,
+          'data': txs.map((t) => {
+            'transaction_id': t.transactionId,
+            'customer_id':    t.customerId,
+            'type':           t.type,
+            'points':         t.points,
+            'reference_no':   t.referenceNo,
+            'remark':         t.remark,
+            'created_at':     t.createdAt.toIso8601String(),
+          }).toList(),
         }),
         headers: {'Content-Type': 'application/json'},
       );

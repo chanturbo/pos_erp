@@ -3,8 +3,10 @@
 // Shared PDF Preview Dialog — ใช้ร่วมกันได้ทุก module
 // รองรับ pinch-to-zoom, zoom buttons (+/-), zoom reset, ปริ้น, ปิด dialog
 
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:printing/printing.dart';
 
 // ─────────────────────────────────────────────────────────────────
@@ -43,6 +45,39 @@ class _PdfPreviewDialogState extends State<PdfPreviewDialog> {
   void _zoomIn()    => _applyScale((_scale + _scaleStep).clamp(_minScale, _maxScale));
   void _zoomOut()   => _applyScale((_scale - _scaleStep).clamp(_minScale, _maxScale));
   void _resetZoom() => _applyScale(1.0);
+
+  Future<void> _savePdf() async {
+    Directory dir;
+    try {
+      dir = await getApplicationDocumentsDirectory();
+    } catch (_) {
+      dir = await getTemporaryDirectory();
+    }
+    final file = File('${dir.path}/${widget.filename}');
+    await file.writeAsBytes(widget.bytes);
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('บันทึกแล้ว: ${file.path}'),
+        backgroundColor: Colors.green[700],
+        behavior: SnackBarBehavior.floating,
+        action: SnackBarAction(
+          label: 'เปิด',
+          textColor: Colors.white,
+          onPressed: () async {
+            if (Platform.isMacOS) {
+              await Process.run('open', [file.path]);
+            } else if (Platform.isWindows) {
+              await Process.run('cmd', ['/c', 'start', '', file.path]);
+            } else if (Platform.isLinux) {
+              await Process.run('xdg-open', [file.path]);
+            }
+          },
+        ),
+      ),
+    );
+  }
 
   Future<void> _print() async {
     await Printing.layoutPdf(
@@ -83,6 +118,7 @@ class _PdfPreviewDialogState extends State<PdfPreviewDialog> {
               onZoomIn:    _zoomIn,
               onZoomOut:   _zoomOut,
               onResetZoom: _resetZoom,
+                onSavePdf:   _savePdf,
               onPrint:     _print,
               onClose: () => Navigator.pop(context),
             ),
@@ -134,6 +170,7 @@ class _DialogHeader extends StatelessWidget {
   final VoidCallback onZoomIn;
   final VoidCallback onZoomOut;
   final VoidCallback onResetZoom;
+  final VoidCallback onSavePdf;
   final VoidCallback onPrint;
   final VoidCallback onClose;
 
@@ -145,6 +182,7 @@ class _DialogHeader extends StatelessWidget {
     required this.onZoomIn,
     required this.onZoomOut,
     required this.onResetZoom,
+    required this.onSavePdf,
     required this.onPrint,
     required this.onClose,
   });
@@ -203,6 +241,14 @@ class _DialogHeader extends StatelessWidget {
             onTap: scale >= maxScale ? null : onZoomIn,
           ),
           const SizedBox(width: 8),
+          // Save PDF
+          PdfZoomButton(
+            icon: Icons.download,
+            tooltip: 'บันทึก PDF',
+            onTap: onSavePdf,
+            color: const Color(0xFF80CBC4),
+          ),
+          const SizedBox(width: 4),
           // Print
           PdfZoomButton(
             icon: Icons.print,

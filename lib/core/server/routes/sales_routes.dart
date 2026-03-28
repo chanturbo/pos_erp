@@ -102,6 +102,7 @@ class SalesRoutes {
             'payment_type': order.paymentType,
             'paid_amount': order.paidAmount,
             'change_amount': order.changeAmount,
+            'points_used': order.pointsUsed,
             'status': order.status,
             'items': items
                 .map(
@@ -241,6 +242,7 @@ class SalesRoutes {
                 couponCodes: Value(data['coupon_codes'] != null
                     ? jsonEncode(data['coupon_codes'])
                     : null),
+                pointsUsed: Value((data['points_used'] as num?)?.toInt() ?? 0),
                 amountBeforeVat: Value((data['amount_before_vat'] as num?)?.toDouble() ?? 0),
                 vatAmount: Value((data['vat_amount'] as num?)?.toDouble() ?? 0),
                 totalAmount: Value((data['total_amount'] as num?)?.toDouble() ?? 0),
@@ -305,35 +307,78 @@ class SalesRoutes {
 
       print('✅ Transaction committed: $orderNo');
 
-      // ✅ คำนวณและ update loyalty points (นอก transaction เพราะไม่ต้อง rollback)
+      // ✅ จัดการ loyalty points (นอก transaction เพราะไม่ต้อง rollback)
       final customerId = data['customer_id'] as String?;
       final totalAmount = (data['total_amount'] as num?)?.toDouble() ?? 0;
+      // ✅ ใช้ (as num?)?.toInt() ป้องกัน TypeError ถ้า JSON decode เป็น num
+      final pointsUsed = (data['points_used'] as num?)?.toInt() ?? 0;
       int earnedPoints = 0;
 
       if (customerId != null &&
           customerId != 'WALK_IN' &&
-          customerId.isNotEmpty &&
-          totalAmount > 0) {
+          customerId.isNotEmpty) {
         final customer = await (db.select(db.customers)
               ..where((t) => t.customerId.equals(customerId)))
             .getSingleOrNull();
 
-        // ✅ ได้แต้มเฉพาะลูกค้าที่มี memberNo เท่านั้น
-        if (customer != null && customer.memberNo != null) {
-          // pointsPerBaht = 100 (ทุก 100 บาท ได้ 1 แต้ม)
-          // TODO: ดึงจาก system_settings table เมื่อมีในอนาคต
-          const double pointsPerBaht = 100.0;
-          earnedPoints = (totalAmount / pointsPerBaht).floor();
+        if (customer != null) {
+          var currentPoints = customer.points;
 
-          if (earnedPoints > 0) {
-            final newPoints = customer.points + earnedPoints;
+          // ── หักแต้มที่ใช้แลก (ไม่ต้องมี memberNo — ใครมีแต้มก็แลกได้) ──
+          if (pointsUsed > 0 && currentPoints >= pointsUsed) {
+            currentPoints -= pointsUsed;
+            try {
+              await db.into(db.pointsTransactions).insert(
+                PointsTransactionsCompanion(
+                  transactionId: Value('PTX-RDM-$ts'),
+                  customerId:    Value(customerId),
+                  type:          const Value('REDEEM'),
+                  points:        Value(pointsUsed),
+                  referenceNo:   Value(orderNo),
+                  remark:        Value('แลกแต้มในการขาย $orderNo'),
+                ),
+              );
+            } catch (e) {
+              print('⚠️ Points transaction log failed (REDEEM): $e');
+            }
+            print('🔻 Points redeemed: $customerId -$pointsUsed');
+          }
+
+          // ── บวกแต้มที่ได้รับ (เฉพาะลูกค้าที่มี memberNo) ──────────
+          if (customer.memberNo != null) {
+            const double pointsPerBaht = 100.0;
+            if (totalAmount > 0) {
+              earnedPoints = (totalAmount / pointsPerBaht).floor();
+            }
+            if (earnedPoints > 0) {
+              currentPoints += earnedPoints;
+              try {
+                await db.into(db.pointsTransactions).insert(
+                  PointsTransactionsCompanion(
+                    transactionId: Value('PTX-ERN-$ts'),
+                    customerId:    Value(customerId),
+                    type:          const Value('EARN'),
+                    points:        Value(earnedPoints),
+                    referenceNo:   Value(orderNo),
+                    remark:        Value('สะสมแต้มจากการซื้อ $orderNo'),
+                  ),
+                );
+              } catch (e) {
+                print('⚠️ Points transaction log failed (EARN): $e');
+              }
+              print('⭐ Points earned: $customerId +$earnedPoints');
+            }
+          }
+
+          // ── อัปเดตยอดแต้มในฐานข้อมูล ─────────────────────────────
+          if (pointsUsed > 0 || earnedPoints > 0) {
             await (db.update(db.customers)
                   ..where((t) => t.customerId.equals(customerId)))
                 .write(CustomersCompanion(
-              points: Value(newPoints),
+              points:    Value(currentPoints),
               updatedAt: Value(DateTime.now()),
             ));
-            print('⭐ Points: $customerId +$earnedPoints → $newPoints pts');
+            print('✅ Points balance: $customerId → $currentPoints pts');
           }
         }
       }
@@ -343,9 +388,10 @@ class SalesRoutes {
           'success': true,
           'message': 'สร้างใบขายสำเร็จ',
           'data': {
-            'order_id': orderId,
-            'order_no': orderNo,
-            'earned_points': earnedPoints, // ✅ แจ้ง client ว่าได้กี่แต้ม
+            'order_id':      orderId,
+            'order_no':      orderNo,
+            'earned_points': earnedPoints,
+            'points_used':   pointsUsed,
           },
         }),
         headers: {'Content-Type': 'application/json'},

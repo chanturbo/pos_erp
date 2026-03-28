@@ -73,9 +73,11 @@ class ApiClient {
   String? getToken() => _token;
   
   /// Get with auth
-  Future<Response> get(String path) async {
+  Future<Response> get(String path,
+      {Map<String, dynamic>? queryParameters}) async {
     try {
-      final response = await _dio.get(path);
+      final response =
+          await _dio.get(path, queryParameters: queryParameters);
       return response;
     } on DioException catch (e) {
       print('❌ GET Error: ${e.message}');
@@ -106,9 +108,11 @@ class ApiClient {
   }
   
   /// Delete with auth
-  Future<Response> delete(String path) async {
+  Future<Response> delete(String path,
+      {Map<String, dynamic>? queryParameters}) async {
     try {
-      final response = await _dio.delete(path);
+      final response =
+          await _dio.delete(path, queryParameters: queryParameters);
       return response;
     } on DioException catch (e) {
       print('❌ DELETE Error: ${e.message}');

@@ -220,6 +220,11 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
                           _buildSummaryRow('ส่วนลดคูปอง', -order.couponDiscount,
                               isDiscount: true, isCoupon: true),
                       ],
+                      if (order.pointsUsed > 0)
+                        _buildSummaryRow(
+                            'แลกแต้ม ${order.pointsUsed} pt',
+                            -order.pointsUsed.toDouble(),
+                            isDiscount: true, isPoints: true),
                       const Divider(),
                       _buildSummaryRow('ยอดชำระ', order.totalAmount,
                           isTotal: true),
@@ -463,6 +468,7 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
     bool isTotal = false,
     bool isChange = false,
     bool isCoupon = false,
+    bool isPoints = false,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -476,16 +482,26 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
                     size: 14, color: Colors.deepOrange),
                 const SizedBox(width: 4),
               ],
+              if (isPoints) ...[
+                const Icon(Icons.stars, size: 14, color: Colors.orange),
+                const SizedBox(width: 4),
+              ],
               Text(label,
                   style: TextStyle(
                     fontSize: isTotal ? 18 : 14,
                     fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
-                    color: isCoupon ? Colors.deepOrange : null,
+                    color: isCoupon
+                        ? Colors.deepOrange
+                        : isPoints
+                            ? Colors.orange[700]
+                            : isChange
+                                ? Colors.green[700]
+                                : null,
                   )),
             ],
           ),
           Text(
-            amount != 0 ? '฿${amount.toStringAsFixed(2)}' : '',
+            amount != 0 ? '฿${amount.toStringAsFixed(2)}' : '฿0.00',
             style: TextStyle(
               fontSize: isTotal ? 22 : 14,
               fontWeight:
@@ -493,7 +509,7 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
               color: isDiscount
                   ? Colors.red
                   : isChange
-                      ? Colors.green
+                      ? Colors.green[700]
                       : isTotal
                           ? Colors.blue
                           : null,
@@ -612,6 +628,7 @@ class _OrderReceiptPage extends ConsumerWidget {
             changeAmount: order.changeAmount,
             numFmt:       numFmt,
             earnedPoints: earnedPoints,
+            pointsUsed:   order.pointsUsed,
           ),
         ),
       ),

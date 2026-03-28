@@ -10,6 +10,7 @@ import 'sales_history_pdf_report.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
 import 'package:pos_erp/shared/pdf/pdf_report_button.dart';
 import 'package:pos_erp/shared/widgets/pagination_bar.dart';
+import 'package:pos_erp/features/settings/presentation/pages/settings_page.dart';
 
 // ─────────────────────────────────────────────────────────────────
 // SalesHistoryPage
@@ -40,7 +41,6 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
 
   // ── Pagination ──────────────────────────────────────────────────
   int _currentPage = 1;
-  static const int _pageSize = 20;
 
   // ── Column widths [วันที่, เลขที่, ลูกค้า, ชำระ, ยอด, สถานะ, จัดการ]
   final List<double> _colWidths = [140, 130, 180, 100, 110, 100, 70];
@@ -161,6 +161,7 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
   @override
   Widget build(BuildContext context) {
     final salesAsync = ref.watch(salesHistoryProvider);
+    final pageSize = ref.watch(settingsProvider).listPageSize;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
@@ -208,10 +209,10 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                 if (filtered.isEmpty) return _buildEmpty(orders.isEmpty);
 
                 // Pagination slice
-                final totalPages = (filtered.length / _pageSize).ceil();
+                final totalPages = (filtered.length / pageSize).ceil();
                 final safePage = _currentPage.clamp(1, totalPages);
-                final pageStart = (safePage - 1) * _pageSize;
-                final pageEnd = (pageStart + _pageSize).clamp(0, filtered.length);
+                final pageStart = (safePage - 1) * pageSize;
+                final pageEnd = (pageStart + pageSize).clamp(0, filtered.length);
                 final pageItems = filtered.sublist(pageStart, pageEnd);
 
                 final screenW = MediaQuery.of(context).size.width - 32;
@@ -315,30 +316,24 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                           PaginationBar(
                             currentPage: safePage,
                             totalItems: filtered.length,
-                            pageSize: _pageSize,
+                            pageSize: pageSize,
                             onPageChanged: (p) => setState(() => _currentPage = p),
+                            trailing: PdfReportButton(
+                              emptyMessage: 'ไม่มีข้อมูลการขาย',
+                              title: 'รายงานประวัติการขาย',
+                              filename: () =>
+                                  PdfFilename.generate('sales_history_report'),
+                              buildPdf: () => SalesHistoryPdfBuilder.build(
+                                filtered,
+                                dateFrom: _dateFrom,
+                                dateTo: _dateTo,
+                                paymentFilter: _paymentFilter,
+                                statusFilter: _statusFilter,
+                              ),
+                              hasData: filtered.isNotEmpty,
+                            ),
                           ),
                         ],
-                      ),
-                    ),
-
-                    // ✅ PDF Button — ลอยมุมขวาล่าง เหมือน CustomerListPage
-                    Positioned(
-                      bottom: 24,
-                      right: 24,
-                      child: PdfReportButton(
-                        emptyMessage: 'ไม่มีข้อมูลการขาย',
-                        title: 'รายงานประวัติการขาย',
-                        filename: () =>
-                            PdfFilename.generate('sales_history_report'),
-                        buildPdf: () => SalesHistoryPdfBuilder.build(
-                          filtered,
-                          dateFrom: _dateFrom,
-                          dateTo: _dateTo,
-                          paymentFilter: _paymentFilter,
-                          statusFilter: _statusFilter,
-                        ),
-                        hasData: filtered.isNotEmpty,
                       ),
                     ),
                   ],

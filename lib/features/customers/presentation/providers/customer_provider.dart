@@ -169,21 +169,36 @@ class CustomerListNotifier extends AsyncNotifier<List<CustomerModel>> {
     }
   }
 
-  /// ลบลูกค้า
-  Future<bool> deleteCustomer(String customerId) async {
+  /// ตรวจก่อนลบ — คืน {has_history, has_orders, order_count, has_points}
+  Future<Map<String, dynamic>> checkDeleteCustomer(String customerId) async {
+    try {
+      final api = ref.read(apiClientProvider);
+      final res = await api.get('/api/customers/$customerId/check-delete');
+      if (res.statusCode == 200) {
+        return Map<String, dynamic>.from(res.data as Map);
+      }
+      return {'success': false};
+    } catch (e) {
+      print('❌ Error checking customer delete: $e');
+      return {'success': false, 'message': '$e'};
+    }
+  }
+
+  /// ลบลูกค้า (Soft Delete) — คืนค่า message จาก server หรือ null ถ้าเกิดข้อผิดพลาด
+  Future<String?> deleteCustomer(String customerId) async {
     try {
       final apiClient = ref.read(apiClientProvider);
-      final response =
-          await apiClient.delete('/api/customers/$customerId');
+      final response = await apiClient.delete('/api/customers/$customerId');
 
       if (response.statusCode == 200) {
         await refresh();
-        return true;
+        final data = response.data is Map ? response.data as Map : {};
+        return data['message'] as String? ?? 'ดำเนินการสำเร็จ';
       }
-      return false;
+      return null;
     } catch (e) {
       print('❌ Error deleting customer: $e');
-      return false;
+      return null;
     }
   }
 }

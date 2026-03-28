@@ -57,6 +57,7 @@ part 'app_database.g.dart';
     // Customers & Suppliers
     CustomerGroups,
     Customers,
+    PointsTransactions,
     Suppliers, // ✅ ตรวจสอบว่ามีบรรทัดนี้อยู่แล้ว
     // Sales
     SalesOrders,
@@ -104,7 +105,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration {
@@ -116,6 +117,10 @@ class AppDatabase extends _$AppDatabase {
         if (from < 2) {
           await m.addColumn(salesOrders, salesOrders.couponDiscount);
           await m.addColumn(salesOrders, salesOrders.couponCodes);
+        }
+        if (from < 3) {
+          await m.addColumn(salesOrders, salesOrders.pointsUsed);
+          await m.createTable(pointsTransactions);
         }
       },
     );

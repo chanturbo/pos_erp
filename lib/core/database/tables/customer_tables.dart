@@ -55,6 +55,25 @@ class Customers extends Table {
 }
 
 // ========================================
+// POINTS TRANSACTIONS
+// ========================================
+@DataClassName('PointsTransaction')
+class PointsTransactions extends Table {
+  TextColumn get transactionId => text()();
+  TextColumn get customerId =>
+      text().references(Customers, #customerId)();
+  TextColumn get type => text()(); // 'EARN' | 'REDEEM'
+  IntColumn get points => integer()(); // always positive
+  TextColumn get referenceNo => text().nullable()();
+  TextColumn get remark => text().nullable()();
+  DateTimeColumn get createdAt =>
+      dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column> get primaryKey => {transactionId};
+}
+
+// ========================================
 // SUPPLIERS
 // ========================================
 @DataClassName('Supplier')

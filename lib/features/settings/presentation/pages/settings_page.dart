@@ -28,6 +28,8 @@ class SettingsState {
   final String promptPayId;
   // ✅ POS View Mode
   final String posProductViewMode; // 'list' | 'grid'
+  // ✅ List Page Size
+  final int listPageSize;
 
   SettingsState({
     this.companyName          = 'บริษัท ทดสอบ POS จำกัด',
@@ -43,6 +45,7 @@ class SettingsState {
     this.pointValue           = 1.0,
     this.promptPayId          = '',
     this.posProductViewMode   = 'list',
+    this.listPageSize         = 50,
   });
 
   SettingsState copyWith({
@@ -59,6 +62,7 @@ class SettingsState {
     double? pointValue,
     String? promptPayId,
     String? posProductViewMode,
+    int?    listPageSize,
   }) {
     return SettingsState(
       companyName:         companyName         ?? this.companyName,
@@ -74,6 +78,7 @@ class SettingsState {
       pointValue:          pointValue          ?? this.pointValue,
       promptPayId:         promptPayId         ?? this.promptPayId,
       posProductViewMode:  posProductViewMode  ?? this.posProductViewMode,
+      listPageSize:        listPageSize        ?? this.listPageSize,
     );
   }
 }
@@ -106,6 +111,7 @@ class SettingsNotifier extends Notifier<SettingsState> {
       pointValue:          prefs.getDouble('point_value')          ?? state.pointValue,
       promptPayId:         prefs.getString('promptpay_id')         ?? state.promptPayId,
       posProductViewMode:  prefs.getString('pos_product_view_mode') ?? state.posProductViewMode,
+      listPageSize:        prefs.getInt('list_page_size')           ?? state.listPageSize,
     );
   }
 
@@ -155,6 +161,13 @@ class SettingsNotifier extends Notifier<SettingsState> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('pos_product_view_mode', mode);
     state = state.copyWith(posProductViewMode: mode);
+  }
+
+  // ✅ List Page Size
+  Future<void> updateListPageSize(int size) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('list_page_size', size);
+    state = state.copyWith(listPageSize: size);
   }
 
   // ✅ Loyalty Points
@@ -301,6 +314,17 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   const SizedBox(height: 16),
 
                   // ══════════════════════════════════════════
+                  // 📋 การแสดงรายการข้อมูล
+                  // ══════════════════════════════════════════
+                  _SectionCard(
+                    title: 'การแสดงรายการข้อมูล',
+                    icon: Icons.format_list_numbered_outlined,
+                    isDark: isDark,
+                    child: _buildListDisplaySection(settings, isDark),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // ══════════════════════════════════════════
                   // 🛒 ตั้งค่าหน้าขาย
                   // ══════════════════════════════════════════
                   _SectionCard(
@@ -436,6 +460,68 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   // ─────────────────────────────────────────────────────────────
   // POS Section
   // ─────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────
+  // List Display Section
+  // ─────────────────────────────────────────────────────────────
+  Widget _buildListDisplaySection(SettingsState settings, bool isDark) {
+    const presets = [10, 20, 50, 100];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'จำนวนรายการต่อหน้า',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: isDark ? Colors.white : Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'ใช้กับทุกหน้าที่แสดงรายการ เช่น สินค้า ลูกค้า ประวัติการขาย สต๊อก',
+          style: TextStyle(
+            fontSize: 12,
+            color: isDark ? Colors.white54 : AppTheme.textSub,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: presets.map((size) {
+            final selected = settings.listPageSize == size;
+            return ChoiceChip(
+              label: Text('$size รายการ'),
+              selected: selected,
+              selectedColor: AppTheme.primary.withValues(alpha: 0.12),
+              checkmarkColor: AppTheme.primary,
+              labelStyle: TextStyle(
+                fontSize: 13,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+                color: selected
+                    ? AppTheme.primary
+                    : (isDark ? Colors.white70 : AppTheme.textSub),
+              ),
+              side: BorderSide(
+                color: selected
+                    ? AppTheme.primary
+                    : (isDark ? Colors.white24 : AppTheme.border),
+              ),
+              backgroundColor:
+                  isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF5F5F5),
+              onSelected: (_) async {
+                await ref
+                    .read(settingsProvider.notifier)
+                    .updateListPageSize(size);
+                if (mounted) _showSuccess('บันทึกการตั้งค่าแล้ว');
+              },
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
   Widget _buildPosSection(SettingsState settings, bool isDark) {
     final isGrid = settings.posProductViewMode == 'grid';
     return Column(

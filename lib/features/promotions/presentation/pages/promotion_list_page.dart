@@ -6,6 +6,8 @@ import '../../data/models/promotion_model.dart';
 import 'promotion_form_page.dart';
 import 'coupon_list_page.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
+import 'package:pos_erp/shared/widgets/pagination_bar.dart';
+import 'package:pos_erp/features/settings/presentation/pages/settings_page.dart';
 
 class PromotionListPage extends ConsumerStatefulWidget {
   const PromotionListPage({super.key});
@@ -18,6 +20,7 @@ class _PromotionListPageState extends ConsumerState<PromotionListPage> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
   String _filter = 'ALL'; // ALL, ACTIVE, UPCOMING, EXPIRED, INACTIVE
+  int _currentPage = 1;
 
   final _fmt = NumberFormat('#,##0.00', 'th_TH');
   final _dateFmt = DateFormat('dd/MM/yyyy', 'th_TH');
@@ -61,6 +64,7 @@ class _PromotionListPageState extends ConsumerState<PromotionListPage> {
     setState(() {
       _searchQuery = '';
       _filter = 'ALL';
+      _currentPage = 1;
     });
   }
 
@@ -91,138 +95,111 @@ class _PromotionListPageState extends ConsumerState<PromotionListPage> {
   @override
   Widget build(BuildContext context) {
     final promotionsAsync = ref.watch(promotionListProvider);
+    final pageSize = ref.watch(settingsProvider).listPageSize;
 
     void openCoupon() => Navigator.push(
           context, MaterialPageRoute(builder: (_) => const CouponListPage()));
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
-      body: Stack(
+      body: Column(
         children: [
-          // ── Main content ────────────────────────────────────────
-          Column(
-            children: [
-              // ── Top Bar ───────────────────────────────────────
-              _TopBar(
-                searchController: _searchController,
-                searchQuery: _searchQuery,
-                hasFilter: _hasFilter,
-                onSearchChanged: (v) => setState(() => _searchQuery = v),
-                onSearchCleared: () {
-                  _searchController.clear();
-                  setState(() => _searchQuery = '');
-                },
-                onRefresh: () =>
-                    ref.read(promotionListProvider.notifier).refresh(),
-                onClearFilter: _hasFilter ? _clearFilters : null,
-              ),
-
-              // ── Filter Bar ────────────────────────────────────
-              _FilterBar(
-                filter: _filter,
-                onFilterChanged: (v) => setState(() => _filter = v),
-              ),
-
-              // ── Body ──────────────────────────────────────────
-              Expanded(
-                child: promotionsAsync.when(
-                  loading: () => const Center(
-                    child:
-                        CircularProgressIndicator(color: AppTheme.primary),
-                  ),
-                  error: (e, _) => _buildError(e),
-                  data: (promotions) {
-                    final filtered = _applyFilter(promotions);
-                    final summary = _calcSummary(promotions);
-
-                    if (filtered.isEmpty) return _buildEmpty(promotions.isEmpty);
-
-                    return Container(
-                      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppTheme.border),
-                      ),
-                      child: Column(
-                        children: [
-                          // ── Summary Bar ────────────────
-                          _SummaryBar(summary: summary),
-                          const Divider(height: 1, color: AppTheme.border),
-
-                          // ── List ───────────────────────
-                          Expanded(
-                            child: ListView.separated(
-                              padding: const EdgeInsets.only(bottom: 96),
-                              itemCount: filtered.length,
-                              separatorBuilder: (_, _) => const Divider(
-                                  height: 1, color: AppTheme.border),
-                              itemBuilder: (ctx, i) => _PromotionRow(
-                                promotion: filtered[i],
-                                fmt: _fmt,
-                                dateFmt: _dateFmt,
-                                onEdit: () => _openForm(filtered[i]),
-                                onToggle: () => _toggleActive(filtered[i]),
-                                onDelete: () => _confirmDelete(filtered[i]),
-                              ),
-                            ),
-                          ),
-
-                          // ── Footer ─────────────────────
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 10),
-                            decoration: const BoxDecoration(
-                              color: AppTheme.headerBg,
-                              borderRadius: BorderRadius.only(
-                                bottomLeft: Radius.circular(12),
-                                bottomRight: Radius.circular(12),
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Text(
-                                  'แสดง ${filtered.length} จาก ${promotions.length} รายการ',
-                                  style: const TextStyle(
-                                      fontSize: 12, color: AppTheme.textSub),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
+          // ── Top Bar ─────────────────────────────────────────
+          _TopBar(
+            searchController: _searchController,
+            searchQuery: _searchQuery,
+            hasFilter: _hasFilter,
+            onSearchChanged: (v) => setState(() {
+              _searchQuery = v;
+              _currentPage = 1;
+            }),
+            onSearchCleared: () {
+              _searchController.clear();
+              setState(() {
+                _searchQuery = '';
+                _currentPage = 1;
+              });
+            },
+            onRefresh: () =>
+                ref.read(promotionListProvider.notifier).refresh(),
+            onClearFilter: _hasFilter ? _clearFilters : null,
           ),
 
-          // ── Dual FAB ──────────────────────────────────────────
-          Positioned(
-            bottom: 24,
-            right: 24,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                FloatingActionButton.extended(
-                  heroTag: 'fab_coupon',
-                  onPressed: openCoupon,
-                  backgroundColor: AppTheme.infoColor,
-                  foregroundColor: Colors.white,
-                  icon: const Icon(Icons.confirmation_number_outlined),
-                  label: const Text('จัดการคูปอง'),
-                ),
-                const SizedBox(width: 12),
-                FloatingActionButton.extended(
-                  heroTag: 'fab_promotion',
-                  onPressed: () => _openForm(null),
-                  backgroundColor: AppTheme.primaryColor,
-                  foregroundColor: Colors.white,
-                  icon: const Icon(Icons.add),
-                  label: const Text('สร้างโปรโมชั่น'),
-                ),
-              ],
+          // ── Filter Bar ──────────────────────────────────────
+          _FilterBar(
+            filter: _filter,
+            onFilterChanged: (v) => setState(() {
+              _filter = v;
+              _currentPage = 1;
+            }),
+          ),
+
+          // ── Body ────────────────────────────────────────────
+          Expanded(
+            child: promotionsAsync.when(
+              loading: () => const Center(
+                child: CircularProgressIndicator(color: AppTheme.primary),
+              ),
+              error: (e, _) => _buildError(e),
+              data: (promotions) {
+                final filtered = _applyFilter(promotions);
+                final summary = _calcSummary(promotions);
+
+                final totalFiltered = filtered.length;
+                final totalPages =
+                    totalFiltered == 0 ? 1 : (totalFiltered / pageSize).ceil();
+                final page = _currentPage.clamp(1, totalPages);
+                final pageStart = (page - 1) * pageSize;
+                final pageEnd = (pageStart + pageSize).clamp(0, totalFiltered);
+                final pageItems = totalFiltered == 0
+                    ? <PromotionModel>[]
+                    : filtered.sublist(pageStart, pageEnd);
+
+                if (filtered.isEmpty) return _buildEmpty(promotions.isEmpty, openCoupon);
+
+                return Container(
+                  margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppTheme.border),
+                  ),
+                  child: Column(
+                    children: [
+                      // ── Summary Bar ──────────────────
+                      _SummaryBar(summary: summary),
+                      const Divider(height: 1, color: AppTheme.border),
+
+                      // ── List ─────────────────────────
+                      Expanded(
+                        child: ListView.separated(
+                          padding: EdgeInsets.zero,
+                          itemCount: pageItems.length,
+                          separatorBuilder: (_, _) => const Divider(
+                              height: 1, color: AppTheme.border),
+                          itemBuilder: (ctx, i) => _PromotionRow(
+                            promotion: pageItems[i],
+                            fmt: _fmt,
+                            dateFmt: _dateFmt,
+                            onEdit: () => _openForm(pageItems[i]),
+                            onToggle: () => _toggleActive(pageItems[i]),
+                            onDelete: () => _confirmDelete(pageItems[i]),
+                          ),
+                        ),
+                      ),
+
+                      // ── Footer / Pagination ──────────
+                      PaginationBar(
+                        currentPage: page,
+                        totalItems: totalFiltered,
+                        pageSize: pageSize,
+                        onPageChanged: (p) => setState(() => _currentPage = p),
+                        trailing: _buildFooterBtns(openCoupon),
+                      ),
+                    ],
+                  ),
+                );
+              },
             ),
           ),
         ],
@@ -230,36 +207,72 @@ class _PromotionListPageState extends ConsumerState<PromotionListPage> {
     );
   }
 
-  Widget _buildEmpty(bool noData) {
-    return Center(
+  Widget _buildEmpty(bool noData, VoidCallback openCoupon) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.border),
+      ),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.local_offer_outlined,
-              size: 80, color: Colors.grey.withValues(alpha: 0.4)),
-          const SizedBox(height: 16),
-          Text(
-            noData ? 'ยังไม่มีโปรโมชั่น' : 'ไม่พบโปรโมชั่นที่ตรงกับเงื่อนไข',
-            style: const TextStyle(fontSize: 15, color: AppTheme.textSub),
+          Expanded(
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.local_offer_outlined,
+                      size: 80, color: Colors.grey.withValues(alpha: 0.4)),
+                  const SizedBox(height: 16),
+                  Text(
+                    noData ? 'ยังไม่มีโปรโมชั่น' : 'ไม่พบโปรโมชั่นที่ตรงกับเงื่อนไข',
+                    style: const TextStyle(fontSize: 15, color: AppTheme.textSub),
+                  ),
+                  if (_hasFilter) ...[
+                    const SizedBox(height: 12),
+                    TextButton.icon(
+                      onPressed: _clearFilters,
+                      icon: const Icon(Icons.filter_alt_off, size: 16),
+                      label: const Text('ล้างตัวกรอง'),
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ),
-          if (_hasFilter) ...[
-            const SizedBox(height: 12),
-            TextButton.icon(
-              onPressed: _clearFilters,
-              icon: const Icon(Icons.filter_alt_off, size: 16),
-              label: const Text('ล้างตัวกรอง'),
-            ),
-          ] else ...[
-            const SizedBox(height: 12),
-            ElevatedButton.icon(
-              onPressed: () => _openForm(null),
-              icon: const Icon(Icons.add),
-              label: const Text('สร้างโปรโมชั่น'),
-              style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primaryColor,
-                  foregroundColor: Colors.white),
-            ),
-          ],
+          PaginationBar(
+            currentPage: 1,
+            totalItems: 0,
+            pageSize: ref.read(settingsProvider).listPageSize,
+            onPageChanged: (_) {},
+            trailing: _buildFooterBtns(openCoupon),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFooterBtns(VoidCallback openCoupon) {
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _PromoFooterBtn(
+            icon: Icons.confirmation_number_outlined,
+            label: 'จัดการคูปอง',
+            color: AppTheme.infoColor,
+            filled: true,
+            onTap: openCoupon,
+          ),
+          const SizedBox(width: 6),
+          _PromoFooterBtn(
+            icon: Icons.add,
+            label: 'สร้างโปรโมชั่น',
+            color: AppTheme.primaryColor,
+            filled: true,
+            onTap: () => _openForm(null),
+          ),
         ],
       ),
     );
@@ -305,22 +318,142 @@ class _PromotionListPageState extends ConsumerState<PromotionListPage> {
         content: Text('ต้องการลบโปรโมชั่น "${p.promotionName}" ใช่หรือไม่?'),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('ยกเลิก')),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('ยกเลิก'),
+          ),
           TextButton(
             onPressed: () async {
               Navigator.pop(ctx);
-              await ref
-                  .read(promotionListProvider.notifier)
-                  .deletePromotion(p.promotionId);
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('ลบโปรโมชั่นแล้ว')),
-                );
-              }
+              await _performDelete(p);
             },
             child: const Text('ลบ',
                 style: TextStyle(color: AppTheme.errorColor)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _performDelete(PromotionModel p,
+      {bool forceDeleteCoupons = false}) async {
+    if (!mounted) return;
+
+    final result = await ref
+        .read(promotionListProvider.notifier)
+        .deletePromotion(p.promotionId,
+            forceDeleteCoupons: forceDeleteCoupons);
+
+    if (!mounted) return;
+    final code = result['code'] as String?;
+
+    if (result['success'] == true) {
+      final cancelled = (result['coupons_cancelled'] as int?) ?? 0;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(cancelled > 0
+            ? 'ลบโปรโมชั่นแล้ว (ยกเลิกคูปอง $cancelled ใบ)'
+            : 'ลบโปรโมชั่นแล้ว'),
+      ));
+      return;
+    }
+
+    if (code == 'HAS_ORDERS') {
+      final orderCount = (result['order_count'] as int?) ?? 0;
+      final usedCoupons = (result['used_coupon_count'] as int?) ?? 0;
+      _showBlockedDialog(p, orderCount, usedCoupons);
+      return;
+    }
+
+    if (code == 'HAS_UNUSED_COUPONS') {
+      final couponCount = (result['coupon_count'] as int?) ?? 0;
+      _showUnusedCouponsDialog(p, couponCount);
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text('เกิดข้อผิดพลาด: ${result['message'] ?? 'ไม่ทราบสาเหตุ'}'),
+    ));
+  }
+
+  void _showBlockedDialog(
+      PromotionModel p, int orderCount, int usedCouponCount) {
+    final detail = [
+      if (orderCount > 0) 'ออเดอร์ $orderCount รายการ',
+      if (usedCouponCount > 0) 'คูปองที่ใช้แล้ว $usedCouponCount ใบ',
+    ].join(' และ ');
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(children: [
+          const Icon(Icons.block, color: AppTheme.errorColor, size: 20),
+          const SizedBox(width: 8),
+          const Text('ไม่สามารถลบได้'),
+        ]),
+        content: Text(
+          'โปรโมชั่น "${p.promotionName}" ถูกใช้งานแล้วใน $detail\n\n'
+          'ต้องการปิดการใช้งานแทนหรือไม่?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('ยกเลิก'),
+          ),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.pause_circle_outline, size: 16),
+            label: const Text('ปิดการใช้งาน'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.warningColor,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              if (p.isActive) {
+                await ref
+                    .read(promotionListProvider.notifier)
+                    .updatePromotion(p.copyWith(isActive: false));
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('ปิดการใช้งานโปรโมชั่นแล้ว')),
+                  );
+                }
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showUnusedCouponsDialog(PromotionModel p, int couponCount) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(children: [
+          const Icon(Icons.confirmation_number_outlined,
+              color: AppTheme.warningColor, size: 20),
+          const SizedBox(width: 8),
+          const Text('มีคูปองที่ยังไม่ได้ใช้'),
+        ]),
+        content: Text(
+          'โปรโมชั่น "${p.promotionName}" มีคูปองที่ยังไม่ถูกใช้อีก $couponCount ใบ\n\n'
+          'ต้องการยกเลิกคูปองทั้งหมดและลบโปรโมชั่นนี้ด้วยหรือไม่?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('ยกเลิก'),
+          ),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.delete_forever_outlined, size: 16),
+            label: Text('ยกเลิกคูปอง $couponCount ใบ และลบ'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.errorColor,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await _performDelete(p, forceDeleteCoupons: true);
+            },
           ),
         ],
       ),
@@ -460,9 +593,10 @@ class _FilterBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      padding: const EdgeInsets.only(bottom: 12),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(
           children: _items.map((item) {
             final value = item.$1;
@@ -817,6 +951,56 @@ class _PromotionRow extends StatelessWidget {
                   onTap: onDelete,
                 ),
               ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Footer Button (จัดการคูปอง / สร้างโปรโมชั่น)
+// ─────────────────────────────────────────────────────────────────
+class _PromoFooterBtn extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final bool filled;
+  final VoidCallback onTap;
+
+  const _PromoFooterBtn({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+    this.filled = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+        decoration: BoxDecoration(
+          color: filled ? color : Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: filled ? color : AppTheme.border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 15, color: filled ? Colors.white : color),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: filled ? Colors.white : color,
+              ),
             ),
           ],
         ),
