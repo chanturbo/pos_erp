@@ -8,6 +8,7 @@ import '../../../products/presentation/providers/product_provider.dart'; // ✅ 
 import '../../../../shared/services/mobile_scanner_service.dart';        // ✅ MobileScannerService
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/responsive_utils.dart';
+import '../../../../shared/widgets/cart_toast.dart';
 
 // ── OAG Tokens ────────────────────────────────────────────────────
 const _navy    = AppTheme.navyColor;
@@ -254,16 +255,10 @@ class _ScanRowState extends ConsumerState<_ScanRow> {
     _focusNode.requestFocus();
 
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Row(children: [
-          const Icon(Icons.check_circle, color: Colors.white, size: 16),
-          const SizedBox(width: 8),
-          Expanded(child: Text('เพิ่ม ${match.productName} แล้ว')),
-        ]),
-        backgroundColor: AppTheme.successColor,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(milliseconds: 800),
-      ));
+      ref.read(cartToastProvider.notifier).show(
+        'เพิ่ม ${match.productName} แล้ว',
+        duration: const Duration(milliseconds: 1200),
+      );
     }
   }
 
@@ -283,16 +278,12 @@ class _ScanRowState extends ConsumerState<_ScanRow> {
   // ── กรณีไม่พบสินค้า ──────────────────────────────────────────
   void _notFound(BuildContext context, String barcode) {
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Row(children: [
-        const Icon(Icons.search_off, color: Colors.white, size: 16),
-        const SizedBox(width: 8),
-        Expanded(child: Text('ไม่พบสินค้า: $barcode')),
-      ]),
+    ref.read(cartToastProvider.notifier).show(
+      'ไม่พบสินค้า: $barcode',
       backgroundColor: AppTheme.errorColor,
-      behavior: SnackBarBehavior.floating,
+      icon: Icons.search_off,
       duration: const Duration(seconds: 2),
-    ));
+    );
   }
 
   @override

@@ -1,7 +1,7 @@
 // lib/shared/pdf/pdf_preview_dialog.dart
 //
 // Shared PDF Preview Dialog — ใช้ร่วมกันได้ทุก module
-// รองรับ pinch-to-zoom, zoom buttons (+/-), zoom reset, ปิด dialog
+// รองรับ pinch-to-zoom, zoom buttons (+/-), zoom reset, ปริ้น, ปิด dialog
 
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
@@ -44,6 +44,13 @@ class _PdfPreviewDialogState extends State<PdfPreviewDialog> {
   void _zoomOut()   => _applyScale((_scale - _scaleStep).clamp(_minScale, _maxScale));
   void _resetZoom() => _applyScale(1.0);
 
+  Future<void> _print() async {
+    await Printing.layoutPdf(
+      onLayout: (_) async => widget.bytes,
+      name: widget.filename,
+    );
+  }
+
   void _applyScale(double newScale) {
     final center = _transform.value.getTranslation();
     _transform.value = Matrix4.identity()
@@ -76,6 +83,7 @@ class _PdfPreviewDialogState extends State<PdfPreviewDialog> {
               onZoomIn:    _zoomIn,
               onZoomOut:   _zoomOut,
               onResetZoom: _resetZoom,
+              onPrint:     _print,
               onClose: () => Navigator.pop(context),
             ),
 
@@ -126,6 +134,7 @@ class _DialogHeader extends StatelessWidget {
   final VoidCallback onZoomIn;
   final VoidCallback onZoomOut;
   final VoidCallback onResetZoom;
+  final VoidCallback onPrint;
   final VoidCallback onClose;
 
   const _DialogHeader({
@@ -136,6 +145,7 @@ class _DialogHeader extends StatelessWidget {
     required this.onZoomIn,
     required this.onZoomOut,
     required this.onResetZoom,
+    required this.onPrint,
     required this.onClose,
   });
 
@@ -193,6 +203,14 @@ class _DialogHeader extends StatelessWidget {
             onTap: scale >= maxScale ? null : onZoomIn,
           ),
           const SizedBox(width: 8),
+          // Print
+          PdfZoomButton(
+            icon: Icons.print,
+            tooltip: 'พิมพ์',
+            onTap: onPrint,
+            color: Colors.white,
+          ),
+          const SizedBox(width: 4),
           // Close
           PdfZoomButton(
             icon: Icons.close,

@@ -14,6 +14,7 @@ import '../../../../shared/widgets/barcode_listener.dart';        // ✅ USB Sca
 import '../../../../shared/theme/app_theme.dart';
 
 import '../../../../shared/utils/responsive_utils.dart';           // ✅ Responsive
+import '../../../../shared/widgets/cart_toast.dart';
 
 
 
@@ -418,9 +419,14 @@ class _PosPageState extends ConsumerState<PosPage> {
           ),
 
           // ── Body ─────────────────────────────────────────────
-          body: isCompact
-              ? _buildCompactBody(cartState)
-              : _buildDesktopBody(productAsync, cartState),
+          body: Stack(
+            children: [
+              isCompact
+                  ? _buildCompactBody(cartState)
+                  : _buildDesktopBody(productAsync, cartState),
+              const CartToastOverlay(),
+            ],
+          ),
         ),
       ),
     );

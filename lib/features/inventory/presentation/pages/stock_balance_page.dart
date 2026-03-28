@@ -124,10 +124,8 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
     final stockAsync = ref.watch(stockBalanceProvider);
     final settings   = ref.watch(settingsProvider);
 
-    final isDark = AppTheme.isDark(context);
-
     return Scaffold(
-      backgroundColor: isDark ? AppTheme.darkBg : const Color(0xFFF5F5F5),
+      backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
         title: const Text('สต๊อกคงเหลือ'),
         actions: [
@@ -246,14 +244,14 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
                     Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 10),
-                      color: AppTheme.cardColor(context),
+                      color: Colors.white,
                       child: Row(
                         children: [
                           Text(
                             'แสดง ${filtered.length} จาก ${stocks.length} รายการ',
-                            style: TextStyle(
+                            style: const TextStyle(
                                 fontSize: 12,
-                                color: AppTheme.subtextColorOf(context)),
+                                color: Color(0xFF8A8A8A)),
                           ),
                         ],
                       ),
@@ -272,14 +270,13 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
   // Toolbar: Search + Warehouse dropdown + Summary
   // ─────────────────────────────────────────────────────────────
   Widget _buildToolbar(AsyncValue stockAsync, settings) {
-    final isDark   = AppTheme.isDark(context);
-    final subColor = AppTheme.subtextColorOf(context);
-    final bdColor  = AppTheme.borderColorOf(context);
-    final fillClr  = AppTheme.surfaceColorOf(context);
-    final txtColor = isDark ? const Color(0xFFE0E0E0) : const Color(0xFF1A1A1A);
+    const subColor = Color(0xFF8A8A8A);
+    const bdColor  = Color(0xFFE0E0E0);
+    const fillClr  = Colors.white;
+    const txtColor = Color(0xFF1A1A1A);
 
     return Container(
-      color: AppTheme.cardColor(context),
+      color: Colors.white,
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       child: Column(
         children: [
@@ -339,7 +336,7 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
                   child: DropdownButton<String>(
                     value: _selectedWarehouse,
                     isDense: true,
-                    dropdownColor: AppTheme.cardColor(context),
+                    dropdownColor: Colors.white,
                     style: TextStyle(fontSize: 14, color: txtColor),
                     items: const [
                       DropdownMenuItem(
@@ -461,8 +458,7 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
   Widget _buildCardView(List<StockBalanceModel> stocks, settings) {
     final int threshold = settings.lowStockThreshold;
     final bool alertOn  = settings.enableLowStockAlert;
-    final isDark        = AppTheme.isDark(context);
-    final nameClr       = isDark ? const Color(0xFFE0E0E0) : const Color(0xFF1A1A1A);
+    const nameClr       = Color(0xFF1A1A1A);
 
     final avatarColors = [
       AppTheme.primary, AppTheme.info, AppTheme.success,
@@ -481,12 +477,8 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
             : '?';
         final avatarColor =
             avatarColors[s.productName.codeUnitAt(0) % avatarColors.length];
-        final cardBg = isLow
-            ? (isDark ? const Color(0xFF3A2E00) : const Color(0xFFFFFDE7))
-            : AppTheme.cardColor(context);
-        final borderClr = isLow
-            ? _warning
-            : AppTheme.borderColorOf(context);
+        final cardBg    = isLow ? const Color(0xFFFFFDE7) : Colors.white;
+        final borderClr = isLow ? _warning : const Color(0xFFE0E0E0);
 
         return Card(
           elevation: 0,
@@ -775,15 +767,14 @@ class _StockTableRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark    = AppTheme.isDark(context);
-    final nameColor = isDark ? const Color(0xFFE0E0E0) : const Color(0xFF1A1A1A);
-    final codeColor = isDark ? const Color(0xFF9E9E9E) : const Color(0xFF555555);
-    final whColor   = isDark ? const Color(0xFF9E9E9E) : const Color(0xFF666666);
-    final unitColor = isDark ? const Color(0xFFE0E0E0) : const Color(0xFF1A1A1A);
-    final noColor   = isDark ? const Color(0xFF666666) : const Color(0xFFBBBBBB);
-    final evenBg    = isDark ? AppTheme.darkCard    : Colors.white;
-    final oddBg     = isDark ? AppTheme.darkElement : const Color(0xFFF9F9F7);
-    final lowBg     = isDark ? const Color(0xFF2E2000) : const Color(0xFFFFF8E1);
+    const nameColor = Color(0xFF1A1A1A);
+    const codeColor = Color(0xFF555555);
+    const whColor   = Color(0xFF666666);
+    const unitColor = Color(0xFF1A1A1A);
+    const noColor   = Color(0xFFBBBBBB);
+    const evenBg    = Colors.white;
+    const oddBg     = Color(0xFFF9F9F7);
+    const lowBg     = Color(0xFFFFF8E1);
 
     return InkWell(
       onTap: onTap,

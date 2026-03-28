@@ -6,6 +6,7 @@ import '../../../products/data/models/product_model.dart';
 import '../providers/cart_provider.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/responsive_utils.dart';
+import '../../../../shared/widgets/cart_toast.dart';
 
 // ── Color Tokens ──────────────────────────────────────────────────
 const _navy    = AppTheme.navyColor;
@@ -547,22 +548,6 @@ class _ProductGridCard extends ConsumerWidget {
 
   void _addToCart(
       BuildContext context, WidgetRef ref, PriceLookupResult lookup) {
-    // ✅ ถ้า fallback → แจ้ง cashier ก่อนเพิ่ม
-    if (lookup.isFallback) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '⚠ ราคา Lv.${lookup.requestedLevel} ยังไม่ได้ตั้งค่า '
-            '— ใช้ราคาปกติ ฿${lookup.price.toStringAsFixed(2)}',
-          ),
-          backgroundColor: Colors.orange.shade700,
-          duration: const Duration(seconds: 3),
-          behavior: SnackBarBehavior.floating,
-          width: 380,
-        ),
-      );
-    }
-
     ref.read(cartProvider.notifier).addItem(
           productId: product.productId,
           productCode: product.productCode,
@@ -577,15 +562,18 @@ class _ProductGridCard extends ConsumerWidget {
           priceLevel5: product.priceLevel5,
         );
 
-    if (!lookup.isFallback) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('เพิ่ม ${product.productName} แล้ว'),
-          duration: const Duration(milliseconds: 500),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: _success,
-          width: 300,
-        ),
+    if (lookup.isFallback) {
+      ref.read(cartToastProvider.notifier).show(
+        '⚠ ราคา Lv.${lookup.requestedLevel} ยังไม่ได้ตั้งค่า '
+        '— ใช้ราคาปกติ ฿${lookup.price.toStringAsFixed(2)}',
+        backgroundColor: Colors.orange.shade700,
+        icon: Icons.warning_amber_rounded,
+        duration: const Duration(seconds: 3),
+      );
+    } else {
+      ref.read(cartToastProvider.notifier).show(
+        'เพิ่ม ${product.productName} แล้ว',
+        duration: const Duration(milliseconds: 1500),
       );
     }
   }

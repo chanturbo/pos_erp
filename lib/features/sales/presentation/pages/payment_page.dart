@@ -14,6 +14,7 @@ import '../providers/cart_provider.dart';
 import '../providers/sales_provider.dart';
 import '../../../dashboard/presentation/providers/dashboard_provider.dart';
 import '../../../../shared/services/mobile_scanner_service.dart';
+import '../../../../shared/widgets/thermal_receipt.dart';
 
 class PaymentPage extends ConsumerStatefulWidget {
   const PaymentPage({super.key});
@@ -25,6 +26,7 @@ class PaymentPage extends ConsumerStatefulWidget {
 class _PaymentPageState extends ConsumerState<PaymentPage> {
   String _paymentType = 'CASH';
   final TextEditingController _receivedController = TextEditingController();
+  final FocusNode _receivedFocusNode = FocusNode();
   double _receivedAmount = 0;
   bool _isProcessing = false;
 
@@ -39,11 +41,22 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
     final cartState = ref.read(cartProvider);
     _receivedAmount = cartState.total;
     _receivedController.text = cartState.total.toStringAsFixed(2);
+
+    // โฟกัสและเลือกทั้งหมดหลัง frame แรก
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _receivedFocusNode.requestFocus();
+      _receivedController.selection = TextSelection(
+        baseOffset: 0,
+        extentOffset: _receivedController.text.length,
+      );
+    });
   }
 
   @override
   void dispose() {
     _receivedController.dispose();
+    _receivedFocusNode.dispose();
     _couponController.dispose();
     super.dispose();
   }
@@ -300,6 +313,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
 
                     TextField(
                       controller: _receivedController,
+                      focusNode: _receivedFocusNode,
                       keyboardType: TextInputType.number,
                       style: const TextStyle(fontSize: 24),
                       decoration: const InputDecoration(
@@ -1289,25 +1303,34 @@ class ReceiptPage extends ConsumerWidget {
           child: Column(
             children: [
               // ── ใบเสร็จ ─────────────────────────────────────────
-              _ThermalReceipt(
-                companyName:    settings.companyName,
-                address:        settings.address,
-                phone:          settings.phone,
-                taxId:          settings.taxId,
-                orderNo:        orderNo,
-                orderDate:      dateFmt.format(orderDate),
-                customerName:   customerName,
-                items:          items,
-                subtotal:       subtotal,
-                discount:       discount,
-                appliedCoupons: appliedCoupons,
-                total:          total,
-                paymentLabel:   _paymentLabel(paymentType),
-                paymentType:    paymentType,
-                paidAmount:     paidAmount,
-                changeAmount:   changeAmount,
-                earnedPoints:   earnedPoints,
-                numFmt:         numFmt,
+              ThermalReceiptWidget(
+                companyName:  settings.companyName,
+                address:      settings.address,
+                phone:        settings.phone,
+                taxId:        settings.taxId,
+                orderNo:      orderNo,
+                orderDate:    dateFmt.format(orderDate),
+                customerName: customerName,
+                items: items.map((i) => ReceiptItem(
+                      name:      i.productName,
+                      quantity:  i.quantity,
+                      unitPrice: i.unitPrice,
+                      amount:    i.amount,
+                    )).toList(),
+                subtotal:     subtotal,
+                discount:     discount,
+                coupons: appliedCoupons.map((c) => ReceiptCoupon(
+                      code:          c.code,
+                      discount:      c.discount,
+                      promotionName: c.promotionName,
+                    )).toList(),
+                total:        total,
+                paymentLabel: _paymentLabel(paymentType),
+                paymentType:  paymentType,
+                paidAmount:   paidAmount,
+                changeAmount: changeAmount,
+                earnedPoints: earnedPoints,
+                numFmt:       numFmt,
               ),
 
               const SizedBox(height: 32),
@@ -1341,312 +1364,3 @@ class ReceiptPage extends ConsumerWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────
-// _ThermalReceipt — ใบเสร็จ thermal printer style
-// ─────────────────────────────────────────────────────────────────
-class _ThermalReceipt extends StatelessWidget {
-  final String   companyName;
-  final String   address;
-  final String   phone;
-  final String   taxId;
-  final String   orderNo;
-  final String   orderDate;
-  final String?  customerName;
-  final List<CartItem> items;
-  final double   subtotal;
-  final double   discount;
-  final List<AppliedCoupon> appliedCoupons;
-  final double   total;
-  final String   paymentLabel;
-  final String   paymentType;
-  final double   paidAmount;
-  final double   changeAmount;
-  final int      earnedPoints;
-  final NumberFormat numFmt;
-
-  const _ThermalReceipt({
-    required this.companyName,
-    required this.address,
-    required this.phone,
-    required this.taxId,
-    required this.orderNo,
-    required this.orderDate,
-    required this.items,
-    required this.subtotal,
-    required this.discount,
-    required this.total,
-    required this.paymentLabel,
-    required this.paymentType,
-    required this.paidAmount,
-    required this.changeAmount,
-    required this.numFmt,
-    this.customerName,
-    this.appliedCoupons = const [],
-    this.earnedPoints = 0,
-  });
-
-  // ── shared text style ────────────────────────────────────────
-  static const _mono    = TextStyle(fontFamily: 'monospace', fontSize: 13, color: Colors.black87);
-  static const _monoSm  = TextStyle(fontFamily: 'monospace', fontSize: 11, color: Colors.black54);
-  static const _monoBd  = TextStyle(fontFamily: 'monospace', fontSize: 13,
-      fontWeight: FontWeight.bold, color: Colors.black87);
-  static const _monoLg  = TextStyle(fontFamily: 'monospace', fontSize: 18,
-      fontWeight: FontWeight.bold, color: Colors.black);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 340,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(4),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          // ── รอยปรุ ด้านบน ──────────────────────────────────────
-          _PerforatedEdge(top: true),
-
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // ── ข้อมูลร้าน ─────────────────────────────────
-                Text(companyName,
-                    style: const TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black),
-                    textAlign: TextAlign.center),
-                if (address.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(address,
-                      style: _monoSm, textAlign: TextAlign.center),
-                ],
-                if (phone.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text('โทร: $phone', style: _monoSm),
-                ],
-                if (taxId.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text('เลขภาษี: $taxId', style: _monoSm),
-                ],
-
-                _dashed(),
-
-                // ── หัวใบเสร็จ ─────────────────────────────────
-                const Text('ใบเสร็จรับเงิน',
-                    style: TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87)),
-                const SizedBox(height: 6),
-                _row('เลขที่', orderNo),
-                _row('วันที่', orderDate),
-                if (customerName != null && customerName != 'ลูกค้าทั่วไป')
-                  _row('ลูกค้า', customerName!),
-
-                _dashed(),
-
-                // ── รายการสินค้า ────────────────────────────────
-                ...items.map((item) => Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 3),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(item.productName, style: _monoBd,
-                              overflow: TextOverflow.ellipsis),
-                          Row(
-                            mainAxisAlignment:
-                                MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                '  ${item.quantity.toStringAsFixed(0)} x '
-                                '${numFmt.format(item.unitPrice)}',
-                                style: _monoSm,
-                              ),
-                              Text(numFmt.format(item.amount),
-                                  style: _mono),
-                            ],
-                          ),
-                        ],
-                      ),
-                    )),
-
-                _dashed(),
-
-                // ── สรุปยอด ────────────────────────────────────
-                _row('รวม', '฿${numFmt.format(subtotal)}'),
-                if (discount > 0)
-                  _row('ส่วนลด', '-฿${numFmt.format(discount)}',
-                      valueColor: Colors.red[700]),
-                ...appliedCoupons.map((c) => _row(
-                      'คูปอง ${c.code}',
-                      '-฿${numFmt.format(c.discount)}',
-                      valueColor: Colors.red[700],
-                      subLabel: c.promotionName,
-                    )),
-
-                const SizedBox(height: 4),
-                _solidLine(),
-                const SizedBox(height: 4),
-
-                // ยอดชำระ — ใหญ่
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('ยอดชำระ', style: _monoBd),
-                    Text('฿${numFmt.format(total)}', style: _monoLg),
-                  ],
-                ),
-
-                const SizedBox(height: 4),
-                _solidLine(),
-                const SizedBox(height: 6),
-
-                // วิธีชำระ / รับเงิน / ทอน
-                _row('ชำระด้วย', paymentLabel),
-                if (paymentType == 'CASH') ...[
-                  _row('รับเงิน', '฿${numFmt.format(paidAmount)}'),
-                  _row('เงินทอน', '฿${numFmt.format(changeAmount)}',
-                      valueColor: Colors.green[700]),
-                ],
-
-                // แต้มสะสม
-                if (earnedPoints > 0) ...[
-                  _dashed(),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.stars,
-                          size: 14, color: Colors.amber),
-                      const SizedBox(width: 4),
-                      Text('ได้รับ $earnedPoints แต้มสะสม',
-                          style: const TextStyle(
-                              fontFamily: 'monospace',
-                              fontSize: 12,
-                              color: Colors.amber,
-                              fontWeight: FontWeight.w600)),
-                    ],
-                  ),
-                ],
-
-                _dashed(),
-
-                // ── ขอบคุณ ─────────────────────────────────────
-                const SizedBox(height: 4),
-                const Text('ขอบคุณที่ใช้บริการ',
-                    style: TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87)),
-                const Text('(THANK YOU)',
-                    style: TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: 11,
-                        color: Colors.black45)),
-                const Text('โปรดเก็บใบเสร็จไว้เป็นหลักฐาน',
-                    style: TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: 10,
-                        color: Colors.black38)),
-                const SizedBox(height: 4),
-              ],
-            ),
-          ),
-
-          // ── รอยปรุ ด้านล่าง ────────────────────────────────────
-          _PerforatedEdge(top: false),
-        ],
-      ),
-    );
-  }
-
-  // helpers
-  Widget _row(String label, String value, {Color? valueColor, String? subLabel}) =>
-      Padding(
-        padding: const EdgeInsets.symmetric(vertical: 2),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(label, style: _mono),
-                  if (subLabel != null && subLabel.isNotEmpty)
-                    Text(subLabel, style: _monoSm, overflow: TextOverflow.ellipsis),
-                ],
-              ),
-            ),
-            Text(value,
-                style: valueColor != null
-                    ? _mono.copyWith(color: valueColor)
-                    : _mono),
-          ],
-        ),
-      );
-
-  Widget _dashed() => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Row(
-          children: List.generate(
-            38,
-            (_) => Expanded(
-              child: Container(
-                height: 1,
-                color: Colors.grey[300],
-                margin: const EdgeInsets.symmetric(horizontal: 1),
-              ),
-            ),
-          ),
-        ),
-      );
-
-  Widget _solidLine() => Container(height: 1.5, color: Colors.black87);
-}
-
-// ─────────────────────────────────────────────────────────────────
-// _PerforatedEdge — รอยปรุกระดาษ thermal
-// ─────────────────────────────────────────────────────────────────
-class _PerforatedEdge extends StatelessWidget {
-  final bool top;
-  const _PerforatedEdge({required this.top});
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRect(
-      child: SizedBox(
-        height: 12,
-        child: Row(
-          children: List.generate(28, (i) {
-            return Expanded(
-              child: Container(
-                height: 12,
-                margin: EdgeInsets.only(
-                  left: i == 0 ? 0 : 2,
-                  right: i == 27 ? 0 : 0,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEEEEEE),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-              ),
-            );
-          }),
-        ),
-      ),
-    );
-  }
-}

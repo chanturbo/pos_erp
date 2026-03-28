@@ -747,6 +747,7 @@ class _SalesTableHeader extends StatelessWidget {
           // ปุ่ม reset
           Tooltip(
             message: 'รีเซตความกว้างคอลัมน์',
+            waitDuration: const Duration(milliseconds: 600),
             child: InkWell(
               onTap: onReset,
               borderRadius: BorderRadius.circular(4),
@@ -1041,6 +1042,7 @@ class _SalesOrderRowState extends State<_SalesOrderRow> {
                 child: Center(
                   child: Tooltip(
                     message: 'ดูรายละเอียด',
+                    waitDuration: const Duration(milliseconds: 600),
                     child: InkWell(
                       onTap: widget.onTap,
                       borderRadius: BorderRadius.circular(6),
@@ -1321,6 +1323,7 @@ class _RefreshBtn extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Tooltip(
         message: 'รีเฟรช',
+        waitDuration: const Duration(milliseconds: 600),
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(8),
@@ -1345,6 +1348,7 @@ class _ClearFilterBtn extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Tooltip(
         message: 'ล้างตัวกรองทั้งหมด',
+        waitDuration: const Duration(milliseconds: 600),
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(8),
