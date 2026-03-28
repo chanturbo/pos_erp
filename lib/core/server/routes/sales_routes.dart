@@ -94,6 +94,10 @@ class SalesRoutes {
             'customer_name': order.customerName,
             'subtotal': order.subtotal,
             'discount_amount': order.discountAmount,
+            'coupon_discount': order.couponDiscount,
+            'coupon_codes': order.couponCodes != null
+                ? jsonDecode(order.couponCodes!)
+                : null,
             'total_amount': order.totalAmount,
             'payment_type': order.paymentType,
             'paid_amount': order.paidAmount,
@@ -233,6 +237,10 @@ class SalesRoutes {
                 userId: Value(userId),
                 subtotal: Value((data['subtotal'] as num?)?.toDouble() ?? 0),
                 discountAmount: Value((data['discount_amount'] as num?)?.toDouble() ?? 0),
+                couponDiscount: Value((data['coupon_discount'] as num?)?.toDouble() ?? 0),
+                couponCodes: Value(data['coupon_codes'] != null
+                    ? jsonEncode(data['coupon_codes'])
+                    : null),
                 amountBeforeVat: Value((data['amount_before_vat'] as num?)?.toDouble() ?? 0),
                 vatAmount: Value((data['vat_amount'] as num?)?.toDouble() ?? 0),
                 totalAmount: Value((data['total_amount'] as num?)?.toDouble() ?? 0),

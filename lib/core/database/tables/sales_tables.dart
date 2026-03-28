@@ -38,6 +38,10 @@ class SalesOrders extends Table {
   RealColumn get vatAmount => real().withDefault(const Constant(0))();
   RealColumn get totalAmount => real().withDefault(const Constant(0))();
   
+  // Coupon
+  RealColumn get couponDiscount => real().withDefault(const Constant(0))();
+  TextColumn get couponCodes => text().nullable()(); // JSON array e.g. '["CODE1","CODE2"]'
+
   // Payment
   TextColumn get paymentType => text().withDefault(const Constant('CASH'))();
   RealColumn get paidAmount => real().withDefault(const Constant(0))();

@@ -757,7 +757,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
 
         // ✅ คำนวณค่าทั้งหมดก่อน navigate — ป้องกัน ref ถูกเรียกหลัง unmount
         final paidAmount   = _paymentType == 'CASH' ? _receivedAmount : cartState.total;
-        final changeAmount = _paymentType == 'CASH' ? _change : 0.0;
+        final changeAmount = _paymentType == 'CASH' ? _receivedAmount - cartState.total : 0.0;
 
         if (mounted) {
           // ✅ ไปหน้าใบเสร็จแทน dialog

@@ -342,19 +342,25 @@ class PromotionRoutes {
   // ─── GET /coupons ─────────────────────────────────────────────────────────
   Future<Response> _getCouponsHandler(Request request) async {
     try {
-      final coupons = await (db.select(db.coupons)
-            ..orderBy([(c) => OrderingTerm.desc(c.createdAt)]))
-          .get();
+      final results = await db.customSelect(
+        '''
+        SELECT c.*, p.promotion_name
+        FROM coupons c
+        LEFT JOIN promotions p ON c.promotion_id = p.promotion_id
+        ORDER BY c.created_at DESC
+        ''',
+      ).get();
 
-      final data = coupons.map((c) => {
-            'coupon_id': c.couponId,
-            'coupon_code': c.couponCode,
-            'promotion_id': c.promotionId,
-            'is_used': c.isUsed,
-            'used_by': c.usedBy,
-            'used_at': c.usedAt?.toIso8601String(),
-            'expires_at': c.expiresAt?.toIso8601String(),
-            'created_at': c.createdAt.toIso8601String(),
+      final data = results.map((row) => {
+            'coupon_id': row.read<String>('coupon_id'),
+            'coupon_code': row.read<String>('coupon_code'),
+            'promotion_id': row.read<String>('promotion_id'),
+            'promotion_name': row.read<String?>('promotion_name'),
+            'is_used': row.read<bool>('is_used'),
+            'used_by': row.read<String?>('used_by'),
+            'used_at': row.read<String?>('used_at'),
+            'expires_at': row.read<String?>('expires_at'),
+            'created_at': row.read<String>('created_at'),
           }).toList();
 
       return Response.ok(
@@ -377,9 +383,17 @@ class PromotionRoutes {
 
       final count = data['count'] as int? ?? 1;
       final promotionId = data['promotion_id'] as String;
-      final expiresAt = data['expires_at'] != null
-          ? DateTime.parse(data['expires_at'] as String)
-          : null;
+
+      // ถ้าไม่ได้ระบุวันหมดอายุ → ใช้ endDate ของโปรโมชั่นเป็น fallback
+      DateTime? expiresAt;
+      if (data['expires_at'] != null) {
+        expiresAt = DateTime.parse(data['expires_at'] as String);
+      } else {
+        final promo = await (db.select(db.promotions)
+              ..where((p) => p.promotionId.equals(promotionId)))
+            .getSingleOrNull();
+        expiresAt = promo?.endDate;
+      }
 
       final createdCodes = <String>[];
 

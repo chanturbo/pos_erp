@@ -7,6 +7,9 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../providers/promotion_provider.dart';
 import '../../data/models/promotion_model.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
+import 'coupon_pdf_report.dart';
+import 'package:pos_erp/shared/pdf/pdf_report_button.dart';
+import 'package:pos_erp/shared/pdf/pdf_export_service.dart';
 
 class CouponListPage extends ConsumerStatefulWidget {
   const CouponListPage({super.key});
@@ -20,6 +23,52 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
   String _filter = 'ALL'; // ALL, VALID, USED, EXPIRED
   String _searchQuery = '';
   final _dateFmt = DateFormat('dd/MM/yyyy HH:mm', 'th_TH');
+
+  // ── Multi-select ───────────────────────────────────────────────
+  bool _selectionMode = false;
+  final Set<String> _selectedIds = {};
+  CouponPaperSize _batchPaperSize = CouponPaperSize.a6;
+
+  void _enterSelectionMode() =>
+      setState(() { _selectionMode = true; _selectedIds.clear(); });
+
+  void _exitSelectionMode() =>
+      setState(() { _selectionMode = false; _selectedIds.clear(); });
+
+  void _toggleSelect(String id) => setState(() {
+    if (_selectedIds.contains(id)) {
+      _selectedIds.remove(id);
+    } else {
+      _selectedIds.add(id);
+    }
+  });
+
+  void _selectAll(List<CouponModel> list) =>
+      setState(() => _selectedIds.addAll(list.map((c) => c.couponCode)));
+
+  Future<void> _printSelected(List<CouponModel> all) async {
+    final selected =
+        all.where((c) => _selectedIds.contains(c.couponCode)).toList();
+    if (selected.isEmpty) return;
+    try {
+      await PdfExportService.showPreview(
+        context,
+        title: 'คูปองส่วนลด (${selected.length} ใบ)',
+        filename: PdfFilename.generate('coupons_batch'),
+        buildPdf: () => CouponCardPdfBuilder.buildMultiple(
+          selected,
+          paperSize: _batchPaperSize,
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('เกิดข้อผิดพลาด: $e'),
+          backgroundColor: AppTheme.errorColor,
+        ));
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -55,6 +104,7 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
     setState(() {
       _searchQuery = '';
       _filter = 'ALL';
+      _selectedIds.clear();
     });
   }
 
@@ -87,10 +137,16 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
             searchController: _searchController,
             searchQuery: _searchQuery,
             hasFilter: _hasFilter,
-            onSearchChanged: (v) => setState(() => _searchQuery = v),
+            onSearchChanged: (v) => setState(() {
+              _searchQuery = v;
+              _selectedIds.clear();
+            }),
             onSearchCleared: () {
               _searchController.clear();
-              setState(() => _searchQuery = '');
+              setState(() {
+                _searchQuery = '';
+                _selectedIds.clear();
+              });
             },
             onRefresh: () => ref.read(couponListProvider.notifier).refresh(),
             onClearFilter: _hasFilter ? _clearFilters : null,
@@ -99,7 +155,10 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
           // ── Filter Bar ────────────────────────────────────────
           _FilterBar(
             filter: _filter,
-            onFilterChanged: (v) => setState(() => _filter = v),
+            onFilterChanged: (v) => setState(() {
+              _filter = v;
+              _selectedIds.clear();
+            }),
           ),
 
           // ── Body ──────────────────────────────────────────────
@@ -139,6 +198,11 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
                               itemBuilder: (ctx, i) => _CouponRow(
                                 coupon: filtered[i],
                                 dateFmt: _dateFmt,
+                                selectionMode: _selectionMode,
+                                isSelected: _selectedIds.contains(filtered[i].couponCode),
+                                onTap: _selectionMode
+                                    ? () => _toggleSelect(filtered[i].couponCode)
+                                    : () => _showDetailDialog(context, filtered[i]),
                                 onCopy: () {
                                   Clipboard.setData(
                                       ClipboardData(text: filtered[i].couponCode));
@@ -148,8 +212,7 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
                                             'คัดลอก ${filtered[i].couponCode} แล้ว')),
                                   );
                                 },
-                                onPrint: () => _showPrintDialog(
-                                    context, filtered[i]),
+                                onPrint: () => _showPrintDialog(context, filtered[i]),
                               ),
                             ),
                           ),
@@ -176,17 +239,65 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
                         ],
                       ),
                     ),
-                    Positioned(
-                      bottom: 24,
-                      right: 24,
-                      child: FloatingActionButton.extended(
-                        onPressed: () => _showGenerateDialog(promotionsAsync),
-                        backgroundColor: AppTheme.primaryColor,
-                        foregroundColor: Colors.white,
-                        icon: const Icon(Icons.add),
-                        label: const Text('สร้างคูปอง'),
+                    if (!_selectionMode) ...[
+                      Positioned(
+                        bottom: 88,
+                        right: 24,
+                        child: PdfReportButton(
+                          emptyMessage: 'ไม่มีข้อมูลคูปอง',
+                          title: 'รายงานคูปอง',
+                          filename: () => PdfFilename.generate('coupon_report'),
+                          buildPdf: () => CouponPdfBuilder.build(filtered),
+                          hasData: filtered.isNotEmpty,
+                        ),
                       ),
-                    ),
+                      Positioned(
+                        bottom: 24,
+                        right: 24,
+                        child: FloatingActionButton.extended(
+                          onPressed: () => _showGenerateDialog(promotionsAsync),
+                          backgroundColor: AppTheme.primaryColor,
+                          foregroundColor: Colors.white,
+                          icon: const Icon(Icons.add),
+                          label: const Text('สร้างคูปอง'),
+                        ),
+                      ),
+                      Positioned(
+                        bottom: 152,
+                        right: 24,
+                        child: Tooltip(
+                          message: 'เลือกพิมพ์หลายรายการ',
+                          child: FloatingActionButton(
+                            heroTag: 'select_fab',
+                            onPressed: _enterSelectionMode,
+                            backgroundColor: AppTheme.infoColor,
+                            foregroundColor: Colors.white,
+                            mini: true,
+                            child: const Icon(Icons.checklist, size: 20),
+                          ),
+                        ),
+                      ),
+                    ] else
+                      Positioned(
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        child: _SelectionBar(
+                          selectedCount: _selectedIds.length,
+                          totalCount: filtered.length,
+                          allSelected: _selectedIds.length == filtered.length,
+                          paperSize: _batchPaperSize,
+                          onPaperSizeChanged: (s) =>
+                              setState(() => _batchPaperSize = s),
+                          onSelectAll: () => _selectAll(filtered),
+                          onDeselectAll: () =>
+                              setState(() => _selectedIds.clear()),
+                          onPrint: _selectedIds.isEmpty
+                              ? null
+                              : () => _printSelected(filtered),
+                          onCancel: _exitSelectionMode,
+                        ),
+                      ),
                   ],
                 );
               },
@@ -413,6 +524,13 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
           ],
         ),
       ),
+    );
+  }
+
+  void _showDetailDialog(BuildContext context, CouponModel coupon) {
+    showDialog(
+      context: context,
+      builder: (_) => _CouponDetailDialog(coupon: coupon, dateFmt: _dateFmt),
     );
   }
 
@@ -664,12 +782,18 @@ class _CouponRow extends StatelessWidget {
   final DateFormat dateFmt;
   final VoidCallback onCopy;
   final VoidCallback onPrint;
+  final VoidCallback? onTap;
+  final bool selectionMode;
+  final bool isSelected;
 
   const _CouponRow({
     required this.coupon,
     required this.dateFmt,
     required this.onCopy,
     required this.onPrint,
+    this.onTap,
+    this.selectionMode = false,
+    this.isSelected = false,
   });
 
   static ({Color color, String label, IconData icon}) _status(CouponModel c) {
@@ -686,20 +810,35 @@ class _CouponRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final st = _status(coupon);
 
-    return Padding(
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          // Icon
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: st.color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(8),
+          // Icon / Checkbox
+          if (selectionMode)
+            SizedBox(
+              width: 42,
+              height: 42,
+              child: Checkbox(
+                value: isSelected,
+                onChanged: (_) => onTap?.call(),
+                activeColor: AppTheme.primaryColor,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(4)),
+              ),
+            )
+          else
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: st.color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(st.icon, color: st.color, size: 20),
             ),
-            child: Icon(st.icon, color: st.color, size: 20),
-          ),
           const SizedBox(width: 12),
 
           // Content
@@ -722,26 +861,28 @@ class _CouponRow extends StatelessWidget {
                             : const Color(0xFF1A1A1A),
                       ),
                     ),
-                    if (!coupon.isUsed && !coupon.isExpired) ...[
+                    if (!selectionMode) ...[
+                      if (!coupon.isUsed && !coupon.isExpired) ...[
+                        const SizedBox(width: 6),
+                        InkWell(
+                          onTap: onCopy,
+                          borderRadius: BorderRadius.circular(4),
+                          child: const Padding(
+                            padding: EdgeInsets.all(2),
+                            child: Icon(Icons.copy, size: 14, color: AppTheme.textSub),
+                          ),
+                        ),
+                      ],
                       const SizedBox(width: 6),
                       InkWell(
-                        onTap: onCopy,
+                        onTap: onPrint,
                         borderRadius: BorderRadius.circular(4),
                         child: const Padding(
                           padding: EdgeInsets.all(2),
-                          child: Icon(Icons.copy, size: 14, color: AppTheme.textSub),
+                          child: Icon(Icons.qr_code, size: 14, color: AppTheme.infoColor),
                         ),
                       ),
                     ],
-                    const SizedBox(width: 6),
-                    InkWell(
-                      onTap: onPrint,
-                      borderRadius: BorderRadius.circular(4),
-                      child: const Padding(
-                        padding: EdgeInsets.all(2),
-                        child: Icon(Icons.qr_code, size: 14, color: AppTheme.infoColor),
-                      ),
-                    ),
                   ],
                 ),
                 if (coupon.promotionName != null) ...[
@@ -788,6 +929,226 @@ class _CouponRow extends StatelessWidget {
           ),
         ],
       ),
+    ));
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Coupon Detail Dialog
+// ─────────────────────────────────────────────────────────────────
+class _CouponDetailDialog extends StatelessWidget {
+  final CouponModel coupon;
+  final DateFormat dateFmt;
+
+  const _CouponDetailDialog({required this.coupon, required this.dateFmt});
+
+  static ({Color color, IconData icon, String label}) _status(CouponModel c) {
+    if (c.isUsed) return (color: AppTheme.textSub, icon: Icons.check_circle, label: 'ใช้แล้ว');
+    if (c.isExpired) return (color: AppTheme.errorColor, icon: Icons.cancel, label: 'หมดอายุ');
+    return (color: AppTheme.successColor, icon: Icons.confirmation_number, label: 'ใช้ได้');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final st = _status(coupon);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final usedByLabel = coupon.usedBy == null || coupon.usedBy!.isEmpty
+        ? '-'
+        : coupon.usedBy == 'WALK_IN'
+            ? 'ลูกค้าทั่วไป'
+            : coupon.usedBy!;
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 380),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // ── Header ──────────────────────────────────────
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: AppTheme.infoContainer,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.confirmation_number,
+                        color: AppTheme.infoColor, size: 18),
+                  ),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text('รายละเอียดคูปอง',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close, size: 20),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // ── Code + Status ────────────────────────────────
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF5F5F5),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                      color: isDark ? const Color(0xFF444444) : AppTheme.border),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        coupon.couponCode,
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 2,
+                          fontFamily: 'monospace',
+                          color: isDark ? Colors.white : Colors.black87,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: st.color.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: st.color.withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(st.icon, size: 12, color: st.color),
+                          const SizedBox(width: 4),
+                          Text(st.label,
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  color: st.color,
+                                  fontWeight: FontWeight.w600)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // ── Info rows ────────────────────────────────────
+              if (coupon.promotionName != null)
+                _DetailRow(
+                  icon: Icons.local_offer_outlined,
+                  label: 'โปรโมชั่น',
+                  value: coupon.promotionName!,
+                ),
+              _DetailRow(
+                icon: Icons.calendar_today_outlined,
+                label: 'สร้างเมื่อ',
+                value: dateFmt.format(coupon.createdAt),
+              ),
+              _DetailRow(
+                icon: Icons.event_outlined,
+                label: 'หมดอายุ',
+                value: coupon.expiresAt != null
+                    ? dateFmt.format(coupon.expiresAt!)
+                    : 'ไม่จำกัด',
+                valueColor: coupon.isExpired ? AppTheme.errorColor : null,
+              ),
+
+              // ── Used section ─────────────────────────────────
+              if (coupon.isUsed) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF5F5F5),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                        color: isDark ? const Color(0xFF444444) : AppTheme.border),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.person_outline, size: 14, color: AppTheme.textSub),
+                          SizedBox(width: 6),
+                          Text('ข้อมูลการใช้งาน',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppTheme.textSub)),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      _DetailRow(
+                        icon: Icons.person,
+                        label: 'ผู้ใช้',
+                        value: usedByLabel,
+                      ),
+                      if (coupon.usedAt != null)
+                        _DetailRow(
+                          icon: Icons.access_time,
+                          label: 'ใช้เมื่อ',
+                          value: dateFmt.format(coupon.usedAt!),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DetailRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color? valueColor;
+
+  const _DetailRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.valueColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final textColor = Theme.of(context).colorScheme.onSurface;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 14, color: AppTheme.textSub),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 80,
+            child: Text(label,
+                style: const TextStyle(fontSize: 12, color: AppTheme.textSub)),
+          ),
+          Expanded(
+            child: Text(value,
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: valueColor ?? textColor)),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -795,14 +1156,48 @@ class _CouponRow extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────
 // Coupon Print / QR Dialog
 // ─────────────────────────────────────────────────────────────────
-class _CouponPrintDialog extends StatelessWidget {
+class _CouponPrintDialog extends StatefulWidget {
   final CouponModel coupon;
   final DateFormat dateFmt;
 
   const _CouponPrintDialog({required this.coupon, required this.dateFmt});
 
   @override
+  State<_CouponPrintDialog> createState() => _CouponPrintDialogState();
+}
+
+class _CouponPrintDialogState extends State<_CouponPrintDialog> {
+  bool _printing = false;
+  CouponPaperSize _paperSize = CouponPaperSize.a6;
+
+  Future<void> _printCard() async {
+    setState(() => _printing = true);
+    try {
+      await PdfExportService.showPreview(
+        context,
+        title: 'คูปองส่วนลด ${widget.coupon.couponCode}',
+        filename: PdfFilename.generate('coupon_${widget.coupon.couponCode}'),
+        buildPdf: () => CouponCardPdfBuilder.build(
+          widget.coupon,
+          paperSize: _paperSize,
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('เกิดข้อผิดพลาด: $e'),
+              backgroundColor: AppTheme.errorColor),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _printing = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final coupon = widget.coupon;
+    final dateFmt = widget.dateFmt;
     final st = coupon.isUsed
         ? (color: AppTheme.textSub, label: 'ใช้แล้ว')
         : coupon.isExpired
@@ -923,6 +1318,37 @@ class _CouponPrintDialog extends StatelessWidget {
                       : AppTheme.textSub,
                 ),
               ],
+              const SizedBox(height: 12),
+
+              // ── Paper size selector ───────────────────────────
+              Row(
+                children: [
+                  const Text('ขนาดกระดาษ',
+                      style: TextStyle(fontSize: 12, color: AppTheme.textSub)),
+                  const Spacer(),
+                  SegmentedButton<CouponPaperSize>(
+                    segments: const [
+                      ButtonSegment(
+                        value: CouponPaperSize.a6,
+                        label: Text('A6'),
+                        icon: Icon(Icons.crop_landscape_outlined, size: 14),
+                      ),
+                      ButtonSegment(
+                        value: CouponPaperSize.a4,
+                        label: Text('A4'),
+                        icon: Icon(Icons.crop_portrait_outlined, size: 14),
+                      ),
+                    ],
+                    selected: {_paperSize},
+                    onSelectionChanged: (s) =>
+                        setState(() => _paperSize = s.first),
+                    style: const ButtonStyle(
+                      visualDensity: VisualDensity.compact,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 8),
 
               // ── Status badge ──────────────────────────────────
@@ -943,9 +1369,153 @@ class _CouponPrintDialog extends StatelessWidget {
                       fontSize: 13),
                 ),
               ),
+              const SizedBox(height: 16),
+
+              // ── Print button ──────────────────────────────────
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _printing ? null : _printCard,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                  ),
+                  icon: _printing
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Icon(Icons.print_outlined, size: 18),
+                  label: Text(_printing ? 'กำลังเตรียม...' : 'พิมพ์ / บันทึก PDF'),
+                ),
+              ),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Selection Action Bar
+// ─────────────────────────────────────────────────────────────────
+class _SelectionBar extends StatelessWidget {
+  final int selectedCount;
+  final int totalCount;
+  final bool allSelected;
+  final CouponPaperSize paperSize;
+  final ValueChanged<CouponPaperSize> onPaperSizeChanged;
+  final VoidCallback onSelectAll;
+  final VoidCallback onDeselectAll;
+  final VoidCallback? onPrint;
+  final VoidCallback onCancel;
+
+  const _SelectionBar({
+    required this.selectedCount,
+    required this.totalCount,
+    required this.allSelected,
+    required this.paperSize,
+    required this.onPaperSizeChanged,
+    required this.onSelectAll,
+    required this.onDeselectAll,
+    required this.onPrint,
+    required this.onCancel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        border: const Border(top: BorderSide(color: AppTheme.border)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 8,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // Count
+          Text(
+            'เลือก $selectedCount / $totalCount',
+            style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.primaryColor),
+          ),
+          const SizedBox(width: 12),
+          // Select all / deselect all toggle
+          TextButton.icon(
+            onPressed: allSelected ? onDeselectAll : onSelectAll,
+            icon: Icon(
+              allSelected ? Icons.deselect : Icons.select_all,
+              size: 16,
+            ),
+            label: Text(allSelected ? 'ยกเลิกทั้งหมด' : 'เลือกทั้งหมด',
+                style: const TextStyle(fontSize: 12)),
+            style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 8)),
+          ),
+          const Spacer(),
+          // Paper size toggle
+          SegmentedButton<CouponPaperSize>(
+            segments: const [
+              ButtonSegment(
+                value: CouponPaperSize.a6,
+                label: Text('A6'),
+                icon: Icon(Icons.crop_landscape_outlined, size: 14),
+              ),
+              ButtonSegment(
+                value: CouponPaperSize.a4,
+                label: Text('A4'),
+                icon: Icon(Icons.crop_portrait_outlined, size: 14),
+              ),
+            ],
+            selected: {paperSize},
+            onSelectionChanged: (s) => onPaperSizeChanged(s.first),
+            style: const ButtonStyle(
+              visualDensity: VisualDensity.compact,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Cancel
+          TextButton(
+            onPressed: onCancel,
+            child: const Text('ยกเลิก',
+                style: TextStyle(fontSize: 13, color: AppTheme.textSub)),
+          ),
+          const SizedBox(width: 8),
+          // Print button
+          ElevatedButton.icon(
+            onPressed: onPrint,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+              foregroundColor: Colors.white,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+            ),
+            icon: const Icon(Icons.print_outlined, size: 16),
+            label: Text(
+              selectedCount == 0
+                  ? 'พิมพ์'
+                  : 'พิมพ์ $selectedCount ใบ',
+              style: const TextStyle(fontSize: 13),
+            ),
+          ),
+        ],
       ),
     );
   }

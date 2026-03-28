@@ -10364,6 +10364,29 @@ class $SalesOrdersTable extends SalesOrders
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _couponDiscountMeta = const VerificationMeta(
+    'couponDiscount',
+  );
+  @override
+  late final GeneratedColumn<double> couponDiscount = GeneratedColumn<double>(
+    'coupon_discount',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _couponCodesMeta = const VerificationMeta(
+    'couponCodes',
+  );
+  @override
+  late final GeneratedColumn<String> couponCodes = GeneratedColumn<String>(
+    'coupon_codes',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _paymentTypeMeta = const VerificationMeta(
     'paymentType',
   );
@@ -10478,6 +10501,8 @@ class $SalesOrdersTable extends SalesOrders
     amountBeforeVat,
     vatAmount,
     totalAmount,
+    couponDiscount,
+    couponCodes,
     paymentType,
     paidAmount,
     changeAmount,
@@ -10640,6 +10665,24 @@ class $SalesOrdersTable extends SalesOrders
         ),
       );
     }
+    if (data.containsKey('coupon_discount')) {
+      context.handle(
+        _couponDiscountMeta,
+        couponDiscount.isAcceptableOrUnknown(
+          data['coupon_discount']!,
+          _couponDiscountMeta,
+        ),
+      );
+    }
+    if (data.containsKey('coupon_codes')) {
+      context.handle(
+        _couponCodesMeta,
+        couponCodes.isAcceptableOrUnknown(
+          data['coupon_codes']!,
+          _couponCodesMeta,
+        ),
+      );
+    }
     if (data.containsKey('payment_type')) {
       context.handle(
         _paymentTypeMeta,
@@ -10782,6 +10825,14 @@ class $SalesOrdersTable extends SalesOrders
         DriftSqlType.double,
         data['${effectivePrefix}total_amount'],
       )!,
+      couponDiscount: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}coupon_discount'],
+      )!,
+      couponCodes: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}coupon_codes'],
+      ),
       paymentType: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}payment_type'],
@@ -10842,6 +10893,8 @@ class SalesOrder extends DataClass implements Insertable<SalesOrder> {
   final double amountBeforeVat;
   final double vatAmount;
   final double totalAmount;
+  final double couponDiscount;
+  final String? couponCodes;
   final String paymentType;
   final double paidAmount;
   final double changeAmount;
@@ -10869,6 +10922,8 @@ class SalesOrder extends DataClass implements Insertable<SalesOrder> {
     required this.amountBeforeVat,
     required this.vatAmount,
     required this.totalAmount,
+    required this.couponDiscount,
+    this.couponCodes,
     required this.paymentType,
     required this.paidAmount,
     required this.changeAmount,
@@ -10911,6 +10966,10 @@ class SalesOrder extends DataClass implements Insertable<SalesOrder> {
     map['amount_before_vat'] = Variable<double>(amountBeforeVat);
     map['vat_amount'] = Variable<double>(vatAmount);
     map['total_amount'] = Variable<double>(totalAmount);
+    map['coupon_discount'] = Variable<double>(couponDiscount);
+    if (!nullToAbsent || couponCodes != null) {
+      map['coupon_codes'] = Variable<String>(couponCodes);
+    }
     map['payment_type'] = Variable<String>(paymentType);
     map['paid_amount'] = Variable<double>(paidAmount);
     map['change_amount'] = Variable<double>(changeAmount);
@@ -10956,6 +11015,10 @@ class SalesOrder extends DataClass implements Insertable<SalesOrder> {
       amountBeforeVat: Value(amountBeforeVat),
       vatAmount: Value(vatAmount),
       totalAmount: Value(totalAmount),
+      couponDiscount: Value(couponDiscount),
+      couponCodes: couponCodes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(couponCodes),
       paymentType: Value(paymentType),
       paidAmount: Value(paidAmount),
       changeAmount: Value(changeAmount),
@@ -10993,6 +11056,8 @@ class SalesOrder extends DataClass implements Insertable<SalesOrder> {
       amountBeforeVat: serializer.fromJson<double>(json['amountBeforeVat']),
       vatAmount: serializer.fromJson<double>(json['vatAmount']),
       totalAmount: serializer.fromJson<double>(json['totalAmount']),
+      couponDiscount: serializer.fromJson<double>(json['couponDiscount']),
+      couponCodes: serializer.fromJson<String?>(json['couponCodes']),
       paymentType: serializer.fromJson<String>(json['paymentType']),
       paidAmount: serializer.fromJson<double>(json['paidAmount']),
       changeAmount: serializer.fromJson<double>(json['changeAmount']),
@@ -11025,6 +11090,8 @@ class SalesOrder extends DataClass implements Insertable<SalesOrder> {
       'amountBeforeVat': serializer.toJson<double>(amountBeforeVat),
       'vatAmount': serializer.toJson<double>(vatAmount),
       'totalAmount': serializer.toJson<double>(totalAmount),
+      'couponDiscount': serializer.toJson<double>(couponDiscount),
+      'couponCodes': serializer.toJson<String?>(couponCodes),
       'paymentType': serializer.toJson<String>(paymentType),
       'paidAmount': serializer.toJson<double>(paidAmount),
       'changeAmount': serializer.toJson<double>(changeAmount),
@@ -11055,6 +11122,8 @@ class SalesOrder extends DataClass implements Insertable<SalesOrder> {
     double? amountBeforeVat,
     double? vatAmount,
     double? totalAmount,
+    double? couponDiscount,
+    Value<String?> couponCodes = const Value.absent(),
     String? paymentType,
     double? paidAmount,
     double? changeAmount,
@@ -11086,6 +11155,8 @@ class SalesOrder extends DataClass implements Insertable<SalesOrder> {
     amountBeforeVat: amountBeforeVat ?? this.amountBeforeVat,
     vatAmount: vatAmount ?? this.vatAmount,
     totalAmount: totalAmount ?? this.totalAmount,
+    couponDiscount: couponDiscount ?? this.couponDiscount,
+    couponCodes: couponCodes.present ? couponCodes.value : this.couponCodes,
     paymentType: paymentType ?? this.paymentType,
     paidAmount: paidAmount ?? this.paidAmount,
     changeAmount: changeAmount ?? this.changeAmount,
@@ -11131,6 +11202,12 @@ class SalesOrder extends DataClass implements Insertable<SalesOrder> {
       totalAmount: data.totalAmount.present
           ? data.totalAmount.value
           : this.totalAmount,
+      couponDiscount: data.couponDiscount.present
+          ? data.couponDiscount.value
+          : this.couponDiscount,
+      couponCodes: data.couponCodes.present
+          ? data.couponCodes.value
+          : this.couponCodes,
       paymentType: data.paymentType.present
           ? data.paymentType.value
           : this.paymentType,
@@ -11171,6 +11248,8 @@ class SalesOrder extends DataClass implements Insertable<SalesOrder> {
           ..write('amountBeforeVat: $amountBeforeVat, ')
           ..write('vatAmount: $vatAmount, ')
           ..write('totalAmount: $totalAmount, ')
+          ..write('couponDiscount: $couponDiscount, ')
+          ..write('couponCodes: $couponCodes, ')
           ..write('paymentType: $paymentType, ')
           ..write('paidAmount: $paidAmount, ')
           ..write('changeAmount: $changeAmount, ')
@@ -11203,6 +11282,8 @@ class SalesOrder extends DataClass implements Insertable<SalesOrder> {
     amountBeforeVat,
     vatAmount,
     totalAmount,
+    couponDiscount,
+    couponCodes,
     paymentType,
     paidAmount,
     changeAmount,
@@ -11234,6 +11315,8 @@ class SalesOrder extends DataClass implements Insertable<SalesOrder> {
           other.amountBeforeVat == this.amountBeforeVat &&
           other.vatAmount == this.vatAmount &&
           other.totalAmount == this.totalAmount &&
+          other.couponDiscount == this.couponDiscount &&
+          other.couponCodes == this.couponCodes &&
           other.paymentType == this.paymentType &&
           other.paidAmount == this.paidAmount &&
           other.changeAmount == this.changeAmount &&
@@ -11263,6 +11346,8 @@ class SalesOrdersCompanion extends UpdateCompanion<SalesOrder> {
   final Value<double> amountBeforeVat;
   final Value<double> vatAmount;
   final Value<double> totalAmount;
+  final Value<double> couponDiscount;
+  final Value<String?> couponCodes;
   final Value<String> paymentType;
   final Value<double> paidAmount;
   final Value<double> changeAmount;
@@ -11291,6 +11376,8 @@ class SalesOrdersCompanion extends UpdateCompanion<SalesOrder> {
     this.amountBeforeVat = const Value.absent(),
     this.vatAmount = const Value.absent(),
     this.totalAmount = const Value.absent(),
+    this.couponDiscount = const Value.absent(),
+    this.couponCodes = const Value.absent(),
     this.paymentType = const Value.absent(),
     this.paidAmount = const Value.absent(),
     this.changeAmount = const Value.absent(),
@@ -11320,6 +11407,8 @@ class SalesOrdersCompanion extends UpdateCompanion<SalesOrder> {
     this.amountBeforeVat = const Value.absent(),
     this.vatAmount = const Value.absent(),
     this.totalAmount = const Value.absent(),
+    this.couponDiscount = const Value.absent(),
+    this.couponCodes = const Value.absent(),
     this.paymentType = const Value.absent(),
     this.paidAmount = const Value.absent(),
     this.changeAmount = const Value.absent(),
@@ -11354,6 +11443,8 @@ class SalesOrdersCompanion extends UpdateCompanion<SalesOrder> {
     Expression<double>? amountBeforeVat,
     Expression<double>? vatAmount,
     Expression<double>? totalAmount,
+    Expression<double>? couponDiscount,
+    Expression<String>? couponCodes,
     Expression<String>? paymentType,
     Expression<double>? paidAmount,
     Expression<double>? changeAmount,
@@ -11383,6 +11474,8 @@ class SalesOrdersCompanion extends UpdateCompanion<SalesOrder> {
       if (amountBeforeVat != null) 'amount_before_vat': amountBeforeVat,
       if (vatAmount != null) 'vat_amount': vatAmount,
       if (totalAmount != null) 'total_amount': totalAmount,
+      if (couponDiscount != null) 'coupon_discount': couponDiscount,
+      if (couponCodes != null) 'coupon_codes': couponCodes,
       if (paymentType != null) 'payment_type': paymentType,
       if (paidAmount != null) 'paid_amount': paidAmount,
       if (changeAmount != null) 'change_amount': changeAmount,
@@ -11414,6 +11507,8 @@ class SalesOrdersCompanion extends UpdateCompanion<SalesOrder> {
     Value<double>? amountBeforeVat,
     Value<double>? vatAmount,
     Value<double>? totalAmount,
+    Value<double>? couponDiscount,
+    Value<String?>? couponCodes,
     Value<String>? paymentType,
     Value<double>? paidAmount,
     Value<double>? changeAmount,
@@ -11443,6 +11538,8 @@ class SalesOrdersCompanion extends UpdateCompanion<SalesOrder> {
       amountBeforeVat: amountBeforeVat ?? this.amountBeforeVat,
       vatAmount: vatAmount ?? this.vatAmount,
       totalAmount: totalAmount ?? this.totalAmount,
+      couponDiscount: couponDiscount ?? this.couponDiscount,
+      couponCodes: couponCodes ?? this.couponCodes,
       paymentType: paymentType ?? this.paymentType,
       paidAmount: paidAmount ?? this.paidAmount,
       changeAmount: changeAmount ?? this.changeAmount,
@@ -11512,6 +11609,12 @@ class SalesOrdersCompanion extends UpdateCompanion<SalesOrder> {
     if (totalAmount.present) {
       map['total_amount'] = Variable<double>(totalAmount.value);
     }
+    if (couponDiscount.present) {
+      map['coupon_discount'] = Variable<double>(couponDiscount.value);
+    }
+    if (couponCodes.present) {
+      map['coupon_codes'] = Variable<String>(couponCodes.value);
+    }
     if (paymentType.present) {
       map['payment_type'] = Variable<String>(paymentType.value);
     }
@@ -11563,6 +11666,8 @@ class SalesOrdersCompanion extends UpdateCompanion<SalesOrder> {
           ..write('amountBeforeVat: $amountBeforeVat, ')
           ..write('vatAmount: $vatAmount, ')
           ..write('totalAmount: $totalAmount, ')
+          ..write('couponDiscount: $couponDiscount, ')
+          ..write('couponCodes: $couponCodes, ')
           ..write('paymentType: $paymentType, ')
           ..write('paidAmount: $paidAmount, ')
           ..write('changeAmount: $changeAmount, ')
@@ -40076,6 +40181,8 @@ typedef $$SalesOrdersTableCreateCompanionBuilder =
       Value<double> amountBeforeVat,
       Value<double> vatAmount,
       Value<double> totalAmount,
+      Value<double> couponDiscount,
+      Value<String?> couponCodes,
       Value<String> paymentType,
       Value<double> paidAmount,
       Value<double> changeAmount,
@@ -40106,6 +40213,8 @@ typedef $$SalesOrdersTableUpdateCompanionBuilder =
       Value<double> amountBeforeVat,
       Value<double> vatAmount,
       Value<double> totalAmount,
+      Value<double> couponDiscount,
+      Value<String?> couponCodes,
       Value<String> paymentType,
       Value<double> paidAmount,
       Value<double> changeAmount,
@@ -40325,6 +40434,16 @@ class $$SalesOrdersTableFilterComposer
 
   ColumnFilters<double> get totalAmount => $composableBuilder(
     column: $table.totalAmount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get couponDiscount => $composableBuilder(
+    column: $table.couponDiscount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get couponCodes => $composableBuilder(
+    column: $table.couponCodes,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -40590,6 +40709,16 @@ class $$SalesOrdersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<double> get couponDiscount => $composableBuilder(
+    column: $table.couponDiscount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get couponCodes => $composableBuilder(
+    column: $table.couponCodes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get paymentType => $composableBuilder(
     column: $table.paymentType,
     builder: (column) => ColumnOrderings(column),
@@ -40783,6 +40912,16 @@ class $$SalesOrdersTableAnnotationComposer
 
   GeneratedColumn<double> get totalAmount => $composableBuilder(
     column: $table.totalAmount,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get couponDiscount => $composableBuilder(
+    column: $table.couponDiscount,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get couponCodes => $composableBuilder(
+    column: $table.couponCodes,
     builder: (column) => column,
   );
 
@@ -41014,6 +41153,8 @@ class $$SalesOrdersTableTableManager
                 Value<double> amountBeforeVat = const Value.absent(),
                 Value<double> vatAmount = const Value.absent(),
                 Value<double> totalAmount = const Value.absent(),
+                Value<double> couponDiscount = const Value.absent(),
+                Value<String?> couponCodes = const Value.absent(),
                 Value<String> paymentType = const Value.absent(),
                 Value<double> paidAmount = const Value.absent(),
                 Value<double> changeAmount = const Value.absent(),
@@ -41042,6 +41183,8 @@ class $$SalesOrdersTableTableManager
                 amountBeforeVat: amountBeforeVat,
                 vatAmount: vatAmount,
                 totalAmount: totalAmount,
+                couponDiscount: couponDiscount,
+                couponCodes: couponCodes,
                 paymentType: paymentType,
                 paidAmount: paidAmount,
                 changeAmount: changeAmount,
@@ -41072,6 +41215,8 @@ class $$SalesOrdersTableTableManager
                 Value<double> amountBeforeVat = const Value.absent(),
                 Value<double> vatAmount = const Value.absent(),
                 Value<double> totalAmount = const Value.absent(),
+                Value<double> couponDiscount = const Value.absent(),
+                Value<String?> couponCodes = const Value.absent(),
                 Value<String> paymentType = const Value.absent(),
                 Value<double> paidAmount = const Value.absent(),
                 Value<double> changeAmount = const Value.absent(),
@@ -41100,6 +41245,8 @@ class $$SalesOrdersTableTableManager
                 amountBeforeVat: amountBeforeVat,
                 vatAmount: vatAmount,
                 totalAmount: totalAmount,
+                couponDiscount: couponDiscount,
+                couponCodes: couponCodes,
                 paymentType: paymentType,
                 paidAmount: paidAmount,
                 changeAmount: changeAmount,

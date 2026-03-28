@@ -50,6 +50,7 @@ dependencies:
   printing: ^5.14.2
   file_picker: ^10.3.10
   qr_flutter: ^4.1.0
+  qr: ^3.0.1
 
 dev_dependencies:
   flutter_test:
