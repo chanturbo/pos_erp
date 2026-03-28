@@ -64,7 +64,7 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
     final isWalkIn = order.customerId == null ||
         order.customerId == 'WALK_IN' ||
         order.customerId!.isEmpty;
-    final hasMember = !isWalkIn && earnedPoints > 0;
+    final hasMember = !isWalkIn;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -122,14 +122,25 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
                             ),
                             child: Row(
                               children: [
-                                const Icon(Icons.stars,
-                                    color: Colors.amber, size: 20),
+                                Icon(
+                                  earnedPoints > 0
+                                      ? Icons.stars
+                                      : Icons.stars_outlined,
+                                  color: earnedPoints > 0
+                                      ? Colors.amber
+                                      : Colors.amber[300],
+                                  size: 20,
+                                ),
                                 const SizedBox(width: 8),
                                 Text(
-                                  'สะสมคะแนน: +$earnedPoints pt',
+                                  earnedPoints > 0
+                                      ? 'สะสมคะแนน: +$earnedPoints pt'
+                                      : 'ยอดไม่ถึงเกณฑ์ (ต้องการ ฿$kPointsPerBaht)',
                                   style: TextStyle(
                                     fontWeight: FontWeight.w600,
-                                    color: Colors.amber[800],
+                                    color: earnedPoints > 0
+                                        ? Colors.amber[800]
+                                        : Colors.amber[600],
                                   ),
                                 ),
                                 const Spacer(),
@@ -170,6 +181,15 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
               ),
               const SizedBox(height: 16),
 
+              // ── Coupon Card ───────────────────────────────────
+              if (order.couponCodes != null &&
+                  order.couponCodes!.isNotEmpty)
+                _buildCouponCard(order),
+
+              if (order.couponCodes != null &&
+                  order.couponCodes!.isNotEmpty)
+                const SizedBox(height: 16),
+
               // ── Summary Card ─────────────────────────────────
               Card(
                 child: Padding(
@@ -177,9 +197,28 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
                   child: Column(
                     children: [
                       _buildSummaryRow('ยอดรวม', order.subtotal),
-                      if (order.discountAmount > 0)
-                        _buildSummaryRow('ส่วนลด', -order.discountAmount,
+                      if (order.discountAmount - order.couponDiscount > 0)
+                        _buildSummaryRow(
+                            'ส่วนลด',
+                            -(order.discountAmount - order.couponDiscount),
                             isDiscount: true),
+                      if (order.couponDiscount > 0) ...[
+                        if (order.couponCodes != null &&
+                            order.couponCodes!.isNotEmpty)
+                          ...order.couponCodes!.asMap().entries.map((e) {
+                            final perCoupon = order.couponDiscount / order.couponCodes!.length;
+                            final isLast = e.key == order.couponCodes!.length - 1;
+                            final amt = isLast
+                                ? order.couponDiscount - perCoupon * e.key
+                                : perCoupon;
+                            return _buildSummaryRow(
+                                'คูปอง ${e.value}', -amt,
+                                isDiscount: true, isCoupon: true);
+                          })
+                        else
+                          _buildSummaryRow('ส่วนลดคูปอง', -order.couponDiscount,
+                              isDiscount: true, isCoupon: true),
+                      ],
                       const Divider(),
                       _buildSummaryRow('ยอดชำระ', order.totalAmount,
                           isTotal: true),
@@ -189,7 +228,7 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
                         _buildSummaryRow('เงินทอน', order.changeAmount,
                             isChange: true),
                       ],
-                      // ✅ Week 5: สรุป points ด้านล่าง summary
+                      // สรุป points ด้านล่าง summary
                       if (hasMember) ...[
                         const Divider(),
                         Row(
@@ -197,8 +236,15 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
                           children: [
                             Row(
                               children: [
-                                const Icon(Icons.stars,
-                                    size: 16, color: Colors.amber),
+                                Icon(
+                                  earnedPoints > 0
+                                      ? Icons.stars
+                                      : Icons.stars_outlined,
+                                  size: 16,
+                                  color: earnedPoints > 0
+                                      ? Colors.amber
+                                      : Colors.amber[300],
+                                ),
                                 const SizedBox(width: 6),
                                 Text(
                                   'คะแนนที่ได้รับ',
@@ -210,11 +256,15 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
                               ],
                             ),
                             Text(
-                              '+$earnedPoints pt',
+                              earnedPoints > 0
+                                  ? '+$earnedPoints pt'
+                                  : '0 pt',
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.amber[700],
+                                color: earnedPoints > 0
+                                    ? Colors.amber[700]
+                                    : Colors.amber[400],
                               ),
                             ),
                           ],
@@ -223,6 +273,124 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
                     ],
                   ),
                 ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCouponCard(SalesOrderModel order) {
+    final fmt = NumberFormat('#,##0.00', 'th_TH');
+    final codes = order.couponCodes!;
+    final totalDiscount = order.couponDiscount;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: const Color(0xFFE8F5E9),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFF4CAF50)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Header ──────────────────────────────────────
+              Row(
+                children: [
+                  const Icon(Icons.confirmation_number_outlined,
+                      size: 18, color: Color(0xFF1565C0)),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'คูปองส่วนลด',
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1565C0)),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF4CAF50),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '${codes.length} ใบ',
+                      style: const TextStyle(
+                          fontSize: 11,
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    'ส่วนลดรวม ฿${fmt.format(totalDiscount)}',
+                    style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF2E7D32)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              // ── Coupon chips ─────────────────────────────────
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: codes.asMap().entries.map((e) {
+                  final perCoupon = totalDiscount / codes.length;
+                  final isLast = e.key == codes.length - 1;
+                  final amt = isLast
+                      ? totalDiscount - perCoupon * e.key
+                      : perCoupon;
+                  return Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF4CAF50).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                          color: const Color(0xFF4CAF50)
+                              .withValues(alpha: 0.4)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.check_circle,
+                            size: 13, color: Color(0xFF2E7D32)),
+                        const SizedBox(width: 5),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              e.value,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 1,
+                                color: Color(0xFF1B5E20),
+                              ),
+                            ),
+                            Text(
+                              'ลด ฿${fmt.format(amt)}',
+                              style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF2E7D32)),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
               ),
             ],
           ),
@@ -293,20 +461,30 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
     bool isDiscount = false,
     bool isTotal = false,
     bool isChange = false,
+    bool isCoupon = false,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label,
-              style: TextStyle(
-                fontSize: isTotal ? 18 : 14,
-                fontWeight:
-                    isTotal ? FontWeight.bold : FontWeight.normal,
-              )),
+          Row(
+            children: [
+              if (isCoupon) ...[
+                const Icon(Icons.local_offer_outlined,
+                    size: 14, color: Colors.deepOrange),
+                const SizedBox(width: 4),
+              ],
+              Text(label,
+                  style: TextStyle(
+                    fontSize: isTotal ? 18 : 14,
+                    fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
+                    color: isCoupon ? Colors.deepOrange : null,
+                  )),
+            ],
+          ),
           Text(
-            '฿${amount.toStringAsFixed(2)}',
+            amount != 0 ? '฿${amount.toStringAsFixed(2)}' : '',
             style: TextStyle(
               fontSize: isTotal ? 22 : 14,
               fontWeight:
@@ -399,7 +577,9 @@ class _OrderReceiptPage extends ConsumerWidget {
             customerName: order.customerName,
             items:        order.items ?? [],
             subtotal:     order.subtotal,
-            discount:     order.discountAmount,
+            discount:     order.discountAmount - order.couponDiscount,
+            couponCodes:  order.couponCodes ?? [],
+            couponDiscount: order.couponDiscount,
             total:        order.totalAmount,
             paymentLabel: _paymentLabel(order.paymentType),
             paymentType:  order.paymentType,
@@ -427,6 +607,8 @@ class _ThermalReceiptFromOrder extends StatelessWidget {
   final List<SalesOrderItemModel> items;
   final double   subtotal;
   final double   discount;
+  final List<String> couponCodes;
+  final double   couponDiscount;
   final double   total;
   final String   paymentLabel;
   final String   paymentType;
@@ -451,6 +633,8 @@ class _ThermalReceiptFromOrder extends StatelessWidget {
     required this.changeAmount,
     required this.numFmt,
     this.customerName,
+    this.couponCodes = const [],
+    this.couponDiscount = 0.0,
   });
 
   static const _mono   = TextStyle(fontFamily: 'monospace', fontSize: 13, color: Colors.black87);
@@ -551,6 +735,26 @@ class _ThermalReceiptFromOrder extends StatelessWidget {
                 if (discount > 0)
                   _row('ส่วนลด', '-฿${numFmt.format(discount)}',
                       valueColor: Colors.red[700]),
+                if (couponDiscount > 0) ...[
+                  if (couponCodes.isNotEmpty)
+                    ...couponCodes.asMap().entries.map((e) {
+                      final perCoupon = couponDiscount / couponCodes.length;
+                      final isLast = e.key == couponCodes.length - 1;
+                      // ปัดเศษให้รวมได้พอดี
+                      final alreadyShown = perCoupon * e.key;
+                      final amt = isLast
+                          ? couponDiscount - alreadyShown
+                          : perCoupon;
+                      return _row(
+                        'คูปอง ${e.value}',
+                        '-฿${numFmt.format(amt)}',
+                        valueColor: Colors.red[700],
+                      );
+                    })
+                  else
+                    _row('ส่วนลดคูปอง', '-฿${numFmt.format(couponDiscount)}',
+                        valueColor: Colors.red[700]),
+                ],
 
                 const SizedBox(height: 4),
                 _solidLine(),
@@ -605,12 +809,22 @@ class _ThermalReceiptFromOrder extends StatelessWidget {
     );
   }
 
-  Widget _row(String label, String value, {Color? valueColor}) => Padding(
+  Widget _row(String label, String value, {Color? valueColor, String? subLabel}) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 2),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(label, style: _mono),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: _mono),
+                  if (subLabel != null && subLabel.isNotEmpty)
+                    Text(subLabel, style: _monoSm, overflow: TextOverflow.ellipsis),
+                ],
+              ),
+            ),
             Text(value,
                 style: valueColor != null
                     ? _mono.copyWith(color: valueColor)

@@ -163,6 +163,8 @@ class _PromotionFormPageState extends ConsumerState<PromotionFormPage> {
   InputDecoration _inputDeco({required String label, IconData? icon, String? prefix, String? suffix}) =>
       InputDecoration(
         labelText: label,
+        labelStyle: const TextStyle(color: AppTheme.textSub, fontSize: 13),
+        floatingLabelStyle: const TextStyle(color: AppTheme.infoColor, fontSize: 12),
         prefixIcon: icon != null ? Icon(icon, size: 18) : null,
         prefixText: prefix,
         suffixText: suffix,
@@ -672,9 +674,9 @@ class _SectionCard extends StatelessWidget {
           // Header
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: isDark ? AppTheme.darkTopBar : AppTheme.headerBg,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+            decoration: const BoxDecoration(
+              color: AppTheme.headerBg,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
             ),
             child: Row(
               children: [
@@ -684,7 +686,7 @@ class _SectionCard extends StatelessWidget {
                     style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: null)),
+                        color: Color(0xFF1A1A1A))),
               ],
             ),
           ),

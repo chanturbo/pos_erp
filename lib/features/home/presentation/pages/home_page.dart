@@ -64,6 +64,9 @@ class HomePage extends ConsumerStatefulWidget {
 
 class _HomePageState extends ConsumerState<HomePage> {
   int _selectedIndex = 0;
+  /// หน้า override สำหรับกรณีที่ต้องการแสดงหน้าพร้อม parameter พิเศษ
+  /// (เช่น SalesHistoryPage กรองวันนี้) โดยยัง highlight เมนูที่ถูกต้อง
+  Widget? _overridePage;
 
   List<_MenuSection> get _sections => [
         _MenuSection('หลัก', [
@@ -80,6 +83,18 @@ class _HomePageState extends ConsumerState<HomePage> {
               onGoToCustomers: () => context.hasPermanentSidebar
                   ? _selectItem(7)
                   : _push(context, const CustomerListPage()),
+              onGoToTodaySales: () {
+                final today = DateTime.now();
+                _showOverridePage(
+                  SalesHistoryPage(
+                    initialDateFrom:
+                        DateTime(today.year, today.month, today.day),
+                    initialDateTo:
+                        DateTime(today.year, today.month, today.day),
+                  ),
+                  2, // highlight "รายการขาย"
+                );
+              },
             ),
           ),
         ]),
@@ -119,7 +134,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   List<_MenuItem> get _allItems =>
       _sections.expand((s) => s.items).toList();
 
-  Widget get _currentPage => _allItems[_selectedIndex].page;
+  Widget get _currentPage => _overridePage ?? _allItems[_selectedIndex].page;
 
   void _selectItem(int i) {
     final item = _allItems[i];
@@ -132,7 +147,26 @@ class _HomePageState extends ConsumerState<HomePage> {
       // Push เป็น route ใหม่ แทนที่จะ swap content
       _push(context, item.page);
     } else {
-      setState(() => _selectedIndex = i);
+      setState(() {
+        _selectedIndex = i;
+        _overridePage = null;
+      });
+    }
+  }
+
+  /// แสดงหน้าพิเศษ (พร้อม parameter เฉพาะ) ใน content area โดย highlight เมนู [highlightIndex]
+  /// บน desktop (hasPermanentSidebar) → swap ใน content area (มี sidebar)
+  /// บน mobile/tablet → push route ตามปกติ
+  void _showOverridePage(Widget page, int highlightIndex) {
+    final nav = Navigator.of(context);
+    if (nav.canPop()) nav.pop();
+    if (context.hasPermanentSidebar) {
+      setState(() {
+        _selectedIndex = highlightIndex;
+        _overridePage = page;
+      });
+    } else {
+      _push(context, page);
     }
   }
 

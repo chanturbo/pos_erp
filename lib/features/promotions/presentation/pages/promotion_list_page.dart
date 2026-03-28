@@ -380,7 +380,7 @@ class _TopBar extends StatelessWidget {
           style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: null),
+              color: Color(0xFF1A1A1A)),
         ),
         const Spacer(),
         ConstrainedBox(
@@ -418,7 +418,7 @@ class _TopBar extends StatelessWidget {
               style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.bold,
-                  color: null),
+                  color: Color(0xFF1A1A1A)),
             ),
             const Spacer(),
             if (hasFilter && onClearFilter != null)
@@ -680,7 +680,9 @@ class _PromotionRow extends StatelessWidget {
                     children: [
                       Text(p.promotionName,
                           style: const TextStyle(
-                              fontWeight: FontWeight.w600, fontSize: 14)),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                              color: Color(0xFF1A1A1A))),
                       const SizedBox(height: 2),
                       Text(p.promotionCode,
                           style: const TextStyle(
@@ -892,13 +894,11 @@ class _SearchField extends StatelessWidget {
         height: 38,
         child: TextField(
           controller: controller,
-          style: const TextStyle(fontSize: 13),
+          style: const TextStyle(fontSize: 13, color: Color(0xFF1A1A1A)),
           decoration: InputDecoration(
             hintText: 'ค้นหาชื่อ, รหัสโปรโมชั่น...',
-            hintStyle:
-                const TextStyle(fontSize: 13, color: AppTheme.textSub),
-            prefixIcon: const Icon(Icons.search,
-                size: 17, color: AppTheme.textSub),
+            hintStyle: const TextStyle(fontSize: 13, color: AppTheme.textSub),
+            prefixIcon: const Icon(Icons.search, size: 17, color: AppTheme.textSub),
             suffixIcon: query.isNotEmpty
                 ? IconButton(
                     icon: const Icon(Icons.clear, size: 15),
@@ -916,8 +916,7 @@ class _SearchField extends StatelessWidget {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide:
-                  const BorderSide(color: AppTheme.primary, width: 1.5),
+              borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
             ),
             filled: true,
             fillColor: Colors.white,
@@ -945,8 +944,7 @@ class _RefreshBtn extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: AppTheme.border),
             ),
-            child: const Icon(Icons.refresh,
-                size: 17, color: AppTheme.textSub),
+            child: const Icon(Icons.refresh, size: 17, color: AppTheme.textSub),
           ),
         ),
       );
@@ -1005,8 +1003,7 @@ class _BackBtn extends StatelessWidget {
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: AppTheme.border),
           ),
-          child: const Icon(Icons.arrow_back,
-              size: 17, color: AppTheme.textSub),
+          child: const Icon(Icons.arrow_back, size: 17, color: AppTheme.textSub),
         ),
       );
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
+import 'package:pos_erp/shared/widgets/pagination_bar.dart';
 import '../providers/product_provider.dart';
 import '../../data/models/product_model.dart';
 import 'product_form_page.dart';
@@ -23,6 +24,10 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
   bool   _userResized   = false; // ✅ ป้องกัน auto-adjust override ค่าที่ user ลากไว้
   String _sortColumn   = 'productCode';
   bool   _sortAsc      = true;
+
+  // ── Pagination ──────────────────────────────────────────────────
+  int _currentPage = 1;
+  static const int _pageSize = 20;
 
   // ✅ ความกว้างคอลัมน์ที่ resize ได้ (ค่าเริ่มต้นก่อน auto-fit)
   // ลำดับ: [รหัส, ชื่อ, หน่วย, ราคา, ต้นทุน, สต๊อก, สถานะ, จัดการ]
@@ -78,6 +83,7 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
         _sortColumn = col;
         _sortAsc = true;
       }
+      _currentPage = 1;
     });
   }
 
@@ -134,13 +140,13 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
             searchQuery: _searchQuery,
             isActiveOnly: _isActiveOnly,
             isTableView: _isTableView,
-            onSearchChanged: (v) => setState(() => _searchQuery = v),
+            onSearchChanged: (v) => setState(() { _searchQuery = v; _currentPage = 1; }),
             onSearchCleared: () {
               _searchController.clear();
-              setState(() => _searchQuery = '');
+              setState(() { _searchQuery = ''; _currentPage = 1; });
             },
             onToggleActive: () =>
-                setState(() => _isActiveOnly = !_isActiveOnly),
+                setState(() { _isActiveOnly = !_isActiveOnly; _currentPage = 1; }),
             onToggleView: () =>
                 setState(() => _isTableView = !_isTableView),
             onRefresh: () =>
@@ -162,22 +168,41 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
               data: (products) {
                 final filtered = _filter(products);
                 if (filtered.isEmpty) return _buildEmpty();
-                return Stack(
+                final sorted = _sort(filtered);
+                final totalPages = (sorted.length / _pageSize).ceil();
+                final safePage = _currentPage.clamp(1, totalPages);
+                final pageStart = (safePage - 1) * _pageSize;
+                final pageEnd = (pageStart + _pageSize).clamp(0, sorted.length);
+                final pageItems = sorted.sublist(pageStart, pageEnd);
+                return Column(
                   children: [
-                    _isTableView
-                        ? _buildTableView(_sort(filtered))
-                        : _buildCardView(_sort(filtered)),
-                    // ปุ่ม PDF
-                    Positioned(
-                      bottom: 16,
-                      right: 16,
-                      child: PdfReportButton(
-                        emptyMessage: 'ไม่มีข้อมูลสินค้า',
-                        title:    'รายงานสินค้า',
-                        filename: () => PdfFilename.generate('product_report'),
-                        buildPdf: () => ProductPdfBuilder.build(filtered),
-                        hasData:  filtered.isNotEmpty,
+                    Expanded(
+                      child: Stack(
+                        children: [
+                          _isTableView
+                              ? _buildTableView(pageItems)
+                              : _buildCardView(pageItems),
+                          // ปุ่ม PDF
+                          Positioned(
+                            bottom: 16,
+                            right: 16,
+                            child: PdfReportButton(
+                              emptyMessage: 'ไม่มีข้อมูลสินค้า',
+                              title:    'รายงานสินค้า',
+                              filename: () => PdfFilename.generate('product_report'),
+                              buildPdf: () => ProductPdfBuilder.build(filtered),
+                              hasData:  filtered.isNotEmpty,
+                            ),
+                          ),
+                        ],
                       ),
+                    ),
+                    // ── Footer / Pagination ──────────────────────
+                    PaginationBar(
+                      currentPage: safePage,
+                      totalItems: sorted.length,
+                      pageSize: _pageSize,
+                      onPageChanged: (p) => setState(() => _currentPage = p),
                     ),
                   ],
                 );

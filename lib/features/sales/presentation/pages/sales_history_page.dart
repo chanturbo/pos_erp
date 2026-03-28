@@ -9,6 +9,7 @@ import 'order_details_page.dart';
 import 'sales_history_pdf_report.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
 import 'package:pos_erp/shared/pdf/pdf_report_button.dart';
+import 'package:pos_erp/shared/widgets/pagination_bar.dart';
 
 // ─────────────────────────────────────────────────────────────────
 // SalesHistoryPage
@@ -36,6 +37,10 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
   // ── Sort ────────────────────────────────────────────────────────
   String _sortColumn = 'date'; // date | orderNo | customer | amount | status
   bool _sortAsc = false;
+
+  // ── Pagination ──────────────────────────────────────────────────
+  int _currentPage = 1;
+  static const int _pageSize = 20;
 
   // ── Column widths [วันที่, เลขที่, ลูกค้า, ชำระ, ยอด, สถานะ, จัดการ]
   final List<double> _colWidths = [140, 130, 180, 100, 110, 100, 70];
@@ -139,6 +144,7 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
       _dateTo = null;
       _paymentFilter = 'ALL';
       _statusFilter = 'ALL';
+      _currentPage = 1;
     });
   }
 
@@ -165,10 +171,10 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
             searchController: _searchController,
             searchQuery: _searchQuery,
             hasFilter: _hasFilter,
-            onSearchChanged: (v) => setState(() => _searchQuery = v),
+            onSearchChanged: (v) => setState(() { _searchQuery = v; _currentPage = 1; }),
             onSearchCleared: () {
               _searchController.clear();
-              setState(() => _searchQuery = '');
+              setState(() { _searchQuery = ''; _currentPage = 1; });
             },
             onRefresh: () => ref.read(salesHistoryProvider.notifier).refresh(),
             onClearFilter: _hasFilter ? _clearFilters : null,
@@ -182,10 +188,10 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
             statusFilter: _statusFilter,
             onPickFrom: () => _pickDate(true),
             onPickTo: () => _pickDate(false),
-            onClearFrom: () => setState(() => _dateFrom = null),
-            onClearTo: () => setState(() => _dateTo = null),
-            onPaymentChanged: (v) => setState(() => _paymentFilter = v),
-            onStatusChanged: (v) => setState(() => _statusFilter = v),
+            onClearFrom: () => setState(() { _dateFrom = null; _currentPage = 1; }),
+            onClearTo: () => setState(() { _dateTo = null; _currentPage = 1; }),
+            onPaymentChanged: (v) => setState(() { _paymentFilter = v; _currentPage = 1; }),
+            onStatusChanged: (v) => setState(() { _statusFilter = v; _currentPage = 1; }),
           ),
 
           // ── Body ─────────────────────────────────────────────────
@@ -200,6 +206,13 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                 final summary = _calcSummary(filtered);
 
                 if (filtered.isEmpty) return _buildEmpty(orders.isEmpty);
+
+                // Pagination slice
+                final totalPages = (filtered.length / _pageSize).ceil();
+                final safePage = _currentPage.clamp(1, totalPages);
+                final pageStart = (safePage - 1) * _pageSize;
+                final pageEnd = (pageStart + _pageSize).clamp(0, filtered.length);
+                final pageItems = filtered.sublist(pageStart, pageEnd);
 
                 final screenW = MediaQuery.of(context).size.width - 32;
                 final totalW = 40.0 +
@@ -252,6 +265,7 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                                             _sortColumn = col;
                                             _sortAsc = col != 'date';
                                           }
+                                          _currentPage = 1;
                                         }),
                                         onResize: (i, w) => setState(() {
                                           _colWidths[i] = w;
@@ -266,14 +280,14 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                                           height: 1, color: AppTheme.border),
                                       Expanded(
                                         child: ListView.separated(
-                                          itemCount: filtered.length,
+                                          itemCount: pageItems.length,
                                           separatorBuilder: (_, _) =>
                                               const Divider(
                                                   height: 1,
                                                   color: AppTheme.border),
                                           itemBuilder: (context, i) {
                                             return _SalesOrderRow(
-                                              order: filtered[i],
+                                              order: pageItems[i],
                                               colWidths: _colWidths,
                                               dateFmt: _dateFmt,
                                               fmt: _fmt,
@@ -282,7 +296,7 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                                                 MaterialPageRoute(
                                                   builder: (_) =>
                                                       OrderDetailsPage(
-                                                          orderId: filtered[i]
+                                                          orderId: pageItems[i]
                                                               .orderId),
                                                 ),
                                               ),
@@ -297,26 +311,12 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                             ),
                           ),
 
-                          // ── Footer ─────────────────────────────
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 10),
-                            decoration: const BoxDecoration(
-                              color: AppTheme.headerBg,
-                              borderRadius: BorderRadius.only(
-                                bottomLeft: Radius.circular(12),
-                                bottomRight: Radius.circular(12),
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Text(
-                                  'แสดง ${filtered.length} จาก ${orders.length} รายการ',
-                                  style: const TextStyle(
-                                      fontSize: 12, color: AppTheme.textSub),
-                                ),
-                              ],
-                            ),
+                          // ── Footer / Pagination ────────────────
+                          PaginationBar(
+                            currentPage: safePage,
+                            totalItems: filtered.length,
+                            pageSize: _pageSize,
+                            onPageChanged: (p) => setState(() => _currentPage = p),
                           ),
                         ],
                       ),

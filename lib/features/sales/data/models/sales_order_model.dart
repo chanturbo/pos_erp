@@ -12,7 +12,9 @@ class SalesOrderModel {
   final double changeAmount;
   final String status;
   final List<SalesOrderItemModel>? items;
-  
+  final List<String>? couponCodes;   // รหัสคูปองที่ใช้
+  final double couponDiscount;       // ส่วนลดรวมจากคูปอง
+
   SalesOrderModel({
     required this.orderId,
     required this.orderNo,
@@ -27,6 +29,8 @@ class SalesOrderModel {
     required this.changeAmount,
     required this.status,
     this.items,
+    this.couponCodes,
+    this.couponDiscount = 0.0,
   });
   
   factory SalesOrderModel.fromJson(Map<String, dynamic> json) {
@@ -49,6 +53,8 @@ class SalesOrderModel {
               .map((item) => SalesOrderItemModel.fromJson(item))
               .toList()
           : null,
+      couponCodes: (json['coupon_codes'] as List?)?.map((e) => e.toString()).toList(),
+      couponDiscount: (json['coupon_discount'] as num?)?.toDouble() ?? 0.0,
     );
   }
   
@@ -67,6 +73,8 @@ class SalesOrderModel {
       'change_amount': changeAmount,
       'status': status,
       'items': items?.map((item) => item.toJson()).toList(),
+      'coupon_codes': couponCodes,
+      'coupon_discount': couponDiscount,
     };
   }
 }

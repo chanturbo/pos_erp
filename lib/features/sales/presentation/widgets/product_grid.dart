@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../products/data/models/product_model.dart';
 import '../providers/cart_provider.dart';
 import '../../../../shared/theme/app_theme.dart';
@@ -21,7 +22,15 @@ final productViewModeProvider =
 
 class _ViewModeNotifier extends Notifier<ProductViewMode> {
   @override
-  ProductViewMode build() => ProductViewMode.list;
+  ProductViewMode build() {
+    Future.microtask(() async {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getString('pos_product_view_mode') ?? 'list';
+      state = saved == 'grid' ? ProductViewMode.grid : ProductViewMode.list;
+    });
+    return ProductViewMode.list;
+  }
+
   void set(ProductViewMode mode) => state = mode;
 }
 

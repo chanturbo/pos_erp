@@ -11,6 +11,8 @@ import '../../../customers/presentation/providers/customer_provider.dart'; // �
 import '../../../settings/presentation/pages/settings_page.dart';
 import '../../../promotions/presentation/providers/promotion_provider.dart';
 import '../providers/cart_provider.dart';
+import '../providers/sales_provider.dart';
+import '../../../dashboard/presentation/providers/dashboard_provider.dart';
 import '../../../../shared/services/mobile_scanner_service.dart';
 
 class PaymentPage extends ConsumerStatefulWidget {
@@ -686,6 +688,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
         'warehouse_id': 'WH001',
         'subtotal': cartState.subtotal,
         'discount_amount': cartState.totalDiscount + cartState.totalCouponDiscount,
+        'coupon_discount': cartState.totalCouponDiscount,
         'amount_before_vat': cartState.total,
         'vat_amount': 0.0,
         'total_amount': cartState.total,
@@ -737,6 +740,10 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
 
         ref.read(cartProvider.notifier).clear();
 
+        // ✅ refresh sales list & dashboard หลังบันทึกออเดอร์สำเร็จ
+        ref.invalidate(salesHistoryProvider);
+        ref.invalidate(dashboardProvider);
+
         // ✅ อ่านค่าแบบ null-safe ป้องกัน crash ถ้า API response ผิดรูปแบบ
         final responseData =
             response.data is Map ? response.data as Map : {};
@@ -758,17 +765,18 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
             context,
             MaterialPageRoute(
               builder: (_) => ReceiptPage(
-                orderNo:      orderNo,
-                orderDate:    DateTime.now(),
-                customerName: cartState.customerName,
-                items:        cartState.items,
-                subtotal:     cartState.subtotal,
-                discount:     cartState.totalDiscount,
-                total:        cartState.total,
-                paymentType:  _paymentType,
-                paidAmount:   paidAmount,
-                changeAmount: changeAmount,
-                earnedPoints: earnedPoints,
+                orderNo:        orderNo,
+                orderDate:      DateTime.now(),
+                customerName:   cartState.customerName,
+                items:          cartState.items,
+                subtotal:       cartState.subtotal,
+                discount:       cartState.totalDiscount,
+                appliedCoupons: cartState.appliedCoupons,
+                total:          cartState.total,
+                paymentType:    _paymentType,
+                paidAmount:     paidAmount,
+                changeAmount:   changeAmount,
+                earnedPoints:   earnedPoints,
               ),
             ),
           );
@@ -1224,6 +1232,7 @@ class ReceiptPage extends ConsumerWidget {
   final List<CartItem> items;
   final double   subtotal;
   final double   discount;
+  final List<AppliedCoupon> appliedCoupons;
   final double   total;
   final String   paymentType;
   final double   paidAmount;
@@ -1242,6 +1251,7 @@ class ReceiptPage extends ConsumerWidget {
     required this.paidAmount,
     required this.changeAmount,
     this.customerName,
+    this.appliedCoupons = const [],
     this.earnedPoints = 0,
   });
 
@@ -1280,23 +1290,24 @@ class ReceiptPage extends ConsumerWidget {
             children: [
               // ── ใบเสร็จ ─────────────────────────────────────────
               _ThermalReceipt(
-                companyName:  settings.companyName,
-                address:      settings.address,
-                phone:        settings.phone,
-                taxId:        settings.taxId,
-                orderNo:      orderNo,
-                orderDate:    dateFmt.format(orderDate),
-                customerName: customerName,
-                items:        items,
-                subtotal:     subtotal,
-                discount:     discount,
-                total:        total,
-                paymentLabel: _paymentLabel(paymentType),
-                paymentType:  paymentType,
-                paidAmount:   paidAmount,
-                changeAmount: changeAmount,
-                earnedPoints: earnedPoints,
-                numFmt:       numFmt,
+                companyName:    settings.companyName,
+                address:        settings.address,
+                phone:          settings.phone,
+                taxId:          settings.taxId,
+                orderNo:        orderNo,
+                orderDate:      dateFmt.format(orderDate),
+                customerName:   customerName,
+                items:          items,
+                subtotal:       subtotal,
+                discount:       discount,
+                appliedCoupons: appliedCoupons,
+                total:          total,
+                paymentLabel:   _paymentLabel(paymentType),
+                paymentType:    paymentType,
+                paidAmount:     paidAmount,
+                changeAmount:   changeAmount,
+                earnedPoints:   earnedPoints,
+                numFmt:         numFmt,
               ),
 
               const SizedBox(height: 32),
@@ -1344,6 +1355,7 @@ class _ThermalReceipt extends StatelessWidget {
   final List<CartItem> items;
   final double   subtotal;
   final double   discount;
+  final List<AppliedCoupon> appliedCoupons;
   final double   total;
   final String   paymentLabel;
   final String   paymentType;
@@ -1369,6 +1381,7 @@ class _ThermalReceipt extends StatelessWidget {
     required this.changeAmount,
     required this.numFmt,
     this.customerName,
+    this.appliedCoupons = const [],
     this.earnedPoints = 0,
   });
 
@@ -1476,6 +1489,12 @@ class _ThermalReceipt extends StatelessWidget {
                 if (discount > 0)
                   _row('ส่วนลด', '-฿${numFmt.format(discount)}',
                       valueColor: Colors.red[700]),
+                ...appliedCoupons.map((c) => _row(
+                      'คูปอง ${c.code}',
+                      '-฿${numFmt.format(c.discount)}',
+                      valueColor: Colors.red[700],
+                      subLabel: c.promotionName,
+                    )),
 
                 const SizedBox(height: 4),
                 _solidLine(),
@@ -1554,13 +1573,23 @@ class _ThermalReceipt extends StatelessWidget {
   }
 
   // helpers
-  Widget _row(String label, String value, {Color? valueColor}) =>
+  Widget _row(String label, String value, {Color? valueColor, String? subLabel}) =>
       Padding(
         padding: const EdgeInsets.symmetric(vertical: 2),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(label, style: _mono),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: _mono),
+                  if (subLabel != null && subLabel.isNotEmpty)
+                    Text(subLabel, style: _monoSm, overflow: TextOverflow.ellipsis),
+                ],
+              ),
+            ),
             Text(value,
                 style: valueColor != null
                     ? _mono.copyWith(color: valueColor)

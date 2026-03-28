@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pos_erp/features/customers/data/models/customer_model.dart';
 import '../../../../shared/pdf/pdf_report_button.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
+import 'package:pos_erp/shared/widgets/pagination_bar.dart';
 import '../providers/customer_provider.dart';
 import 'customer_detail_page.dart'; // ✅
 import 'customer_form_page.dart';
@@ -27,6 +28,10 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
   // column keys: 'name','code','phone','memberNo','points','creditLimit','status'
   String _sortColumn = 'name';
   bool   _sortAsc    = true;
+
+  // ── Pagination ──────────────────────────────────────────────────
+  int _currentPage = 1;
+  static const int _pageSize = 20;
 
   // ✅ ความกว้างคอลัมน์ (pixel) — auto-fit ตามเนื้อหา + ลากขยาย/ย่อได้
   // ลำดับ: [ชื่อ, รหัส, โทร, สมาชิก, คะแนน, เครดิต, สถานะ, จัดการ]
@@ -73,13 +78,13 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
             searchQuery: _searchQuery,
             showMembersOnly: _showMembersOnly,
             isTableView: _isTableView,
-            onSearchChanged: (v) => setState(() => _searchQuery = v),
+            onSearchChanged: (v) => setState(() { _searchQuery = v; _currentPage = 1; }),
             onSearchCleared: () {
               _searchController.clear();
-              setState(() => _searchQuery = '');
+              setState(() { _searchQuery = ''; _currentPage = 1; });
             },
             onToggleMember: () =>
-                setState(() => _showMembersOnly = !_showMembersOnly),
+                setState(() { _showMembersOnly = !_showMembersOnly; _currentPage = 1; }),
             onToggleView: () => setState(() => _isTableView = !_isTableView),
             onRefresh: () => ref.read(customerListProvider.notifier).refresh(),
             onAdd: () async {
@@ -141,9 +146,26 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
 
                 if (filtered.isEmpty) return _buildEmpty();
 
+                // Pagination
+                final totalPages = (filtered.length / _pageSize).ceil();
+                final safePage = _currentPage.clamp(1, totalPages);
+                final pageStart = (safePage - 1) * _pageSize;
+                final pageEnd = (pageStart + _pageSize).clamp(0, filtered.length);
+                final pageItems = filtered.sublist(pageStart, pageEnd);
+
                 // ✅ Card View เมื่อ user เลือก
                 if (!_isTableView) {
-                  return _buildCustomerCardView(context, filtered);
+                  return Column(
+                    children: [
+                      Expanded(child: _buildCustomerCardView(context, pageItems)),
+                      PaginationBar(
+                        currentPage: safePage,
+                        totalItems: filtered.length,
+                        pageSize: _pageSize,
+                        onPageChanged: (p) => setState(() => _currentPage = p),
+                      ),
+                    ],
+                  );
                 }
 
                 // ✅ Auto-fit colWidths ตามเนื้อหา (เฉพาะครั้งแรก / ยังไม่ resize)
@@ -197,6 +219,7 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
                                             _sortColumn = col;
                                             _sortAsc = true;
                                           }
+                                          _currentPage = 1;
                                         }),
                                         onResize: (i, w) => setState(() {
                                           _colWidths[i] = w;
@@ -216,14 +239,14 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
                                       // Rows — ใช้ shrinkWrap ภายใน Column ที่รู้ขนาดแล้ว
                                       Expanded(
                                         child: ListView.separated(
-                                          itemCount: filtered.length,
+                                          itemCount: pageItems.length,
                                           separatorBuilder: (_, _) =>
                                               const Divider(
                                                 height: 1,
                                                 color: AppTheme.border,
                                               ),
                                           itemBuilder: (context, i) {
-                                            final c = filtered[i];
+                                            final c = pageItems[i];
                                             final isMember =
                                                 c.memberNo != null &&
                                                 c.memberNo!.isNotEmpty;
@@ -281,30 +304,12 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
                               ),
                             ),
                           ),
-                          // ── Footer (ไม่ scroll แนวนอน) ───────────────
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 10,
-                            ),
-                            decoration: const BoxDecoration(
-                              color: AppTheme.headerBg,
-                              borderRadius: BorderRadius.only(
-                                bottomLeft: Radius.circular(12),
-                                bottomRight: Radius.circular(12),
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Text(
-                                  'ทั้งหมด ${filtered.length} รายการ',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: AppTheme.textSub,
-                                  ),
-                                ),
-                              ],
-                            ),
+                          // ── Footer / Pagination ───────────────────
+                          PaginationBar(
+                            currentPage: safePage,
+                            totalItems: filtered.length,
+                            pageSize: _pageSize,
+                            onPageChanged: (p) => setState(() => _currentPage = p),
                           ),
                         ],
                       ),

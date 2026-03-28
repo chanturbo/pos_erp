@@ -26,6 +26,8 @@ class SettingsState {
   final double pointValue;      // 1 แต้ม = กี่บาท (สำหรับแลก)
   // ✅ PromptPay
   final String promptPayId;
+  // ✅ POS View Mode
+  final String posProductViewMode; // 'list' | 'grid'
 
   SettingsState({
     this.companyName          = 'บริษัท ทดสอบ POS จำกัด',
@@ -40,6 +42,7 @@ class SettingsState {
     this.pointsPerBaht        = 100.0,
     this.pointValue           = 1.0,
     this.promptPayId          = '',
+    this.posProductViewMode   = 'list',
   });
 
   SettingsState copyWith({
@@ -55,6 +58,7 @@ class SettingsState {
     double? pointsPerBaht,
     double? pointValue,
     String? promptPayId,
+    String? posProductViewMode,
   }) {
     return SettingsState(
       companyName:         companyName         ?? this.companyName,
@@ -69,6 +73,7 @@ class SettingsState {
       pointsPerBaht:       pointsPerBaht       ?? this.pointsPerBaht,
       pointValue:          pointValue          ?? this.pointValue,
       promptPayId:         promptPayId         ?? this.promptPayId,
+      posProductViewMode:  posProductViewMode  ?? this.posProductViewMode,
     );
   }
 }
@@ -100,6 +105,7 @@ class SettingsNotifier extends Notifier<SettingsState> {
       pointsPerBaht:       prefs.getDouble('points_per_baht')      ?? state.pointsPerBaht,
       pointValue:          prefs.getDouble('point_value')          ?? state.pointValue,
       promptPayId:         prefs.getString('promptpay_id')         ?? state.promptPayId,
+      posProductViewMode:  prefs.getString('pos_product_view_mode') ?? state.posProductViewMode,
     );
   }
 
@@ -142,6 +148,13 @@ class SettingsNotifier extends Notifier<SettingsState> {
       enableLowStockAlert: enableLowStockAlert,
       lowStockThreshold:   lowStockThreshold,
     );
+  }
+
+  // ✅ POS View Mode
+  Future<void> updatePosViewMode(String mode) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('pos_product_view_mode', mode);
+    state = state.copyWith(posProductViewMode: mode);
   }
 
   // ✅ Loyalty Points
@@ -288,6 +301,17 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   const SizedBox(height: 16),
 
                   // ══════════════════════════════════════════
+                  // 🛒 ตั้งค่าหน้าขาย
+                  // ══════════════════════════════════════════
+                  _SectionCard(
+                    title: 'ตั้งค่าหน้าขาย (POS)',
+                    icon: Icons.point_of_sale_outlined,
+                    isDark: isDark,
+                    child: _buildPosSection(settings, isDark),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // ══════════════════════════════════════════
                   // 🏢 ข้อมูลบริษัท
                   // ══════════════════════════════════════════
                   _SectionCard(
@@ -406,6 +430,104 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           style: const ButtonStyle(visualDensity: VisualDensity.compact),
         ),
       ],
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // POS Section
+  // ─────────────────────────────────────────────────────────────
+  Widget _buildPosSection(SettingsState settings, bool isDark) {
+    final isGrid = settings.posProductViewMode == 'grid';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'รูปแบบแสดงรายการสินค้าเริ่มต้น',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: isDark ? Colors.white : Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'เลือกรูปแบบที่ต้องการแสดงเมื่อเปิดหน้าขาย',
+          style: TextStyle(
+            fontSize: 12,
+            color: isDark ? Colors.white54 : AppTheme.textSub,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _viewModeOption(
+                label: 'Grid View',
+                icon: Icons.grid_view,
+                selected: isGrid,
+                isDark: isDark,
+                onTap: () => ref
+                    .read(settingsProvider.notifier)
+                    .updatePosViewMode('grid'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _viewModeOption(
+                label: 'List View',
+                icon: Icons.view_list,
+                selected: !isGrid,
+                isDark: isDark,
+                onTap: () => ref
+                    .read(settingsProvider.notifier)
+                    .updatePosViewMode('list'),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _viewModeOption({
+    required String label,
+    required IconData icon,
+    required bool selected,
+    required bool isDark,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: selected
+              ? AppTheme.primary.withValues(alpha: 0.1)
+              : (isDark ? const Color(0xFF2A2A2A) : Colors.white),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: selected ? AppTheme.primary : (isDark ? Colors.white24 : AppTheme.border),
+            width: selected ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(icon,
+                size: 28,
+                color: selected ? AppTheme.primary : (isDark ? Colors.white54 : Colors.grey)),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+                color: selected ? AppTheme.primary : (isDark ? Colors.white70 : Colors.black87),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

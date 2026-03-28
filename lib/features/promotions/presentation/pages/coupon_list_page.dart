@@ -494,7 +494,7 @@ class _TopBar extends StatelessWidget {
             style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: null)),
+                color: Color(0xFF1A1A1A))),
         const Spacer(),
         ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 260),
@@ -530,7 +530,7 @@ class _TopBar extends StatelessWidget {
                 style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.bold,
-                    color: null)),
+                    color: Color(0xFF1A1A1A))),
             const Spacer(),
             if (hasFilter && onClearFilter != null)
               _ClearFilterBtn(onTap: onClearFilter!),
@@ -592,7 +592,8 @@ class _FilterBar extends StatelessWidget {
                 selected: selected,
                 selectedColor: color.withValues(alpha: 0.12),
                 checkmarkColor: color,
-                side: BorderSide(color: selected ? color : AppTheme.border),
+                side: BorderSide(
+                    color: selected ? color : AppTheme.border),
                 backgroundColor: const Color(0xFFF5F5F5),
                 onSelected: (_) => onFilterChanged(value),
               ),
@@ -716,7 +717,9 @@ class _CouponRow extends StatelessWidget {
                         fontFamily: 'monospace',
                         letterSpacing: 1.2,
                         decoration: coupon.isUsed ? TextDecoration.lineThrough : null,
-                        color: coupon.isUsed ? AppTheme.textSub : null,
+                        color: coupon.isUsed
+                            ? AppTheme.textSub
+                            : const Color(0xFF1A1A1A),
                       ),
                     ),
                     if (!coupon.isUsed && !coupon.isExpired) ...[
@@ -1004,7 +1007,7 @@ class _SearchField extends StatelessWidget {
         height: 38,
         child: TextField(
           controller: controller,
-          style: const TextStyle(fontSize: 13),
+          style: const TextStyle(fontSize: 13, color: Color(0xFF1A1A1A)),
           decoration: InputDecoration(
             hintText: 'ค้นหาโค้ดคูปอง...',
             hintStyle: const TextStyle(fontSize: 13, color: AppTheme.textSub),
@@ -1106,7 +1109,8 @@ class _BackBtn extends StatelessWidget {
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: AppTheme.border),
           ),
-          child: const Icon(Icons.arrow_back, size: 17, color: AppTheme.textSub),
+          child: const Icon(Icons.arrow_back,
+              size: 17, color: AppTheme.textSub),
         ),
       );
 }

@@ -12,12 +12,15 @@ class DashboardPage extends ConsumerWidget {
   final VoidCallback? onGoToProducts;
   final VoidCallback? onGoToCustomers;
   final VoidCallback? onGoToSalesHistory;
+  /// เปิดหน้ารายการขาย กรองเฉพาะวันนี้ (ใช้ตอนกด card ยอดขายวันนี้/ออเดอร์วันนี้)
+  final VoidCallback? onGoToTodaySales;
 
   const DashboardPage({
     super.key,
     this.onGoToProducts,
     this.onGoToCustomers,
     this.onGoToSalesHistory,
+    this.onGoToTodaySales,
   });
 
   @override
@@ -76,6 +79,7 @@ class DashboardPage extends ConsumerWidget {
           onGoToProducts: onGoToProducts,
           onGoToCustomers: onGoToCustomers,
           onGoToSalesHistory: onGoToSalesHistory,
+          onGoToTodaySales: onGoToTodaySales,
         ),
       ),
     );
@@ -90,12 +94,14 @@ class _DashboardBody extends StatelessWidget {
   final VoidCallback? onGoToProducts;
   final VoidCallback? onGoToCustomers;
   final VoidCallback? onGoToSalesHistory;
+  final VoidCallback? onGoToTodaySales;
 
   const _DashboardBody({
     required this.stats,
     this.onGoToProducts,
     this.onGoToCustomers,
     this.onGoToSalesHistory,
+    this.onGoToTodaySales,
   });
 
   @override
@@ -141,6 +147,11 @@ class _DashboardBody extends StatelessWidget {
   }
 
   void _openTodaySales(BuildContext context) {
+    if (onGoToTodaySales != null) {
+      onGoToTodaySales!();
+      return;
+    }
+    // fallback: push route (mobile หรือกรณีไม่มี callback)
     final today = DateTime.now();
     Navigator.push(
       context,
