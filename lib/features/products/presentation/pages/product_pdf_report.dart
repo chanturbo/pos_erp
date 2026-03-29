@@ -52,8 +52,8 @@ class ProductPdfBuilder {
     final summaryLine =
         'ทั้งหมด ${products.length} รายการ   ใช้งาน $activeCount รายการ   ไม่ใช้งาน ${products.length - activeCount} รายการ';
 
-    // แบ่ง page (30 rows/page — landscape A4)
-    const rowsPerPage = 30;
+    // แบ่ง page (38 rows/page — portrait A4)
+    const rowsPerPage = 38;
     final pages = <List<ProductModel>>[];
     for (var i = 0; i < products.length; i += rowsPerPage) {
       pages.add(products.sublist(
@@ -70,7 +70,7 @@ class ProductPdfBuilder {
 
       doc.addPage(
         pw.Page(
-          pageFormat: PdfPageFormat.a4.landscape,
+          pageFormat: PdfPageFormat.a4,
           margin: const pw.EdgeInsets.all(24),
           build: (ctx) => pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.stretch,
@@ -160,15 +160,16 @@ class ProductPdfBuilder {
     required pw.Font ttf,
     required pw.Font ttfRegular,
   }) {
+    // portrait A4 usable ≈ 547pt — fixed total 362pt → flex ≈ 185pt
     const colWidths = [
-      pw.FixedColumnWidth(36),   // #
-      pw.FixedColumnWidth(80),   // รหัส
-      pw.FlexColumnWidth(2.5),   // ชื่อ
-      pw.FixedColumnWidth(55),   // หน่วย
-      pw.FixedColumnWidth(75),   // ราคา
-      pw.FixedColumnWidth(75),   // ต้นทุน
-      pw.FixedColumnWidth(55),   // สต๊อก
-      pw.FixedColumnWidth(55),   // สถานะ
+      pw.FixedColumnWidth(26),   // #
+      pw.FixedColumnWidth(72),   // รหัส
+      pw.FlexColumnWidth(1),     // ชื่อ
+      pw.FixedColumnWidth(45),   // หน่วย
+      pw.FixedColumnWidth(62),   // ราคา
+      pw.FixedColumnWidth(62),   // ต้นทุน
+      pw.FixedColumnWidth(50),   // สต๊อก
+      pw.FixedColumnWidth(45),   // สถานะ
     ];
 
     pw.Widget cell(String text, pw.Font font,

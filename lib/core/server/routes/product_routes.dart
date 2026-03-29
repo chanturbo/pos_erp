@@ -44,6 +44,7 @@ class ProductRoutes {
         'is_stock_control': p.isStockControl,
         'allow_negative_stock': p.allowNegativeStock,
         'is_active': p.isActive,
+        'image_path': p.imagePath,
       };
 
   // ─────────────────────────────────────────────────────────────
@@ -109,7 +110,8 @@ class ProductRoutes {
               product_id, product_code, product_name, barcode, group_id,
               base_unit, price_level1, price_level2, price_level3,
               price_level4, price_level5, standard_cost,
-              is_stock_control, allow_negative_stock, is_active
+              is_stock_control, allow_negative_stock, is_active,
+              image_path
             FROM products
             $where
             ORDER BY product_code ASC
@@ -137,6 +139,7 @@ class ProductRoutes {
               'is_stock_control': row.read<bool>('is_stock_control'),
               'allow_negative_stock': row.read<bool>('allow_negative_stock'),
               'is_active': row.read<bool>('is_active'),
+              'image_path': row.readNullable<String>('image_path'),
             },
           )
           .toList();
@@ -226,6 +229,7 @@ class ProductRoutes {
               standardCost: Value((data['standard_cost'] as num?)?.toDouble() ?? 0),
               isStockControl: Value(data['is_stock_control'] as bool? ?? true),
               allowNegativeStock: Value(data['allow_negative_stock'] as bool? ?? false),
+              imagePath: Value(data['image_path'] as String?),
             ),
           );
 
@@ -293,6 +297,9 @@ class ProductRoutes {
           standardCost: Value((data['standard_cost'] as num?)?.toDouble() ?? 0),
           isStockControl: Value(data['is_stock_control'] as bool? ?? true),
           allowNegativeStock: Value(data['allow_negative_stock'] as bool? ?? false),
+          imagePath: data.containsKey('image_path')
+              ? Value(data['image_path'] as String?)
+              : const Value.absent(),
           updatedAt: Value(DateTime.now()),
         ),
       );

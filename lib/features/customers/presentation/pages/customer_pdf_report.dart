@@ -60,8 +60,8 @@ class CustomerPdfBuilder {
     final summaryLine =
         'ทั้งหมด $total ราย   ใช้งาน $active ราย   สมาชิก $members ราย   เครดิต $creditCount ราย';
 
-    // แบ่ง page (28 rows/page — landscape A4)
-    const rowsPerPage = 28;
+    // แบ่ง page (38 rows/page — portrait A4)
+    const rowsPerPage = 38;
     final pages = <List<CustomerModel>>[];
     for (var i = 0; i < customers.length; i += rowsPerPage) {
       pages.add(customers.sublist(
@@ -80,7 +80,7 @@ class CustomerPdfBuilder {
 
       doc.addPage(
         pw.Page(
-          pageFormat: PdfPageFormat.a4.landscape,
+          pageFormat: PdfPageFormat.a4,
           margin: const pw.EdgeInsets.all(24),
           build: (ctx) => pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.stretch,
@@ -170,15 +170,16 @@ class CustomerPdfBuilder {
     required pw.Font ttf,
     required pw.Font ttfRegular,
   }) {
+    // portrait A4 usable ≈ 547pt — fixed total 368pt → flex ≈ 179pt
     const colWidths = [
-      pw.FixedColumnWidth(32),   // #
-      pw.FixedColumnWidth(70),   // รหัส
-      pw.FlexColumnWidth(2.0),   // ชื่อ
-      pw.FixedColumnWidth(90),   // โทร
-      pw.FixedColumnWidth(65),   // เลขสมาชิก
-      pw.FixedColumnWidth(55),   // คะแนน
-      pw.FixedColumnWidth(75),   // วงเงิน
-      pw.FixedColumnWidth(55),   // สถานะ
+      pw.FixedColumnWidth(26),   // #
+      pw.FixedColumnWidth(60),   // รหัส
+      pw.FlexColumnWidth(1),     // ชื่อ
+      pw.FixedColumnWidth(75),   // โทร
+      pw.FixedColumnWidth(55),   // เลขสมาชิก
+      pw.FixedColumnWidth(45),   // คะแนน
+      pw.FixedColumnWidth(62),   // วงเงิน
+      pw.FixedColumnWidth(45),   // สถานะ
     ];
 
     pw.Widget cell(String text, pw.Font font,

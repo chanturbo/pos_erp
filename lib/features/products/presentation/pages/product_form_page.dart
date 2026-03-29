@@ -2,6 +2,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
 import '../providers/product_provider.dart';
 import '../../data/models/product_model.dart';
 import '../../../../shared/services/mobile_scanner_service.dart';
@@ -132,9 +134,20 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
       allowMultiple: false,
     );
     if (result == null || result.files.isEmpty) return;
-    final path = result.files.first.path;
-    if (path == null) return;
-    setState(() => _imagePath = path);
+    final srcPath = result.files.first.path;
+    if (srcPath == null) return;
+
+    // copy ไฟล์ไปไว้ใน app documents เพื่อให้ path คงที่ ไม่หายเมื่อ source ถูกลบ
+    final docsDir = await getApplicationDocumentsDirectory();
+    final imgDir  = Directory(p.join(docsDir.path, 'product_images'));
+    if (!imgDir.existsSync()) imgDir.createSync(recursive: true);
+
+    final ext     = p.extension(srcPath);
+    final dstName = 'product_${DateTime.now().millisecondsSinceEpoch}$ext';
+    final dstPath = p.join(imgDir.path, dstName);
+    await File(srcPath).copy(dstPath);
+
+    setState(() => _imagePath = dstPath);
   }
 
   void _removeImage() => setState(() => _imagePath = null);

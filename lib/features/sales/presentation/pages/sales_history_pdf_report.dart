@@ -72,8 +72,8 @@ class SalesHistoryPdfBuilder {
     final summaryLine =
         'ทั้งหมด ${orders.length} ใบ   สำเร็จ ${completed.length} ใบ   รอดำเนิน ${pending.length} ใบ   ยกเลิก ${cancelled.length} ใบ   ยอดรวม ฿${_fmt.format(totalRevenue)}';
 
-    // แบ่งหน้า 30 rows / page (A4 แนวนอน)
-    const rowsPerPage = 30;
+    // แบ่งหน้า 38 rows / page (A4 แนวตั้ง)
+    const rowsPerPage = 38;
     final pages = <List<SalesOrderModel>>[];
     for (var i = 0; i < orders.length; i += rowsPerPage) {
       final end = (i + rowsPerPage) > orders.length ? orders.length : i + rowsPerPage;
@@ -88,7 +88,7 @@ class SalesHistoryPdfBuilder {
 
       doc.addPage(
         pw.Page(
-          pageFormat: PdfPageFormat.a4.landscape,
+          pageFormat: PdfPageFormat.a4,
           margin: const pw.EdgeInsets.all(24),
           build: (ctx) => pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.stretch,
@@ -183,15 +183,16 @@ class SalesHistoryPdfBuilder {
     required pw.Font ttf,
     required pw.Font ttfRegular,
   }) {
+    // portrait A4 usable ≈ 547pt — fixed total 417pt → flex ≈ 130pt
     const colWidths = {
-      0: pw.FixedColumnWidth(32),   // #
-      1: pw.FixedColumnWidth(100),  // วันที่
-      2: pw.FixedColumnWidth(110),  // เลขที่
-      3: pw.FlexColumnWidth(2),     // ลูกค้า
-      4: pw.FixedColumnWidth(65),   // ชำระด้วย
-      5: pw.FixedColumnWidth(70),   // ส่วนลด
-      6: pw.FixedColumnWidth(85),   // ยอดรวม
-      7: pw.FixedColumnWidth(65),   // สถานะ
+      0: pw.FixedColumnWidth(24),   // #
+      1: pw.FixedColumnWidth(80),   // วันที่
+      2: pw.FixedColumnWidth(88),   // เลขที่
+      3: pw.FlexColumnWidth(1),     // ลูกค้า
+      4: pw.FixedColumnWidth(50),   // ชำระด้วย
+      5: pw.FixedColumnWidth(55),   // ส่วนลด
+      6: pw.FixedColumnWidth(70),   // ยอดรวม
+      7: pw.FixedColumnWidth(50),   // สถานะ
     };
 
     pw.Widget cell(String text, pw.Font font,
