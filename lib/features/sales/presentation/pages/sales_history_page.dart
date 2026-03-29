@@ -323,13 +323,22 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                               title: 'รายงานประวัติการขาย',
                               filename: () =>
                                   PdfFilename.generate('sales_history_report'),
-                              buildPdf: () => SalesHistoryPdfBuilder.build(
-                                filtered,
-                                dateFrom: _dateFrom,
-                                dateTo: _dateTo,
-                                paymentFilter: _paymentFilter,
-                                statusFilter: _statusFilter,
-                              ),
+                              buildPdf: () {
+                                final allOrders = ref
+                                        .read(salesHistoryProvider)
+                                        .asData
+                                        ?.value ??
+                                    [];
+                                final current =
+                                    _applySort(_applyFilter(allOrders));
+                                return SalesHistoryPdfBuilder.build(
+                                  current,
+                                  dateFrom: _dateFrom,
+                                  dateTo: _dateTo,
+                                  paymentFilter: _paymentFilter,
+                                  statusFilter: _statusFilter,
+                                );
+                              },
                               hasData: filtered.isNotEmpty,
                             ),
                           ),

@@ -10,6 +10,7 @@ import '../widgets/stock_in_dialog.dart';
 import '../widgets/stock_out_dialog.dart';
 import '../widgets/stock_adjust_dialog.dart';
 import '../widgets/stock_transfer_dialog.dart';
+import '../widgets/stock_product_history_dialog.dart';
 import 'stock_movement_history_page.dart';
 import 'stock_balance_pdf_report.dart';
 import '../../data/models/stock_balance_model.dart';
@@ -700,6 +701,20 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
                 showDialog(
                     context: context,
                     builder: (_) => StockAdjustDialog(stock: stock));
+              },
+            ),
+            const Divider(height: 1),
+            ListTile(
+              leading: Icon(Icons.history,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.white
+                      : _navy),
+              title: const Text('ดูประวัติสต๊อก'),
+              onTap: () {
+                Navigator.pop(context);
+                showDialog(
+                    context: context,
+                    builder: (_) => StockProductHistoryDialog(stock: stock));
               },
             ),
             const SizedBox(height: 8),

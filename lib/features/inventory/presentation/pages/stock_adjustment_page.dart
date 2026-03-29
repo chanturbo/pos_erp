@@ -17,6 +17,7 @@ import '../../../inventory/data/models/stock_balance_model.dart';
 import '../../../inventory/presentation/providers/stock_provider.dart';
 import 'stock_movement_history_page.dart';
 import '../../../../shared/services/mobile_scanner_service.dart'; // ✅ Phase 5
+import '../../../../shared/theme/app_theme.dart';
 
 // ════════════════════════════════════════════════════════════════
 // ✅ STEP 1: StockAdjustmentPage — หน้าเมนูหลัก
@@ -26,131 +27,163 @@ class StockAdjustmentPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final canPop = Navigator.of(context).canPop();
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('📦 ปรับปรุงสต๊อก'),
-        backgroundColor: Colors.deepPurple,
-        foregroundColor: Colors.white,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header Info
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.deepPurple.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: Colors.deepPurple.withValues(alpha: 0.2),
+      backgroundColor: const Color(0xFFF5F5F5),
+      body: Column(
+        children: [
+          // ── TopBar ──────────────────────────────────────────────
+          Container(
+            color: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                if (canPop) ...[
+                  InkWell(
+                    onTap: () => Navigator.of(context).pop(),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF5F5F5),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppTheme.border),
+                      ),
+                      child: const Icon(Icons.arrow_back_ios_new,
+                          size: 15, color: Color(0xFF8A8A8A)),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                ],
+                Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.inventory_2_outlined,
+                      color: AppTheme.primaryColor, size: 18),
                 ),
-              ),
-              child: const Row(
+                const SizedBox(width: 10),
+                const Text(
+                  'ปรับปรุงสต๊อก',
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1A1A1A)),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+
+          // ── Content ─────────────────────────────────────────────
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.info_outline, color: Colors.deepPurple),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'เลือกประเภทการปรับปรุงสต๊อกที่ต้องการ\n'
-                      'ทุกการเปลี่ยนแปลงจะบันทึกประวัติไว้ในระบบ',
-                      style: TextStyle(fontSize: 13, color: Colors.deepPurple),
+                  // Info banner
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                          color: AppTheme.primaryColor.withValues(alpha: 0.3)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.info_outline,
+                            color: AppTheme.primaryColor, size: 18),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'เลือกประเภทการปรับปรุงสต๊อกที่ต้องการ\n'
+                            'ทุกการเปลี่ยนแปลงจะบันทึกประวัติไว้ในระบบ',
+                            style: TextStyle(
+                                fontSize: 13, color: AppTheme.primaryColor),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Section label
+                  const Text(
+                    'เลือกประเภทการปรับสต๊อก',
+                    style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1A1A1A)),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Menu cards — dashboard quick-menu style
+                  Card(
+                    elevation: 0,
+                    color: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: const BorderSide(color: AppTheme.border),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: GridView.count(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        crossAxisCount: 2,
+                        crossAxisSpacing: 10,
+                        mainAxisSpacing: 10,
+                        childAspectRatio: 2.8,
+                        children: [
+                          _MenuCard(
+                            icon: Icons.tune,
+                            label: 'ปรับสต๊อก (เพิ่ม/ลด)',
+                            color: AppTheme.primaryColor,
+                            onTap: () => Navigator.push(context,
+                                MaterialPageRoute(
+                                    builder: (_) =>
+                                        const AdjustStockSubPage())),
+                          ),
+                          _MenuCard(
+                            icon: Icons.fact_check_outlined,
+                            label: 'ตรวจนับสต๊อก',
+                            color: AppTheme.warningColor,
+                            onTap: () => Navigator.push(context,
+                                MaterialPageRoute(
+                                    builder: (_) =>
+                                        const StockTakeSubPage())),
+                          ),
+                          _MenuCard(
+                            icon: Icons.swap_horiz,
+                            label: 'โอนย้ายสต๊อก',
+                            color: AppTheme.tealColor,
+                            onTap: () => Navigator.push(context,
+                                MaterialPageRoute(
+                                    builder: (_) =>
+                                        const StockTransferSubPage())),
+                          ),
+                          _MenuCard(
+                            icon: Icons.analytics_outlined,
+                            label: 'รายงานผลต่าง',
+                            color: AppTheme.purpleColor,
+                            onTap: () => Navigator.push(context,
+                                MaterialPageRoute(
+                                    builder: (_) =>
+                                        const VarianceReportPage())),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 32),
-            const Text(
-              'เลือกประเภทการปรับสต๊อก',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-
-            Expanded(
-              child: GridView.count(
-                crossAxisCount: 2,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-                childAspectRatio: 1.3,
-                children: [
-                  // 1) ปรับสต๊อก (เพิ่ม/ลด) ✅ Step 2 พร้อมแล้ว
-                  _MenuCard(
-                    icon: Icons.tune,
-                    title: 'ปรับสต๊อก',
-                    subtitle: 'เพิ่มหรือลดสต๊อก\nรายการเดียว',
-                    color: Colors.blue,
-                    badge: '✅ พร้อมใช้',
-                    badgeColor: Colors.green,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const AdjustStockSubPage(),
-                        ),
-                      );
-                    },
-                  ),
-
-                  // 2) ตรวจนับสต๊อก (Stock Take)
-                  _MenuCard(
-                    icon: Icons.fact_check_outlined,
-                    title: 'ตรวจนับสต๊อก',
-                    subtitle: 'นับจริงทั้งคลัง\nแล้วเปรียบเทียบ',
-                    color: Colors.orange,
-                    badge: '✅ พร้อมใช้',
-                    badgeColor: Colors.green,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const StockTakeSubPage(),
-                        ),
-                      );
-                    },
-                  ),
-
-                  // 3) โอนย้ายสต๊อก (Transfer)
-                  _MenuCard(
-                    icon: Icons.swap_horiz,
-                    title: 'โอนย้ายสต๊อก',
-                    subtitle: 'โอนระหว่างคลัง\nต้นทาง → ปลายทาง',
-                    color: Colors.purple,
-                    badge: '✅ พร้อมใช้',
-                    badgeColor: Colors.green,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const StockTransferSubPage(),
-                        ),
-                      );
-                    },
-                  ),
-
-                  // 4) รายงานผลต่าง
-                  _MenuCard(
-                    icon: Icons.analytics_outlined,
-                    title: 'รายงานผลต่าง',
-                    subtitle: 'ดูผล Stock Take\nเกิน / ขาด / ตรง',
-                    color: Colors.teal,
-                    badge: '✅ พร้อมใช้',
-                    badgeColor: Colors.green,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const VarianceReportPage(),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -208,145 +241,231 @@ class _AdjustStockSubPageState extends ConsumerState<AdjustStockSubPage> {
     return _newBalance - current;
   }
 
+  List<StockBalanceModel> _filter(List<StockBalanceModel> src) {
+    if (_searchQuery.isEmpty) return src;
+    final q = _searchQuery.toLowerCase();
+    return src.where((s) =>
+        s.productName.toLowerCase().contains(q) ||
+        s.productCode.toLowerCase().contains(q)).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final stockAsync = ref.watch(stockBalanceProvider);
+    final canPop = Navigator.of(context).canPop();
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('ปรับสต๊อก (เพิ่ม/ลด)'),
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
-      ),
-      body: stockAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('เกิดข้อผิดพลาด: $e')),
-        data: (stocks) {
-          // กรองสินค้าตาม search
-          final filtered = _searchQuery.isEmpty
-              ? stocks
-              : stocks
-                    .where(
-                      (s) =>
-                          s.productName.toLowerCase().contains(
-                            _searchQuery.toLowerCase(),
-                          ) ||
-                          s.productCode.toLowerCase().contains(
-                            _searchQuery.toLowerCase(),
-                          ),
-                    )
-                    .toList();
+      backgroundColor: const Color(0xFFF5F5F5),
+      body: Column(
+        children: [
+          // ── TopBar ──────────────────────────────────────────────
+          Container(
+            color: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                // Back button
+                if (canPop) ...[
+                  InkWell(
+                    onTap: () => Navigator.of(context).pop(),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF5F5F5),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppTheme.border),
+                      ),
+                      child: const Icon(Icons.arrow_back_ios_new,
+                          size: 15, color: Color(0xFF8A8A8A)),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                ],
+                // Page icon
+                Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.tune,
+                      color: AppTheme.primaryColor, size: 18),
+                ),
+                const SizedBox(width: 10),
+                const Text(
+                  'ปรับสต๊อก (เพิ่ม/ลด)',
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1A1A1A)),
+                ),
+                const Spacer(),
+                // Search field
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 260),
+                  child: SizedBox(
+                    height: 38,
+                    child: TextField(
+                      controller: _searchController,
+                      style: const TextStyle(fontSize: 13),
+                      decoration: InputDecoration(
+                        hintText: 'ค้นหาชื่อ / รหัสสินค้า...',
+                        hintStyle: const TextStyle(
+                            fontSize: 13, color: Color(0xFF8A8A8A)),
+                        prefixIcon: const Icon(Icons.search,
+                            size: 17, color: Color(0xFF8A8A8A)),
+                        suffixIcon: _searchQuery.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear, size: 15),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  setState(() => _searchQuery = '');
+                                },
+                              )
+                            : ScannerButton(
+                                onScanned: (value) {
+                                  _searchController.text = value;
+                                  setState(() => _searchQuery = value);
+                                },
+                              ),
+                        contentPadding: EdgeInsets.zero,
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide:
+                                const BorderSide(color: Color(0xFFE0E0E0))),
+                        enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide:
+                                const BorderSide(color: Color(0xFFE0E0E0))),
+                        focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(
+                                color: AppTheme.primary, width: 1.5)),
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
+                      onChanged: (v) => setState(() => _searchQuery = v),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Refresh button
+                Tooltip(
+                  message: 'รีเฟรช',
+                  child: InkWell(
+                    onTap: () =>
+                        ref.read(stockBalanceProvider.notifier).refresh(),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF5F5F5),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppTheme.border),
+                      ),
+                      child: const Icon(Icons.refresh,
+                          size: 17, color: Color(0xFF8A8A8A)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
 
-          return Row(
-            children: [
-              // ── ซ้าย: เลือกสินค้า ────────────────────────
-              SizedBox(
-                width: 360,
-                child: Column(
+          // ── Content ─────────────────────────────────────────────
+          Expanded(
+            child: stockAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(child: Text('เกิดข้อผิดพลาด: $e')),
+              data: (stocks) {
+                final filtered = _filter(stocks);
+                return Row(
                   children: [
-                    // Search bar ✅ + ScannerButton
-                    Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: TextField(
-                        controller: _searchController,
-                        decoration: InputDecoration(
-                          hintText: 'ค้นหาสินค้า...',
-                          prefixIcon: const Icon(Icons.search),
-                          border: const OutlineInputBorder(),
-                          suffixIcon: _searchQuery.isNotEmpty
-                              ? IconButton(
-                                  icon: const Icon(Icons.clear),
-                                  onPressed: () {
-                                    _searchController.clear();
-                                    setState(() => _searchQuery = '');
-                                  },
-                                )
-                              : ScannerButton(
-                                  onScanned: (value) {
-                                    _searchController.text = value;
-                                    setState(() => _searchQuery = value);
-                                  },
-                                ),
-                        ),
-                        onChanged: (v) => setState(() => _searchQuery = v),
+                    // ── ซ้าย: เลือกสินค้า ────────────────────
+                    SizedBox(
+                      width: 360,
+                      child: Column(
+                        children: [
+                          // Summary chips
+                          Container(
+                            color: Colors.white,
+                            padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+                            child: Row(
+                              children: [
+                                _AdjSummaryChip(
+                                    'ทั้งหมด', stocks.length, AppTheme.navy),
+                                const SizedBox(width: 8),
+                                _AdjSummaryChip('กรองแล้ว', filtered.length,
+                                    AppTheme.primaryDark),
+                              ],
+                            ),
+                          ),
+                          const Divider(height: 1),
+                          // List
+                          Expanded(
+                            child: filtered.isEmpty
+                                ? Center(
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.search_off_outlined,
+                                            size: 56,
+                                            color: Colors.grey[300]),
+                                        const SizedBox(height: 10),
+                                        Text(
+                                          _searchQuery.isEmpty
+                                              ? 'ไม่มีข้อมูลสต๊อก'
+                                              : 'ไม่พบสินค้า "$_searchQuery"',
+                                          style: TextStyle(
+                                              color: Colors.grey[500]),
+                                        ),
+                                      ],
+                                    ),
+                                  )
+                                : ListView.separated(
+                                    padding: const EdgeInsets.all(8),
+                                    itemCount: filtered.length,
+                                    separatorBuilder: (_, _) =>
+                                        const SizedBox(height: 6),
+                                    itemBuilder: (context, index) {
+                                      final stock = filtered[index];
+                                      final isSelected =
+                                          _selectedStock?.productId ==
+                                                  stock.productId &&
+                                              _selectedStock?.warehouseId ==
+                                                  stock.warehouseId;
+                                      return _AdjStockItemCard(
+                                        stock: stock,
+                                        isSelected: isSelected,
+                                        onTap: () => setState(() {
+                                          _selectedStock = stock;
+                                          _qtyController.clear();
+                                        }),
+                                      );
+                                    },
+                                  ),
+                          ),
+                        ],
                       ),
                     ),
 
-                    // รายการสินค้า
+                    const VerticalDivider(width: 1),
+
+                    // ── ขวา: Form ปรับสต๊อก ──────────────────
                     Expanded(
-                      child: filtered.isEmpty
-                          ? const Center(child: Text('ไม่พบสินค้า'))
-                          : ListView.builder(
-                              itemCount: filtered.length,
-                              itemBuilder: (context, index) {
-                                final stock = filtered[index];
-                                final isSelected =
-                                    _selectedStock?.productId ==
-                                        stock.productId &&
-                                    _selectedStock?.warehouseId ==
-                                        stock.warehouseId;
-                                return ListTile(
-                                  selected: isSelected,
-                                  selectedTileColor: Colors.blue.withValues(
-                                    alpha: 0.1,
-                                  ),
-                                  leading: CircleAvatar(
-                                    backgroundColor: isSelected
-                                        ? Colors.blue
-                                        : Colors.grey[200],
-                                    child: Icon(
-                                      Icons.inventory_2,
-                                      color: isSelected
-                                          ? Colors.white
-                                          : Colors.grey[600],
-                                      size: 18,
-                                    ),
-                                  ),
-                                  title: Text(
-                                    stock.productName,
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                  subtitle: Text(
-                                    '${stock.productCode} • ${stock.warehouseName}',
-                                    style: const TextStyle(fontSize: 11),
-                                  ),
-                                  trailing: Text(
-                                    '${stock.balance.toStringAsFixed(0)} ${stock.baseUnit}',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: stock.balance > 0
-                                          ? Colors.green[700]
-                                          : Colors.red,
-                                    ),
-                                  ),
-                                  onTap: () {
-                                    setState(() {
-                                      _selectedStock = stock;
-                                      _qtyController.clear();
-                                    });
-                                  },
-                                );
-                              },
-                            ),
+                      child: _selectedStock == null
+                          ? _buildEmptyState()
+                          : _buildAdjustForm(),
                     ),
                   ],
-                ),
-              ),
-
-              const VerticalDivider(width: 1),
-
-              // ── ขวา: Form ปรับสต๊อก ──────────────────────
-              Expanded(
-                child: _selectedStock == null
-                    ? _buildEmptyState()
-                    : _buildAdjustForm(),
-              ),
-            ],
-          );
-        },
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -357,11 +476,27 @@ class _AdjustStockSubPageState extends ConsumerState<AdjustStockSubPage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.touch_app, size: 64, color: Colors.grey[400]),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppTheme.primaryContainer,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.touch_app,
+                size: 48, color: AppTheme.primaryColor),
+          ),
           const SizedBox(height: 16),
-          Text(
+          const Text(
             'เลือกสินค้าที่ต้องการปรับสต๊อก',
-            style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+            style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF1A1A1A)),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'เลือกรายการจากแผงด้านซ้าย',
+            style: TextStyle(fontSize: 13, color: Colors.grey[500]),
           ),
         ],
       ),
@@ -382,12 +517,26 @@ class _AdjustStockSubPageState extends ConsumerState<AdjustStockSubPage> {
           children: [
             // ── Product Info Card ──────────────────────────
             Card(
-              color: Colors.blue[50],
+              elevation: 0,
+              color: AppTheme.primaryContainer,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: const BorderSide(
+                    color: AppTheme.primaryColor, width: 0.5),
+              ),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Row(
                   children: [
-                    const Icon(Icons.inventory_2, color: Colors.blue, size: 40),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryColor,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.inventory_2,
+                          color: Colors.white, size: 28),
+                    ),
                     const SizedBox(width: 16),
                     Expanded(
                       child: Column(
@@ -398,14 +547,15 @@ class _AdjustStockSubPageState extends ConsumerState<AdjustStockSubPage> {
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
+                              color: Color(0xFF1A1A1A),
                             ),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             'รหัส: ${stock.productCode}  •  คลัง: ${stock.warehouseName}',
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 12,
-                              color: Colors.grey[600],
+                              color: AppTheme.textSub,
                             ),
                           ),
                         ],
@@ -417,19 +567,21 @@ class _AdjustStockSubPageState extends ConsumerState<AdjustStockSubPage> {
                       children: [
                         const Text(
                           'สต๊อกปัจจุบัน',
-                          style: TextStyle(fontSize: 11),
+                          style: TextStyle(
+                              fontSize: 11, color: AppTheme.textSub),
                         ),
                         Text(
                           stock.balance.toStringAsFixed(0),
                           style: const TextStyle(
                             fontSize: 28,
                             fontWeight: FontWeight.bold,
-                            color: Colors.blue,
+                            color: AppTheme.primaryColor,
                           ),
                         ),
                         Text(
                           stock.baseUnit,
-                          style: TextStyle(color: Colors.grey[600]),
+                          style: const TextStyle(
+                              fontSize: 12, color: AppTheme.textSub),
                         ),
                       ],
                     ),
@@ -450,7 +602,7 @@ class _AdjustStockSubPageState extends ConsumerState<AdjustStockSubPage> {
                 _AdjustTypeButton(
                   label: 'เพิ่มสต๊อก',
                   icon: Icons.add_circle,
-                  color: Colors.green,
+                  color: AppTheme.success,
                   isSelected: _adjustType == 'INCREASE',
                   onTap: () => setState(() => _adjustType = 'INCREASE'),
                 ),
@@ -458,7 +610,7 @@ class _AdjustStockSubPageState extends ConsumerState<AdjustStockSubPage> {
                 _AdjustTypeButton(
                   label: 'ลดสต๊อก',
                   icon: Icons.remove_circle,
-                  color: Colors.red,
+                  color: AppTheme.error,
                   isSelected: _adjustType == 'DECREASE',
                   onTap: () => setState(() => _adjustType = 'DECREASE'),
                 ),
@@ -466,7 +618,7 @@ class _AdjustStockSubPageState extends ConsumerState<AdjustStockSubPage> {
                 _AdjustTypeButton(
                   label: 'กำหนดยอด',
                   icon: Icons.edit,
-                  color: Colors.orange,
+                  color: AppTheme.warning,
                   isSelected: _adjustType == 'SET',
                   onTap: () => setState(() => _adjustType = 'SET'),
                 ),
@@ -493,10 +645,10 @@ class _AdjustStockSubPageState extends ConsumerState<AdjustStockSubPage> {
                       ? Icons.remove
                       : Icons.edit,
                   color: _adjustType == 'INCREASE'
-                      ? Colors.green
+                      ? AppTheme.success
                       : _adjustType == 'DECREASE'
-                      ? Colors.red
-                      : Colors.orange,
+                      ? AppTheme.error
+                      : AppTheme.warning,
                 ),
               ),
               validator: (value) {
@@ -519,10 +671,12 @@ class _AdjustStockSubPageState extends ConsumerState<AdjustStockSubPage> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: _difference >= 0 ? Colors.green[50] : Colors.red[50],
-                  borderRadius: BorderRadius.circular(8),
+                  color: _difference >= 0
+                      ? AppTheme.successColor.withValues(alpha: 0.06)
+                      : AppTheme.errorColor.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(10),
                   border: Border.all(
-                    color: _difference >= 0 ? Colors.green : Colors.red,
+                    color: _difference >= 0 ? AppTheme.success : AppTheme.error,
                   ),
                 ),
                 child: Row(
@@ -532,25 +686,27 @@ class _AdjustStockSubPageState extends ConsumerState<AdjustStockSubPage> {
                       label: 'ปัจจุบัน',
                       value: stock.balance.toStringAsFixed(0),
                       unit: stock.baseUnit,
-                      color: Colors.grey[700]!,
+                      color: AppTheme.textSub,
                     ),
                     Icon(
                       Icons.arrow_forward,
-                      color: _difference >= 0 ? Colors.green : Colors.red,
+                      color:
+                          _difference >= 0 ? AppTheme.success : AppTheme.error,
                     ),
                     _PreviewItem(
                       label: 'หลังปรับ',
                       value: _newBalance.toStringAsFixed(0),
                       unit: stock.baseUnit,
-                      color: _difference >= 0 ? Colors.green : Colors.red,
+                      color:
+                          _difference >= 0 ? AppTheme.success : AppTheme.error,
                     ),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
+                          horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: _difference >= 0 ? Colors.green : Colors.red,
+                        color: _difference >= 0
+                            ? AppTheme.success
+                            : AppTheme.error,
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
@@ -622,9 +778,11 @@ class _AdjustStockSubPageState extends ConsumerState<AdjustStockSubPage> {
                   flex: 2,
                   child: ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
+                      backgroundColor: AppTheme.primaryColor,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
                     ),
                     onPressed: _isLoading ? null : _handleSubmit,
                     icon: _isLoading
@@ -676,15 +834,15 @@ class _AdjustStockSubPageState extends ConsumerState<AdjustStockSubPage> {
         SnackBar(
           content: Text(
             success
-                ? '✅ ปรับสต๊อก ${_selectedStock!.productName} สำเร็จ'
-                : '❌ เกิดข้อผิดพลาด กรุณาลองใหม่',
+                ? 'ปรับสต๊อก ${_selectedStock!.productName} สำเร็จ'
+                : 'เกิดข้อผิดพลาด กรุณาลองใหม่',
           ),
-          backgroundColor: success ? Colors.green : Colors.red,
+          backgroundColor: success ? AppTheme.success : AppTheme.error,
+          behavior: SnackBarBehavior.floating,
         ),
       );
 
       if (success) {
-        // Reset form หลังบันทึกสำเร็จ
         setState(() {
           _selectedStock = null;
           _qtyController.clear();
@@ -693,6 +851,165 @@ class _AdjustStockSubPageState extends ConsumerState<AdjustStockSubPage> {
         });
       }
     }
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// _AdjSummaryChip — summary chip สำหรับ AdjustStockSubPage
+// ════════════════════════════════════════════════════════════════
+class _AdjSummaryChip extends StatelessWidget {
+  final String label;
+  final int count;
+  final Color color;
+  const _AdjSummaryChip(this.label, this.count, this.color);
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding:
+            const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(label,
+                style: TextStyle(
+                    fontSize: 11,
+                    color: color,
+                    fontWeight: FontWeight.w500)),
+            const SizedBox(width: 4),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '$count',
+                style: const TextStyle(
+                    fontSize: 11,
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+      );
+}
+
+// ════════════════════════════════════════════════════════════════
+// _AdjStockItemCard — card item สำหรับ product selection list
+// ════════════════════════════════════════════════════════════════
+class _AdjStockItemCard extends StatelessWidget {
+  final StockBalanceModel stock;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _AdjStockItemCard({
+    required this.stock,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  static final _avatarColors = [
+    AppTheme.infoColor,
+    AppTheme.successColor,
+    AppTheme.warningColor,
+    AppTheme.purpleColor,
+    AppTheme.tealColor,
+    AppTheme.primaryColor,
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final initial = stock.productName.isNotEmpty
+        ? stock.productName.substring(0, 1).toUpperCase()
+        : '?';
+    final avatarColor =
+        _avatarColors[stock.productName.codeUnitAt(0) % _avatarColors.length];
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppTheme.primaryColor.withValues(alpha: 0.06)
+              : Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected ? AppTheme.primaryColor : AppTheme.border,
+            width: isSelected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: isSelected ? AppTheme.primaryColor : avatarColor,
+              child: Text(
+                initial,
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    stock.productName,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: isSelected
+                          ? AppTheme.primaryColor
+                          : const Color(0xFF1A1A1A),
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${stock.productCode} • ${stock.warehouseName}',
+                    style: const TextStyle(
+                        fontSize: 11, color: AppTheme.textSub),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  stock.balance.toStringAsFixed(0),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: stock.balance > 0
+                        ? AppTheme.success
+                        : AppTheme.error,
+                  ),
+                ),
+                Text(
+                  stock.baseUnit,
+                  style: const TextStyle(
+                      fontSize: 10, color: AppTheme.textSub),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -2221,90 +2538,59 @@ class _PreviewTransferItem extends StatelessWidget {
 }
 
 // ════════════════════════════════════════════════════════════════
-// Widget: _MenuCard (ใช้ใน Step 1)
+// Widget: _MenuCard — Dashboard quick-menu style (ใช้ใน Step 1)
 // ════════════════════════════════════════════════════════════════
 class _MenuCard extends StatelessWidget {
   final IconData icon;
-  final String title;
-  final String subtitle;
+  final String label;
   final Color color;
-  final String badge;
-  final Color badgeColor;
   final VoidCallback onTap;
 
   const _MenuCard({
     required this.icon,
-    required this.title,
-    required this.subtitle,
+    required this.label,
     required this.color,
-    required this.badge,
-    required this.badgeColor,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 3,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    return Material(
+      color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Stack(
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.07),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: color.withValues(alpha: 0.2)),
+          ),
+          child: Row(
             children: [
-              Positioned(
-                top: 0,
-                right: 0,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, size: 20, color: color),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1A1A1A),
                   ),
-                  decoration: BoxDecoration(
-                    color: badgeColor.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    badge,
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: badgeColor,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(icon, size: 36, color: color),
-                  const SizedBox(height: 10),
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                  ),
-                ],
-              ),
-              Positioned(
-                bottom: 0,
-                right: 0,
-                child: Icon(
-                  Icons.arrow_forward_ios,
-                  size: 14,
-                  color: Colors.grey[400],
-                ),
-              ),
+              Icon(Icons.chevron_right,
+                  size: 16, color: color.withValues(alpha: 0.5)),
             ],
           ),
         ),

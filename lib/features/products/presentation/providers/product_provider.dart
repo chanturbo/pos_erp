@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/client/api_client.dart';
 import '../../data/models/product_model.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../inventory/presentation/providers/stock_provider.dart';
 
 // ─────────────────────────────────────────────────────────────
 // State class สำหรับ pagination
@@ -166,6 +167,7 @@ class ProductListNotifier extends AsyncNotifier<List<ProductModel>> {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         await refresh();
+        ref.invalidate(stockBalanceProvider);
         return true;
       }
       return false;
@@ -187,6 +189,7 @@ class ProductListNotifier extends AsyncNotifier<List<ProductModel>> {
 
       if (response.statusCode == 200) {
         await refresh();
+        ref.invalidate(stockBalanceProvider);
         return true;
       }
       return false;

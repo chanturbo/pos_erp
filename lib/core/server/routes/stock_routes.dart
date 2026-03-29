@@ -3,6 +3,7 @@ import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 import 'package:drift/drift.dart' hide JsonKey;
 import '../../database/app_database.dart';
+import '../middleware/auth_middleware.dart';
 
 class StockRoutes {
   final AppDatabase db;
@@ -14,6 +15,7 @@ class StockRoutes {
 
     router.get('/balance', _getStockBalanceHandler);
     router.get('/movements', _getStockMovementsHandler);
+    router.get('/movements/product/<productId>', _getProductMovementsHandler);
     router.post('/in', _stockInHandler);
     router.post('/out', _stockOutHandler);
     router.post('/adjust', _stockAdjustHandler);
@@ -105,17 +107,79 @@ class StockRoutes {
     }
   }
 
+  /// GET /api/stock/movements/product/:productId - ประวัติของสินค้าตัวนั้น
+  Future<Response> _getProductMovementsHandler(
+      Request request, String productId) async {
+    try {
+      final result = await db.customSelect(
+        '''
+        SELECT
+          sm.movement_id,
+          sm.movement_no,
+          sm.movement_date,
+          sm.movement_type,
+          sm.product_id,
+          p.product_name,
+          p.product_code,
+          p.base_unit,
+          sm.warehouse_id,
+          w.warehouse_name,
+          sm.quantity,
+          sm.reference_no,
+          sm.remark
+        FROM stock_movements sm
+        LEFT JOIN products p ON p.product_id = sm.product_id
+        LEFT JOIN warehouses w ON w.warehouse_id = sm.warehouse_id
+        WHERE sm.product_id = ?
+        ORDER BY sm.movement_date DESC
+        ''',
+        variables: [Variable.withString(productId)],
+      ).get();
+
+      final data = result
+          .map((row) => {
+                'movement_id': row.read<String>('movement_id'),
+                'movement_no': row.readNullable<String>('movement_no'),
+                'movement_date':
+                    row.read<DateTime>('movement_date').toIso8601String(),
+                'movement_type': row.read<String>('movement_type'),
+                'product_id': row.read<String>('product_id'),
+                'product_name': row.readNullable<String>('product_name'),
+                'product_code': row.readNullable<String>('product_code'),
+                'base_unit': row.readNullable<String>('base_unit'),
+                'warehouse_id': row.read<String>('warehouse_id'),
+                'warehouse_name': row.readNullable<String>('warehouse_name'),
+                'quantity': row.read<double>('quantity'),
+                'reference_no': row.readNullable<String>('reference_no'),
+                'remark': row.readNullable<String>('remark'),
+              })
+          .toList();
+
+      return Response.ok(
+        jsonEncode({'success': true, 'data': data}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    } catch (e) {
+      return Response.internalServerError(
+        body: jsonEncode({'success': false, 'message': 'เกิดข้อผิดพลาด: $e'}),
+      );
+    }
+  }
+
   /// POST /api/stock/in - รับสินค้าเข้า (manual)
   Future<Response> _stockInHandler(Request request) async {
     try {
       final payload = await request.readAsString();
       final data = jsonDecode(payload) as Map<String, dynamic>;
 
-      final movementId = 'STK${DateTime.now().millisecondsSinceEpoch}';
+      final ts = DateTime.now().millisecondsSinceEpoch;
+      final movementId = 'STK$ts';
+      final userId = getAuthUser(request)?.userId ?? 'USR001';
 
       await db.into(db.stockMovements).insert(
             StockMovementsCompanion(
               movementId: Value(movementId),
+              movementNo: Value('IN-$ts'),
               movementDate: Value(DateTime.now()),
               movementType: const Value('IN'),
               productId: Value(data['product_id'] as String),
@@ -123,6 +187,7 @@ class StockRoutes {
               quantity: Value((data['quantity'] as num).toDouble()),
               referenceNo: Value(data['reference_no'] as String?),
               remark: Value(data['remark'] as String?),
+              userId: Value(userId),
             ),
           );
 
@@ -165,18 +230,22 @@ class StockRoutes {
         );
       }
 
-      final movementId = 'STK${DateTime.now().millisecondsSinceEpoch}';
+      final ts = DateTime.now().millisecondsSinceEpoch;
+      final movementId = 'STK$ts';
+      final userId = getAuthUser(request)?.userId ?? 'USR001';
 
       await db.into(db.stockMovements).insert(
             StockMovementsCompanion(
               movementId: Value(movementId),
+              movementNo: Value('OUT-$ts'),
               movementDate: Value(DateTime.now()),
               movementType: const Value('OUT'),
               productId: Value(productId),
               warehouseId: Value(warehouseId),
-              quantity: Value(-quantity), // ลบ = เบิกออก
+              quantity: Value(-quantity),
               referenceNo: Value(data['reference_no'] as String?),
               remark: Value(data['remark'] as String?),
+              userId: Value(userId),
             ),
           );
 
@@ -209,18 +278,22 @@ class StockRoutes {
       final currentStock = await _getCurrentStock(productId, warehouseId);
       final adjustQty = newBalance - currentStock;
 
-      final movementId = 'STK${DateTime.now().millisecondsSinceEpoch}';
+      final ts = DateTime.now().millisecondsSinceEpoch;
+      final movementId = 'STK$ts';
+      final userId = getAuthUser(request)?.userId ?? 'USR001';
 
       await db.into(db.stockMovements).insert(
             StockMovementsCompanion(
               movementId: Value(movementId),
+              movementNo: Value('ADJ-$ts'),
               movementDate: Value(DateTime.now()),
               movementType: const Value('ADJUST'),
               productId: Value(productId),
               warehouseId: Value(warehouseId),
-              quantity: Value(adjustQty), // บวก/ลบ ขึ้นกับผล
+              quantity: Value(adjustQty),
               referenceNo: Value(data['reference_no'] as String?),
               remark: Value(data['remark'] as String?),
+              userId: Value(userId),
             ),
           );
 
@@ -271,16 +344,14 @@ class StockRoutes {
 
       final ts = DateTime.now().millisecondsSinceEpoch;
       final transferId = 'TRF$ts';
+      final userId = getAuthUser(request)?.userId ?? 'USR001';
 
-      // ─────────────────────────────────────────────────────────────
-      // ✅ สร้าง OUT + IN ใน transaction เดียว
-      //    ถ้า crash กลางทาง ทั้งคู่จะ rollback → สต๊อกไม่สูญหาย
-      // ─────────────────────────────────────────────────────────────
       await db.transaction(() async {
         // OUT จากคลังต้นทาง
         await db.into(db.stockMovements).insert(
               StockMovementsCompanion(
                 movementId: Value('${transferId}_OUT'),
+                movementNo: Value('TRF-${ts}_OUT'),
                 movementDate: Value(DateTime.now()),
                 movementType: const Value('TRANSFER_OUT'),
                 productId: Value(productId),
@@ -288,6 +359,7 @@ class StockRoutes {
                 quantity: Value(-quantity),
                 referenceNo: Value(transferId),
                 remark: Value(data['remark'] as String?),
+                userId: Value(userId),
               ),
             );
 
@@ -295,6 +367,7 @@ class StockRoutes {
         await db.into(db.stockMovements).insert(
               StockMovementsCompanion(
                 movementId: Value('${transferId}_IN'),
+                movementNo: Value('TRF-${ts}_IN'),
                 movementDate: Value(DateTime.now()),
                 movementType: const Value('TRANSFER_IN'),
                 productId: Value(productId),
@@ -302,6 +375,7 @@ class StockRoutes {
                 quantity: Value(quantity),
                 referenceNo: Value(transferId),
                 remark: Value(data['remark'] as String?),
+                userId: Value(userId),
               ),
             );
       });

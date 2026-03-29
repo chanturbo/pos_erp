@@ -56,25 +56,21 @@ class _PdfPreviewDialogState extends State<PdfPreviewDialog> {
     final file = File('${dir.path}/${widget.filename}');
     await file.writeAsBytes(widget.bytes);
 
+    // เปิดไฟล์อัตโนมัติทันที
+    if (Platform.isMacOS) {
+      await Process.run('open', [file.path]);
+    } else if (Platform.isWindows) {
+      await Process.run('cmd', ['/c', 'start', '', file.path]);
+    } else if (Platform.isLinux) {
+      await Process.run('xdg-open', [file.path]);
+    }
+
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('บันทึกแล้ว: ${file.path}'),
+        content: Text('บันทึก PDF แล้ว: ${file.path}'),
         backgroundColor: Colors.green[700],
         behavior: SnackBarBehavior.floating,
-        action: SnackBarAction(
-          label: 'เปิด',
-          textColor: Colors.white,
-          onPressed: () async {
-            if (Platform.isMacOS) {
-              await Process.run('open', [file.path]);
-            } else if (Platform.isWindows) {
-              await Process.run('cmd', ['/c', 'start', '', file.path]);
-            } else if (Platform.isLinux) {
-              await Process.run('xdg-open', [file.path]);
-            }
-          },
-        ),
       ),
     );
   }

@@ -21,21 +21,16 @@ import 'package:printing/printing.dart';
 import '../../data/models/customer_model.dart';
 
 // ─────────────────────────────────────────────────────────────────
-// PDF Colors — ใช้ PdfColor (pdf package) ไม่ใช่ Flutter Color
-// ไม่สามารถใช้ AppColors ได้โดยตรงเพราะ AppColors เป็น Flutter Color
-// ค่าสีตรงกับ AppColors palette ของ app
+// Standard color palette
 // ─────────────────────────────────────────────────────────────────
-const _kPrimary    = PdfColor.fromInt(0xFFE8622A);
-const _kNavy       = PdfColor.fromInt(0xFF16213E);
-const _kHeaderBg   = PdfColor.fromInt(0xFFF4F4F0);
-const _kBorder     = PdfColor.fromInt(0xFFE0E0E0);
-const _kTextSub    = PdfColor.fromInt(0xFF666666);
-const _kSuccess    = PdfColor.fromInt(0xFF2E7D32);
-const _kSuccessBg  = PdfColor.fromInt(0xFFE8F5E9);
-const _kInactive   = PdfColor.fromInt(0xFFC62828);
-const _kInactiveBg = PdfColor.fromInt(0xFFFFEBEE);
-const _kAmber      = PdfColor.fromInt(0xFFFFB300);
-const _kWhite      = PdfColors.white;
+const _kBorder  = PdfColor.fromInt(0xFFBBBBBB);
+const _kHdrBg   = PdfColor.fromInt(0xFFDDDDDD);
+const _kAltRow  = PdfColor.fromInt(0xFFF5F5F5);
+const _kText    = PdfColors.black;
+const _kSub     = PdfColor.fromInt(0xFF555555);
+const _kSuccess = PdfColor.fromInt(0xFF1B5E20);
+const _kError   = PdfColor.fromInt(0xFFB71C1C);
+const _kAmber   = PdfColor.fromInt(0xFFE65100);
 
 // ─────────────────────────────────────────────────────────────────
 // CustomerPdfBuilder — สร้าง pw.Document เท่านั้น
@@ -62,6 +57,9 @@ class CustomerPdfBuilder {
         .length;
     final creditCount = customers.where((c) => c.creditLimit > 0).length;
 
+    final summaryLine =
+        'ทั้งหมด $total ราย   ใช้งาน $active ราย   สมาชิก $members ราย   เครดิต $creditCount ราย';
+
     // แบ่ง page (28 rows/page — landscape A4)
     const rowsPerPage = 28;
     final pages = <List<CustomerModel>>[];
@@ -73,40 +71,34 @@ class CustomerPdfBuilder {
             : i + rowsPerPage,
       ));
     }
-    final totalPages = pages.isEmpty ? 1 : pages.length;
+    if (pages.isEmpty) pages.add([]);
+    final totalPages = pages.length;
 
-    for (var pageIdx = 0;
-        pageIdx < (pages.isEmpty ? 1 : pages.length);
-        pageIdx++) {
-      final pageCustomers =
-          pages.isEmpty ? <CustomerModel>[] : pages[pageIdx];
-      final startNo = pageIdx * rowsPerPage + 1;
+    for (var pageIdx = 0; pageIdx < pages.length; pageIdx++) {
+      final pageCustomers = pages[pageIdx];
+      final startNo       = pageIdx * rowsPerPage + 1;
 
       doc.addPage(
         pw.Page(
           pageFormat: PdfPageFormat.a4.landscape,
           margin: const pw.EdgeInsets.all(24),
           build: (ctx) => pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            crossAxisAlignment: pw.CrossAxisAlignment.stretch,
             children: [
-              _buildHeader(
+              _buildPageHeader(
                 companyName:  companyName,
+                reportTitle:  'รายงานรายการลูกค้า',
                 printedAt:    printedAt,
-                total:        total,
-                active:       active,
-                members:      members,
-                creditCount:  creditCount,
+                page:         pageIdx + 1,
+                totalPages:   totalPages,
                 ttf:          ttf,
                 ttfRegular:   ttfRegular,
+                summaryLine:  summaryLine,
               ),
-              pw.SizedBox(height: 12),
               _buildTable(pageCustomers,
                   startNo: startNo, ttf: ttf, ttfRegular: ttfRegular),
               pw.Spacer(),
-              _buildFooter(
-                  page: pageIdx + 1,
-                  totalPages: totalPages,
-                  ttfRegular: ttfRegular),
+              _buildFooter(ttfRegular: ttfRegular),
             ],
           ),
         ),
@@ -116,81 +108,65 @@ class CustomerPdfBuilder {
     return doc;
   }
 
-  // ── Header ────────────────────────────────────────────────────
-  static pw.Widget _buildHeader({
-    required String companyName,
-    required String printedAt,
-    required int total,
-    required int active,
-    required int members,
-    required int creditCount,
+  // ── Page Header ───────────────────────────────────────────────
+  static pw.Widget _buildPageHeader({
+    required String  companyName,
+    required String  reportTitle,
+    required String  printedAt,
+    required int     page,
+    required int     totalPages,
     required pw.Font ttf,
     required pw.Font ttfRegular,
+    String?          subtitle,
+    String?          summaryLine,
   }) {
-    return pw.Container(
-      decoration: pw.BoxDecoration(
-          color: _kNavy, borderRadius: pw.BorderRadius.circular(8)),
-      padding:
-          const pw.EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-      child: pw.Row(
-        crossAxisAlignment: pw.CrossAxisAlignment.center,
-        children: [
-          pw.Expanded(
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Text('รายงานรายการลูกค้า',
-                    style: pw.TextStyle(
-                        font: ttf, fontSize: 18, color: _kWhite)),
-                pw.SizedBox(height: 4),
-                pw.Text(companyName,
-                    style: pw.TextStyle(
-                        font: ttfRegular,
-                        fontSize: 11,
-                        color: const PdfColor.fromInt(0xFFAAAAAA))),
-              ],
-            ),
-          ),
-          pw.Row(children: [
-            _statChip('ทั้งหมด',  '$total',        _kPrimary, ttf, ttfRegular),
-            pw.SizedBox(width: 6),
-            _statChip('ใช้งาน',   '$active',       _kSuccess, ttf, ttfRegular),
-            pw.SizedBox(width: 6),
-            _statChip('สมาชิก',   '$members',      _kAmber,   ttf, ttfRegular),
-            pw.SizedBox(width: 6),
-            _statChip('เครดิต',   '$creditCount',
-                const PdfColor.fromInt(0xFF1565C0), ttf, ttfRegular),
-            pw.SizedBox(width: 6),
-            _statChip('พิมพ์เมื่อ', printedAt,
-                const PdfColor.fromInt(0xFF555555), ttf, ttfRegular),
-          ]),
-        ],
-      ),
-    );
-  }
-
-  static pw.Widget _statChip(String label, String value, PdfColor color,
-      pw.Font ttf, pw.Font ttfRegular) {
-    return pw.Container(
-      padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: pw.BoxDecoration(
-          color: PdfColors.white,
-          borderRadius: pw.BorderRadius.circular(6)),
-      child: pw.Column(children: [
-        pw.Text(label,
-            style: pw.TextStyle(
-                font: ttfRegular, fontSize: 8, color: _kTextSub)),
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+      children: [
+        pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          children: [
+            pw.Text('พิมพ์เมื่อ $printedAt',
+                style: pw.TextStyle(font: ttfRegular, fontSize: 8, color: _kSub)),
+            pw.Text('หน้าที่ $page / $totalPages',
+                style: pw.TextStyle(font: ttfRegular, fontSize: 8, color: _kSub)),
+          ],
+        ),
+        pw.SizedBox(height: 3),
+        pw.Center(
+          child: pw.Text(companyName,
+              style: pw.TextStyle(font: ttfRegular, fontSize: 9, color: _kSub)),
+        ),
         pw.SizedBox(height: 2),
-        pw.Text(value,
-            style: pw.TextStyle(font: ttf, fontSize: 10, color: color)),
-      ]),
+        pw.Center(
+          child: pw.Text(reportTitle,
+              style: pw.TextStyle(font: ttf, fontSize: 14, color: _kText)),
+        ),
+        if (subtitle != null) ...[
+          pw.SizedBox(height: 3),
+          pw.Center(
+            child: pw.Text(subtitle,
+                style: pw.TextStyle(font: ttfRegular, fontSize: 8, color: _kSub)),
+          ),
+        ],
+        if (summaryLine != null) ...[
+          pw.SizedBox(height: 2),
+          pw.Center(
+            child: pw.Text(summaryLine,
+                style: pw.TextStyle(font: ttfRegular, fontSize: 8, color: _kSub)),
+          ),
+        ],
+        pw.SizedBox(height: 6),
+        pw.Container(height: 0.5, color: _kBorder),
+        pw.SizedBox(height: 6),
+      ],
     );
   }
 
   // ── Table ─────────────────────────────────────────────────────
   static pw.Widget _buildTable(
     List<CustomerModel> customers, {
-    required int startNo,
+    required int     startNo,
     required pw.Font ttf,
     required pw.Font ttfRegular,
   }) {
@@ -211,10 +187,10 @@ class CustomerPdfBuilder {
         PdfColor? bgColor}) {
       return pw.Container(
         color: bgColor,
-        padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+        padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 5),
         alignment: align,
         child: pw.Text(text,
-            style: pw.TextStyle(font: font, fontSize: 9, color: color)),
+            style: pw.TextStyle(font: font, fontSize: 8.5, color: color ?? _kText)),
       );
     }
 
@@ -226,25 +202,24 @@ class CustomerPdfBuilder {
       children: [
         // Header row
         pw.TableRow(
-          decoration: pw.BoxDecoration(color: _kNavy),
+          decoration: pw.BoxDecoration(color: _kHdrBg),
           children: ['#', 'รหัส', 'ชื่อลูกค้า', 'โทรศัพท์',
                   'เลขสมาชิก', 'คะแนน', 'วงเงินเครดิต', 'สถานะ']
               .map((h) => pw.Container(
                     padding: const pw.EdgeInsets.symmetric(
-                        horizontal: 6, vertical: 7),
+                        horizontal: 5, vertical: 6),
                     child: pw.Text(h,
                         style: pw.TextStyle(
-                            font: ttf, fontSize: 9, color: _kWhite)),
+                            font: ttf, fontSize: 8, color: _kText)),
                   ))
               .toList(),
         ),
         // Data rows
         ...customers.asMap().entries.map((e) {
-          final i = e.key;
-          final c = e.value;
-          final rowBg      = i.isEven ? _kHeaderBg : PdfColors.white;
-          final statusColor = c.isActive ? _kSuccess : _kInactive;
-          final statusBg    = c.isActive ? _kSuccessBg : _kInactiveBg;
+          final i    = e.key;
+          final c    = e.value;
+          final rowBg       = i.isEven ? _kAltRow : null;
+          final statusColor = c.isActive ? _kSuccess : _kError;
           final isMember    = c.memberNo != null && c.memberNo!.isNotEmpty;
 
           return pw.TableRow(children: [
@@ -255,17 +230,16 @@ class CustomerPdfBuilder {
             cell(c.phone ?? '-', ttfRegular, bgColor: rowBg),
             cell(isMember ? (c.memberNo ?? '-') : '-', ttfRegular,
                 align: pw.Alignment.center,
-                color: isMember ? _kAmber : _kTextSub,
+                color: isMember ? _kAmber : _kSub,
                 bgColor: rowBg),
             cell(isMember ? '${c.points}' : '-', ttfRegular,
                 align: pw.Alignment.center, bgColor: rowBg),
-            cell(c.creditLimit > 0 ? _fmt(c.creditLimit) : '-',
-                ttfRegular,
+            cell(c.creditLimit > 0 ? _fmt(c.creditLimit) : '-', ttfRegular,
                 align: pw.Alignment.centerRight, bgColor: rowBg),
             cell(c.isActive ? 'ใช้งาน' : 'ปิด', ttf,
                 align: pw.Alignment.center,
                 color: statusColor,
-                bgColor: statusBg),
+                bgColor: rowBg),
           ]);
         }),
       ],
@@ -273,27 +247,14 @@ class CustomerPdfBuilder {
   }
 
   // ── Footer ────────────────────────────────────────────────────
-  static pw.Widget _buildFooter({
-    required int page,
-    required int totalPages,
-    required pw.Font ttfRegular,
-  }) {
+  static pw.Widget _buildFooter({required pw.Font ttfRegular}) {
     return pw.Container(
-      padding: const pw.EdgeInsets.only(top: 8),
+      padding: const pw.EdgeInsets.only(top: 6),
       decoration: const pw.BoxDecoration(
           border: pw.Border(
               top: pw.BorderSide(color: _kBorder, width: 0.5))),
-      child: pw.Row(
-        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-        children: [
-          pw.Text('DEE POS — รายงานลูกค้า',
-              style: pw.TextStyle(
-                  font: ttfRegular, fontSize: 8, color: _kTextSub)),
-          pw.Text('หน้า $page / $totalPages',
-              style: pw.TextStyle(
-                  font: ttfRegular, fontSize: 8, color: _kTextSub)),
-        ],
-      ),
+      child: pw.Text('DEE POS — รายงานรายการลูกค้า',
+          style: pw.TextStyle(font: ttfRegular, fontSize: 7, color: _kSub)),
     );
   }
 

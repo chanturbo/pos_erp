@@ -124,7 +124,7 @@ class StockBalanceNotifier extends AsyncNotifier<List<StockBalanceModel>> {
       final response = await apiClient.post('/api/stock/adjust', data: {
         'product_id': productId,
         'warehouse_id': warehouseId,
-        'new_quantity': newBalance,
+        'new_balance': newBalance,
         'reference_no': referenceNo,
         'remark': remark,
       });

@@ -80,13 +80,13 @@ class _StockInDialogState extends ConsumerState<StockInDialog> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('สต๊อกปัจจุบัน:'),
+                    const Text('สต๊อกปัจจุบัน:', style: TextStyle(color: Colors.black87)),
                     Text(
                       '${widget.stock.balance.toStringAsFixed(0)} ${widget.stock.baseUnit}',
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: Colors.blue,
+                        color: Colors.black87,
                       ),
                     ),
                   ],

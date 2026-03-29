@@ -1,7 +1,7 @@
 // lib/features/promotions/presentation/pages/coupon_pdf_report.dart
 //
 // CouponPdfBuilder — สร้าง PDF รายงานคูปอง
-// Portrait A4, 25 rows/page
+// Portrait A4, 30 rows/page
 //
 
 import 'package:intl/intl.dart';
@@ -12,20 +12,20 @@ import 'package:printing/printing.dart';
 import '../../data/models/promotion_model.dart';
 
 // ─────────────────────────────────────────────────────────────────
-// PDF Colors — ใช้ PdfColor (pdf package) ไม่ใช่ Flutter Color
+// Standard color palette
 // ─────────────────────────────────────────────────────────────────
-const _kPrimary    = PdfColor.fromInt(0xFFE8622A);
-const _kNavy       = PdfColor.fromInt(0xFF16213E);
-const _kHeaderBg   = PdfColor.fromInt(0xFFF4F4F0);
-const _kBorder     = PdfColor.fromInt(0xFFE0E0E0);
-const _kTextSub    = PdfColor.fromInt(0xFF666666);
-const _kSuccess    = PdfColor.fromInt(0xFF2E7D32);
-const _kSuccessBg  = PdfColor.fromInt(0xFFE8F5E9);
-const _kGrey       = PdfColor.fromInt(0xFF757575);
-const _kGreyBg     = PdfColor.fromInt(0xFFF5F5F5);
-const _kError      = PdfColor.fromInt(0xFFC62828);
-const _kErrorBg    = PdfColor.fromInt(0xFFFFEBEE);
-const _kWhite      = PdfColors.white;
+const _kBorder  = PdfColor.fromInt(0xFFBBBBBB);
+const _kHdrBg   = PdfColor.fromInt(0xFFDDDDDD);
+const _kAltRow  = PdfColor.fromInt(0xFFF5F5F5);
+const _kText    = PdfColors.black;
+const _kSub     = PdfColor.fromInt(0xFF555555);
+const _kSuccess = PdfColor.fromInt(0xFF1B5E20);
+const _kError   = PdfColor.fromInt(0xFFB71C1C);
+
+// Colors retained for CouponCardPdfBuilder (do not remove)
+const _kPrimary  = PdfColor.fromInt(0xFFE8622A);
+const _kNavy     = PdfColor.fromInt(0xFF16213E);
+const _kTextSub  = PdfColor.fromInt(0xFF666666);
 
 // ─────────────────────────────────────────────────────────────────
 // CouponPdfBuilder — สร้าง pw.Document เท่านั้น
@@ -56,8 +56,11 @@ class CouponPdfBuilder {
       }
     }
 
-    // แบ่ง page (25 rows/page — portrait A4)
-    const rowsPerPage = 25;
+    final summaryLine =
+        'ทั้งหมด ${coupons.length} ใบ   ใช้ได้ $valid ใบ   ใช้แล้ว $used ใบ   หมดอายุ $expired ใบ';
+
+    // แบ่ง page (30 rows/page — portrait A4)
+    const rowsPerPage = 30;
     final pages = <List<CouponModel>>[];
     for (var i = 0; i < coupons.length; i += rowsPerPage) {
       pages.add(coupons.sublist(
@@ -65,40 +68,34 @@ class CouponPdfBuilder {
         (i + rowsPerPage) > coupons.length ? coupons.length : i + rowsPerPage,
       ));
     }
-    final totalPages = pages.isEmpty ? 1 : pages.length;
+    if (pages.isEmpty) pages.add([]);
+    final totalPages = pages.length;
 
-    for (var pageIdx = 0;
-        pageIdx < (pages.isEmpty ? 1 : pages.length);
-        pageIdx++) {
-      final pageCoupons =
-          pages.isEmpty ? <CouponModel>[] : pages[pageIdx];
-      final startNo = pageIdx * rowsPerPage + 1;
+    for (var pageIdx = 0; pageIdx < pages.length; pageIdx++) {
+      final pageCoupons = pages[pageIdx];
+      final startNo     = pageIdx * rowsPerPage + 1;
 
       doc.addPage(
         pw.Page(
           pageFormat: PdfPageFormat.a4,
           margin: const pw.EdgeInsets.all(24),
           build: (ctx) => pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            crossAxisAlignment: pw.CrossAxisAlignment.stretch,
             children: [
-              _buildHeader(
-                companyName: companyName,
-                printedAt:   printedAt,
-                total:       coupons.length,
-                valid:       valid,
-                used:        used,
-                expired:     expired,
-                ttf:         ttf,
-                ttfRegular:  ttfRegular,
+              _buildPageHeader(
+                companyName:  companyName,
+                reportTitle:  'รายงานคูปอง',
+                printedAt:    printedAt,
+                page:         pageIdx + 1,
+                totalPages:   totalPages,
+                ttf:          ttf,
+                ttfRegular:   ttfRegular,
+                summaryLine:  summaryLine,
               ),
-              pw.SizedBox(height: 12),
               _buildTable(pageCoupons,
                   startNo: startNo, ttf: ttf, ttfRegular: ttfRegular),
               pw.Spacer(),
-              _buildFooter(
-                  page: pageIdx + 1,
-                  totalPages: totalPages,
-                  ttfRegular: ttfRegular),
+              _buildFooter(ttfRegular: ttfRegular),
             ],
           ),
         ),
@@ -108,81 +105,65 @@ class CouponPdfBuilder {
     return doc;
   }
 
-  // ── Header ────────────────────────────────────────────────────
-  static pw.Widget _buildHeader({
-    required String companyName,
-    required String printedAt,
-    required int total,
-    required int valid,
-    required int used,
-    required int expired,
+  // ── Page Header ───────────────────────────────────────────────
+  static pw.Widget _buildPageHeader({
+    required String  companyName,
+    required String  reportTitle,
+    required String  printedAt,
+    required int     page,
+    required int     totalPages,
     required pw.Font ttf,
     required pw.Font ttfRegular,
+    String?          subtitle,
+    String?          summaryLine,
   }) {
-    return pw.Container(
-      decoration: pw.BoxDecoration(
-          color: _kNavy, borderRadius: pw.BorderRadius.circular(8)),
-      padding:
-          const pw.EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-      child: pw.Row(
-        crossAxisAlignment: pw.CrossAxisAlignment.center,
-        children: [
-          pw.Expanded(
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Text('รายงานคูปอง',
-                    style: pw.TextStyle(
-                        font: ttf, fontSize: 18, color: _kWhite)),
-                pw.SizedBox(height: 4),
-                pw.Text(companyName,
-                    style: pw.TextStyle(
-                        font: ttfRegular,
-                        fontSize: 11,
-                        color: const PdfColor.fromInt(0xFFAAAAAA))),
-              ],
-            ),
-          ),
-          pw.Row(children: [
-            _statChip('ทั้งหมด', '$total ใบ', _kPrimary, ttf, ttfRegular),
-            pw.SizedBox(width: 6),
-            _statChip('ใช้ได้', '$valid ใบ', _kSuccess, ttf, ttfRegular),
-            pw.SizedBox(width: 6),
-            _statChip('ใช้แล้ว', '$used ใบ', _kGrey, ttf, ttfRegular),
-            pw.SizedBox(width: 6),
-            _statChip('หมดอายุ', '$expired ใบ', _kError, ttf, ttfRegular),
-            pw.SizedBox(width: 6),
-            _statChip('พิมพ์เมื่อ', printedAt,
-                const PdfColor.fromInt(0xFF1565C0), ttf, ttfRegular),
-          ]),
-        ],
-      ),
-    );
-  }
-
-  static pw.Widget _statChip(String label, String value, PdfColor color,
-      pw.Font ttf, pw.Font ttfRegular) {
-    return pw.Container(
-      padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      decoration: pw.BoxDecoration(
-          color: PdfColors.white,
-          borderRadius: pw.BorderRadius.circular(6)),
-      child: pw.Column(children: [
-        pw.Text(label,
-            style: pw.TextStyle(
-                font: ttfRegular, fontSize: 7, color: _kTextSub)),
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+      children: [
+        pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          children: [
+            pw.Text('พิมพ์เมื่อ $printedAt',
+                style: pw.TextStyle(font: ttfRegular, fontSize: 8, color: _kSub)),
+            pw.Text('หน้าที่ $page / $totalPages',
+                style: pw.TextStyle(font: ttfRegular, fontSize: 8, color: _kSub)),
+          ],
+        ),
+        pw.SizedBox(height: 3),
+        pw.Center(
+          child: pw.Text(companyName,
+              style: pw.TextStyle(font: ttfRegular, fontSize: 9, color: _kSub)),
+        ),
         pw.SizedBox(height: 2),
-        pw.Text(value,
-            style:
-                pw.TextStyle(font: ttf, fontSize: 9, color: color)),
-      ]),
+        pw.Center(
+          child: pw.Text(reportTitle,
+              style: pw.TextStyle(font: ttf, fontSize: 14, color: _kText)),
+        ),
+        if (subtitle != null) ...[
+          pw.SizedBox(height: 3),
+          pw.Center(
+            child: pw.Text(subtitle,
+                style: pw.TextStyle(font: ttfRegular, fontSize: 8, color: _kSub)),
+          ),
+        ],
+        if (summaryLine != null) ...[
+          pw.SizedBox(height: 2),
+          pw.Center(
+            child: pw.Text(summaryLine,
+                style: pw.TextStyle(font: ttfRegular, fontSize: 8, color: _kSub)),
+          ),
+        ],
+        pw.SizedBox(height: 6),
+        pw.Container(height: 0.5, color: _kBorder),
+        pw.SizedBox(height: 6),
+      ],
     );
   }
 
   // ── Table ─────────────────────────────────────────────────────
   static pw.Widget _buildTable(
     List<CouponModel> coupons, {
-    required int startNo,
+    required int     startNo,
     required pw.Font ttf,
     required pw.Font ttfRegular,
   }) {
@@ -207,7 +188,7 @@ class CouponPdfBuilder {
         padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 5),
         alignment: align,
         child: pw.Text(text,
-            style: pw.TextStyle(font: font, fontSize: 8, color: color)),
+            style: pw.TextStyle(font: font, fontSize: 8, color: color ?? _kText)),
       );
     }
 
@@ -218,15 +199,9 @@ class CouponPdfBuilder {
     }
 
     PdfColor statusColor(CouponModel c) {
-      if (c.isUsed) return _kGrey;
+      if (c.isUsed) return _kSub;
       if (c.isExpired) return _kError;
       return _kSuccess;
-    }
-
-    PdfColor statusBg(CouponModel c) {
-      if (c.isUsed) return _kGreyBg;
-      if (c.isExpired) return _kErrorBg;
-      return _kSuccessBg;
     }
 
     String usedByLabel(String? usedBy) {
@@ -241,7 +216,7 @@ class CouponPdfBuilder {
       children: [
         // Header row
         pw.TableRow(
-          decoration: pw.BoxDecoration(color: _kNavy),
+          decoration: pw.BoxDecoration(color: _kHdrBg),
           children: [
             '#',
             'รหัสคูปอง',
@@ -253,20 +228,19 @@ class CouponPdfBuilder {
           ]
               .map((h) => pw.Container(
                     padding: const pw.EdgeInsets.symmetric(
-                        horizontal: 5, vertical: 7),
+                        horizontal: 5, vertical: 6),
                     child: pw.Text(h,
                         style: pw.TextStyle(
-                            font: ttf, fontSize: 8, color: _kWhite)),
+                            font: ttf, fontSize: 8, color: _kText)),
                   ))
               .toList(),
         ),
         // Data rows
         ...coupons.asMap().entries.map((e) {
-          final i = e.key;
-          final c = e.value;
-          final rowBg = i.isEven ? _kHeaderBg : PdfColors.white;
+          final i      = e.key;
+          final c      = e.value;
+          final rowBg  = i.isEven ? _kAltRow : null;
           final sColor = statusColor(c);
-          final sBg    = statusBg(c);
 
           // ผู้ใช้/ใช้เมื่อ column
           final usedByText = c.isUsed
@@ -281,7 +255,7 @@ class CouponPdfBuilder {
             cell(statusLabel(c), ttf,
                 align: pw.Alignment.center,
                 color: sColor,
-                bgColor: sBg),
+                bgColor: rowBg),
             cell(dateFmt.format(c.createdAt), ttfRegular,
                 align: pw.Alignment.center, bgColor: rowBg),
             cell(
@@ -297,27 +271,14 @@ class CouponPdfBuilder {
   }
 
   // ── Footer ────────────────────────────────────────────────────
-  static pw.Widget _buildFooter({
-    required int page,
-    required int totalPages,
-    required pw.Font ttfRegular,
-  }) {
+  static pw.Widget _buildFooter({required pw.Font ttfRegular}) {
     return pw.Container(
-      padding: const pw.EdgeInsets.only(top: 8),
+      padding: const pw.EdgeInsets.only(top: 6),
       decoration: const pw.BoxDecoration(
           border: pw.Border(
               top: pw.BorderSide(color: _kBorder, width: 0.5))),
-      child: pw.Row(
-        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-        children: [
-          pw.Text('DEE POS — รายงานคูปอง',
-              style: pw.TextStyle(
-                  font: ttfRegular, fontSize: 8, color: _kTextSub)),
-          pw.Text('หน้า $page / $totalPages',
-              style: pw.TextStyle(
-                  font: ttfRegular, fontSize: 8, color: _kTextSub)),
-        ],
-      ),
+      child: pw.Text('DEE POS — รายงานคูปอง',
+          style: pw.TextStyle(font: ttfRegular, fontSize: 7, color: _kSub)),
     );
   }
 }
