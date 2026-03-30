@@ -1434,14 +1434,11 @@ class _ActionIconBtn extends StatelessWidget {
       required this.onTap});
 
   @override
-  Widget build(BuildContext context) => Tooltip(
-        message: tooltip,
-        child: IconButton(
-          icon: Icon(icon, size: 18, color: color),
-          constraints:
-              const BoxConstraints(minWidth: 36, minHeight: 36),
-          onPressed: onTap,
-        ),
+  Widget build(BuildContext context) => IconButton(
+        icon: Icon(icon, size: 18, color: color),
+        tooltip: tooltip,
+        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+        onPressed: onTap,
       );
 }
 

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
@@ -137,20 +138,77 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     final srcPath = result.files.first.path;
     if (srcPath == null) return;
 
-    // copy ไฟล์ไปไว้ใน app documents เพื่อให้ path คงที่ ไม่หายเมื่อ source ถูกลบ
     final docsDir = await getApplicationDocumentsDirectory();
     final imgDir  = Directory(p.join(docsDir.path, 'product_images'));
     if (!imgDir.existsSync()) imgDir.createSync(recursive: true);
 
-    final ext     = p.extension(srcPath);
-    final dstName = 'product_${DateTime.now().millisecondsSinceEpoch}$ext';
-    final dstPath = p.join(imgDir.path, dstName);
-    await File(srcPath).copy(dstPath);
+    // ย่อภาพตามสัดส่วนเดิม โดยจำกัดด้านที่ยาวกว่าไม่เกิน 800px
+    const int maxPx    = 200;
+    final srcBytes     = await File(srcPath).readAsBytes();
+
+    // Decode เต็มขนาดก่อนเพื่ออ่าน dimension จริง
+    final codec0 = await ui.instantiateImageCodec(srcBytes);
+    final frame0  = await codec0.getNextFrame();
+    final origW   = frame0.image.width;
+    final origH   = frame0.image.height;
+    frame0.image.dispose();
+
+    // คำนวณขนาดใหม่โดยรักษาสัดส่วน
+    int dstW, dstH;
+    if (origW >= origH) {
+      dstW = origW > maxPx ? maxPx : origW;
+      dstH = (origH * dstW / origW).round();
+    } else {
+      dstH = origH > maxPx ? maxPx : origH;
+      dstW = (origW * dstH / origH).round();
+    }
+
+    // Decode อีกครั้งที่ขนาดจริงที่ต้องการ
+    final codec   = await ui.instantiateImageCodec(
+      srcBytes,
+      targetWidth: dstW,
+      targetHeight: dstH,
+    );
+    final frame    = await codec.getNextFrame();
+    final srcImg   = frame.image;
+
+    final recorder = ui.PictureRecorder();
+    paintImage(
+      canvas: Canvas(recorder),
+      rect: Rect.fromLTWH(0, 0, dstW.toDouble(), dstH.toDouble()),
+      image: srcImg,
+      fit: BoxFit.fill,
+      filterQuality: FilterQuality.medium,
+    );
+    final picture    = recorder.endRecording();
+    final resizedImg = await picture.toImage(dstW, dstH);
+    final byteData   = await resizedImg.toByteData(format: ui.ImageByteFormat.png);
+    srcImg.dispose();
+    resizedImg.dispose();
+
+    // ลบภาพเก่าออกก่อนบันทึกภาพใหม่
+    _deleteImageFile(_imagePath);
+
+    final dstPath = p.join(
+      imgDir.path,
+      'product_${DateTime.now().millisecondsSinceEpoch}.png',
+    );
+    await File(dstPath).writeAsBytes(byteData!.buffer.asUint8List());
 
     setState(() => _imagePath = dstPath);
   }
 
-  void _removeImage() => setState(() => _imagePath = null);
+  /// ลบไฟล์ภาพออกจาก disk (ถ้ามี) — ไม่ throw ถ้าไม่เจอไฟล์
+  void _deleteImageFile(String? path) {
+    if (path == null) return;
+    final file = File(path);
+    if (file.existsSync()) file.deleteSync();
+  }
+
+  void _removeImage() {
+    _deleteImageFile(_imagePath);
+    setState(() => _imagePath = null);
+  }
 
   // ─────────────────────────────────────────────────────────────
   // Submit

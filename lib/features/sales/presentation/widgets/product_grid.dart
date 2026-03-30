@@ -314,14 +314,41 @@ class _ProductImage extends StatelessWidget {
 
     Widget content;
     if (hasImage && exists) {
-      content = ClipRRect(
-        borderRadius: borderRadius,
-        child: Image.file(
-          file,
-          fit: BoxFit.cover,
-          errorBuilder: (_, _, _) => _placeholder(),
-        ),
-      );
+      if (_isExpand) {
+        // Card view: แสดงภาพเต็ม มี padding 5pt และขอบมน
+        // ใช้ FittedBox ห่อ ClipRRect เพื่อให้ clip ตรงขอบรูปจริง (ไม่ใช่ขอบ widget)
+        content = Container(
+          decoration: BoxDecoration(
+            color: _orange.withValues(alpha: 0.06),
+            borderRadius: borderRadius,
+          ),
+          padding: const EdgeInsets.all(5),
+          child: FittedBox(
+            fit: BoxFit.contain,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: Image.file(
+                file,
+                errorBuilder: (_, _, _) => _placeholder(),
+              ),
+            ),
+          ),
+        );
+      } else {
+        // List view: thumbnail เล็ก เห็นภาพครบ
+        content = Container(
+          decoration: BoxDecoration(
+            color: _orange.withValues(alpha: 0.06),
+            borderRadius: borderRadius,
+          ),
+          padding: const EdgeInsets.all(2),
+          child: Image.file(
+            file,
+            fit: BoxFit.contain,
+            errorBuilder: (_, _, _) => _placeholder(),
+          ),
+        );
+      }
     } else {
       content = _placeholder();
     }
