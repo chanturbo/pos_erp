@@ -256,85 +256,77 @@ class _SupplierListPageState extends ConsumerState<SupplierListPage> {
 
   // ── Card View ──────────────────────────────────────────────────
   Widget _buildCardView(List<SupplierModel> suppliers) {
-    return Builder(builder: (ctx) {
-      final cs     = Theme.of(ctx).colorScheme;
-      final isDark = Theme.of(ctx).brightness == Brightness.dark;
+    return ListView.separated(
+      padding: const EdgeInsets.all(12),
+      itemCount: suppliers.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 8),
+      itemBuilder: (_, i) {
+        final s       = suppliers[i];
+        final initial = s.supplierName.isNotEmpty
+            ? s.supplierName.substring(0, 1).toUpperCase()
+            : '?';
+        final color = _avatarColor(s.supplierName);
 
-      return ListView.separated(
-        padding: const EdgeInsets.all(12),
-        itemCount: suppliers.length,
-        separatorBuilder: (_, _) => const SizedBox(height: 8),
-        itemBuilder: (_, i) {
-          final s       = suppliers[i];
-          final initial = s.supplierName.isNotEmpty
-              ? s.supplierName.substring(0, 1).toUpperCase()
-              : '?';
-          final color = _avatarColor(s.supplierName);
-
-          return Card(
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-              side: BorderSide(color: cs.outline.withValues(alpha: 0.3)),
-            ),
-            color: cs.surface,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(10),
-              hoverColor: AppTheme.primaryLight.withValues(alpha: 0.6),
-              onTap: () => _showSupplierDetails(s),
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Row(
-                  children: [
-                    // Avatar
-                    CircleAvatar(
-                      radius: 20,
-                      backgroundColor: color,
-                      child: Text(
-                        initial,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
+        return Card(
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+            side: const BorderSide(color: AppTheme.border),
+          ),
+          color: Colors.white,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(10),
+            hoverColor: AppTheme.primaryLight.withValues(alpha: 0.6),
+            onTap: () => _showSupplierDetails(s),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  // Avatar
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundColor: color,
+                    child: Text(
+                      initial,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const SizedBox(width: 12),
+                  ),
+                  const SizedBox(width: 12),
 
-                    // Info
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  s.supplierName,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: cs.onSurface,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                  maxLines: 1,
+                  // Info
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                s.supplierName,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF1A1A1A),
                                 ),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
                               ),
-                              const SizedBox(width: 8),
-                              // Status badge
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: s.isActive
-                                      ? (isDark
-                                          ? const Color(0xFF1B5E20).withValues(alpha: 0.4)
-                                          : const Color(0xFFE8F5E9))
-                                      : (isDark
-                                          ? const Color(0xFFB71C1C).withValues(alpha: 0.4)
-                                          : const Color(0xFFFFEBEE)),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
+                            ),
+                            const SizedBox(width: 8),
+                            // Status badge
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: s.isActive
+                                    ? const Color(0xFFE8F5E9)
+                                    : const Color(0xFFFFEBEE),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
@@ -431,7 +423,6 @@ class _SupplierListPageState extends ConsumerState<SupplierListPage> {
           );
         },
       );
-    });
   }
 
   // ── Auto-fit columns ───────────────────────────────────────────
