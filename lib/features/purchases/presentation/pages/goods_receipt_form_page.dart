@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:pos_erp/shared/theme/app_theme.dart';
 
 import '../../../products/presentation/providers/product_provider.dart';
 import '../../../suppliers/presentation/providers/supplier_provider.dart';
@@ -8,11 +9,10 @@ import '../../data/models/goods_receipt_model.dart';
 import '../../data/models/goods_receipt_item_model.dart';
 import '../providers/goods_receipt_provider.dart';
 import '../providers/purchase_provider.dart';
-import '../../../../../shared/services/mobile_scanner_service.dart'; // ✅ Phase 5
+import '../../../../../shared/services/mobile_scanner_service.dart';
 
 class GoodsReceiptFormPage extends ConsumerStatefulWidget {
   final GoodsReceiptModel? receipt;
-
   const GoodsReceiptFormPage({super.key, this.receipt});
 
   @override
@@ -20,7 +20,8 @@ class GoodsReceiptFormPage extends ConsumerStatefulWidget {
       _GoodsReceiptFormPageState();
 }
 
-class _GoodsReceiptFormPageState extends ConsumerState<GoodsReceiptFormPage> {
+class _GoodsReceiptFormPageState
+    extends ConsumerState<GoodsReceiptFormPage> {
   final _formKey = GlobalKey<FormState>();
 
   DateTime _grDate = DateTime.now();
@@ -30,12 +31,12 @@ class _GoodsReceiptFormPageState extends ConsumerState<GoodsReceiptFormPage> {
   String? _supplierName;
   String _warehouseId = 'WH001';
   String _warehouseName = 'คลังสาขาหลัก';
-  String? _remark;
+  final _remarkController = TextEditingController();
 
   final List<GoodsReceiptItemModel> _items = [];
-
   bool _isLoading = false;
   bool _isViewMode = false;
+  bool _isCardView = false;
 
   @override
   void initState() {
@@ -47,538 +48,756 @@ class _GoodsReceiptFormPageState extends ConsumerState<GoodsReceiptFormPage> {
   }
 
   void _loadReceiptData() {
-    final receipt = widget.receipt!;
-    _grDate = receipt.grDate;
-    _poId = receipt.poId;
-    _poNo = receipt.poNo;
-    _supplierId = receipt.supplierId;
-    _supplierName = receipt.supplierName;
-    _warehouseId = receipt.warehouseId;
-    _warehouseName = receipt.warehouseName;
-    _remark = receipt.remark;
-
-    if (receipt.items != null) {
-      _items.addAll(receipt.items!);
-    }
+    final r = widget.receipt!;
+    _grDate = r.grDate;
+    _poId = r.poId;
+    _poNo = r.poNo;
+    _supplierId = r.supplierId;
+    _supplierName = r.supplierName;
+    _warehouseId = r.warehouseId;
+    _warehouseName = r.warehouseName;
+    _remarkController.text = r.remark ?? '';
+    if (r.items != null) _items.addAll(r.items!);
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_getTitle()),
-        actions: _isViewMode
-            ? []
-            : [
-                IconButton(
-                  icon: const Icon(Icons.help_outline),
-                  onPressed: _showHelp,
-                ),
-              ],
-      ),
-      body: Form(
-        key: _formKey,
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Method Selection (ถ้าเป็นการสร้างใหม่)
-                    if (widget.receipt == null && _poId == null)
-                      _buildMethodSelection(),
-
-                    // Header Card
-                    _buildHeaderCard(),
-
-                    const SizedBox(height: 16),
-
-                    // Items Card
-                    _buildItemsCard(),
-
-                    const SizedBox(height: 16),
-
-                    // Summary (ถ้ามีรายการ)
-                    if (_items.isNotEmpty) _buildSummaryCard(),
-                  ],
-                ),
-              ),
-            ),
-
-            // Bottom Actions
-            if (!_isViewMode) _buildBottomActions(),
-          ],
-        ),
-      ),
-    );
+  void dispose() {
+    _remarkController.dispose();
+    super.dispose();
   }
 
-  String _getTitle() {
+  String get _pageTitle {
     if (_isViewMode) return 'รายละเอียดใบรับสินค้า';
     if (widget.receipt == null) return 'สร้างใบรับสินค้า';
     return 'แก้ไขใบรับสินค้า';
   }
 
-  // Method Selection
-  Widget _buildMethodSelection() {
-    return Card(
-      color: Colors.blue.withValues(alpha: 0.1),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'เลือกวิธีการสร้างใบรับสินค้า',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _selectFromPO,
-                    icon: const Icon(Icons.shopping_cart),
-                    label: const Text('จาก Purchase Order'),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.all(16),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _createManually,
-                    icon: const Icon(Icons.edit),
-                    label: const Text('สร้างเอง'),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.all(16),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  // ─────────────────────────────────────────────────────────────
+  // Build
+  // ─────────────────────────────────────────────────────────────
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    // Preload products so the dialog opens immediately on first tap
+    ref.watch(productListProvider);
 
-  // Header Card
-  Widget _buildHeaderCard() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'ข้อมูลทั่วไป',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
+    return Scaffold(
+      backgroundColor:
+          isDark ? AppTheme.darkBg : const Color(0xFFF5F5F5),
+      body: Column(
+        children: [
+          // ── Title Bar ─────────────────────────────────────────
+          _GRFormTitleBar(
+            title: _pageTitle,
+            isViewMode: _isViewMode,
+            onHelp: _isViewMode ? null : _showHelp,
+          ),
 
-            // วันที่
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.calendar_today),
-              title: const Text('วันที่รับสินค้า'),
-              subtitle: Text(DateFormat('dd/MM/yyyy').format(_grDate)),
-              trailing: _isViewMode ? null : const Icon(Icons.chevron_right),
-              onTap: _isViewMode ? null : _selectDate,
-            ),
-
-            const Divider(),
-
-            // PO Reference (ถ้ามี)
-            if (_poNo != null) ...[
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.receipt_long),
-                title: const Text('อ้างอิง Purchase Order'),
-                subtitle: Text(_poNo!),
-              ),
-              const Divider(),
-            ],
-
-            // Supplier
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.business),
-              title: const Text('ซัพพลายเออร์'),
-              subtitle: Text(_supplierName ?? '-'),
-            ),
-
-            const Divider(),
-
-            // Warehouse
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.warehouse),
-              title: const Text('คลังสินค้า'),
-              subtitle: Text(_warehouseName),
-            ),
-
-            const Divider(),
-
-            // Remark
-            if (_isViewMode)
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.note),
-                title: const Text('หมายเหตุ'),
-                subtitle: Text(_remark ?? '-'),
-              )
-            else
-              TextFormField(
-                decoration: const InputDecoration(
-                  labelText: 'หมายเหตุ',
-                  prefixIcon: Icon(Icons.note),
-                ),
-                initialValue: _remark,
-                maxLines: 2,
-                onChanged: (value) {
-                  _remark = value;
-                },
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // Items Card
-  Widget _buildItemsCard() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'รายการสินค้า',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                if (!_isViewMode && _supplierId != null)
-                  ElevatedButton.icon(
-                    onPressed: _addItem,
-                    icon: const Icon(Icons.add, size: 18),
-                    label: const Text('เพิ่มสินค้า'),
-                    style: ElevatedButton.styleFrom(
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            if (_items.isEmpty)
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(32),
-                  child: Column(
-                    children: [
-                      Icon(
-                        Icons.inventory_2_outlined,
-                        size: 64,
-                        color: Colors.grey[400],
+          // ── Form Body ─────────────────────────────────────────
+          Expanded(
+            child: Form(
+              key: _formKey,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    // Section 0 — Method Selection (create mode, no PO yet)
+                    if (widget.receipt == null && _poId == null &&
+                        _supplierId == null) ...[
+                      _GRSectionCard(
+                        icon: Icons.alt_route_outlined,
+                        iconColor: AppTheme.info,
+                        title: 'เลือกวิธีสร้างใบรับสินค้า',
+                        child: _buildMethodSelection(isDark),
                       ),
-                      const SizedBox(height: 16),
-                      Text(
-                        _supplierId == null
-                            ? 'กรุณาเลือกวิธีการสร้างใบรับสินค้าก่อน'
-                            : 'ยังไม่มีรายการสินค้า',
-                        style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                        textAlign: TextAlign.center,
-                      ),
+                      const SizedBox(height: 14),
                     ],
-                  ),
-                ),
-              )
-            else
-              ..._items.asMap().entries.map((entry) {
-                final index = entry.key;
-                final item = entry.value;
-                return _buildItemRow(item, index);
-              }),
-          ],
-        ),
-      ),
-    );
-  }
 
-  // Item Row
-  Widget _buildItemRow(GoodsReceiptItemModel item, int index) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      color: Colors.grey[50],
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        item.productName,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      Text(
-                        item.productCode,
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                      ),
-                    ],
-                  ),
-                ),
-                if (!_isViewMode)
-                  IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.red),
-                    onPressed: () {
-                      setState(() {
-                        _items.removeAt(index);
-                      });
-                    },
-                  ),
-              ],
-            ),
-
-            const Divider(height: 16),
-
-            // Quantities
-            Row(
-              children: [
-                Expanded(
-                  child: _buildQuantityInfo(
-                    'สั่งซื้อ',
-                    item.orderedQuantity,
-                    item.unit,
-                    Colors.blue,
-                  ),
-                ),
-                Expanded(
-                  child: _buildQuantityInfo(
-                    'รับจริง',
-                    item.receivedQuantity,
-                    item.unit,
-                    Colors.green,
-                  ),
-                ),
-                if (item.orderedQuantity > 0)
-                  Expanded(
-                    child: _buildQuantityInfo(
-                      'คงเหลือ',
-                      item.orderedQuantity - item.receivedQuantity,
-                      item.unit,
-                      Colors.orange,
+                    // Section 1 — ข้อมูลทั่วไป
+                    _GRSectionCard(
+                      icon: Icons.local_shipping_outlined,
+                      iconColor: AppTheme.success,
+                      title: 'ข้อมูลทั่วไป',
+                      child: _buildGeneralSection(isDark),
                     ),
-                  ),
-              ],
-            ),
+                    const SizedBox(height: 14),
 
-            // Additional Info
-            if (item.lotNumber != null || item.expiryDate != null) ...[
-              const Divider(height: 16),
-              Wrap(
-                spacing: 16,
-                runSpacing: 8,
+                    // Section 2 — รายการสินค้า
+                    _GRSectionCard(
+                      icon: Icons.inventory_2_outlined,
+                      iconColor: AppTheme.info,
+                      title: 'รายการสินค้า',
+                      trailing: (!_isViewMode && _supplierId != null)
+                          ? Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _GRSmallIconBtn(
+                                  icon: _isCardView
+                                      ? Icons.view_list_outlined
+                                      : Icons.grid_view_outlined,
+                                  tooltip: _isCardView
+                                      ? 'List View'
+                                      : 'Card View',
+                                  isDark: isDark,
+                                  onTap: () => setState(
+                                      () => _isCardView = !_isCardView),
+                                ),
+                                const SizedBox(width: 6),
+                                ElevatedButton.icon(
+                                  onPressed: _addItem,
+                                  icon: const Icon(Icons.add, size: 15),
+                                  label: const Text('เพิ่ม',
+                                      style: TextStyle(fontSize: 12)),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppTheme.info,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 8),
+                                    minimumSize: Size.zero,
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(8)),
+                                    elevation: 0,
+                                  ),
+                                ),
+                              ],
+                            )
+                          : (_isViewMode
+                              ? null
+                              : _GRSmallIconBtn(
+                                  icon: _isCardView
+                                      ? Icons.view_list_outlined
+                                      : Icons.grid_view_outlined,
+                                  tooltip: _isCardView
+                                      ? 'List View'
+                                      : 'Card View',
+                                  isDark: isDark,
+                                  onTap: () => setState(
+                                      () => _isCardView = !_isCardView),
+                                )),
+                      child: _buildItemsSection(isDark),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Section 3 — สรุปยอด
+                    if (_items.isNotEmpty) ...[
+                      _GRSectionCard(
+                        icon: Icons.summarize_outlined,
+                        iconColor: AppTheme.success,
+                        title: 'สรุปรายการ',
+                        child: _buildSummarySection(isDark),
+                      ),
+                      const SizedBox(height: 14),
+                    ],
+
+                    // Section 4 — หมายเหตุ
+                    _GRSectionCard(
+                      icon: Icons.note_outlined,
+                      iconColor: AppTheme.textSub,
+                      title: 'หมายเหตุ',
+                      child: _isViewMode
+                          ? _GRReadOnlyField(
+                              label: _remarkController.text.isEmpty
+                                  ? '-'
+                                  : _remarkController.text,
+                              icon: Icons.edit_note,
+                              isDark: isDark,
+                            )
+                          : _GRTextField(
+                              controller: _remarkController,
+                              hint: 'บันทึกเพิ่มเติม (ถ้ามี)',
+                              icon: Icons.edit_note,
+                              maxLines: 3,
+                              isDark: isDark,
+                            ),
+                    ),
+                    const SizedBox(height: 80),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // ── Bottom Action Bar ─────────────────────────────────
+          if (!_isViewMode)
+            Container(
+              color: isDark ? AppTheme.darkTopBar : Colors.white,
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 20, vertical: 14),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  if (item.lotNumber != null)
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.qr_code, size: 14, color: Colors.grey[600]),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Lot: ${item.lotNumber}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
+                  OutlinedButton(
+                    onPressed:
+                        _isLoading ? null : () => Navigator.pop(context),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 12),
+                      side: BorderSide(
+                          color: isDark
+                              ? Colors.white24
+                              : AppTheme.border),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
                     ),
-                  if (item.expiryDate != null)
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.event, size: 14, color: Colors.grey[600]),
-                        const SizedBox(width: 4),
-                        Text(
-                          'EXP: ${DateFormat('dd/MM/yyyy').format(item.expiryDate!)}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
+                    child: Text('ยกเลิก',
+                        style: TextStyle(
+                            color: isDark
+                                ? Colors.white60
+                                : AppTheme.textSub)),
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton.icon(
+                    onPressed: _isLoading ? null : _saveReceipt,
+                    icon: _isLoading
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white),
+                          )
+                        : const Icon(Icons.save_outlined, size: 18),
+                    label: Text(
+                      widget.receipt == null
+                          ? 'สร้างใบรับสินค้า'
+                          : 'บันทึก',
+                      style: const TextStyle(fontSize: 14),
                     ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.success,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
+                      elevation: 0,
+                    ),
+                  ),
                 ],
               ),
-            ],
-
-            // Edit Button (ถ้าไม่ใช่ View Mode)
-            if (!_isViewMode) ...[
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => _editItem(item, index),
-                  icon: const Icon(Icons.edit, size: 16),
-                  label: const Text('แก้ไขจำนวน/ข้อมูลเพิ่มเติม'),
-                  style: OutlinedButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
+            ),
+        ],
       ),
     );
   }
 
-  // Quantity Info Widget
-  Widget _buildQuantityInfo(
-    String label,
-    double quantity,
-    String unit,
-    Color color,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  // ─────────────────────────────────────────────────────────────
+  // Method Selection Section
+  // ─────────────────────────────────────────────────────────────
+  Widget _buildMethodSelection(bool isDark) {
+    return Row(
       children: [
-        Text(label, style: TextStyle(fontSize: 11, color: Colors.grey[600])),
-        const SizedBox(height: 2),
-        Text(
-          '${quantity.toStringAsFixed(0)} $unit',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: color,
+        Expanded(
+          child: _GRMethodBtn(
+            icon: Icons.receipt_long_outlined,
+            label: 'จาก Purchase Order',
+            sublabel: 'ดึงข้อมูลจาก PO ที่อนุมัติแล้ว',
+            color: AppTheme.info,
+            isDark: isDark,
+            onTap: _selectFromPO,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _GRMethodBtn(
+            icon: Icons.edit_outlined,
+            label: 'สร้างเอง',
+            sublabel: 'ไม่อ้างอิง PO',
+            color: AppTheme.primaryDark,
+            isDark: isDark,
+            onTap: _createManually,
           ),
         ),
       ],
     );
   }
 
-  // Summary Card
-  Widget _buildSummaryCard() {
-    final totalItems = _items.length;
-    final totalOrdered = _items.fold<double>(
-      0,
-      (sum, item) => sum + item.orderedQuantity,
-    );
-    final totalReceived = _items.fold<double>(
-      0,
-      (sum, item) => sum + item.receivedQuantity,
-    );
+  // ─────────────────────────────────────────────────────────────
+  // General Section
+  // ─────────────────────────────────────────────────────────────
+  Widget _buildGeneralSection(bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // วันที่
+        _GRFieldLabel(label: 'วันที่รับสินค้า', isDark: isDark),
+        const SizedBox(height: 6),
+        InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: _isViewMode ? null : _selectDate,
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+                horizontal: 12, vertical: 12),
+            decoration: BoxDecoration(
+              color: _isViewMode
+                  ? (isDark
+                      ? AppTheme.darkCard
+                      : const Color(0xFFF5F5F5))
+                  : (isDark ? AppTheme.darkElement : Colors.white),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                  color: isDark ? Colors.white24 : AppTheme.border),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.calendar_today_outlined,
+                    size: 17,
+                    color: isDark ? Colors.white54 : AppTheme.textSub),
+                const SizedBox(width: 8),
+                Text(
+                  DateFormat('dd/MM/yyyy').format(_grDate),
+                  style: TextStyle(
+                      fontSize: 13,
+                      color: isDark ? Colors.white : Colors.black87),
+                ),
+                const Spacer(),
+                if (!_isViewMode)
+                  Icon(Icons.chevron_right,
+                      size: 18,
+                      color: isDark
+                          ? Colors.white38
+                          : AppTheme.textSub),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
 
-    return Card(
-      color: Colors.green.withValues(alpha: 0.1),
+        // PO Reference (ถ้ามี)
+        if (_poNo != null) ...[
+          _GRFieldLabel(
+              label: 'อ้างอิง Purchase Order', isDark: isDark),
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(
+                horizontal: 12, vertical: 12),
+            decoration: BoxDecoration(
+              color: AppTheme.info.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                  color: AppTheme.info.withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.receipt_long_outlined,
+                    size: 17, color: AppTheme.info),
+                const SizedBox(width: 8),
+                Text(_poNo!,
+                    style: const TextStyle(
+                        fontSize: 13,
+                        color: AppTheme.info,
+                        fontWeight: FontWeight.w600)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+        ],
+
+        // ซัพพลายเออร์
+        _GRFieldLabel(label: 'ซัพพลายเออร์', isDark: isDark),
+        const SizedBox(height: 6),
+        Container(
+          padding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          decoration: BoxDecoration(
+            color: isDark
+                ? AppTheme.darkCard
+                : const Color(0xFFF5F5F5),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+                color: isDark ? Colors.white12 : AppTheme.border),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.business_outlined,
+                  size: 17,
+                  color: isDark ? Colors.white38 : AppTheme.textSub),
+              const SizedBox(width: 8),
+              Text(
+                _supplierName ?? '-',
+                style: TextStyle(
+                    fontSize: 13,
+                    color: isDark ? Colors.white70 : Colors.black87),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // คลังสินค้า
+        _GRFieldLabel(label: 'คลังสินค้า', isDark: isDark),
+        const SizedBox(height: 6),
+        Container(
+          padding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          decoration: BoxDecoration(
+            color: isDark
+                ? AppTheme.darkCard
+                : const Color(0xFFF5F5F5),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+                color: isDark ? Colors.white12 : AppTheme.border),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.warehouse_outlined,
+                  size: 17,
+                  color: isDark ? Colors.white38 : AppTheme.textSub),
+              const SizedBox(width: 8),
+              Text(
+                _warehouseName,
+                style: TextStyle(
+                    fontSize: 13,
+                    color: isDark ? Colors.white54 : AppTheme.textSub),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Items Section
+  // ─────────────────────────────────────────────────────────────
+  Widget _buildItemsSection(bool isDark) {
+    if (_items.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        child: Center(
+          child: Column(
+            children: [
+              Icon(
+                _supplierId == null
+                    ? Icons.alt_route_outlined
+                    : Icons.add_shopping_cart_outlined,
+                size: 48,
+                color: isDark
+                    ? const Color(0xFF444444)
+                    : Colors.grey[300],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _supplierId == null
+                    ? 'กรุณาเลือกวิธีสร้างใบรับสินค้าก่อน'
+                    : 'ยังไม่มีรายการสินค้า\nกดปุ่ม "เพิ่ม" เพื่อเพิ่มสินค้า',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontSize: 13,
+                    color: isDark
+                        ? const Color(0xFF888888)
+                        : Colors.grey[500]),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      children: _items.asMap().entries.map((entry) {
+        final i = entry.key;
+        final item = entry.value;
+        return _isCardView
+            ? _buildItemCard(item, i, isDark)
+            : _buildItemListRow(item, i, isDark);
+      }).toList(),
+    );
+  }
+
+  // Item Card View
+  Widget _buildItemCard(
+      GoodsReceiptItemModel item, int index, bool isDark) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkElement : const Color(0xFFF9FAFB),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+            color: isDark ? Colors.white12 : AppTheme.border),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Header row
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('จำนวนรายการ', style: TextStyle(fontSize: 14)),
-                Text(
-                  '$totalItems รายการ',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.success.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.inventory_2_outlined,
+                      size: 16, color: AppTheme.success),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(item.productName,
+                          style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: isDark
+                                  ? Colors.white
+                                  : const Color(0xFF1A1A1A))),
+                      const SizedBox(height: 2),
+                      Text(item.productCode,
+                          style: TextStyle(
+                              fontSize: 11,
+                              color: isDark
+                                  ? Colors.white54
+                                  : AppTheme.textSub)),
+                    ],
                   ),
                 ),
+                if (!_isViewMode)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _GRSmallIconBtn(
+                        icon: Icons.edit_outlined,
+                        tooltip: 'แก้ไขจำนวน',
+                        isDark: isDark,
+                        color: AppTheme.info,
+                        onTap: () => _editItem(item, index),
+                      ),
+                      const SizedBox(width: 4),
+                      _GRSmallIconBtn(
+                        icon: Icons.delete_outline,
+                        tooltip: 'ลบ',
+                        isDark: isDark,
+                        color: AppTheme.error,
+                        onTap: () =>
+                            setState(() => _items.removeAt(index)),
+                      ),
+                    ],
+                  ),
               ],
             ),
-            const Divider(),
+            const SizedBox(height: 10),
+            Divider(
+                height: 1,
+                color: isDark ? Colors.white12 : AppTheme.border),
+            const SizedBox(height: 10),
+
+            // Qty row
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('จำนวนที่สั่ง', style: TextStyle(fontSize: 14)),
-                Text(
-                  totalOrdered.toStringAsFixed(0),
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue,
+                Expanded(
+                  child: _QtyStat(
+                    label: 'สั่งซื้อ',
+                    qty: item.orderedQuantity,
+                    unit: item.unit,
+                    color: AppTheme.info,
+                    isDark: isDark,
                   ),
                 ),
-              ],
-            ),
-            const Divider(),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('จำนวนที่รับจริง', style: TextStyle(fontSize: 14)),
-                Text(
-                  totalReceived.toStringAsFixed(0),
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.green,
+                Expanded(
+                  child: _QtyStat(
+                    label: 'รับจริง',
+                    qty: item.receivedQuantity,
+                    unit: item.unit,
+                    color: AppTheme.success,
+                    isDark: isDark,
                   ),
                 ),
+                if (item.orderedQuantity > 0)
+                  Expanded(
+                    child: _QtyStat(
+                      label: 'คงเหลือ',
+                      qty: item.orderedQuantity - item.receivedQuantity,
+                      unit: item.unit,
+                      color: AppTheme.warning,
+                      isDark: isDark,
+                    ),
+                  ),
               ],
             ),
+
+            // Lot / Expiry
+            if (item.lotNumber != null || item.expiryDate != null) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 12,
+                children: [
+                  if (item.lotNumber != null)
+                    _GRBadge(
+                      icon: Icons.qr_code,
+                      text: 'Lot: ${item.lotNumber}',
+                      isDark: isDark,
+                    ),
+                  if (item.expiryDate != null)
+                    _GRBadge(
+                      icon: Icons.event_outlined,
+                      text:
+                          'EXP: ${DateFormat('dd/MM/yyyy').format(item.expiryDate!)}',
+                      isDark: isDark,
+                    ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
     );
   }
 
-  // Bottom Actions
-  Widget _buildBottomActions() {
+  // Item List Row (compact)
+  Widget _buildItemListRow(
+      GoodsReceiptItemModel item, int index, bool isDark) {
+    final isEven = index.isEven;
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding:
+          const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 4,
-            offset: const Offset(0, -2),
+        color: isEven
+            ? (isDark ? AppTheme.darkElement : const Color(0xFFF9FAFB))
+            : (isDark ? AppTheme.darkCard : Colors.white),
+        border: Border(
+          bottom: BorderSide(
+            color: isDark ? Colors.white12 : AppTheme.border,
+            width: 0.5,
           ),
-        ],
+        ),
       ),
       child: Row(
         children: [
+          SizedBox(
+            width: 24,
+            child: Text('${index + 1}',
+                style: TextStyle(
+                    fontSize: 11,
+                    color: isDark ? Colors.white38 : AppTheme.textSub)),
+          ),
           Expanded(
-            child: OutlinedButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('ยกเลิก'),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(item.productName,
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: isDark
+                            ? Colors.white
+                            : const Color(0xFF1A1A1A)),
+                    overflow: TextOverflow.ellipsis),
+                Text(item.productCode,
+                    style: TextStyle(
+                        fontSize: 10,
+                        color: isDark
+                            ? Colors.white54
+                            : AppTheme.textSub)),
+              ],
             ),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: ElevatedButton(
-              onPressed: _isLoading ? null : _saveReceipt,
-              child: _isLoading
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text('บันทึก'),
-            ),
+          // สั่ง / รับ
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                'สั่ง ${item.orderedQuantity.toStringAsFixed(0)}',
+                style: TextStyle(
+                    fontSize: 10,
+                    color: isDark ? Colors.white38 : AppTheme.textSub),
+              ),
+              Text(
+                'รับ ${item.receivedQuantity.toStringAsFixed(0)} ${item.unit}',
+                style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.success),
+              ),
+            ],
           ),
+          if (!_isViewMode) ...[
+            const SizedBox(width: 8),
+            InkWell(
+              borderRadius: BorderRadius.circular(4),
+              onTap: () => _editItem(item, index),
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: Icon(Icons.edit_outlined,
+                    size: 15, color: AppTheme.info),
+              ),
+            ),
+            InkWell(
+              borderRadius: BorderRadius.circular(4),
+              onTap: () =>
+                  setState(() => _items.removeAt(index)),
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: Icon(Icons.close,
+                    size: 15,
+                    color: isDark ? Colors.white38 : AppTheme.textSub),
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 
-  // Select Date
+  // ─────────────────────────────────────────────────────────────
+  // Summary Section
+  // ─────────────────────────────────────────────────────────────
+  Widget _buildSummarySection(bool isDark) {
+    final totalOrdered =
+        _items.fold<double>(0, (s, i) => s + i.orderedQuantity);
+    final totalReceived =
+        _items.fold<double>(0, (s, i) => s + i.receivedQuantity);
+
+    return Column(
+      children: [
+        _GRSummaryRow(
+          label: 'จำนวนรายการ',
+          value: '${_items.length} รายการ',
+          isDark: isDark,
+        ),
+        const SizedBox(height: 8),
+        _GRSummaryRow(
+          label: 'จำนวนที่สั่ง',
+          value: totalOrdered.toStringAsFixed(0),
+          valueColor: AppTheme.info,
+          isDark: isDark,
+        ),
+        Divider(
+            height: 20,
+            color: isDark ? Colors.white12 : AppTheme.border),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('จำนวนที่รับจริง',
+                style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: isDark
+                        ? Colors.white
+                        : const Color(0xFF1A1A1A))),
+            Text(
+              totalReceived.toStringAsFixed(0),
+              style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.success),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Actions
+  // ─────────────────────────────────────────────────────────────
   Future<void> _selectDate() async {
     final date = await showDatePicker(
       context: context,
@@ -586,20 +805,15 @@ class _GoodsReceiptFormPageState extends ConsumerState<GoodsReceiptFormPage> {
       firstDate: DateTime(2020),
       lastDate: DateTime.now().add(const Duration(days: 365)),
     );
-    if (date != null) {
-      setState(() {
-        _grDate = date;
-      });
-    }
+    if (date != null) setState(() => _grDate = date);
   }
 
-  // Select from PO
   Future<void> _selectFromPO() async {
-    // โหลดรายการ PO ที่รอรับสินค้า
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator()),
+      builder: (_) =>
+          const Center(child: CircularProgressIndicator()),
     );
 
     final pendingPOs = await ref
@@ -607,59 +821,79 @@ class _GoodsReceiptFormPageState extends ConsumerState<GoodsReceiptFormPage> {
         .getPendingPurchaseOrders();
 
     if (!mounted) return;
-    Navigator.pop(context); // ปิด loading dialog
+    Navigator.pop(context);
 
     if (pendingPOs.isEmpty) {
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('ไม่มี Purchase Order'),
-          content: const Text(
-            'ไม่พบ Purchase Order ที่อนุมัติแล้วและรอรับสินค้า\n\n'
-            'กรุณาสร้างและอนุมัติ Purchase Order ก่อน หรือเลือก "สร้างเอง"',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('ปิด'),
-            ),
-          ],
-        ),
+      _showInfoDialog(
+        title: 'ไม่มี Purchase Order',
+        message:
+            'ไม่พบ PO ที่อนุมัติแล้วและรอรับสินค้า\n\nกรุณาสร้างและอนุมัติ PO ก่อน หรือเลือก "สร้างเอง"',
       );
       return;
     }
 
-    // แสดง Dialog เลือก PO
     final selectedPO = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (context) => _POSelectionDialog(pos: pendingPOs),
+      builder: (ctx) => _POSelectionDialog(pos: pendingPOs),
     );
 
-    if (selectedPO != null) {
-      await _loadFromPO(selectedPO);
-    }
+    if (selectedPO != null) await _loadFromPO(selectedPO);
   }
 
-  // Create Manually
   void _createManually() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('สร้างใบรับสินค้าเอง'),
-        content: const Text(
-          'คุณต้องการสร้างใบรับสินค้าโดยไม่อ้างอิง Purchase Order ใช่หรือไม่?\n\n'
+      builder: (ctx) => AlertDialog(
+        backgroundColor:
+            isDark ? AppTheme.darkCard : Colors.white,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryDark.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.edit_outlined,
+                  size: 18, color: AppTheme.primaryDark),
+            ),
+            const SizedBox(width: 10),
+            Text('สร้างใบรับสินค้าเอง',
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color:
+                        isDark ? Colors.white : const Color(0xFF1A1A1A))),
+          ],
+        ),
+        content: Text(
+          'คุณต้องการสร้างใบรับสินค้าโดยไม่อ้างอิง PO ใช่หรือไม่?\n\n'
           'คุณจะต้องเลือกซัพพลายเออร์และเพิ่มรายการสินค้าเอง',
+          style: TextStyle(
+              color: isDark ? Colors.white70 : Colors.black87),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('ยกเลิก'),
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('ยกเลิก',
+                style: TextStyle(
+                    color: isDark ? Colors.white60 : AppTheme.textSub)),
           ),
           ElevatedButton(
             onPressed: () {
-              Navigator.pop(context);
+              Navigator.pop(ctx);
               _showSupplierSelection();
             },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryDark,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+              elevation: 0,
+            ),
             child: const Text('ดำเนินการต่อ'),
           ),
         ],
@@ -667,72 +901,53 @@ class _GoodsReceiptFormPageState extends ConsumerState<GoodsReceiptFormPage> {
     );
   }
 
-  // Add Item
   Future<void> _addItem() async {
-    final productsAsync = ref.read(productListProvider);
-
-    await productsAsync.when(
-      data: (products) async {
-        final result = await showDialog<GoodsReceiptItemModel>(
-          context: context,
-          builder: (context) =>
-              _ItemDialog(products: products, lineNo: _items.length + 1),
-        );
-
-        if (result != null) {
-          setState(() {
-            _items.add(result);
-          });
-        }
-      },
-      loading: () {},
-      error: (error, stack) {},
+    final products = ref.read(productListProvider).value;
+    if (products == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('กำลังโหลดข้อมูลสินค้า...'),
+        duration: Duration(seconds: 1),
+      ));
+      return;
+    }
+    final result = await showDialog<GoodsReceiptItemModel>(
+      context: context,
+      builder: (ctx) =>
+          _ItemDialog(products: products, lineNo: _items.length + 1),
     );
+    if (result != null) setState(() => _items.add(result));
   }
 
-  // Edit Item
   Future<void> _editItem(GoodsReceiptItemModel item, int index) async {
     final result = await showDialog<GoodsReceiptItemModel>(
       context: context,
-      builder: (context) => _ItemEditDialog(item: item),
+      builder: (ctx) => _ItemEditDialog(item: item),
     );
-
-    if (result != null) {
-      setState(() {
-        _items[index] = result;
-      });
-    }
+    if (result != null) setState(() => _items[index] = result);
   }
 
-  // Save Receipt
   Future<void> _saveReceipt() async {
-    if (!_formKey.currentState!.validate()) {
+    if (!_formKey.currentState!.validate()) return;
+
+    if (_supplierId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('กรุณาเลือกซัพพลายเออร์'),
+        backgroundColor: AppTheme.error,
+        behavior: SnackBarBehavior.floating,
+      ));
       return;
     }
 
     if (_items.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('กรุณาเพิ่มรายการสินค้า'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('กรุณาเพิ่มรายการสินค้าอย่างน้อย 1 รายการ'),
+        backgroundColor: AppTheme.error,
+        behavior: SnackBarBehavior.floating,
+      ));
       return;
     }
 
-    if (_supplierId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('กรุณาเลือกซัพพลายเออร์'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     final receipt = GoodsReceiptModel(
       grId: widget.receipt?.grId ?? '',
@@ -746,7 +961,9 @@ class _GoodsReceiptFormPageState extends ConsumerState<GoodsReceiptFormPage> {
       warehouseName: _warehouseName,
       userId: 'USR001',
       status: 'DRAFT',
-      remark: _remark,
+      remark: _remarkController.text.isEmpty
+          ? null
+          : _remarkController.text,
       createdAt: widget.receipt?.createdAt ?? DateTime.now(),
       updatedAt: DateTime.now(),
       items: _items,
@@ -754,113 +971,54 @@ class _GoodsReceiptFormPageState extends ConsumerState<GoodsReceiptFormPage> {
 
     final success = widget.receipt == null
         ? await ref
-              .read(goodsReceiptListProvider.notifier)
-              .createGoodsReceipt(receipt)
+            .read(goodsReceiptListProvider.notifier)
+            .createGoodsReceipt(receipt)
         : await ref
-              .read(goodsReceiptListProvider.notifier)
-              .updateGoodsReceipt(receipt);
-
-    setState(() {
-      _isLoading = false;
-    });
+            .read(goodsReceiptListProvider.notifier)
+            .updateGoodsReceipt(receipt);
 
     if (mounted) {
+      setState(() => _isLoading = false);
       if (success) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              widget.receipt == null
-                  ? 'สร้างใบรับสินค้าสำเร็จ'
-                  : 'แก้ไขใบรับสินค้าสำเร็จ',
-            ),
-            backgroundColor: Colors.green,
-          ),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(widget.receipt == null
+              ? 'สร้างใบรับสินค้าสำเร็จ'
+              : 'แก้ไขใบรับสินค้าสำเร็จ'),
+          backgroundColor: AppTheme.success,
+          behavior: SnackBarBehavior.floating,
+        ));
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('บันทึกไม่สำเร็จ'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('บันทึกไม่สำเร็จ กรุณาลองใหม่'),
+          backgroundColor: AppTheme.error,
+          behavior: SnackBarBehavior.floating,
+        ));
       }
     }
   }
 
-  // Show Help
-  void _showHelp() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('คำแนะนำ'),
-        content: const SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'วิธีการสร้างใบรับสินค้า',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              SizedBox(height: 8),
-              Text(
-                '1. จาก Purchase Order - เลือก PO ที่อนุมัติแล้ว ข้อมูลจะถูกดึงมาอัตโนมัติ',
-              ),
-              SizedBox(height: 8),
-              Text('2. สร้างเอง - สร้างใบรับสินค้าโดยไม่อ้างอิง PO'),
-              SizedBox(height: 16),
-              Text(
-                'การแก้ไขจำนวน',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              SizedBox(height: 8),
-              Text('คุณสามารถแก้ไขจำนวนที่รับจริง ถ้ารับไม่ตรงกับที่สั่ง'),
-              SizedBox(height: 16),
-              Text(
-                'Lot Number & Expiry Date',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              SizedBox(height: 8),
-              Text(
-                'สามารถเพิ่มข้อมูล Lot Number และวันหมดอายุได้ในแต่ละรายการ',
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('ปิด'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Load data from PO
   Future<void> _loadFromPO(Map<String, dynamic> poData) async {
-    // แสดง loading
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator()),
+      builder: (_) =>
+          const Center(child: CircularProgressIndicator()),
     );
 
-    // ดึงรายละเอียด PO พร้อม items
-    final purchaseProvider = ref.read(purchaseListProvider.notifier);
-    final po = await purchaseProvider.getPurchaseOrderDetails(poData['po_id']);
+    final po = await ref
+        .read(purchaseListProvider.notifier)
+        .getPurchaseOrderDetails(poData['po_id']);
 
     if (!mounted) return;
-    Navigator.pop(context); // ปิด loading
+    Navigator.pop(context);
 
     if (po == null || po.items == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('ไม่สามารถโหลดข้อมูล PO ได้'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('ไม่สามารถโหลดข้อมูล PO ได้'),
+        backgroundColor: AppTheme.error,
+        behavior: SnackBarBehavior.floating,
+      ));
       return;
     }
 
@@ -871,173 +1029,764 @@ class _GoodsReceiptFormPageState extends ConsumerState<GoodsReceiptFormPage> {
       _supplierName = po.supplierName;
       _warehouseId = po.warehouseId;
       _warehouseName = po.warehouseName ?? 'คลังสาขาหลัก';
-
-      // แปลง PO Items เป็น GR Items
       _items.clear();
       for (var i = 0; i < po.items!.length; i++) {
         final poItem = po.items![i];
-
-        // คำนวณจำนวนที่ยังรับไม่ครบ
-        final remainingQty = poItem.remainingQuantity;
-
-        if (remainingQty > 0) {
-          _items.add(
-            GoodsReceiptItemModel(
-              itemId: '',
-              grId: '',
-              lineNo: i + 1,
-              poItemId: poItem.itemId,
-              productId: poItem.productId,
-              productCode: poItem.productCode ?? '',
-              productName: poItem.productName ?? '',
-              unit: poItem.unit ?? '',
-              orderedQuantity: poItem.quantity,
-              receivedQuantity: remainingQty, // Default รับเท่าที่เหลือ
-              unitPrice: poItem.unitPrice,
-              amount: remainingQty * poItem.unitPrice,
-            ),
-          );
+        final remaining = poItem.remainingQuantity;
+        if (remaining > 0) {
+          _items.add(GoodsReceiptItemModel(
+            itemId: '',
+            grId: '',
+            lineNo: i + 1,
+            poItemId: poItem.itemId,
+            productId: poItem.productId,
+            productCode: poItem.productCode ?? '',
+            productName: poItem.productName ?? '',
+            unit: poItem.unit ?? '',
+            orderedQuantity: poItem.quantity,
+            receivedQuantity: remaining,
+            unitPrice: poItem.unitPrice,
+            amount: remaining * poItem.unitPrice,
+          ));
         }
       }
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'โหลดข้อมูลจาก PO: ${po.poNo} สำเร็จ (${_items.length} รายการ)',
-        ),
-        backgroundColor: Colors.green,
-      ),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(
+          'โหลดข้อมูลจาก PO: ${po.poNo} สำเร็จ (${_items.length} รายการ)'),
+      backgroundColor: AppTheme.success,
+      behavior: SnackBarBehavior.floating,
+    ));
   }
 
-  // Show Supplier Selection
   Future<void> _showSupplierSelection() async {
     final suppliersAsync = ref.read(supplierListProvider);
-
     await suppliersAsync.when(
       data: (suppliers) async {
         final selected = await showDialog<Map<String, String>>(
           context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('เลือกซัพพลายเออร์'),
-            content: SizedBox(
-              width: 400,
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: suppliers.length,
-                itemBuilder: (context, index) {
-                  final supplier = suppliers[index];
-                  return ListTile(
-                    title: Text(supplier.supplierName),
-                    subtitle: Text(supplier.supplierCode),
-                    onTap: () {
-                      Navigator.pop(context, {
-                        'id': supplier.supplierId,
-                        'name': supplier.supplierName,
-                      });
-                    },
-                  );
-                },
-              ),
-            ),
-          ),
+          builder: (ctx) =>
+              _SupplierSelectionDialog(suppliers: suppliers),
         );
-
-        if (selected != null) {
-          if (!mounted) return;
-
+        if (selected != null && mounted) {
           setState(() {
             _supplierId = selected['id'];
             _supplierName = selected['name'];
           });
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('เลือกซัพพลายเออร์: ${selected['name']}'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('เลือกซัพพลายเออร์: ${selected['name']}'),
+            backgroundColor: AppTheme.success,
+            behavior: SnackBarBehavior.floating,
+          ));
         }
       },
       loading: () {},
-      error: (error, stack) {},
+      error: (_, _) {},
+    );
+  }
+
+  void _showHelp() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor:
+            isDark ? AppTheme.darkCard : Colors.white,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                color: AppTheme.info.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.help_outline,
+                  size: 18, color: AppTheme.info),
+            ),
+            const SizedBox(width: 10),
+            Text('คำแนะนำ',
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color:
+                        isDark ? Colors.white : const Color(0xFF1A1A1A))),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _HelpItem(
+                title: 'จาก Purchase Order',
+                detail:
+                    'เลือก PO ที่อนุมัติแล้ว ระบบจะดึงข้อมูลสินค้ามาให้อัตโนมัติ',
+                isDark: isDark,
+              ),
+              const SizedBox(height: 10),
+              _HelpItem(
+                title: 'สร้างเอง',
+                detail:
+                    'สร้างใบรับสินค้าโดยไม่อ้างอิง PO — เลือกซัพพลายเออร์และเพิ่มสินค้าเอง',
+                isDark: isDark,
+              ),
+              const SizedBox(height: 10),
+              _HelpItem(
+                title: 'แก้ไขจำนวน',
+                detail:
+                    'กดปุ่มดินสอที่รายการเพื่อแก้ไขจำนวนที่รับจริง',
+                isDark: isDark,
+              ),
+              const SizedBox(height: 10),
+              _HelpItem(
+                title: 'Lot Number & วันหมดอายุ',
+                detail:
+                    'สามารถเพิ่ม Lot Number และวันหมดอายุได้ในแต่ละรายการ',
+                isDark: isDark,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.info,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+              elevation: 0,
+            ),
+            child: const Text('เข้าใจแล้ว'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showInfoDialog(
+      {required String title, required String message}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor:
+            isDark ? AppTheme.darkCard : Colors.white,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12)),
+        title: Text(title,
+            style: TextStyle(
+                color:
+                    isDark ? Colors.white : const Color(0xFF1A1A1A))),
+        content: Text(message,
+            style: TextStyle(
+                color: isDark ? Colors.white70 : Colors.black87)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('ปิด'),
+          ),
+        ],
+      ),
     );
   }
 }
 
-// ========================================
-// PO SELECTION DIALOG
-// ========================================
+// ════════════════════════════════════════════════════════════════
+// _GRFormTitleBar
+// ════════════════════════════════════════════════════════════════
+class _GRFormTitleBar extends StatelessWidget {
+  final String title;
+  final bool isViewMode;
+  final VoidCallback? onHelp;
 
-class _POSelectionDialog extends StatelessWidget {
-  final List<Map<String, dynamic>> pos;
-
-  const _POSelectionDialog({required this.pos});
+  const _GRFormTitleBar({
+    required this.title,
+    required this.isViewMode,
+    this.onHelp,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final canPop = Navigator.of(context).canPop();
+
+    return Container(
+      color: isDark ? AppTheme.darkTopBar : Colors.white,
+      padding:
+          const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      child: Row(
+        children: [
+          if (canPop) ...[
+            InkWell(
+              onTap: () => Navigator.pop(context),
+              borderRadius: BorderRadius.circular(6),
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: Icon(Icons.arrow_back,
+                    size: 20,
+                    color:
+                        isDark ? Colors.white70 : AppTheme.textSub),
+              ),
+            ),
+            const SizedBox(width: 10),
+          ],
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppTheme.successContainer,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.local_shipping_outlined,
+                color: AppTheme.success, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              title,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color:
+                    isDark ? Colors.white : const Color(0xFF1A1A1A),
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          if (onHelp != null) ...[
+            Tooltip(
+              message: 'คำแนะนำ',
+              child: InkWell(
+                onTap: onHelp,
+                borderRadius: BorderRadius.circular(6),
+                child: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: Icon(Icons.help_outline,
+                      size: 20,
+                      color:
+                          isDark ? Colors.white54 : AppTheme.textSub),
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+          ],
+          if (canPop)
+            InkWell(
+              onTap: () => Navigator.pop(context),
+              borderRadius: BorderRadius.circular(6),
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: Icon(Icons.close,
+                    size: 20,
+                    color:
+                        isDark ? Colors.white54 : AppTheme.textSub),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// _GRSectionCard
+// ════════════════════════════════════════════════════════════════
+class _GRSectionCard extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final Widget child;
+  final Widget? trailing;
+
+  const _GRSectionCard({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.child,
+    this.trailing,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkCard : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+            color: isDark ? Colors.white12 : AppTheme.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(
+                horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: isDark ? AppTheme.darkElement : AppTheme.headerBg,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(12),
+                topRight: Radius.circular(12),
+              ),
+              border: Border(
+                  bottom: BorderSide(
+                      color:
+                          isDark ? Colors.white12 : AppTheme.border)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: iconColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Icon(icon, size: 15, color: iconColor),
+                ),
+                const SizedBox(width: 8),
+                Text(title,
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: iconColor)),
+                if (trailing != null) ...[
+                  const Spacer(),
+                  trailing!,
+                ],
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: child,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// PO Selection Dialog
+// ════════════════════════════════════════════════════════════════
+class _POSelectionDialog extends StatefulWidget {
+  final List<Map<String, dynamic>> pos;
+  const _POSelectionDialog({required this.pos});
+
+  @override
+  State<_POSelectionDialog> createState() => _POSelectionDialogState();
+}
+
+class _POSelectionDialogState extends State<_POSelectionDialog> {
+  String _search = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final filtered = _search.isEmpty
+        ? widget.pos
+        : widget.pos.where((po) {
+            final q = _search.toLowerCase();
+            return (po['po_no'] as String? ?? '')
+                    .toLowerCase()
+                    .contains(q) ||
+                (po['supplier_name'] as String? ?? '')
+                    .toLowerCase()
+                    .contains(q);
+          }).toList();
+
     return AlertDialog(
-      title: const Text('เลือก Purchase Order'),
+      backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12)),
+      title: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+              color: AppTheme.info.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.receipt_long_outlined,
+                size: 18, color: AppTheme.info),
+          ),
+          const SizedBox(width: 10),
+          Text('เลือก Purchase Order',
+              style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : const Color(0xFF1A1A1A))),
+        ],
+      ),
       content: SizedBox(
         width: 500,
-        height: 400,
-        child: ListView.builder(
-          itemCount: pos.length,
-          itemBuilder: (context, index) {
-            final po = pos[index];
-            return Card(
-              margin: const EdgeInsets.only(bottom: 8),
-              child: ListTile(
-                title: Text(
-                  po['po_no'] ?? '',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+        height: 420,
+        child: Column(
+          children: [
+            // Search
+            SizedBox(
+              height: 38,
+              child: TextField(
+                style: TextStyle(
+                    fontSize: 13,
+                    color: isDark ? Colors.white : Colors.black87),
+                decoration: InputDecoration(
+                  hintText: 'ค้นหาเลขที่ PO, ซัพพลายเออร์...',
+                  hintStyle: TextStyle(
+                      fontSize: 13,
+                      color: isDark
+                          ? const Color(0xFF666666)
+                          : AppTheme.textSub),
+                  prefixIcon: Icon(Icons.search,
+                      size: 17,
+                      color: isDark
+                          ? Colors.white38
+                          : AppTheme.textSub),
+                  contentPadding: EdgeInsets.zero,
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(
+                          color: isDark
+                              ? Colors.white24
+                              : AppTheme.border)),
+                  enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(
+                          color: isDark
+                              ? Colors.white24
+                              : AppTheme.border)),
+                  focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(
+                          color: AppTheme.primary, width: 1.5)),
+                  filled: true,
+                  fillColor:
+                      isDark ? AppTheme.darkElement : Colors.white,
                 ),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('ซัพพลายเออร์: ${po['supplier_name'] ?? ''}'),
-                    Text(
-                      'วันที่: ${DateFormat('dd/MM/yyyy').format(DateTime.parse(po['po_date']))}',
-                    ),
-                    Text(
-                      'ยอดรวม: ฿${(po['total_amount'] ?? 0).toStringAsFixed(2)}',
-                    ),
-                  ],
-                ),
-                trailing: Chip(
-                  label: Text(
-                    po['status'] == 'APPROVED' ? 'รอรับสินค้า' : 'รับบางส่วน',
-                    style: const TextStyle(fontSize: 11),
-                  ),
-                  backgroundColor: po['status'] == 'APPROVED'
-                      ? Colors.blue.withValues(alpha: 0.2)
-                      : Colors.orange.withValues(alpha: 0.2),
-                ),
-                onTap: () => Navigator.pop(context, po),
+                onChanged: (v) => setState(() => _search = v),
               ),
-            );
-          },
+            ),
+            const SizedBox(height: 10),
+            // List
+            Expanded(
+              child: ListView.separated(
+                itemCount: filtered.length,
+                separatorBuilder: (_, _) =>
+                    const SizedBox(height: 6),
+                itemBuilder: (ctx, i) {
+                  final po = filtered[i];
+                  final isApproved = po['status'] == 'APPROVED';
+                  final statusColor =
+                      isApproved ? AppTheme.info : AppTheme.warning;
+                  final statusLabel =
+                      isApproved ? 'รอรับสินค้า' : 'รับบางส่วน';
+                  final fmt = NumberFormat('#,##0.00', 'th_TH');
+
+                  return InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () => Navigator.pop(ctx, po),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? AppTheme.darkElement
+                            : const Color(0xFFF9FAFB),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                            color: isDark
+                                ? Colors.white12
+                                : AppTheme.border),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 4,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: statusColor,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment:
+                                  CrossAxisAlignment.start,
+                              children: [
+                                Text(po['po_no'] ?? '',
+                                    style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                        color: isDark
+                                            ? Colors.white
+                                            : const Color(0xFF1A1A1A))),
+                                Text(po['supplier_name'] ?? '',
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        color: isDark
+                                            ? const Color(0xFFAAAAAA)
+                                            : AppTheme.textSub)),
+                                Text(
+                                  DateFormat('dd/MM/yyyy').format(
+                                      DateTime.parse(po['po_date'])),
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      color: isDark
+                                          ? const Color(0xFFAAAAAA)
+                                          : AppTheme.textSub),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Column(
+                            crossAxisAlignment:
+                                CrossAxisAlignment.end,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: statusColor
+                                      .withValues(alpha: 0.12),
+                                  borderRadius:
+                                      BorderRadius.circular(10),
+                                ),
+                                child: Text(statusLabel,
+                                    style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w600,
+                                        color: statusColor)),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '฿${fmt.format(po['total_amount'] ?? 0)}',
+                                style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppTheme.info),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
         ),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('ยกเลิก'),
+          child: Text('ยกเลิก',
+              style: TextStyle(
+                  color: isDark ? Colors.white60 : AppTheme.textSub)),
         ),
       ],
     );
   }
 }
 
-// ========================================
-// ITEM DIALOG (สำหรับเพิ่มรายการใหม่)
-// ========================================
+// ════════════════════════════════════════════════════════════════
+// Supplier Selection Dialog
+// ════════════════════════════════════════════════════════════════
+class _SupplierSelectionDialog extends StatefulWidget {
+  final List suppliers;
+  const _SupplierSelectionDialog({required this.suppliers});
 
+  @override
+  State<_SupplierSelectionDialog> createState() =>
+      _SupplierSelectionDialogState();
+}
+
+class _SupplierSelectionDialogState
+    extends State<_SupplierSelectionDialog> {
+  String _search = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final filtered = _search.isEmpty
+        ? widget.suppliers
+        : widget.suppliers.where((s) {
+            final q = _search.toLowerCase();
+            return s.supplierName.toLowerCase().contains(q) ||
+                s.supplierCode.toLowerCase().contains(q);
+          }).toList();
+
+    return AlertDialog(
+      backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12)),
+      title: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+              color: AppTheme.primaryDark.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.business_outlined,
+                size: 18, color: AppTheme.primaryDark),
+          ),
+          const SizedBox(width: 10),
+          Text('เลือกซัพพลายเออร์',
+              style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : const Color(0xFF1A1A1A))),
+        ],
+      ),
+      content: SizedBox(
+        width: 420,
+        height: 380,
+        child: Column(
+          children: [
+            SizedBox(
+              height: 38,
+              child: TextField(
+                style: TextStyle(
+                    fontSize: 13,
+                    color: isDark ? Colors.white : Colors.black87),
+                decoration: InputDecoration(
+                  hintText: 'ค้นหาชื่อ / รหัสซัพพลายเออร์...',
+                  hintStyle: TextStyle(
+                      fontSize: 13,
+                      color: isDark
+                          ? const Color(0xFF666666)
+                          : AppTheme.textSub),
+                  prefixIcon: Icon(Icons.search,
+                      size: 17,
+                      color: isDark
+                          ? Colors.white38
+                          : AppTheme.textSub),
+                  contentPadding: EdgeInsets.zero,
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(
+                          color: isDark
+                              ? Colors.white24
+                              : AppTheme.border)),
+                  enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(
+                          color: isDark
+                              ? Colors.white24
+                              : AppTheme.border)),
+                  focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(
+                          color: AppTheme.primary, width: 1.5)),
+                  filled: true,
+                  fillColor:
+                      isDark ? AppTheme.darkElement : Colors.white,
+                ),
+                onChanged: (v) => setState(() => _search = v),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Expanded(
+              child: ListView.separated(
+                itemCount: filtered.length,
+                separatorBuilder: (_, _) =>
+                    const SizedBox(height: 4),
+                itemBuilder: (ctx, i) {
+                  final s = filtered[i];
+                  return InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () => Navigator.pop(ctx, <String, String>{
+                      'id': s.supplierId,
+                      'name': s.supplierName,
+                    }),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? AppTheme.darkElement
+                            : const Color(0xFFF9FAFB),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                            color: isDark
+                                ? Colors.white12
+                                : AppTheme.border),
+                      ),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 16,
+                            backgroundColor: AppTheme.primaryDark
+                                .withValues(alpha: 0.15),
+                            child: Text(
+                              s.supplierName.isNotEmpty
+                                  ? s.supplierName[0].toUpperCase()
+                                  : 'S',
+                              style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.primaryDark),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment:
+                                  CrossAxisAlignment.start,
+                              children: [
+                                Text(s.supplierName,
+                                    style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        color: isDark
+                                            ? Colors.white
+                                            : const Color(0xFF1A1A1A))),
+                                Text(s.supplierCode,
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        color: isDark
+                                            ? const Color(0xFFAAAAAA)
+                                            : AppTheme.textSub)),
+                              ],
+                            ),
+                          ),
+                          Icon(Icons.chevron_right,
+                              size: 16,
+                              color: isDark
+                                  ? Colors.white38
+                                  : AppTheme.textSub),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text('ยกเลิก',
+              style: TextStyle(
+                  color: isDark ? Colors.white60 : AppTheme.textSub)),
+        ),
+      ],
+    );
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// Item Add Dialog
+// ════════════════════════════════════════════════════════════════
 class _ItemDialog extends ConsumerStatefulWidget {
   final List products;
   final int lineNo;
-
   const _ItemDialog({required this.products, required this.lineNo});
 
   @override
@@ -1048,9 +1797,8 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
   String? _selectedProductId;
   final _quantityController = TextEditingController(text: '1');
   final _lotController = TextEditingController();
-  DateTime? _expiryDate;
   final _remarkController = TextEditingController();
-  // ✅ Phase 5 — สำหรับกรอง dropdown จาก barcode scan
+  DateTime? _expiryDate;
   String _productSearch = '';
 
   @override
@@ -1063,7 +1811,7 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
 
   @override
   Widget build(BuildContext context) {
-    // กรองสินค้าตาม barcode / code ที่สแกนได้
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final filteredProducts = _productSearch.isEmpty
         ? widget.products
         : widget.products.where((p) {
@@ -1074,20 +1822,36 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
           }).toList();
 
     return AlertDialog(
+      backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12)),
       title: Row(
         children: [
-          const Text('เพิ่มรายการสินค้า'),
+          Container(
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+              color: AppTheme.success.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.add_shopping_cart_outlined,
+                size: 18, color: AppTheme.success),
+          ),
+          const SizedBox(width: 10),
+          Text('เพิ่มรายการสินค้า',
+              style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : const Color(0xFF1A1A1A))),
           const Spacer(),
-          // ✅ ScannerButton ใน title bar ของ dialog
           ScannerButton(
-            tooltip: 'สแกนบาร์โค้ดสินค้า',
+            tooltip: 'สแกนบาร์โค้ด',
             onScanned: (value) {
               setState(() {
                 _productSearch = value;
-                // ถ้าพบสินค้าเดียว → เลือกให้เลย
                 final matched = widget.products.where((p) =>
                     (p.barcode?.toLowerCase() == value.toLowerCase()) ||
-                    (p.productCode?.toLowerCase() == value.toLowerCase()));
+                    (p.productCode?.toLowerCase() ==
+                        value.toLowerCase()));
                 if (matched.length == 1) {
                   _selectedProductId = matched.first.productId;
                 }
@@ -1101,79 +1865,125 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Product Selection ✅ ใช้ filteredProducts
-              DropdownButtonFormField<String>(
-                decoration: const InputDecoration(labelText: 'สินค้า *'),
-                initialValue: _selectedProductId,
-                items: filteredProducts.map<DropdownMenuItem<String>>((product) {
-                  return DropdownMenuItem<String>(
-                    value: product.productId,
-                    child: Text(
-                      '${product.productCode} - ${product.productName}',
-                    ),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  setState(() {
-                    _selectedProductId = value;
-                  });
-                },
+              // Search
+              _GRDialogField(
+                controller: TextEditingController(text: _productSearch),
+                hint: 'ค้นหาชื่อ / รหัส / บาร์โค้ด...',
+                icon: Icons.search,
+                isDark: isDark,
+                onChanged: (v) => setState(() => _productSearch = v),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 10),
+
+              // Product dropdown
+              _GRDialogDropdown<String>(
+                value: _selectedProductId,
+                hint: 'เลือกสินค้า *',
+                icon: Icons.inventory_2_outlined,
+                isDark: isDark,
+                items: filteredProducts
+                    .map<DropdownMenuItem<String>>((p) =>
+                        DropdownMenuItem(
+                          value: p.productId,
+                          child: Text(
+                              '${p.productCode} — ${p.productName}',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  color: isDark
+                                      ? Colors.white
+                                      : Colors.black87),
+                              overflow: TextOverflow.ellipsis),
+                        ))
+                    .toList(),
+                onChanged: (v) =>
+                    setState(() => _selectedProductId = v),
+              ),
+              const SizedBox(height: 10),
 
               // Quantity
-              TextField(
+              _GRDialogField(
                 controller: _quantityController,
-                decoration: const InputDecoration(labelText: 'จำนวนที่รับ *'),
+                hint: 'จำนวนที่รับ *',
+                icon: Icons.numbers,
+                isDark: isDark,
                 keyboardType: TextInputType.number,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 10),
 
               // Lot Number
-              TextField(
+              _GRDialogField(
                 controller: _lotController,
-                decoration: const InputDecoration(
-                  labelText: 'Lot Number (ถ้ามี)',
-                  hintText: 'เช่น LOT2024001',
-                ),
+                hint: 'Lot Number (ถ้ามี) เช่น LOT2024001',
+                icon: Icons.qr_code,
+                isDark: isDark,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 10),
 
               // Expiry Date
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('วันหมดอายุ (ถ้ามี)'),
-                subtitle: Text(
-                  _expiryDate != null
-                      ? DateFormat('dd/MM/yyyy').format(_expiryDate!)
-                      : 'ไม่ระบุ',
-                ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (_expiryDate != null)
-                      IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          setState(() {
-                            _expiryDate = null;
-                          });
-                        },
+              _GRFieldLabel(label: 'วันหมดอายุ (ถ้ามี)', isDark: isDark),
+              const SizedBox(height: 6),
+              InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: _selectExpiryDate,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: isDark ? AppTheme.darkElement : Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                        color:
+                            isDark ? Colors.white24 : AppTheme.border),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.event_outlined,
+                          size: 17,
+                          color: isDark
+                              ? Colors.white54
+                              : AppTheme.textSub),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _expiryDate != null
+                              ? DateFormat('dd/MM/yyyy')
+                                  .format(_expiryDate!)
+                              : 'ไม่ระบุ',
+                          style: TextStyle(
+                              fontSize: 13,
+                              color: _expiryDate != null
+                                  ? (isDark
+                                      ? Colors.white
+                                      : Colors.black87)
+                                  : (isDark
+                                      ? const Color(0xFF666666)
+                                      : AppTheme.textSub)),
+                        ),
                       ),
-                    IconButton(
-                      icon: const Icon(Icons.calendar_today),
-                      onPressed: _selectExpiryDate,
-                    ),
-                  ],
+                      if (_expiryDate != null)
+                        InkWell(
+                          onTap: () =>
+                              setState(() => _expiryDate = null),
+                          child: Icon(Icons.clear,
+                              size: 15,
+                              color: isDark
+                                  ? Colors.white38
+                                  : AppTheme.textSub),
+                        ),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 10),
 
               // Remark
-              TextField(
+              _GRDialogField(
                 controller: _remarkController,
-                decoration: const InputDecoration(labelText: 'หมายเหตุ'),
+                hint: 'หมายเหตุ (ถ้ามี)',
+                icon: Icons.note_outlined,
+                isDark: isDark,
                 maxLines: 2,
               ),
             ],
@@ -1183,9 +1993,22 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('ยกเลิก'),
+          child: Text('ยกเลิก',
+              style: TextStyle(
+                  color: isDark ? Colors.white60 : AppTheme.textSub)),
         ),
-        ElevatedButton(onPressed: _addItem, child: const Text('เพิ่ม')),
+        ElevatedButton.icon(
+          icon: const Icon(Icons.add, size: 16),
+          label: const Text('เพิ่ม'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppTheme.success,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8)),
+            elevation: 0,
+          ),
+          onPressed: _addItem,
+        ),
       ],
     );
   }
@@ -1193,71 +2016,64 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
   Future<void> _selectExpiryDate() async {
     final date = await showDatePicker(
       context: context,
-      initialDate: _expiryDate ?? DateTime.now().add(const Duration(days: 365)),
+      initialDate:
+          _expiryDate ?? DateTime.now().add(const Duration(days: 365)),
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 3650)),
     );
-    if (date != null) {
-      setState(() {
-        _expiryDate = date;
-      });
-    }
+    if (date != null) setState(() => _expiryDate = date);
   }
 
   void _addItem() {
     if (_selectedProductId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('กรุณาเลือกสินค้า'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('กรุณาเลือกสินค้า'),
+        backgroundColor: AppTheme.error,
+        behavior: SnackBarBehavior.floating,
+      ));
       return;
     }
-
-    final quantity = double.tryParse(_quantityController.text) ?? 0;
-    if (quantity <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('กรุณาระบุจำนวนที่ถูกต้อง'),
-          backgroundColor: Colors.red,
-        ),
-      );
+    final qty = double.tryParse(_quantityController.text) ?? 0;
+    if (qty <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('กรุณาระบุจำนวนที่ถูกต้อง'),
+        backgroundColor: AppTheme.error,
+        behavior: SnackBarBehavior.floating,
+      ));
       return;
     }
-
-    final product = widget.products.firstWhere(
-      (p) => p.productId == _selectedProductId,
+    final product = widget.products
+        .firstWhere((p) => p.productId == _selectedProductId);
+    Navigator.pop(
+      context,
+      GoodsReceiptItemModel(
+        itemId: '',
+        grId: '',
+        lineNo: widget.lineNo,
+        productId: product.productId,
+        productCode: product.productCode,
+        productName: product.productName,
+        unit: product.baseUnit,
+        orderedQuantity: 0,
+        receivedQuantity: qty,
+        unitPrice: 0,
+        amount: 0,
+        lotNumber:
+            _lotController.text.isEmpty ? null : _lotController.text,
+        expiryDate: _expiryDate,
+        remark: _remarkController.text.isEmpty
+            ? null
+            : _remarkController.text,
+      ),
     );
-
-    final item = GoodsReceiptItemModel(
-      itemId: '',
-      grId: '',
-      lineNo: widget.lineNo,
-      productId: product.productId,
-      productCode: product.productCode,
-      productName: product.productName,
-      unit: product.baseUnit,
-      orderedQuantity: 0,
-      receivedQuantity: quantity,
-      unitPrice: 0,
-      amount: 0,
-      lotNumber: _lotController.text.isEmpty ? null : _lotController.text,
-      expiryDate: _expiryDate,
-      remark: _remarkController.text.isEmpty ? null : _remarkController.text,
-    );
-
-    Navigator.pop(context, item);
   }
 }
 
-// ========================================
-// ITEM EDIT DIALOG (สำหรับแก้ไขรายการ)
-// ========================================
-
+// ════════════════════════════════════════════════════════════════
+// Item Edit Dialog
+// ════════════════════════════════════════════════════════════════
 class _ItemEditDialog extends StatefulWidget {
   final GoodsReceiptItemModel item;
-
   const _ItemEditDialog({required this.item});
 
   @override
@@ -1274,10 +2090,11 @@ class _ItemEditDialogState extends State<_ItemEditDialog> {
   void initState() {
     super.initState();
     _quantityController = TextEditingController(
-      text: widget.item.receivedQuantity.toStringAsFixed(0),
-    );
-    _lotController = TextEditingController(text: widget.item.lotNumber ?? '');
-    _remarkController = TextEditingController(text: widget.item.remark ?? '');
+        text: widget.item.receivedQuantity.toStringAsFixed(0));
+    _lotController =
+        TextEditingController(text: widget.item.lotNumber ?? '');
+    _remarkController =
+        TextEditingController(text: widget.item.remark ?? '');
     _expiryDate = widget.item.expiryDate;
   }
 
@@ -1291,8 +2108,31 @@ class _ItemEditDialogState extends State<_ItemEditDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return AlertDialog(
-      title: const Text('แก้ไขรายการ'),
+      backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12)),
+      title: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+              color: AppTheme.info.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.edit_outlined,
+                size: 18, color: AppTheme.info),
+          ),
+          const SizedBox(width: 10),
+          Text('แก้ไขรายการ',
+              style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : const Color(0xFF1A1A1A))),
+        ],
+      ),
       content: SizedBox(
         width: 450,
         child: SingleChildScrollView(
@@ -1300,84 +2140,162 @@ class _ItemEditDialogState extends State<_ItemEditDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Product Info (แสดงอย่างเดียว)
-              Text(
-                widget.item.productName,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+              // Product info (read-only)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? AppTheme.darkElement
+                      : const Color(0xFFF9FAFB),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                      color: isDark ? Colors.white12 : AppTheme.border),
                 ),
-              ),
-              Text(
-                widget.item.productCode,
-                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-              ),
-              const Divider(height: 24),
-
-              // Ordered Quantity (ถ้ามี)
-              if (widget.item.orderedQuantity > 0) ...[
-                Text(
-                  'จำนวนที่สั่ง: ${widget.item.orderedQuantity.toStringAsFixed(0)} ${widget.item.unit}',
-                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                ),
-                const SizedBox(height: 16),
-              ],
-
-              // Received Quantity
-              TextField(
-                controller: _quantityController,
-                decoration: InputDecoration(
-                  labelText: 'จำนวนที่รับจริง *',
-                  suffixText: widget.item.unit,
-                ),
-                keyboardType: TextInputType.number,
-              ),
-              const SizedBox(height: 16),
-
-              // Lot Number
-              TextField(
-                controller: _lotController,
-                decoration: const InputDecoration(
-                  labelText: 'Lot Number (ถ้ามี)',
-                  hintText: 'เช่น LOT2024001',
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Expiry Date
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('วันหมดอายุ (ถ้ามี)'),
-                subtitle: Text(
-                  _expiryDate != null
-                      ? DateFormat('dd/MM/yyyy').format(_expiryDate!)
-                      : 'ไม่ระบุ',
-                ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
+                child: Row(
                   children: [
-                    if (_expiryDate != null)
-                      IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          setState(() {
-                            _expiryDate = null;
-                          });
-                        },
+                    Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: AppTheme.info.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
                       ),
-                    IconButton(
-                      icon: const Icon(Icons.calendar_today),
-                      onPressed: _selectExpiryDate,
+                      child: const Icon(Icons.inventory_2_outlined,
+                          size: 15, color: AppTheme.info),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(widget.item.productName,
+                              style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark
+                                      ? Colors.white
+                                      : const Color(0xFF1A1A1A))),
+                          Text(widget.item.productCode,
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  color: isDark
+                                      ? Colors.white54
+                                      : AppTheme.textSub)),
+                        ],
+                      ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
+
+              // Ordered qty (info only)
+              if (widget.item.orderedQuantity > 0) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.info.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                        color: AppTheme.info.withValues(alpha: 0.2)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.shopping_cart_outlined,
+                          size: 15, color: AppTheme.info),
+                      const SizedBox(width: 6),
+                      Text(
+                        'จำนวนที่สั่ง: ${widget.item.orderedQuantity.toStringAsFixed(0)} ${widget.item.unit}',
+                        style: const TextStyle(
+                            fontSize: 12, color: AppTheme.info),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+
+              // Received qty
+              _GRDialogField(
+                controller: _quantityController,
+                hint:
+                    'จำนวนที่รับจริง * (${widget.item.unit})',
+                icon: Icons.numbers,
+                isDark: isDark,
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 10),
+
+              // Lot
+              _GRDialogField(
+                controller: _lotController,
+                hint: 'Lot Number (ถ้ามี)',
+                icon: Icons.qr_code,
+                isDark: isDark,
+              ),
+              const SizedBox(height: 10),
+
+              // Expiry Date
+              _GRFieldLabel(label: 'วันหมดอายุ (ถ้ามี)', isDark: isDark),
+              const SizedBox(height: 6),
+              InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: _selectExpiryDate,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color:
+                        isDark ? AppTheme.darkElement : Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                        color: isDark ? Colors.white24 : AppTheme.border),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.event_outlined,
+                          size: 17,
+                          color: isDark
+                              ? Colors.white54
+                              : AppTheme.textSub),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _expiryDate != null
+                              ? DateFormat('dd/MM/yyyy')
+                                  .format(_expiryDate!)
+                              : 'ไม่ระบุ',
+                          style: TextStyle(
+                              fontSize: 13,
+                              color: _expiryDate != null
+                                  ? (isDark ? Colors.white : Colors.black87)
+                                  : (isDark
+                                      ? const Color(0xFF666666)
+                                      : AppTheme.textSub)),
+                        ),
+                      ),
+                      if (_expiryDate != null)
+                        InkWell(
+                          onTap: () =>
+                              setState(() => _expiryDate = null),
+                          child: Icon(Icons.clear,
+                              size: 15,
+                              color: isDark
+                                  ? Colors.white38
+                                  : AppTheme.textSub),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
 
               // Remark
-              TextField(
+              _GRDialogField(
                 controller: _remarkController,
-                decoration: const InputDecoration(labelText: 'หมายเหตุ'),
+                hint: 'หมายเหตุ (ถ้ามี)',
+                icon: Icons.note_outlined,
+                isDark: isDark,
                 maxLines: 2,
               ),
             ],
@@ -1387,9 +2305,22 @@ class _ItemEditDialogState extends State<_ItemEditDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('ยกเลิก'),
+          child: Text('ยกเลิก',
+              style: TextStyle(
+                  color: isDark ? Colors.white60 : AppTheme.textSub)),
         ),
-        ElevatedButton(onPressed: _saveItem, child: const Text('บันทึก')),
+        ElevatedButton.icon(
+          icon: const Icon(Icons.save_outlined, size: 16),
+          label: const Text('บันทึก'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppTheme.info,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8)),
+            elevation: 0,
+          ),
+          onPressed: _saveItem,
+        ),
       ],
     );
   }
@@ -1397,37 +2328,481 @@ class _ItemEditDialogState extends State<_ItemEditDialog> {
   Future<void> _selectExpiryDate() async {
     final date = await showDatePicker(
       context: context,
-      initialDate: _expiryDate ?? DateTime.now().add(const Duration(days: 365)),
+      initialDate:
+          _expiryDate ?? DateTime.now().add(const Duration(days: 365)),
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 3650)),
     );
-    if (date != null) {
-      setState(() {
-        _expiryDate = date;
-      });
-    }
+    if (date != null) setState(() => _expiryDate = date);
   }
 
   void _saveItem() {
-    final quantity = double.tryParse(_quantityController.text) ?? 0;
-    if (quantity <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('กรุณาระบุจำนวนที่ถูกต้อง'),
-          backgroundColor: Colors.red,
-        ),
-      );
+    final qty = double.tryParse(_quantityController.text) ?? 0;
+    if (qty <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('กรุณาระบุจำนวนที่ถูกต้อง'),
+        backgroundColor: AppTheme.error,
+        behavior: SnackBarBehavior.floating,
+      ));
       return;
     }
-
-    final updatedItem = widget.item.copyWith(
-      receivedQuantity: quantity,
-      amount: quantity * widget.item.unitPrice,
-      lotNumber: _lotController.text.isEmpty ? null : _lotController.text,
-      expiryDate: _expiryDate,
-      remark: _remarkController.text.isEmpty ? null : _remarkController.text,
+    Navigator.pop(
+      context,
+      widget.item.copyWith(
+        receivedQuantity: qty,
+        amount: qty * widget.item.unitPrice,
+        lotNumber:
+            _lotController.text.isEmpty ? null : _lotController.text,
+        expiryDate: _expiryDate,
+        remark: _remarkController.text.isEmpty
+            ? null
+            : _remarkController.text,
+      ),
     );
-
-    Navigator.pop(context, updatedItem);
   }
+}
+
+// ════════════════════════════════════════════════════════════════
+// Small shared widgets
+// ════════════════════════════════════════════════════════════════
+
+class _GRFieldLabel extends StatelessWidget {
+  final String label;
+  final bool isDark;
+  const _GRFieldLabel({required this.label, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) => Text(label,
+      style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+          color: isDark ? Colors.white60 : AppTheme.textSub));
+}
+
+class _GRTextField extends StatelessWidget {
+  final TextEditingController controller;
+  final String hint;
+  final IconData icon;
+  final bool isDark;
+  final int maxLines;
+  const _GRTextField({
+    required this.controller,
+    required this.hint,
+    required this.icon,
+    required this.isDark,
+    this.maxLines = 1,
+  });
+
+  @override
+  Widget build(BuildContext context) => TextField(
+        controller: controller,
+        maxLines: maxLines,
+        style: TextStyle(
+            fontSize: 13,
+            color: isDark ? Colors.white : Colors.black87),
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: TextStyle(
+              fontSize: 13,
+              color: isDark
+                  ? const Color(0xFF666666)
+                  : AppTheme.textSub),
+          prefixIcon: Icon(icon,
+              size: 17,
+              color: isDark ? Colors.white38 : AppTheme.textSub),
+          contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12, vertical: 12),
+          border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(
+                  color:
+                      isDark ? Colors.white24 : AppTheme.border)),
+          enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(
+                  color:
+                      isDark ? Colors.white24 : AppTheme.border)),
+          focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(
+                  color: AppTheme.primary, width: 1.5)),
+          filled: true,
+          fillColor: isDark ? AppTheme.darkElement : Colors.white,
+        ),
+      );
+}
+
+class _GRReadOnlyField extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool isDark;
+  const _GRReadOnlyField(
+      {required this.label, required this.icon, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          color: isDark ? AppTheme.darkCard : const Color(0xFFF5F5F5),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+              color: isDark ? Colors.white12 : AppTheme.border),
+        ),
+        child: Row(
+          children: [
+            Icon(icon,
+                size: 17,
+                color: isDark ? Colors.white38 : AppTheme.textSub),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(label,
+                  style: TextStyle(
+                      fontSize: 13,
+                      color: isDark ? Colors.white54 : AppTheme.textSub)),
+            ),
+          ],
+        ),
+      );
+}
+
+class _GRDialogField extends StatelessWidget {
+  final TextEditingController controller;
+  final String hint;
+  final IconData icon;
+  final bool isDark;
+  final int maxLines;
+  final TextInputType? keyboardType;
+  final ValueChanged<String>? onChanged;
+
+  const _GRDialogField({
+    required this.controller,
+    required this.hint,
+    required this.icon,
+    required this.isDark,
+    this.maxLines = 1,
+    this.keyboardType,
+    this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) => TextField(
+        controller: controller,
+        maxLines: maxLines,
+        keyboardType: keyboardType,
+        style: TextStyle(
+            fontSize: 13,
+            color: isDark ? Colors.white : Colors.black87),
+        onChanged: onChanged,
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: TextStyle(
+              fontSize: 12,
+              color: isDark
+                  ? const Color(0xFF666666)
+                  : AppTheme.textSub),
+          prefixIcon: Icon(icon,
+              size: 16,
+              color: isDark ? Colors.white38 : AppTheme.textSub),
+          contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12, vertical: 10),
+          border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(
+                  color:
+                      isDark ? Colors.white24 : AppTheme.border)),
+          enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(
+                  color:
+                      isDark ? Colors.white24 : AppTheme.border)),
+          focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(
+                  color: AppTheme.primary, width: 1.5)),
+          filled: true,
+          fillColor: isDark ? AppTheme.darkElement : Colors.white,
+        ),
+      );
+}
+
+class _GRDialogDropdown<T> extends StatelessWidget {
+  final T? value;
+  final String hint;
+  final IconData icon;
+  final bool isDark;
+  final List<DropdownMenuItem<T>> items;
+  final ValueChanged<T?>? onChanged;
+
+  const _GRDialogDropdown({
+    required this.value,
+    required this.hint,
+    required this.icon,
+    required this.isDark,
+    required this.items,
+    this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) => DropdownButtonFormField<T>(
+        initialValue: value,
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: TextStyle(
+              fontSize: 12,
+              color: isDark
+                  ? const Color(0xFF666666)
+                  : AppTheme.textSub),
+          prefixIcon: Icon(icon,
+              size: 16,
+              color: isDark ? Colors.white38 : AppTheme.textSub),
+          contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12, vertical: 10),
+          border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(
+                  color:
+                      isDark ? Colors.white24 : AppTheme.border)),
+          enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(
+                  color:
+                      isDark ? Colors.white24 : AppTheme.border)),
+          focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(
+                  color: AppTheme.primary, width: 1.5)),
+          filled: true,
+          fillColor: isDark ? AppTheme.darkElement : Colors.white,
+        ),
+        dropdownColor: isDark ? AppTheme.darkCard : Colors.white,
+        style: TextStyle(
+            fontSize: 12,
+            color: isDark ? Colors.white : Colors.black87),
+        items: items,
+        onChanged: onChanged,
+      );
+}
+
+class _GRSmallIconBtn extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final bool isDark;
+  final Color? color;
+  final VoidCallback onTap;
+
+  const _GRSmallIconBtn({
+    required this.icon,
+    required this.tooltip,
+    required this.isDark,
+    required this.onTap,
+    this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+        message: tooltip,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(6),
+          child: Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: color != null
+                  ? color!.withValues(alpha: 0.1)
+                  : (isDark
+                      ? AppTheme.darkElement
+                      : const Color(0xFFF5F5F5)),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                  color: color != null
+                      ? color!.withValues(alpha: 0.3)
+                      : (isDark
+                          ? const Color(0xFF444444)
+                          : AppTheme.border)),
+            ),
+            child: Icon(icon,
+                size: 15,
+                color: color ??
+                    (isDark
+                        ? Colors.white54
+                        : AppTheme.textSub)),
+          ),
+        ),
+      );
+}
+
+class _QtyStat extends StatelessWidget {
+  final String label;
+  final double qty;
+  final String unit;
+  final Color color;
+  final bool isDark;
+
+  const _QtyStat({
+    required this.label,
+    required this.qty,
+    required this.unit,
+    required this.color,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label,
+              style: TextStyle(
+                  fontSize: 10,
+                  color: isDark ? Colors.white38 : AppTheme.textSub)),
+          const SizedBox(height: 2),
+          Text(
+            '${qty.toStringAsFixed(0)} $unit',
+            style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: color),
+          ),
+        ],
+      );
+}
+
+class _GRBadge extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final bool isDark;
+
+  const _GRBadge(
+      {required this.icon, required this.text, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon,
+              size: 12,
+              color: isDark ? Colors.white38 : AppTheme.textSub),
+          const SizedBox(width: 3),
+          Text(text,
+              style: TextStyle(
+                  fontSize: 11,
+                  color: isDark
+                      ? const Color(0xFFAAAAAA)
+                      : AppTheme.textSub)),
+        ],
+      );
+}
+
+class _GRSummaryRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool isDark;
+  final Color? valueColor;
+
+  const _GRSummaryRow({
+    required this.label,
+    required this.value,
+    required this.isDark,
+    this.valueColor,
+  });
+
+  @override
+  Widget build(BuildContext context) => Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label,
+              style: TextStyle(
+                  fontSize: 13,
+                  color: isDark ? Colors.white70 : AppTheme.textSub)),
+          Text(value,
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: valueColor ??
+                      (isDark ? Colors.white70 : Colors.black87))),
+        ],
+      );
+}
+
+class _GRMethodBtn extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String sublabel;
+  final Color color;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  const _GRMethodBtn({
+    required this.icon,
+    required this.label,
+    required this.sublabel,
+    required this.color,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.07),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: color.withValues(alpha: 0.3)),
+          ),
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, size: 22, color: color),
+              ),
+              const SizedBox(height: 8),
+              Text(label,
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: color)),
+              const SizedBox(height: 2),
+              Text(sublabel,
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: isDark
+                          ? Colors.white54
+                          : AppTheme.textSub),
+                  textAlign: TextAlign.center),
+            ],
+          ),
+        ),
+      );
+}
+
+class _HelpItem extends StatelessWidget {
+  final String title;
+  final String detail;
+  final bool isDark;
+  const _HelpItem(
+      {required this.title, required this.detail, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title,
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white : const Color(0xFF1A1A1A))),
+          const SizedBox(height: 2),
+          Text(detail,
+              style: TextStyle(
+                  fontSize: 12,
+                  color: isDark ? Colors.white60 : AppTheme.textSub)),
+        ],
+      );
 }
