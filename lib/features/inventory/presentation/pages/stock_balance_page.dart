@@ -84,6 +84,7 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
             productId: ex.productId,
             productCode: ex.productCode,
             productName: ex.productName,
+            barcode: ex.barcode,
             baseUnit: ex.baseUnit,
             warehouseId: 'ALL',
             warehouseName: 'ทุกคลัง',
@@ -445,187 +446,200 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // CARD VIEW
+  // CARD VIEW (ListView)
+  // โครงสร้างตรงกับ product_list_page._buildCardView
   // ─────────────────────────────────────────────────────────────
   Widget _buildCardView(List<StockBalanceModel> stocks, settings) {
     final int threshold = settings.lowStockThreshold;
     final bool alertOn  = settings.enableLowStockAlert;
-    const nameClr       = Color(0xFF1A1A1A);
 
     final avatarColors = [
       AppTheme.primary, AppTheme.info, AppTheme.success,
       AppTheme.warning, AppTheme.purpleColor, AppTheme.tealColor,
     ];
 
-    return ListView.separated(
-      padding: const EdgeInsets.all(12),
-      itemCount: stocks.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 8),
-      itemBuilder: (context, i) {
-        final s      = stocks[i];
-        final isLow  = alertOn && s.balance < threshold;
-        final initial = s.productName.isNotEmpty
-            ? s.productName.substring(0, 1).toUpperCase()
-            : '?';
-        final avatarColor =
-            avatarColors[s.productName.codeUnitAt(0) % avatarColors.length];
-        final cardBg    = isLow ? const Color(0xFFFFFDE7) : Colors.white;
-        final borderClr = isLow ? _warning : const Color(0xFFE0E0E0);
+    return Builder(builder: (ctx) {
+      final cs = Theme.of(ctx).colorScheme;
+      final isDark = Theme.of(ctx).brightness == Brightness.dark;
 
-        return Card(
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-            side: BorderSide(
-              color: borderClr,
-              width: isLow ? 1.5 : 1,
+      return ListView.separated(
+        padding: const EdgeInsets.all(12),
+        itemCount: stocks.length,
+        separatorBuilder: (_, _) => const SizedBox(height: 8),
+        itemBuilder: (context, i) {
+          final s         = stocks[i];
+          final isLow     = alertOn && s.balance < threshold;
+          final initial   = s.productName.isNotEmpty
+              ? s.productName.substring(0, 1).toUpperCase()
+              : '?';
+          final avatarColor =
+              avatarColors[s.productName.codeUnitAt(0) % avatarColors.length];
+          final cardBg    = isLow
+              ? (isDark ? const Color(0xFF3E2E00) : const Color(0xFFFFFDE7))
+              : cs.surface;
+          final borderClr = isLow
+              ? _warning
+              : cs.outline.withValues(alpha: 0.3);
+
+          return Card(
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+              side: BorderSide(color: borderClr, width: isLow ? 1.5 : 1),
             ),
-          ),
-          color: cardBg,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(10),
-            onTap: () => _showStockActions(context, s),
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                children: [
-                  // ── Avatar + low-stock badge ──────────────────
-                  Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      CircleAvatar(
-                        radius: 20,
-                        backgroundColor: avatarColor,
-                        child: Text(
-                          initial,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      if (isLow)
-                        Positioned(
-                          right: -2,
-                          bottom: -2,
-                          child: Container(
-                            width: 14,
-                            height: 14,
-                            decoration: BoxDecoration(
-                              color: _warning,
-                              shape: BoxShape.circle,
-                              border:
-                                  Border.all(color: Colors.white, width: 1.5),
-                            ),
-                            child: const Icon(
-                              Icons.warning_amber_rounded,
-                              size: 8,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(width: 12),
-
-                  // ── Info ────────────────────────────────────────
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+            color: cardBg,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(10),
+              onTap: () => _showStockActions(context, s),
+              hoverColor: AppTheme.primaryLight.withValues(alpha: 0.6),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    // ── Avatar + low-stock dot badge ──────────────
+                    Stack(
+                      clipBehavior: Clip.none,
                       children: [
-                        // ชื่อ + badge สต๊อกต่ำ
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                s.productName,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: nameClr,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                        CircleAvatar(
+                          radius: 20,
+                          backgroundColor: avatarColor,
+                          child: Text(
+                            initial,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
                             ),
-                            if (isLow) ...[
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 7, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFFFF3CD),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
+                          ),
+                        ),
+                        if (isLow)
+                          Positioned(
+                            right: -2,
+                            bottom: -2,
+                            child: Container(
+                              width: 14,
+                              height: 14,
+                              decoration: BoxDecoration(
+                                color: _warning,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                    color: cardBg, width: 1.5),
+                              ),
+                              child: const Icon(Icons.warning_amber_rounded,
+                                  size: 8, color: Colors.white),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(width: 12),
+
+                    // ── Info (เหมือน product card) ──────────────────
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // ชื่อ + badge สต๊อกต่ำ
+                          Row(
+                            children: [
+                              Expanded(
                                 child: Text(
-                                  'สต๊อกต่ำ',
+                                  s.productName,
                                   style: TextStyle(
-                                    fontSize: 10,
+                                    fontSize: 13,
                                     fontWeight: FontWeight.w600,
-                                    color: _warning,
+                                    color: cs.onSurface,
                                   ),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                              ),
+                              if (isLow) ...[
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 7, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFFF3CD),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Text(
+                                    'สต๊อกต่ำ',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      color: _warning,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+
+                          // รหัส · คลัง — บรรทัดเดียว (เหมือน product code + barcode)
+                          Row(
+                            children: [
+                              Text(
+                                'รหัส: ${s.productCode}',
+                                style: const TextStyle(
+                                    fontSize: 11, color: AppTheme.textSub),
+                              ),
+                              const Text(
+                                '  ·  ',
+                                style: TextStyle(
+                                    fontSize: 11, color: AppTheme.textSub),
+                              ),
+                              const Icon(Icons.warehouse_outlined,
+                                  size: 11, color: AppTheme.textSub),
+                              const SizedBox(width: 3),
+                              Expanded(
+                                child: Text(
+                                  s.warehouseName,
+                                  style: const TextStyle(
+                                      fontSize: 11, color: AppTheme.textSub),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
                                 ),
                               ),
                             ],
-                          ],
-                        ),
-                        const SizedBox(height: 3),
+                          ),
+                        ],
+                      ),
+                    ),
 
-                        // รหัสสินค้า
+                    // ── Balance column (เหมือน price column ใน product card) ──
+                    const SizedBox(width: 8),
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
                         Text(
-                          'รหัส: ${s.productCode}',
+                          s.balance.toStringAsFixed(0),
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: isLow ? _error : _success,
+                          ),
+                        ),
+                        Text(
+                          s.baseUnit,
                           style: const TextStyle(
                               fontSize: 11, color: AppTheme.textSub),
                         ),
-
-                        // คลัง
-                        Row(
-                          children: [
-                            const Icon(Icons.warehouse_outlined,
-                                size: 11, color: AppTheme.textSub),
-                            const SizedBox(width: 3),
-                            Text(
-                              s.warehouseName,
-                              style: const TextStyle(
-                                  fontSize: 11, color: AppTheme.textSub),
-                            ),
-                          ],
-                        ),
-
                         const SizedBox(height: 4),
-
-                        // ยอดคงเหลือ
-                        Row(
-                          children: [
-                            Text(
-                              s.balance.toStringAsFixed(0),
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                color: isLow ? _error : _success,
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              s.baseUnit,
-                              style: const TextStyle(
-                                  fontSize: 11, color: AppTheme.textSub),
-                            ),
-                          ],
-                        ),
+                        Icon(Icons.chevron_right,
+                            size: 16,
+                            color: cs.onSurface.withValues(alpha: 0.3)),
                       ],
                     ),
-                  ),
-
-                  // ── Action icon ──────────────────────────────────
-                  const Icon(Icons.more_vert, color: AppTheme.textSub, size: 20),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-        );
-      },
-    );
+          );
+        },
+      );
+    });
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -748,7 +762,7 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
 // ════════════════════════════════════════════════════════════════
 // _StockTableRow
 // ════════════════════════════════════════════════════════════════
-class _StockTableRow extends StatelessWidget {
+class _StockTableRow extends StatefulWidget {
   final StockBalanceModel stock;
   final int no;
   final bool isEven;
@@ -772,7 +786,19 @@ class _StockTableRow extends StatelessWidget {
   });
 
   @override
+  State<_StockTableRow> createState() => _StockTableRowState();
+}
+
+class _StockTableRowState extends State<_StockTableRow> {
+  bool _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
+    final stock = widget.stock;
+    final no    = widget.no;
+    final isEven = widget.isEven;
+    final isLow  = widget.isLow;
+
     const nameColor = Color(0xFF1A1A1A);
     const codeColor = Color(0xFF555555);
     const whColor   = Color(0xFF666666);
@@ -782,18 +808,23 @@ class _StockTableRow extends StatelessWidget {
     const oddBg     = Color(0xFFF9F9F7);
     const lowBg     = Color(0xFFFFF8E1);
 
-    return InkWell(
-      onTap: onTap,
-      hoverColor: _orange.withValues(alpha: 0.05),
-      child: Container(
-        decoration: BoxDecoration(
-          color: isLow ? lowBg : (isEven ? evenBg : oddBg),
-          border: isLow
-              ? const Border(
-                  left: BorderSide(color: _warning, width: 3))
-              : null,
-        ),
-        child: Row(
+    final normalBg = isLow ? lowBg : (isEven ? evenBg : oddBg);
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          decoration: BoxDecoration(
+            color: _hovered ? AppTheme.primaryLight : normalBg,
+            border: isLow
+                ? const Border(
+                    left: BorderSide(color: _warning, width: 3))
+                : null,
+          ),
+          child: Row(
           children: [
             // No.
             SizedBox(
@@ -818,17 +849,25 @@ class _StockTableRow extends StatelessWidget {
                         color: codeColor)),
               ),
             ),
-            // ชื่อ
+            // ชื่อ + barcode
             Expanded(
               flex: 4,
               child: Padding(
                 padding: const EdgeInsets.symmetric(
-                    vertical: 11, horizontal: 8),
-                child: Text(stock.productName,
-                    style: TextStyle(
-                        fontSize: 13,
-                        color: nameColor),
-                    overflow: TextOverflow.ellipsis),
+                    vertical: 10, horizontal: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(stock.productName,
+                        style: TextStyle(fontSize: 13, color: nameColor),
+                        overflow: TextOverflow.ellipsis),
+                    if (stock.barcode != null && stock.barcode!.isNotEmpty)
+                      Text(stock.barcode!,
+                          style: const TextStyle(
+                              fontSize: 11, color: Color(0xFF999999))),
+                  ],
+                ),
               ),
             ),
             // คลัง
@@ -919,29 +958,30 @@ class _StockTableRow extends StatelessWidget {
                       icon: Icons.add_box_outlined,
                       color: _success,
                       tooltip: 'รับเข้า',
-                      onTap: onStockIn),
+                      onTap: widget.onStockIn),
                   _StockActionBtn(
                       icon: Icons.remove_circle_outline,
                       color: _orange,
                       tooltip: 'เบิกออก',
-                      onTap: onStockOut),
+                      onTap: widget.onStockOut),
                   _StockActionBtn(
                       icon: Icons.swap_horiz,
                       color: const Color(0xFF6A1B9A),
                       tooltip: 'โอนย้าย',
-                      onTap: onTransfer),
+                      onTap: widget.onTransfer),
                   _StockActionBtn(
                       icon: Icons.edit_outlined,
                       color: const Color(0xFF1565C0),
                       tooltip: 'ปรับสต๊อก',
-                      onTap: onAdjust),
+                      onTap: widget.onAdjust),
                 ],
               ),
             ),
           ],
         ),
       ),
-    );
+    ),
+  );
   }
 }
 

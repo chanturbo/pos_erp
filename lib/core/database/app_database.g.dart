@@ -10878,6 +10878,17 @@ class $SalesOrdersTable extends SalesOrders
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _promotionIdsMeta = const VerificationMeta(
+    'promotionIds',
+  );
+  @override
+  late final GeneratedColumn<String> promotionIds = GeneratedColumn<String>(
+    'promotion_ids',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _paymentTypeMeta = const VerificationMeta(
     'paymentType',
   );
@@ -10995,6 +11006,7 @@ class $SalesOrdersTable extends SalesOrders
     couponDiscount,
     couponCodes,
     pointsUsed,
+    promotionIds,
     paymentType,
     paidAmount,
     changeAmount,
@@ -11181,6 +11193,15 @@ class $SalesOrdersTable extends SalesOrders
         pointsUsed.isAcceptableOrUnknown(data['points_used']!, _pointsUsedMeta),
       );
     }
+    if (data.containsKey('promotion_ids')) {
+      context.handle(
+        _promotionIdsMeta,
+        promotionIds.isAcceptableOrUnknown(
+          data['promotion_ids']!,
+          _promotionIdsMeta,
+        ),
+      );
+    }
     if (data.containsKey('payment_type')) {
       context.handle(
         _paymentTypeMeta,
@@ -11335,6 +11356,10 @@ class $SalesOrdersTable extends SalesOrders
         DriftSqlType.int,
         data['${effectivePrefix}points_used'],
       )!,
+      promotionIds: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}promotion_ids'],
+      ),
       paymentType: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}payment_type'],
@@ -11398,6 +11423,7 @@ class SalesOrder extends DataClass implements Insertable<SalesOrder> {
   final double couponDiscount;
   final String? couponCodes;
   final int pointsUsed;
+  final String? promotionIds;
   final String paymentType;
   final double paidAmount;
   final double changeAmount;
@@ -11428,6 +11454,7 @@ class SalesOrder extends DataClass implements Insertable<SalesOrder> {
     required this.couponDiscount,
     this.couponCodes,
     required this.pointsUsed,
+    this.promotionIds,
     required this.paymentType,
     required this.paidAmount,
     required this.changeAmount,
@@ -11475,6 +11502,9 @@ class SalesOrder extends DataClass implements Insertable<SalesOrder> {
       map['coupon_codes'] = Variable<String>(couponCodes);
     }
     map['points_used'] = Variable<int>(pointsUsed);
+    if (!nullToAbsent || promotionIds != null) {
+      map['promotion_ids'] = Variable<String>(promotionIds);
+    }
     map['payment_type'] = Variable<String>(paymentType);
     map['paid_amount'] = Variable<double>(paidAmount);
     map['change_amount'] = Variable<double>(changeAmount);
@@ -11525,6 +11555,9 @@ class SalesOrder extends DataClass implements Insertable<SalesOrder> {
           ? const Value.absent()
           : Value(couponCodes),
       pointsUsed: Value(pointsUsed),
+      promotionIds: promotionIds == null && nullToAbsent
+          ? const Value.absent()
+          : Value(promotionIds),
       paymentType: Value(paymentType),
       paidAmount: Value(paidAmount),
       changeAmount: Value(changeAmount),
@@ -11565,6 +11598,7 @@ class SalesOrder extends DataClass implements Insertable<SalesOrder> {
       couponDiscount: serializer.fromJson<double>(json['couponDiscount']),
       couponCodes: serializer.fromJson<String?>(json['couponCodes']),
       pointsUsed: serializer.fromJson<int>(json['pointsUsed']),
+      promotionIds: serializer.fromJson<String?>(json['promotionIds']),
       paymentType: serializer.fromJson<String>(json['paymentType']),
       paidAmount: serializer.fromJson<double>(json['paidAmount']),
       changeAmount: serializer.fromJson<double>(json['changeAmount']),
@@ -11600,6 +11634,7 @@ class SalesOrder extends DataClass implements Insertable<SalesOrder> {
       'couponDiscount': serializer.toJson<double>(couponDiscount),
       'couponCodes': serializer.toJson<String?>(couponCodes),
       'pointsUsed': serializer.toJson<int>(pointsUsed),
+      'promotionIds': serializer.toJson<String?>(promotionIds),
       'paymentType': serializer.toJson<String>(paymentType),
       'paidAmount': serializer.toJson<double>(paidAmount),
       'changeAmount': serializer.toJson<double>(changeAmount),
@@ -11633,6 +11668,7 @@ class SalesOrder extends DataClass implements Insertable<SalesOrder> {
     double? couponDiscount,
     Value<String?> couponCodes = const Value.absent(),
     int? pointsUsed,
+    Value<String?> promotionIds = const Value.absent(),
     String? paymentType,
     double? paidAmount,
     double? changeAmount,
@@ -11667,6 +11703,7 @@ class SalesOrder extends DataClass implements Insertable<SalesOrder> {
     couponDiscount: couponDiscount ?? this.couponDiscount,
     couponCodes: couponCodes.present ? couponCodes.value : this.couponCodes,
     pointsUsed: pointsUsed ?? this.pointsUsed,
+    promotionIds: promotionIds.present ? promotionIds.value : this.promotionIds,
     paymentType: paymentType ?? this.paymentType,
     paidAmount: paidAmount ?? this.paidAmount,
     changeAmount: changeAmount ?? this.changeAmount,
@@ -11721,6 +11758,9 @@ class SalesOrder extends DataClass implements Insertable<SalesOrder> {
       pointsUsed: data.pointsUsed.present
           ? data.pointsUsed.value
           : this.pointsUsed,
+      promotionIds: data.promotionIds.present
+          ? data.promotionIds.value
+          : this.promotionIds,
       paymentType: data.paymentType.present
           ? data.paymentType.value
           : this.paymentType,
@@ -11764,6 +11804,7 @@ class SalesOrder extends DataClass implements Insertable<SalesOrder> {
           ..write('couponDiscount: $couponDiscount, ')
           ..write('couponCodes: $couponCodes, ')
           ..write('pointsUsed: $pointsUsed, ')
+          ..write('promotionIds: $promotionIds, ')
           ..write('paymentType: $paymentType, ')
           ..write('paidAmount: $paidAmount, ')
           ..write('changeAmount: $changeAmount, ')
@@ -11799,6 +11840,7 @@ class SalesOrder extends DataClass implements Insertable<SalesOrder> {
     couponDiscount,
     couponCodes,
     pointsUsed,
+    promotionIds,
     paymentType,
     paidAmount,
     changeAmount,
@@ -11833,6 +11875,7 @@ class SalesOrder extends DataClass implements Insertable<SalesOrder> {
           other.couponDiscount == this.couponDiscount &&
           other.couponCodes == this.couponCodes &&
           other.pointsUsed == this.pointsUsed &&
+          other.promotionIds == this.promotionIds &&
           other.paymentType == this.paymentType &&
           other.paidAmount == this.paidAmount &&
           other.changeAmount == this.changeAmount &&
@@ -11865,6 +11908,7 @@ class SalesOrdersCompanion extends UpdateCompanion<SalesOrder> {
   final Value<double> couponDiscount;
   final Value<String?> couponCodes;
   final Value<int> pointsUsed;
+  final Value<String?> promotionIds;
   final Value<String> paymentType;
   final Value<double> paidAmount;
   final Value<double> changeAmount;
@@ -11896,6 +11940,7 @@ class SalesOrdersCompanion extends UpdateCompanion<SalesOrder> {
     this.couponDiscount = const Value.absent(),
     this.couponCodes = const Value.absent(),
     this.pointsUsed = const Value.absent(),
+    this.promotionIds = const Value.absent(),
     this.paymentType = const Value.absent(),
     this.paidAmount = const Value.absent(),
     this.changeAmount = const Value.absent(),
@@ -11928,6 +11973,7 @@ class SalesOrdersCompanion extends UpdateCompanion<SalesOrder> {
     this.couponDiscount = const Value.absent(),
     this.couponCodes = const Value.absent(),
     this.pointsUsed = const Value.absent(),
+    this.promotionIds = const Value.absent(),
     this.paymentType = const Value.absent(),
     this.paidAmount = const Value.absent(),
     this.changeAmount = const Value.absent(),
@@ -11965,6 +12011,7 @@ class SalesOrdersCompanion extends UpdateCompanion<SalesOrder> {
     Expression<double>? couponDiscount,
     Expression<String>? couponCodes,
     Expression<int>? pointsUsed,
+    Expression<String>? promotionIds,
     Expression<String>? paymentType,
     Expression<double>? paidAmount,
     Expression<double>? changeAmount,
@@ -11997,6 +12044,7 @@ class SalesOrdersCompanion extends UpdateCompanion<SalesOrder> {
       if (couponDiscount != null) 'coupon_discount': couponDiscount,
       if (couponCodes != null) 'coupon_codes': couponCodes,
       if (pointsUsed != null) 'points_used': pointsUsed,
+      if (promotionIds != null) 'promotion_ids': promotionIds,
       if (paymentType != null) 'payment_type': paymentType,
       if (paidAmount != null) 'paid_amount': paidAmount,
       if (changeAmount != null) 'change_amount': changeAmount,
@@ -12031,6 +12079,7 @@ class SalesOrdersCompanion extends UpdateCompanion<SalesOrder> {
     Value<double>? couponDiscount,
     Value<String?>? couponCodes,
     Value<int>? pointsUsed,
+    Value<String?>? promotionIds,
     Value<String>? paymentType,
     Value<double>? paidAmount,
     Value<double>? changeAmount,
@@ -12063,6 +12112,7 @@ class SalesOrdersCompanion extends UpdateCompanion<SalesOrder> {
       couponDiscount: couponDiscount ?? this.couponDiscount,
       couponCodes: couponCodes ?? this.couponCodes,
       pointsUsed: pointsUsed ?? this.pointsUsed,
+      promotionIds: promotionIds ?? this.promotionIds,
       paymentType: paymentType ?? this.paymentType,
       paidAmount: paidAmount ?? this.paidAmount,
       changeAmount: changeAmount ?? this.changeAmount,
@@ -12141,6 +12191,9 @@ class SalesOrdersCompanion extends UpdateCompanion<SalesOrder> {
     if (pointsUsed.present) {
       map['points_used'] = Variable<int>(pointsUsed.value);
     }
+    if (promotionIds.present) {
+      map['promotion_ids'] = Variable<String>(promotionIds.value);
+    }
     if (paymentType.present) {
       map['payment_type'] = Variable<String>(paymentType.value);
     }
@@ -12195,6 +12248,7 @@ class SalesOrdersCompanion extends UpdateCompanion<SalesOrder> {
           ..write('couponDiscount: $couponDiscount, ')
           ..write('couponCodes: $couponCodes, ')
           ..write('pointsUsed: $pointsUsed, ')
+          ..write('promotionIds: $promotionIds, ')
           ..write('paymentType: $paymentType, ')
           ..write('paidAmount: $paidAmount, ')
           ..write('changeAmount: $changeAmount, ')
@@ -12420,6 +12474,32 @@ class $SalesOrderItemsTable extends SalesOrderItems
         type: DriftSqlType.string,
         requiredDuringInsert: false,
       );
+  static const VerificationMeta _isFreeItemMeta = const VerificationMeta(
+    'isFreeItem',
+  );
+  @override
+  late final GeneratedColumn<bool> isFreeItem = GeneratedColumn<bool>(
+    'is_free_item',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_free_item" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _promotionIdMeta = const VerificationMeta(
+    'promotionId',
+  );
+  @override
+  late final GeneratedColumn<String> promotionId = GeneratedColumn<String>(
+    'promotion_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -12452,6 +12532,8 @@ class $SalesOrderItemsTable extends SalesOrderItems
     kitchenStatus,
     preparedAt,
     specialInstructions,
+    isFreeItem,
+    promotionId,
     createdAt,
   ];
   @override
@@ -12617,6 +12699,24 @@ class $SalesOrderItemsTable extends SalesOrderItems
         ),
       );
     }
+    if (data.containsKey('is_free_item')) {
+      context.handle(
+        _isFreeItemMeta,
+        isFreeItem.isAcceptableOrUnknown(
+          data['is_free_item']!,
+          _isFreeItemMeta,
+        ),
+      );
+    }
+    if (data.containsKey('promotion_id')) {
+      context.handle(
+        _promotionIdMeta,
+        promotionId.isAcceptableOrUnknown(
+          data['promotion_id']!,
+          _promotionIdMeta,
+        ),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -12704,6 +12804,14 @@ class $SalesOrderItemsTable extends SalesOrderItems
         DriftSqlType.string,
         data['${effectivePrefix}special_instructions'],
       ),
+      isFreeItem: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_free_item'],
+      )!,
+      promotionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}promotion_id'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -12736,6 +12844,8 @@ class SalesOrderItem extends DataClass implements Insertable<SalesOrderItem> {
   final String kitchenStatus;
   final DateTime? preparedAt;
   final String? specialInstructions;
+  final bool isFreeItem;
+  final String? promotionId;
   final DateTime createdAt;
   const SalesOrderItem({
     required this.itemId,
@@ -12756,6 +12866,8 @@ class SalesOrderItem extends DataClass implements Insertable<SalesOrderItem> {
     required this.kitchenStatus,
     this.preparedAt,
     this.specialInstructions,
+    required this.isFreeItem,
+    this.promotionId,
     required this.createdAt,
   });
   @override
@@ -12784,6 +12896,10 @@ class SalesOrderItem extends DataClass implements Insertable<SalesOrderItem> {
     }
     if (!nullToAbsent || specialInstructions != null) {
       map['special_instructions'] = Variable<String>(specialInstructions);
+    }
+    map['is_free_item'] = Variable<bool>(isFreeItem);
+    if (!nullToAbsent || promotionId != null) {
+      map['promotion_id'] = Variable<String>(promotionId);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
     return map;
@@ -12815,6 +12931,10 @@ class SalesOrderItem extends DataClass implements Insertable<SalesOrderItem> {
       specialInstructions: specialInstructions == null && nullToAbsent
           ? const Value.absent()
           : Value(specialInstructions),
+      isFreeItem: Value(isFreeItem),
+      promotionId: promotionId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(promotionId),
       createdAt: Value(createdAt),
     );
   }
@@ -12845,6 +12965,8 @@ class SalesOrderItem extends DataClass implements Insertable<SalesOrderItem> {
       specialInstructions: serializer.fromJson<String?>(
         json['specialInstructions'],
       ),
+      isFreeItem: serializer.fromJson<bool>(json['isFreeItem']),
+      promotionId: serializer.fromJson<String?>(json['promotionId']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
@@ -12870,6 +12992,8 @@ class SalesOrderItem extends DataClass implements Insertable<SalesOrderItem> {
       'kitchenStatus': serializer.toJson<String>(kitchenStatus),
       'preparedAt': serializer.toJson<DateTime?>(preparedAt),
       'specialInstructions': serializer.toJson<String?>(specialInstructions),
+      'isFreeItem': serializer.toJson<bool>(isFreeItem),
+      'promotionId': serializer.toJson<String?>(promotionId),
       'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
@@ -12893,6 +13017,8 @@ class SalesOrderItem extends DataClass implements Insertable<SalesOrderItem> {
     String? kitchenStatus,
     Value<DateTime?> preparedAt = const Value.absent(),
     Value<String?> specialInstructions = const Value.absent(),
+    bool? isFreeItem,
+    Value<String?> promotionId = const Value.absent(),
     DateTime? createdAt,
   }) => SalesOrderItem(
     itemId: itemId ?? this.itemId,
@@ -12915,6 +13041,8 @@ class SalesOrderItem extends DataClass implements Insertable<SalesOrderItem> {
     specialInstructions: specialInstructions.present
         ? specialInstructions.value
         : this.specialInstructions,
+    isFreeItem: isFreeItem ?? this.isFreeItem,
+    promotionId: promotionId.present ? promotionId.value : this.promotionId,
     createdAt: createdAt ?? this.createdAt,
   );
   SalesOrderItem copyWithCompanion(SalesOrderItemsCompanion data) {
@@ -12953,6 +13081,12 @@ class SalesOrderItem extends DataClass implements Insertable<SalesOrderItem> {
       specialInstructions: data.specialInstructions.present
           ? data.specialInstructions.value
           : this.specialInstructions,
+      isFreeItem: data.isFreeItem.present
+          ? data.isFreeItem.value
+          : this.isFreeItem,
+      promotionId: data.promotionId.present
+          ? data.promotionId.value
+          : this.promotionId,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
@@ -12978,13 +13112,15 @@ class SalesOrderItem extends DataClass implements Insertable<SalesOrderItem> {
           ..write('kitchenStatus: $kitchenStatus, ')
           ..write('preparedAt: $preparedAt, ')
           ..write('specialInstructions: $specialInstructions, ')
+          ..write('isFreeItem: $isFreeItem, ')
+          ..write('promotionId: $promotionId, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     itemId,
     orderId,
     lineNo,
@@ -13003,8 +13139,10 @@ class SalesOrderItem extends DataClass implements Insertable<SalesOrderItem> {
     kitchenStatus,
     preparedAt,
     specialInstructions,
+    isFreeItem,
+    promotionId,
     createdAt,
-  );
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -13027,6 +13165,8 @@ class SalesOrderItem extends DataClass implements Insertable<SalesOrderItem> {
           other.kitchenStatus == this.kitchenStatus &&
           other.preparedAt == this.preparedAt &&
           other.specialInstructions == this.specialInstructions &&
+          other.isFreeItem == this.isFreeItem &&
+          other.promotionId == this.promotionId &&
           other.createdAt == this.createdAt);
 }
 
@@ -13049,6 +13189,8 @@ class SalesOrderItemsCompanion extends UpdateCompanion<SalesOrderItem> {
   final Value<String> kitchenStatus;
   final Value<DateTime?> preparedAt;
   final Value<String?> specialInstructions;
+  final Value<bool> isFreeItem;
+  final Value<String?> promotionId;
   final Value<DateTime> createdAt;
   final Value<int> rowid;
   const SalesOrderItemsCompanion({
@@ -13070,6 +13212,8 @@ class SalesOrderItemsCompanion extends UpdateCompanion<SalesOrderItem> {
     this.kitchenStatus = const Value.absent(),
     this.preparedAt = const Value.absent(),
     this.specialInstructions = const Value.absent(),
+    this.isFreeItem = const Value.absent(),
+    this.promotionId = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -13092,6 +13236,8 @@ class SalesOrderItemsCompanion extends UpdateCompanion<SalesOrderItem> {
     this.kitchenStatus = const Value.absent(),
     this.preparedAt = const Value.absent(),
     this.specialInstructions = const Value.absent(),
+    this.isFreeItem = const Value.absent(),
+    this.promotionId = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : itemId = Value(itemId),
@@ -13124,6 +13270,8 @@ class SalesOrderItemsCompanion extends UpdateCompanion<SalesOrderItem> {
     Expression<String>? kitchenStatus,
     Expression<DateTime>? preparedAt,
     Expression<String>? specialInstructions,
+    Expression<bool>? isFreeItem,
+    Expression<String>? promotionId,
     Expression<DateTime>? createdAt,
     Expression<int>? rowid,
   }) {
@@ -13147,6 +13295,8 @@ class SalesOrderItemsCompanion extends UpdateCompanion<SalesOrderItem> {
       if (preparedAt != null) 'prepared_at': preparedAt,
       if (specialInstructions != null)
         'special_instructions': specialInstructions,
+      if (isFreeItem != null) 'is_free_item': isFreeItem,
+      if (promotionId != null) 'promotion_id': promotionId,
       if (createdAt != null) 'created_at': createdAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -13171,6 +13321,8 @@ class SalesOrderItemsCompanion extends UpdateCompanion<SalesOrderItem> {
     Value<String>? kitchenStatus,
     Value<DateTime?>? preparedAt,
     Value<String?>? specialInstructions,
+    Value<bool>? isFreeItem,
+    Value<String?>? promotionId,
     Value<DateTime>? createdAt,
     Value<int>? rowid,
   }) {
@@ -13193,6 +13345,8 @@ class SalesOrderItemsCompanion extends UpdateCompanion<SalesOrderItem> {
       kitchenStatus: kitchenStatus ?? this.kitchenStatus,
       preparedAt: preparedAt ?? this.preparedAt,
       specialInstructions: specialInstructions ?? this.specialInstructions,
+      isFreeItem: isFreeItem ?? this.isFreeItem,
+      promotionId: promotionId ?? this.promotionId,
       createdAt: createdAt ?? this.createdAt,
       rowid: rowid ?? this.rowid,
     );
@@ -13255,6 +13409,12 @@ class SalesOrderItemsCompanion extends UpdateCompanion<SalesOrderItem> {
     if (specialInstructions.present) {
       map['special_instructions'] = Variable<String>(specialInstructions.value);
     }
+    if (isFreeItem.present) {
+      map['is_free_item'] = Variable<bool>(isFreeItem.value);
+    }
+    if (promotionId.present) {
+      map['promotion_id'] = Variable<String>(promotionId.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -13285,6 +13445,8 @@ class SalesOrderItemsCompanion extends UpdateCompanion<SalesOrderItem> {
           ..write('kitchenStatus: $kitchenStatus, ')
           ..write('preparedAt: $preparedAt, ')
           ..write('specialInstructions: $specialInstructions, ')
+          ..write('isFreeItem: $isFreeItem, ')
+          ..write('promotionId: $promotionId, ')
           ..write('createdAt: $createdAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -19941,17 +20103,14 @@ class $PromotionsTable extends Promotions
     requiredDuringInsert: true,
   );
   @override
-  late final GeneratedColumnWithTypeConverter<Map<String, dynamic>?, String>
-  applyToIds =
-      GeneratedColumn<String>(
-        'apply_to_ids',
-        aliasedName,
-        true,
-        type: DriftSqlType.string,
-        requiredDuringInsert: false,
-      ).withConverter<Map<String, dynamic>?>(
-        $PromotionsTable.$converterapplyToIdsn,
-      );
+  late final GeneratedColumnWithTypeConverter<List<String>?, String>
+  applyToIds = GeneratedColumn<String>(
+    'apply_to_ids',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  ).withConverter<List<String>?>($PromotionsTable.$converterapplyToIdsn);
   static const VerificationMeta _startDateMeta = const VerificationMeta(
     'startDate',
   );
@@ -20480,9 +20639,9 @@ class $PromotionsTable extends Promotions
     return $PromotionsTable(attachedDatabase, alias);
   }
 
-  static TypeConverter<Map<String, dynamic>, String> $converterapplyToIds =
-      const JsonConverter();
-  static TypeConverter<Map<String, dynamic>?, String?> $converterapplyToIdsn =
+  static TypeConverter<List<String>, String> $converterapplyToIds =
+      const StringListConverter();
+  static TypeConverter<List<String>?, String?> $converterapplyToIdsn =
       NullAwareTypeConverter.wrap($converterapplyToIds);
   static TypeConverter<Map<String, dynamic>, String> $converterapplyDays =
       const JsonConverter();
@@ -20504,7 +20663,7 @@ class Promotion extends DataClass implements Insertable<Promotion> {
   final double minAmount;
   final double minQty;
   final String applyTo;
-  final Map<String, dynamic>? applyToIds;
+  final List<String>? applyToIds;
   final DateTime startDate;
   final DateTime endDate;
   final String? startTime;
@@ -20685,9 +20844,7 @@ class Promotion extends DataClass implements Insertable<Promotion> {
       minAmount: serializer.fromJson<double>(json['minAmount']),
       minQty: serializer.fromJson<double>(json['minQty']),
       applyTo: serializer.fromJson<String>(json['applyTo']),
-      applyToIds: serializer.fromJson<Map<String, dynamic>?>(
-        json['applyToIds'],
-      ),
+      applyToIds: serializer.fromJson<List<String>?>(json['applyToIds']),
       startDate: serializer.fromJson<DateTime>(json['startDate']),
       endDate: serializer.fromJson<DateTime>(json['endDate']),
       startTime: serializer.fromJson<String?>(json['startTime']),
@@ -20720,7 +20877,7 @@ class Promotion extends DataClass implements Insertable<Promotion> {
       'minAmount': serializer.toJson<double>(minAmount),
       'minQty': serializer.toJson<double>(minQty),
       'applyTo': serializer.toJson<String>(applyTo),
-      'applyToIds': serializer.toJson<Map<String, dynamic>?>(applyToIds),
+      'applyToIds': serializer.toJson<List<String>?>(applyToIds),
       'startDate': serializer.toJson<DateTime>(startDate),
       'endDate': serializer.toJson<DateTime>(endDate),
       'startTime': serializer.toJson<String?>(startTime),
@@ -20751,7 +20908,7 @@ class Promotion extends DataClass implements Insertable<Promotion> {
     double? minAmount,
     double? minQty,
     String? applyTo,
-    Value<Map<String, dynamic>?> applyToIds = const Value.absent(),
+    Value<List<String>?> applyToIds = const Value.absent(),
     DateTime? startDate,
     DateTime? endDate,
     Value<String?> startTime = const Value.absent(),
@@ -20965,7 +21122,7 @@ class PromotionsCompanion extends UpdateCompanion<Promotion> {
   final Value<double> minAmount;
   final Value<double> minQty;
   final Value<String> applyTo;
-  final Value<Map<String, dynamic>?> applyToIds;
+  final Value<List<String>?> applyToIds;
   final Value<DateTime> startDate;
   final Value<DateTime> endDate;
   final Value<String?> startTime;
@@ -21123,7 +21280,7 @@ class PromotionsCompanion extends UpdateCompanion<Promotion> {
     Value<double>? minAmount,
     Value<double>? minQty,
     Value<String>? applyTo,
-    Value<Map<String, dynamic>?>? applyToIds,
+    Value<List<String>?>? applyToIds,
     Value<DateTime>? startDate,
     Value<DateTime>? endDate,
     Value<String?>? startTime,
@@ -41199,6 +41356,7 @@ typedef $$SalesOrdersTableCreateCompanionBuilder =
       Value<double> couponDiscount,
       Value<String?> couponCodes,
       Value<int> pointsUsed,
+      Value<String?> promotionIds,
       Value<String> paymentType,
       Value<double> paidAmount,
       Value<double> changeAmount,
@@ -41232,6 +41390,7 @@ typedef $$SalesOrdersTableUpdateCompanionBuilder =
       Value<double> couponDiscount,
       Value<String?> couponCodes,
       Value<int> pointsUsed,
+      Value<String?> promotionIds,
       Value<String> paymentType,
       Value<double> paidAmount,
       Value<double> changeAmount,
@@ -41466,6 +41625,11 @@ class $$SalesOrdersTableFilterComposer
 
   ColumnFilters<int> get pointsUsed => $composableBuilder(
     column: $table.pointsUsed,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get promotionIds => $composableBuilder(
+    column: $table.promotionIds,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -41746,6 +41910,11 @@ class $$SalesOrdersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get promotionIds => $composableBuilder(
+    column: $table.promotionIds,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get paymentType => $composableBuilder(
     column: $table.paymentType,
     builder: (column) => ColumnOrderings(column),
@@ -41954,6 +42123,11 @@ class $$SalesOrdersTableAnnotationComposer
 
   GeneratedColumn<int> get pointsUsed => $composableBuilder(
     column: $table.pointsUsed,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get promotionIds => $composableBuilder(
+    column: $table.promotionIds,
     builder: (column) => column,
   );
 
@@ -42188,6 +42362,7 @@ class $$SalesOrdersTableTableManager
                 Value<double> couponDiscount = const Value.absent(),
                 Value<String?> couponCodes = const Value.absent(),
                 Value<int> pointsUsed = const Value.absent(),
+                Value<String?> promotionIds = const Value.absent(),
                 Value<String> paymentType = const Value.absent(),
                 Value<double> paidAmount = const Value.absent(),
                 Value<double> changeAmount = const Value.absent(),
@@ -42219,6 +42394,7 @@ class $$SalesOrdersTableTableManager
                 couponDiscount: couponDiscount,
                 couponCodes: couponCodes,
                 pointsUsed: pointsUsed,
+                promotionIds: promotionIds,
                 paymentType: paymentType,
                 paidAmount: paidAmount,
                 changeAmount: changeAmount,
@@ -42252,6 +42428,7 @@ class $$SalesOrdersTableTableManager
                 Value<double> couponDiscount = const Value.absent(),
                 Value<String?> couponCodes = const Value.absent(),
                 Value<int> pointsUsed = const Value.absent(),
+                Value<String?> promotionIds = const Value.absent(),
                 Value<String> paymentType = const Value.absent(),
                 Value<double> paidAmount = const Value.absent(),
                 Value<double> changeAmount = const Value.absent(),
@@ -42283,6 +42460,7 @@ class $$SalesOrdersTableTableManager
                 couponDiscount: couponDiscount,
                 couponCodes: couponCodes,
                 pointsUsed: pointsUsed,
+                promotionIds: promotionIds,
                 paymentType: paymentType,
                 paidAmount: paidAmount,
                 changeAmount: changeAmount,
@@ -42488,6 +42666,8 @@ typedef $$SalesOrderItemsTableCreateCompanionBuilder =
       Value<String> kitchenStatus,
       Value<DateTime?> preparedAt,
       Value<String?> specialInstructions,
+      Value<bool> isFreeItem,
+      Value<String?> promotionId,
       Value<DateTime> createdAt,
       Value<int> rowid,
     });
@@ -42511,6 +42691,8 @@ typedef $$SalesOrderItemsTableUpdateCompanionBuilder =
       Value<String> kitchenStatus,
       Value<DateTime?> preparedAt,
       Value<String?> specialInstructions,
+      Value<bool> isFreeItem,
+      Value<String?> promotionId,
       Value<DateTime> createdAt,
       Value<int> rowid,
     });
@@ -42703,6 +42885,16 @@ class $$SalesOrderItemsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<bool> get isFreeItem => $composableBuilder(
+    column: $table.isFreeItem,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get promotionId => $composableBuilder(
+    column: $table.promotionId,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnFilters(column),
@@ -42887,6 +43079,16 @@ class $$SalesOrderItemsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get isFreeItem => $composableBuilder(
+    column: $table.isFreeItem,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get promotionId => $composableBuilder(
+    column: $table.promotionId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -43027,6 +43229,16 @@ class $$SalesOrderItemsTableAnnotationComposer
 
   GeneratedColumn<String> get specialInstructions => $composableBuilder(
     column: $table.specialInstructions,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get isFreeItem => $composableBuilder(
+    column: $table.isFreeItem,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get promotionId => $composableBuilder(
+    column: $table.promotionId,
     builder: (column) => column,
   );
 
@@ -43182,6 +43394,8 @@ class $$SalesOrderItemsTableTableManager
                 Value<String> kitchenStatus = const Value.absent(),
                 Value<DateTime?> preparedAt = const Value.absent(),
                 Value<String?> specialInstructions = const Value.absent(),
+                Value<bool> isFreeItem = const Value.absent(),
+                Value<String?> promotionId = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SalesOrderItemsCompanion(
@@ -43203,6 +43417,8 @@ class $$SalesOrderItemsTableTableManager
                 kitchenStatus: kitchenStatus,
                 preparedAt: preparedAt,
                 specialInstructions: specialInstructions,
+                isFreeItem: isFreeItem,
+                promotionId: promotionId,
                 createdAt: createdAt,
                 rowid: rowid,
               ),
@@ -43226,6 +43442,8 @@ class $$SalesOrderItemsTableTableManager
                 Value<String> kitchenStatus = const Value.absent(),
                 Value<DateTime?> preparedAt = const Value.absent(),
                 Value<String?> specialInstructions = const Value.absent(),
+                Value<bool> isFreeItem = const Value.absent(),
+                Value<String?> promotionId = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SalesOrderItemsCompanion.insert(
@@ -43247,6 +43465,8 @@ class $$SalesOrderItemsTableTableManager
                 kitchenStatus: kitchenStatus,
                 preparedAt: preparedAt,
                 specialInstructions: specialInstructions,
+                isFreeItem: isFreeItem,
+                promotionId: promotionId,
                 createdAt: createdAt,
                 rowid: rowid,
               ),
@@ -47562,7 +47782,7 @@ typedef $$PromotionsTableCreateCompanionBuilder =
       Value<double> minAmount,
       Value<double> minQty,
       required String applyTo,
-      Value<Map<String, dynamic>?> applyToIds,
+      Value<List<String>?> applyToIds,
       required DateTime startDate,
       required DateTime endDate,
       Value<String?> startTime,
@@ -47593,7 +47813,7 @@ typedef $$PromotionsTableUpdateCompanionBuilder =
       Value<double> minAmount,
       Value<double> minQty,
       Value<String> applyTo,
-      Value<Map<String, dynamic>?> applyToIds,
+      Value<List<String>?> applyToIds,
       Value<DateTime> startDate,
       Value<DateTime> endDate,
       Value<String?> startTime,
@@ -47755,11 +47975,7 @@ class $$PromotionsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnWithTypeConverterFilters<
-    Map<String, dynamic>?,
-    Map<String, dynamic>,
-    String
-  >
+  ColumnWithTypeConverterFilters<List<String>?, List<String>, String>
   get applyToIds => $composableBuilder(
     column: $table.applyToIds,
     builder: (column) => ColumnWithTypeConverterFilters(column),
@@ -48131,11 +48347,11 @@ class $$PromotionsTableAnnotationComposer
   GeneratedColumn<String> get applyTo =>
       $composableBuilder(column: $table.applyTo, builder: (column) => column);
 
-  GeneratedColumnWithTypeConverter<Map<String, dynamic>?, String>
-  get applyToIds => $composableBuilder(
-    column: $table.applyToIds,
-    builder: (column) => column,
-  );
+  GeneratedColumnWithTypeConverter<List<String>?, String> get applyToIds =>
+      $composableBuilder(
+        column: $table.applyToIds,
+        builder: (column) => column,
+      );
 
   GeneratedColumn<DateTime> get startDate =>
       $composableBuilder(column: $table.startDate, builder: (column) => column);
@@ -48299,7 +48515,7 @@ class $$PromotionsTableTableManager
                 Value<double> minAmount = const Value.absent(),
                 Value<double> minQty = const Value.absent(),
                 Value<String> applyTo = const Value.absent(),
-                Value<Map<String, dynamic>?> applyToIds = const Value.absent(),
+                Value<List<String>?> applyToIds = const Value.absent(),
                 Value<DateTime> startDate = const Value.absent(),
                 Value<DateTime> endDate = const Value.absent(),
                 Value<String?> startTime = const Value.absent(),
@@ -48359,7 +48575,7 @@ class $$PromotionsTableTableManager
                 Value<double> minAmount = const Value.absent(),
                 Value<double> minQty = const Value.absent(),
                 required String applyTo,
-                Value<Map<String, dynamic>?> applyToIds = const Value.absent(),
+                Value<List<String>?> applyToIds = const Value.absent(),
                 required DateTime startDate,
                 required DateTime endDate,
                 Value<String?> startTime = const Value.absent(),

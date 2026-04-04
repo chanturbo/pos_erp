@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
 import 'package:pos_erp/shared/widgets/pagination_bar.dart';
 import '../providers/product_provider.dart';
@@ -8,6 +9,8 @@ import 'product_form_page.dart';
 import 'product_pdf_report.dart'; // ✅ PDF report
 import '../../../../shared/pdf/pdf_report_button.dart';
 import '../../../../features/settings/presentation/pages/settings_page.dart';
+import '../../../../features/inventory/presentation/providers/stock_provider.dart';
+import '../../../../features/inventory/data/models/stock_balance_model.dart';
 
 class ProductListPage extends ConsumerStatefulWidget {
   const ProductListPage({super.key});
@@ -169,6 +172,7 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
   @override
   Widget build(BuildContext context) {
     final productAsync = ref.watch(productListProvider);
+    final stockAsync   = ref.watch(stockBalanceProvider);
     final pageSize = ref.watch(settingsProvider).listPageSize;
 
     return Scaffold(
@@ -198,8 +202,8 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
             },
           ),
 
-          // ── Summary chips ────────────────────────────────────
-          _buildSummaryBar(productAsync),
+          // ── Summary chips + financial bar ────────────────────
+          _buildSummaryBar(productAsync, stockAsync),
 
           // ── Content ─────────────────────────────────────────
           Expanded(
@@ -232,7 +236,27 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
                         emptyMessage: 'ไม่มีข้อมูลสินค้า',
                         title:    'รายงานสินค้า',
                         filename: () => PdfFilename.generate('product_report'),
-                        buildPdf: () => ProductPdfBuilder.build(filtered),
+                        buildPdf: () {
+                          // คำนวณ stockMap จาก stockAsync ที่ capture ไว้
+                          final stocks = stockAsync.value ?? [];
+                          final stockMap = <String, double>{};
+                          for (final s in stocks) {
+                            stockMap[s.productId] =
+                                (stockMap[s.productId] ?? 0) + s.balance;
+                          }
+                          double cost = 0, selling = 0;
+                          for (final p in filtered) {
+                            final qty = stockMap[p.productId] ?? 0;
+                            cost    += p.standardCost * qty;
+                            selling += p.priceLevel1  * qty;
+                          }
+                          return ProductPdfBuilder.build(
+                            List<ProductModel>.from(filtered),
+                            totalCost:    cost,
+                            totalSelling: selling,
+                            totalProfit:  selling - cost,
+                          );
+                        },
                         hasData:  filtered.isNotEmpty,
                       ),
                     ),
@@ -247,27 +271,79 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // Summary Bar — แถว chips สรุปจำนวน
+  // Summary Bar — chips จำนวน + แถวมูลค่าสินค้าคลัง
   // ─────────────────────────────────────────────────────────────
-  Widget _buildSummaryBar(AsyncValue productAsync) {
+  Widget _buildSummaryBar(
+    AsyncValue productAsync,
+    AsyncValue<List<StockBalanceModel>> stockAsync,
+  ) {
     return productAsync.maybeWhen(
       data: (products) {
         final all      = products as List<ProductModel>;
         final filtered = _filter(all);
+
+        // สร้าง stockMap: productId → ยอดรวมทุก warehouse
+        final stockMap = <String, double>{};
+        stockAsync.whenData((stocks) {
+          for (final s in stocks) {
+            stockMap[s.productId] = (stockMap[s.productId] ?? 0) + s.balance;
+          }
+        });
+
+        // คำนวณมูลค่าจากสินค้าที่ filter แล้ว
+        double totalCost    = 0;
+        double totalSelling = 0;
+        for (final p in filtered) {
+          final qty = stockMap[p.productId] ?? 0;
+          totalCost    += p.standardCost * qty;
+          totalSelling += p.priceLevel1   * qty;
+        }
+        final profit = totalSelling - totalCost;
+
         return Container(
           color: Colors.white,
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _SummaryChip('ทั้งหมด', all.length, AppTheme.navy),
-              const SizedBox(width: 8),
-              _SummaryChip('กรองแล้ว', filtered.length, AppTheme.primaryDark),
-              const SizedBox(width: 8),
-              _SummaryChip('ใช้งาน',
-                  all.where((p) => p.isActive).length, AppTheme.success),
-              const SizedBox(width: 8),
-              _SummaryChip('ปิดใช้',
-                  all.where((p) => !p.isActive).length, AppTheme.error),
+              // แถว 1 — จำนวน
+              Row(
+                children: [
+                  _SummaryChip('ทั้งหมด', all.length, AppTheme.navy),
+                  const SizedBox(width: 8),
+                  _SummaryChip('กรองแล้ว', filtered.length, AppTheme.primaryDark),
+                  const SizedBox(width: 8),
+                  _SummaryChip('ใช้งาน',
+                      all.where((p) => p.isActive).length, AppTheme.success),
+                  const SizedBox(width: 8),
+                  _SummaryChip('ปิดใช้',
+                      all.where((p) => !p.isActive).length, AppTheme.error),
+                ],
+              ),
+              const SizedBox(height: 8),
+              // แถว 2 — มูลค่าสินค้าในคลัง (cost × stock, price × stock)
+              Row(
+                children: [
+                  _ValueStat(
+                    label: 'ต้นทุนรวม',
+                    value: totalCost,
+                    color: AppTheme.navy,
+                  ),
+                  const SizedBox(width: 8),
+                  _ValueStat(
+                    label: 'มูลค่าขาย',
+                    value: totalSelling,
+                    color: AppTheme.primaryDark,
+                  ),
+                  const SizedBox(width: 8),
+                  _ValueStat(
+                    label: profit >= 0 ? 'กำไรคาดการณ์' : 'ขาดทุนคาดการณ์',
+                    value: profit.abs(),
+                    color: profit >= 0 ? AppTheme.success : AppTheme.error,
+                    sign: profit >= 0 ? '+' : '-',
+                  ),
+                ],
+              ),
             ],
           ),
         );
@@ -1442,6 +1518,50 @@ class _ActionIconBtn extends StatelessWidget {
       );
 }
 
+
+// ── มูลค่าสินค้า (ต้นทุน / ราคาขาย / กำไร) ──────────────────────────────────
+class _ValueStat extends StatelessWidget {
+  final String label;
+  final double value;
+  final Color  color;
+  final String sign;
+
+  const _ValueStat({
+    required this.label,
+    required this.value,
+    required this.color,
+    this.sign = '',
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final fmt = NumberFormat('#,##0.00');
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.22)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label,
+              style: TextStyle(fontSize: 10, color: color)),
+          const SizedBox(height: 1),
+          Text(
+            '$sign฿${fmt.format(value)}',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _SummaryChip extends StatelessWidget {
   final String label;

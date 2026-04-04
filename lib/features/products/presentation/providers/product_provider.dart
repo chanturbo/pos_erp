@@ -232,3 +232,49 @@ class ProductListNotifier extends AsyncNotifier<List<ProductModel>> {
     }
   }
 }
+
+// ─────────────────────────────────────────────────────────────
+// ProductGroupModel
+// ─────────────────────────────────────────────────────────────
+class ProductGroupModel {
+  final String groupId;
+  final String groupCode;
+  final String groupName;
+
+  const ProductGroupModel({
+    required this.groupId,
+    required this.groupCode,
+    required this.groupName,
+  });
+
+  factory ProductGroupModel.fromJson(Map<String, dynamic> json) =>
+      ProductGroupModel(
+        groupId: json['group_id'] as String,
+        groupCode: json['group_code'] as String,
+        groupName: json['group_name'] as String,
+      );
+}
+
+// ─────────────────────────────────────────────────────────────
+// productGroupsProvider — ดึง product groups ทั้งหมด
+// ─────────────────────────────────────────────────────────────
+final productGroupsProvider =
+    FutureProvider<List<ProductGroupModel>>((ref) async {
+  try {
+    final authState = ref.watch(authProvider);
+    if (authState.isRestoring || !authState.isAuthenticated) return [];
+    final api = ref.read(apiClientProvider);
+    final res = await api.get('/api/products/groups');
+    if (res.statusCode == 200 && res.data != null) {
+      final list = res.data['data'] as List;
+      return list
+          .map((j) =>
+              ProductGroupModel.fromJson(j as Map<String, dynamic>))
+          .toList();
+    }
+    return [];
+  } catch (e) {
+    print('❌ Error loading product groups: $e');
+    return [];
+  }
+});

@@ -28,10 +28,11 @@ class StockRoutes {
   Future<Response> _getStockBalanceHandler(Request request) async {
     try {
       final query = '''
-        SELECT 
+        SELECT
           p.product_id,
           p.product_code,
           p.product_name,
+          p.barcode,
           p.base_unit,
           w.warehouse_id,
           w.warehouse_name,
@@ -54,6 +55,7 @@ class StockRoutes {
               'product_id': row.read<String>('product_id'),
               'product_code': row.read<String>('product_code'),
               'product_name': row.read<String>('product_name'),
+              'barcode': row.readNullable<String>('barcode'),
               'base_unit': row.read<String>('base_unit'),
               'warehouse_id': row.read<String>('warehouse_id'),
               'warehouse_name': row.read<String>('warehouse_name'),

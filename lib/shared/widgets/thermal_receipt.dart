@@ -36,6 +36,18 @@ class ReceiptCoupon {
   });
 }
 
+class ReceiptFreeItem {
+  final String name;
+  final double quantity;
+  final String? promotionName;
+
+  const ReceiptFreeItem({
+    required this.name,
+    required this.quantity,
+    this.promotionName,
+  });
+}
+
 // ─────────────────────────────────────────────────────────────────
 // ThermalReceiptWidget
 // ─────────────────────────────────────────────────────────────────
@@ -48,7 +60,8 @@ class ThermalReceiptWidget extends StatelessWidget {
   final String         orderNo;
   final String         orderDate;
   final String?        customerName;
-  final List<ReceiptItem>   items;
+  final List<ReceiptItem>     items;
+  final List<ReceiptFreeItem> freeItems;
   final double         subtotal;
   final double         discount;
   final List<ReceiptCoupon> coupons;
@@ -80,6 +93,7 @@ class ThermalReceiptWidget extends StatelessWidget {
     required this.changeAmount,
     required this.numFmt,
     this.customerName,
+    this.freeItems     = const [],
     this.coupons       = const [],
     this.earnedPoints  = 0,
     this.pointsUsed    = 0,
@@ -183,6 +197,55 @@ class ThermalReceiptWidget extends StatelessWidget {
                         ],
                       ),
                     )),
+                // ── จำนวนรายการ ──────────────────────────────
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    'รวม ${items.length} รายการ',
+                    style: _monoSm,
+                  ),
+                ),
+
+                // ── สินค้าแถมฟรี (BUY_X_GET_Y) ─────────────────
+                if (freeItems.isNotEmpty) ...[
+                  _dashed(),
+                  Row(
+                    children: const [
+                      Icon(Icons.card_giftcard, size: 13, color: Colors.green),
+                      SizedBox(width: 4),
+                      Text('ของแถมฟรี',
+                          style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green)),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  ...freeItems.map((item) => Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: Row(
+                          children: [
+                            const Text('  🎁 ',
+                                style: TextStyle(fontSize: 12)),
+                            Expanded(
+                              child: Text(item.name,
+                                  style: const TextStyle(
+                                      fontFamily: 'monospace',
+                                      fontSize: 12,
+                                      color: Colors.green)),
+                            ),
+                            Text(
+                              'x${item.quantity.toStringAsFixed(0)}  ฿0.00',
+                              style: const TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 12,
+                                  color: Colors.green),
+                            ),
+                          ],
+                        ),
+                      )),
+                ],
 
                 _dashed(),
 

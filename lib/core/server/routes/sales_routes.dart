@@ -83,6 +83,42 @@ class SalesRoutes {
         db.salesOrderItems,
       )..where((t) => t.orderId.equals(id))).get();
 
+      // ── Fetch promotion names for free items ──────────────────────
+      final promoIds = items
+          .map((i) => i.promotionId)
+          .whereType<String>()
+          .toSet()
+          .toList();
+
+      final promoMap = <String, String>{};
+      if (promoIds.isNotEmpty) {
+        final promos = await (db.select(db.promotions)
+              ..where((t) => t.promotionId.isIn(promoIds)))
+            .get();
+        for (final p in promos) {
+          promoMap[p.promotionId] = p.promotionName;
+        }
+      }
+
+      // ── Build coupon_promotion_names map ──────────────────────────
+      final couponCodes = order.couponCodes != null
+          ? (jsonDecode(order.couponCodes!) as List)
+              .map((e) => e.toString())
+              .toList()
+          : <String>[];
+
+      final couponPromoNames = <String, String>{};
+      for (final code in couponCodes) {
+        final coupon = await (db.select(db.coupons)
+              ..where((t) => t.couponCode.equals(code)))
+            .getSingleOrNull();
+        if (coupon != null) {
+          final name = promoMap[coupon.promotionId] ??
+              await _getPromotionName(coupon.promotionId);
+          if (name != null) couponPromoNames[code] = name;
+        }
+      }
+
       return Response.ok(
         jsonEncode({
           'success': true,
@@ -95,9 +131,9 @@ class SalesRoutes {
             'subtotal': order.subtotal,
             'discount_amount': order.discountAmount,
             'coupon_discount': order.couponDiscount,
-            'coupon_codes': order.couponCodes != null
-                ? jsonDecode(order.couponCodes!)
-                : null,
+            'coupon_codes': couponCodes.isEmpty ? null : couponCodes,
+            'coupon_promotion_names':
+                couponPromoNames.isEmpty ? null : couponPromoNames,
             'total_amount': order.totalAmount,
             'payment_type': order.paymentType,
             'paid_amount': order.paidAmount,
@@ -105,18 +141,21 @@ class SalesRoutes {
             'points_used': order.pointsUsed,
             'status': order.status,
             'items': items
-                .map(
-                  (i) => {
-                    'item_id': '${i.orderId}_${i.lineNo}',
-                    'order_id': i.orderId,
-                    'product_id': i.productId,
-                    'product_code': i.productCode,
-                    'product_name': i.productName,
-                    'quantity': i.quantity,
-                    'unit_price': i.unitPrice,
-                    'amount': i.amount,
-                  },
-                )
+                .map((i) => {
+                      'item_id': '${i.orderId}_${i.lineNo}',
+                      'order_id': i.orderId,
+                      'product_id': i.productId,
+                      'product_code': i.productCode,
+                      'product_name': i.productName,
+                      'quantity': i.quantity,
+                      'unit_price': i.unitPrice,
+                      'amount': i.amount,
+                      'is_free_item': i.isFreeItem,
+                      'promotion_id': i.promotionId,
+                      'promotion_name': i.promotionId != null
+                          ? promoMap[i.promotionId]
+                          : null,
+                    })
                 .toList(),
           },
         }),
@@ -128,6 +167,13 @@ class SalesRoutes {
         body: jsonEncode({'success': false, 'message': 'เกิดข้อผิดพลาด: $e'}),
       );
     }
+  }
+
+  Future<String?> _getPromotionName(String promotionId) async {
+    final promo = await (db.select(db.promotions)
+          ..where((t) => t.promotionId.equals(promotionId)))
+        .getSingleOrNull();
+    return promo?.promotionName;
   }
 
   /// POST /api/sales - สร้างใบขายใหม่
@@ -242,6 +288,9 @@ class SalesRoutes {
                 couponCodes: Value(data['coupon_codes'] != null
                     ? jsonEncode(data['coupon_codes'])
                     : null),
+                promotionIds: Value(data['promotion_ids'] != null
+                    ? jsonEncode(data['promotion_ids'])
+                    : null),
                 pointsUsed: Value((data['points_used'] as num?)?.toInt() ?? 0),
                 amountBeforeVat: Value((data['amount_before_vat'] as num?)?.toDouble() ?? 0),
                 vatAmount: Value((data['vat_amount'] as num?)?.toDouble() ?? 0),
@@ -303,9 +352,89 @@ class SalesRoutes {
             print('✅ Stock movement: $movementNo (-$quantity)');
           }
         }
+
+        // --- Insert Free Items (BUY_X_GET_Y) + Stock Movements ---
+        final freeItemsList = data['free_items'] as List? ?? [];
+        for (var i = 0; i < freeItemsList.length; i++) {
+          final item = freeItemsList[i] as Map<String, dynamic>;
+          final lineNo = items.length + i + 1;
+          final itemId = '${orderId}_F$lineNo';
+          final productId = item['product_id'] as String;
+          final quantity = (item['quantity'] as num).toDouble();
+          final promoId = item['promotion_id'] as String?;
+
+          await db.into(db.salesOrderItems).insert(
+                SalesOrderItemsCompanion(
+                  itemId: Value(itemId),
+                  orderId: Value(orderId),
+                  lineNo: Value(lineNo),
+                  productId: Value(productId),
+                  productCode: Value(item['product_code'] as String),
+                  productName: Value(item['product_name'] as String),
+                  unit: Value(item['unit'] as String),
+                  quantity: Value(quantity),
+                  unitPrice: const Value(0),
+                  discountPercent: const Value(0),
+                  discountAmount: const Value(0),
+                  amount: const Value(0),
+                  warehouseId: Value(warehouseId),
+                  isFreeItem: const Value(true),
+                  promotionId: Value(promoId),
+                ),
+              );
+
+          final product = await (db.select(db.products)
+                ..where((t) => t.productId.equals(productId)))
+              .getSingleOrNull();
+
+          if (product != null && product.isStockControl) {
+            final movementNo = 'SM-$datePart-$ts-F$lineNo';
+            await db.into(db.stockMovements).insert(
+                  StockMovementsCompanion(
+                    movementId: Value(itemId),
+                    movementNo: Value(movementNo),
+                    movementDate: Value(now),
+                    movementType: const Value('SALE'),
+                    productId: Value(productId),
+                    warehouseId: Value(warehouseId),
+                    userId: Value(userId),
+                    quantity: Value(-quantity),
+                    referenceNo: Value(orderNo),
+                    remark: const Value('สินค้าแถมฟรี'),
+                  ),
+                );
+            print('✅ Free item stock movement: $movementNo (-$quantity)');
+          }
+        }
       });
 
       print('✅ Transaction committed: $orderNo');
+
+      // ── Increment currentUses for applied promotions ────────────
+      final promotionIdList = data['promotion_ids'] as List? ?? [];
+      final custIdForUsage = data['customer_id'] as String?;
+      for (final promoId in promotionIdList) {
+        if (promoId is String && promoId.isNotEmpty) {
+          await db.customUpdate(
+            'UPDATE promotions SET current_uses = current_uses + 1 WHERE promotion_id = ?',
+            variables: [Variable.withString(promoId)],
+          );
+          // บันทึกประวัติการใช้งานโปรโมชั่น
+          final usageId = 'PU-$ts-$promoId';
+          await db.into(db.promotionUsages).insertOnConflictUpdate(
+            PromotionUsagesCompanion(
+              usageId:       Value(usageId),
+              promotionId:   Value(promoId),
+              orderId:       Value(orderId),
+              customerId:    Value(custIdForUsage != null &&
+                  custIdForUsage != 'WALK_IN' &&
+                  custIdForUsage.isNotEmpty ? custIdForUsage : null),
+              discountAmount: const Value(0), // BUY_X_GET_Y ไม่มีตัวเลขส่วนลด
+            ),
+          );
+          print('✅ Promotion $promoId usage incremented');
+        }
+      }
 
       // ✅ จัดการ loyalty points (นอก transaction เพราะไม่ต้อง rollback)
       final customerId = data['customer_id'] as String?;

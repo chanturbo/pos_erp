@@ -35,9 +35,14 @@ const _kError   = PdfColor.fromInt(0xFFB71C1C);
 // ProductPdfBuilder — สร้าง pw.Document เท่านั้น
 // ─────────────────────────────────────────────────────────────────
 class ProductPdfBuilder {
+  static final _money = NumberFormat('#,##0.00');
+
   static Future<pw.Document> build(
     List<ProductModel> products, {
-    String companyName = 'DEE POS',
+    String  companyName  = 'DEE POS',
+    double? totalCost,
+    double? totalSelling,
+    double? totalProfit,
   }) async {
     final doc = pw.Document(
       title: 'รายงานรายการสินค้า',
@@ -51,6 +56,17 @@ class ProductPdfBuilder {
     final activeCount = products.where((p) => p.isActive).length;
     final summaryLine =
         'ทั้งหมด ${products.length} รายการ   ใช้งาน $activeCount รายการ   ไม่ใช้งาน ${products.length - activeCount} รายการ';
+
+    // Financial summary widget (แสดงทุกหน้า)
+    final financialRow = (totalCost != null && totalSelling != null && totalProfit != null)
+        ? _buildFinancialRow(
+            totalCost:    totalCost,
+            totalSelling: totalSelling,
+            totalProfit:  totalProfit,
+            ttf:          ttf,
+            ttfRegular:   ttfRegular,
+          )
+        : null;
 
     // แบ่ง page (38 rows/page — portrait A4)
     const rowsPerPage = 38;
@@ -76,14 +92,15 @@ class ProductPdfBuilder {
             crossAxisAlignment: pw.CrossAxisAlignment.stretch,
             children: [
               _buildPageHeader(
-                companyName:  companyName,
-                reportTitle:  'รายงานรายการสินค้า',
-                printedAt:    printedAt,
-                page:         pageIdx + 1,
-                totalPages:   totalPages,
-                ttf:          ttf,
-                ttfRegular:   ttfRegular,
-                summaryLine:  summaryLine,
+                companyName:   companyName,
+                reportTitle:   'รายงานรายการสินค้า',
+                printedAt:     printedAt,
+                page:          pageIdx + 1,
+                totalPages:    totalPages,
+                ttf:           ttf,
+                ttfRegular:    ttfRegular,
+                summaryLine:   summaryLine,
+                financialRow:  financialRow,
               ),
               _buildTable(pageProducts,
                   startNo: startNo, ttf: ttf, ttfRegular: ttfRegular),
@@ -100,15 +117,16 @@ class ProductPdfBuilder {
 
   // ── Page Header ───────────────────────────────────────────────
   static pw.Widget _buildPageHeader({
-    required String  companyName,
-    required String  reportTitle,
-    required String  printedAt,
-    required int     page,
-    required int     totalPages,
-    required pw.Font ttf,
-    required pw.Font ttfRegular,
-    String?          subtitle,
-    String?          summaryLine,
+    required String   companyName,
+    required String   reportTitle,
+    required String   printedAt,
+    required int      page,
+    required int      totalPages,
+    required pw.Font  ttf,
+    required pw.Font  ttfRegular,
+    String?           subtitle,
+    String?           summaryLine,
+    pw.Widget?        financialRow,
   }) {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.stretch,
@@ -146,10 +164,63 @@ class ProductPdfBuilder {
                 style: pw.TextStyle(font: ttfRegular, fontSize: 8, color: _kSub)),
           ),
         ],
+        if (financialRow != null) ...[
+          pw.SizedBox(height: 5),
+          financialRow,
+        ],
         pw.SizedBox(height: 6),
         pw.Container(height: 0.5, color: _kBorder),
         pw.SizedBox(height: 6),
       ],
+    );
+  }
+
+  // ── Financial Summary Row ─────────────────────────────────────
+  static pw.Widget _buildFinancialRow({
+    required double  totalCost,
+    required double  totalSelling,
+    required double  totalProfit,
+    required pw.Font ttf,
+    required pw.Font ttfRegular,
+  }) {
+    final profitColor = totalProfit >= 0 ? _kSuccess : _kError;
+    final profitSign  = totalProfit >= 0 ? '+' : '-';
+
+    pw.Widget cell(String label, String value, PdfColor valueColor) =>
+        pw.Expanded(
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.center,
+            children: [
+              pw.Text(label,
+                  style: pw.TextStyle(font: ttfRegular, fontSize: 8, color: _kSub)),
+              pw.SizedBox(height: 2),
+              pw.Text(value,
+                  style: pw.TextStyle(font: ttf, fontSize: 10, color: valueColor)),
+            ],
+          ),
+        );
+
+    return pw.Container(
+      padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: pw.BoxDecoration(
+        color: const PdfColor.fromInt(0xFFF5F5F5),
+        border: pw.Border.all(color: _kBorder, width: 0.5),
+        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(3)),
+      ),
+      child: pw.Row(
+        children: [
+          cell('ต้นทุนรวม',
+              '฿${_money.format(totalCost)}', _kSub),
+          pw.Container(width: 0.5, height: 28, color: _kBorder),
+          cell('มูลค่าขาย',
+              '฿${_money.format(totalSelling)}',
+              const PdfColor.fromInt(0xFF1565C0)),
+          pw.Container(width: 0.5, height: 28, color: _kBorder),
+          cell('กำไรคาดการณ์',
+              '$profitSign฿${_money.format(totalProfit.abs())}',
+              profitColor),
+        ],
+      ),
     );
   }
 

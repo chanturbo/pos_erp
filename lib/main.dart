@@ -7,6 +7,7 @@ import 'package:flutter_localizations/flutter_localizations.dart'; // ✅ เพ
 import 'package:drift/drift.dart' hide Column;
 import 'package:intl/date_symbol_data_local.dart';
 import 'core/config/app_mode.dart';
+import 'core/navigation/navigator_key.dart';
 import 'shared/theme/app_theme.dart';
 import 'shared/theme/theme_provider.dart'; // 🌙
 import 'routes/app_router.dart';
@@ -111,7 +112,8 @@ class MyApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final themeMode = ref.watch(themeModeProvider); // 🌙
+    final themeMode    = ref.watch(themeModeProvider);   // 🌙
+    final navigatorKey = ref.watch(navigatorKeyProvider);
 
     return ScreenUtilInit(
       designSize: const Size(1920, 1080),
@@ -119,6 +121,7 @@ class MyApp extends ConsumerWidget {
       splitScreenMode: true,
       builder: (context, child) {
         return MaterialApp(
+          navigatorKey: navigatorKey,
           title: 'POS + ERP System',
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,  // 🌙

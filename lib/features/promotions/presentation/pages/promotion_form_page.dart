@@ -8,6 +8,8 @@ import 'package:intl/intl.dart';
 import '../providers/promotion_provider.dart';
 import '../../data/models/promotion_model.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
+import '../../../products/presentation/providers/product_provider.dart';
+import '../../../products/data/models/product_model.dart';
 
 class PromotionFormPage extends ConsumerStatefulWidget {
   final PromotionModel? promotion;
@@ -36,6 +38,12 @@ class _PromotionFormPageState extends ConsumerState<PromotionFormPage> {
   // State
   String _promotionType = 'DISCOUNT_PERCENT';
   String _applyTo = 'ALL';
+  List<String> _applyToIds = [];
+  /// cache: id → display name (ใช้แสดงใน chips)
+  final Map<String, String> _idToLabel = {};
+  /// BUY_X_GET_Y — สินค้าแถม (null = สินค้าเดิม)
+  String? _getProductId;
+  String? _getProductName;
   bool _isExclusive = false;
   bool _isActive = true;
   DateTime _startDate = DateTime.now();
@@ -85,10 +93,13 @@ class _PromotionFormPageState extends ConsumerState<PromotionFormPage> {
     if (p != null) {
       _promotionType = p.promotionType;
       _applyTo = p.applyTo;
+      _applyToIds = List<String>.from(p.applyToIds ?? []);
       _isExclusive = p.isExclusive;
       _isActive = p.isActive;
       _startDate = p.startDate;
       _endDate = p.endDate;
+      _getProductId = p.getProductId;
+      // _getProductName จะถูก resolve ในครั้งแรกที่เปิด selector หรือผ่าน cache
     }
   }
 
@@ -331,6 +342,48 @@ class _PromotionFormPageState extends ConsumerState<PromotionFormPage> {
                 ),
               ],
             ),
+            const SizedBox(height: 12),
+            // ── Free product picker ──────────────────────────────
+            Row(
+              children: [
+                const Icon(Icons.card_giftcard, size: 16, color: AppTheme.textSub),
+                const SizedBox(width: 8),
+                const Text('สินค้าแถม:',
+                    style: TextStyle(fontSize: 13, color: AppTheme.textSub)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _getProductName ?? 'สินค้าเดิมที่ซื้อ',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: _getProductId != null
+                          ? AppTheme.primaryColor
+                          : AppTheme.textSub,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                TextButton(
+                  onPressed: _openFreeProductSelector,
+                  child: Text(
+                    _getProductId != null ? 'เปลี่ยน' : 'เลือกสินค้าแถม',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ),
+                if (_getProductId != null)
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 16, color: AppTheme.textSub),
+                    tooltip: 'ใช้สินค้าเดิม',
+                    onPressed: () => setState(() {
+                      _getProductId = null;
+                      _getProductName = null;
+                    }),
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                  ),
+              ],
+            ),
           ] else if (_promotionType == 'FREE_ITEM') ...[
             _InfoBox(text: 'ของแถมฟรี — สามารถตั้งสินค้าแถมได้จากหน้าการขาย'),
           ],
@@ -363,19 +416,201 @@ class _PromotionFormPageState extends ConsumerState<PromotionFormPage> {
               ButtonSegment(value: 'CATEGORY', label: Text('หมวดหมู่')),
             ],
             selected: {_applyTo},
-            onSelectionChanged: (s) => setState(() => _applyTo = s.first),
+            onSelectionChanged: (s) => setState(() {
+              _applyTo = s.first;
+              _applyToIds = [];
+            }),
           ),
-          if (_applyTo != 'ALL') ...[
-            const SizedBox(height: 8),
-            _InfoBox(
-              text: _applyTo == 'PRODUCT'
-                  ? 'เลือกสินค้าที่ต้องการ (ยังไม่รองรับในเวอร์ชันนี้)'
-                  : 'เลือกหมวดหมู่ (ยังไม่รองรับในเวอร์ชันนี้)',
+          if (_applyTo == 'PRODUCT') ...[
+            const SizedBox(height: 12),
+            _buildSelectedChips(
+              ids: _applyToIds,
+              labelBuilder: (id) => _idToLabel[id] ?? id,
+              onRemove: (id) => setState(() => _applyToIds.remove(id)),
             ),
+            OutlinedButton.icon(
+              onPressed: _openProductSelector,
+              icon: const Icon(Icons.checklist, size: 18),
+              label: Text(_applyToIds.isEmpty
+                  ? 'เลือกสินค้า'
+                  : 'แก้ไขสินค้าที่เลือก (${_applyToIds.length})'),
+            ),
+            if (_applyToIds.isEmpty)
+              const Padding(
+                padding: EdgeInsets.only(top: 8),
+                child: Text('* กรุณาเลือกสินค้าอย่างน้อย 1 รายการ',
+                    style: TextStyle(color: AppTheme.errorColor, fontSize: 12)),
+              ),
+          ] else if (_applyTo == 'CATEGORY') ...[
+            const SizedBox(height: 12),
+            _buildSelectedChips(
+              ids: _applyToIds,
+              labelBuilder: (id) => _idToLabel[id] ?? id,
+              onRemove: (id) => setState(() => _applyToIds.remove(id)),
+            ),
+            OutlinedButton.icon(
+              onPressed: _openCategorySelector,
+              icon: const Icon(Icons.category_outlined, size: 18),
+              label: Text(_applyToIds.isEmpty
+                  ? 'เลือกหมวดหมู่'
+                  : 'แก้ไขหมวดหมู่ที่เลือก (${_applyToIds.length})'),
+            ),
+            if (_applyToIds.isEmpty)
+              const Padding(
+                padding: EdgeInsets.only(top: 8),
+                child: Text('* กรุณาเลือกหมวดหมู่อย่างน้อย 1 รายการ',
+                    style: TextStyle(color: AppTheme.errorColor, fontSize: 12)),
+              ),
           ],
         ],
       ),
     );
+  }
+
+  Widget _buildSelectedChips({
+    required List<String> ids,
+    required String Function(String id) labelBuilder,
+    required void Function(String id) onRemove,
+  }) {
+    if (ids.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 4,
+        children: ids.map((id) => Chip(
+          label: Text(labelBuilder(id), style: const TextStyle(fontSize: 12)),
+          deleteIcon: const Icon(Icons.close, size: 14),
+          onDeleted: () => onRemove(id),
+          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          visualDensity: VisualDensity.compact,
+        )).toList(),
+      ),
+    );
+  }
+
+  // ─── Product Selector ─────────────────────────────────────────────────────
+  Future<void> _openProductSelector() async {
+    // โหลดสินค้าถ้ายังไม่มี
+    List<ProductModel> allProducts =
+        ref.read(productListProvider).value ?? [];
+    if (allProducts.isEmpty) {
+      await ref
+          .read(productListProvider.notifier)
+          .refresh(activeOnly: true);
+      allProducts = ref.read(productListProvider).value ?? [];
+    }
+
+    if (!mounted) return;
+
+    final items = allProducts
+        .map((p) => _SelectableItem(
+              id: p.productId,
+              primaryText: p.productName,
+              secondaryText: p.productCode,
+            ))
+        .toList();
+
+    // อัปเดต cache ชื่อสินค้า เพื่อแสดงใน chips
+    for (final p in allProducts) {
+      _idToLabel[p.productId] = p.productName;
+    }
+
+    final selected = await showDialog<List<String>>(
+      context: context,
+      builder: (_) => _ItemSelectorDialog(
+        title: 'เลือกสินค้า',
+        searchHint: 'ค้นหาสินค้า...',
+        items: items,
+        selectedIds: List<String>.from(_applyToIds),
+      ),
+    );
+
+    if (selected != null) setState(() => _applyToIds = selected);
+  }
+
+  // ─── Category Selector ────────────────────────────────────────────────────
+  Future<void> _openCategorySelector() async {
+    final groupsAsync = ref.read(productGroupsProvider);
+    List<ProductGroupModel> allGroups = groupsAsync.value ?? [];
+    if (allGroups.isEmpty) {
+      // refresh
+      ref.invalidate(productGroupsProvider);
+      await ref.read(productGroupsProvider.future);
+      allGroups = ref.read(productGroupsProvider).value ?? [];
+    }
+
+    if (!mounted) return;
+
+    final items = allGroups
+        .map((g) => _SelectableItem(
+              id: g.groupId,
+              primaryText: g.groupName,
+              secondaryText: g.groupCode,
+            ))
+        .toList();
+
+    // อัปเดต cache ชื่อหมวดหมู่ เพื่อแสดงใน chips
+    for (final g in allGroups) {
+      _idToLabel[g.groupId] = g.groupName;
+    }
+
+    final selected = await showDialog<List<String>>(
+      context: context,
+      builder: (_) => _ItemSelectorDialog(
+        title: 'เลือกหมวดหมู่',
+        searchHint: 'ค้นหาหมวดหมู่...',
+        items: items,
+        selectedIds: List<String>.from(_applyToIds),
+      ),
+    );
+
+    if (selected != null) setState(() => _applyToIds = selected);
+  }
+
+  // ─── Free Product Selector (BUY_X_GET_Y) ────────────────────────────────
+  Future<void> _openFreeProductSelector() async {
+    List<ProductModel> allProducts =
+        ref.read(productListProvider).value ?? [];
+    if (allProducts.isEmpty) {
+      await ref.read(productListProvider.notifier).refresh(activeOnly: true);
+      allProducts = ref.read(productListProvider).value ?? [];
+    }
+
+    if (!mounted) return;
+
+    // อัปเดต cache ชื่อสินค้า
+    for (final p in allProducts) {
+      _idToLabel[p.productId] = p.productName;
+    }
+
+    final items = allProducts
+        .map((p) => _SelectableItem(
+              id: p.productId,
+              primaryText: p.productName,
+              secondaryText: p.productCode,
+            ))
+        .toList();
+
+    final selected = await showDialog<List<String>>(
+      context: context,
+      builder: (_) => _ItemSelectorDialog(
+        title: 'เลือกสินค้าแถม',
+        searchHint: 'ค้นหาสินค้า...',
+        items: items,
+        selectedIds: _getProductId != null ? [_getProductId!] : [],
+        singleSelect: true,
+      ),
+    );
+
+    if (selected != null) {
+      setState(() {
+        _getProductId = selected.isEmpty ? null : selected.first;
+        _getProductName = _getProductId != null
+            ? (_idToLabel[_getProductId!] ?? _getProductId)
+            : null;
+      });
+    }
   }
 
   // ─── Period ───────────────────────────────────────────────────────────────
@@ -519,8 +754,17 @@ class _PromotionFormPageState extends ConsumerState<PromotionFormPage> {
     if (!_formKey.currentState!.validate()) return;
     if (_endDate.isBefore(_startDate)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('วันสิ้นสุดต้องหลังวันเริ่มต้น')),
+        const SnackBar(content: Text('วันสิ้นสุดต้องหลังวันเริ่มต้น')),
+      );
+      return;
+    }
+    if (_applyTo != 'ALL' && _applyToIds.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_applyTo == 'PRODUCT'
+              ? 'กรุณาเลือกสินค้าอย่างน้อย 1 รายการ'
+              : 'กรุณาเลือกหมวดหมู่อย่างน้อย 1 รายการ'),
+        ),
       );
       return;
     }
@@ -545,8 +789,10 @@ class _PromotionFormPageState extends ConsumerState<PromotionFormPage> {
           double.tryParse(_maxDiscountCtrl.text),
       buyQty: int.tryParse(_buyQtyCtrl.text),
       getQty: int.tryParse(_getQtyCtrl.text),
+      getProductId: _promotionType == 'BUY_X_GET_Y' ? _getProductId : null,
       minAmount: double.tryParse(_minAmountCtrl.text) ?? 0,
       applyTo: _applyTo,
+      applyToIds: _applyTo == 'ALL' ? null : (_applyToIds.isEmpty ? null : List<String>.from(_applyToIds)),
       startDate: _startDate,
       endDate: _endDate,
       maxUses: int.tryParse(_maxUsesCtrl.text),
@@ -748,4 +994,218 @@ class _InfoBox extends StatelessWidget {
           ],
         ),
       );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// _SelectableItem — data class สำหรับ selector dialog
+// ─────────────────────────────────────────────────────────────────
+class _SelectableItem {
+  final String id;
+  final String primaryText;
+  final String? secondaryText;
+
+  const _SelectableItem({
+    required this.id,
+    required this.primaryText,
+    this.secondaryText,
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────
+// _ItemSelectorDialog — dialog เลือกรายการ (สินค้า / หมวดหมู่)
+// ─────────────────────────────────────────────────────────────────
+class _ItemSelectorDialog extends StatefulWidget {
+  final String title;
+  final String searchHint;
+  final List<_SelectableItem> items;
+  final List<String> selectedIds;
+  final bool singleSelect;
+
+  const _ItemSelectorDialog({
+    required this.title,
+    required this.searchHint,
+    required this.items,
+    required this.selectedIds,
+    this.singleSelect = false,
+  });
+
+  @override
+  State<_ItemSelectorDialog> createState() => _ItemSelectorDialogState();
+}
+
+class _ItemSelectorDialogState extends State<_ItemSelectorDialog> {
+  late List<String> _selected;
+  String _search = '';
+  late TextEditingController _searchCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = List<String>.from(widget.selectedIds);
+    _searchCtrl = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  List<_SelectableItem> get _filtered {
+    if (_search.isEmpty) return widget.items;
+    final q = _search.toLowerCase();
+    return widget.items.where((item) {
+      return item.primaryText.toLowerCase().contains(q) ||
+          (item.secondaryText?.toLowerCase().contains(q) ?? false);
+    }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = _filtered;
+    return AlertDialog(
+      title: Text(widget.title,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+      contentPadding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      content: SizedBox(
+        width: 420,
+        height: 480,
+        child: Column(
+          children: [
+            // Search bar
+            TextField(
+              controller: _searchCtrl,
+              decoration: InputDecoration(
+                hintText: widget.searchHint,
+                prefixIcon: const Icon(Icons.search, size: 18),
+                suffixIcon: _search.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, size: 16),
+                        onPressed: () => setState(() {
+                          _search = '';
+                          _searchCtrl.clear();
+                        }),
+                      )
+                    : null,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: AppTheme.border)),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                isDense: true,
+              ),
+              onChanged: (v) => setState(() => _search = v),
+            ),
+            const SizedBox(height: 8),
+            // Select all / count row (multi-select only)
+            if (!widget.singleSelect)
+              Row(
+                children: [
+                  TextButton(
+                    onPressed: filtered.isEmpty
+                        ? null
+                        : () => setState(
+                            () => _selected = filtered.map((e) => e.id).toList()),
+                    child: const Text('เลือกทั้งหมด',
+                        style: TextStyle(fontSize: 12)),
+                  ),
+                  TextButton(
+                    onPressed: _selected.isEmpty
+                        ? null
+                        : () => setState(() => _selected.clear()),
+                    child: const Text('ยกเลิกทั้งหมด',
+                        style: TextStyle(fontSize: 12)),
+                  ),
+                  const Spacer(),
+                  Text('เลือก ${_selected.length} รายการ',
+                      style: const TextStyle(
+                          fontSize: 12, color: AppTheme.textSub)),
+                ],
+              ),
+            const Divider(height: 1, color: AppTheme.border),
+            // List
+            Expanded(
+              child: filtered.isEmpty
+                  ? const Center(
+                      child: Text('ไม่พบรายการ',
+                          style: TextStyle(color: AppTheme.textSub)))
+                  : ListView.builder(
+                      itemCount: filtered.length,
+                      itemBuilder: (_, i) {
+                        final item = filtered[i];
+                        final checked = _selected.contains(item.id);
+                        if (widget.singleSelect) {
+                          final isSelected = _selected.isNotEmpty &&
+                              _selected.first == item.id;
+                          return ListTile(
+                            leading: Icon(
+                              isSelected
+                                  ? Icons.radio_button_checked
+                                  : Icons.radio_button_off,
+                              color: isSelected
+                                  ? AppTheme.primaryColor
+                                  : AppTheme.textSub,
+                              size: 20,
+                            ),
+                            title: Text(item.primaryText,
+                                style: const TextStyle(fontSize: 13)),
+                            subtitle: item.secondaryText != null
+                                ? Text(item.secondaryText!,
+                                    style: const TextStyle(
+                                        fontSize: 11,
+                                        color: AppTheme.textSub))
+                                : null,
+                            dense: true,
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 4),
+                            onTap: () {
+                              Navigator.pop(context, [item.id]);
+                            },
+                          );
+                        }
+                        return CheckboxListTile(
+                          value: checked,
+                          onChanged: (v) => setState(() {
+                            if (v == true) {
+                              _selected.add(item.id);
+                            } else {
+                              _selected.remove(item.id);
+                            }
+                          }),
+                          title: Text(item.primaryText,
+                              style: const TextStyle(fontSize: 13)),
+                          subtitle: item.secondaryText != null
+                              ? Text(item.secondaryText!,
+                                  style: const TextStyle(
+                                      fontSize: 11,
+                                      color: AppTheme.textSub))
+                              : null,
+                          activeColor: AppTheme.primaryColor,
+                          controlAffinity: ListTileControlAffinity.leading,
+                          dense: true,
+                          contentPadding:
+                              const EdgeInsets.symmetric(horizontal: 4),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('ยกเลิก'),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context, _selected),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppTheme.primaryColor,
+            foregroundColor: Colors.white,
+          ),
+          child: Text('ยืนยัน (${_selected.length})'),
+        ),
+      ],
+    );
+  }
 }

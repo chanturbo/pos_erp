@@ -9,6 +9,7 @@ import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/responsive_utils.dart';
 
 class DashboardPage extends ConsumerWidget {
+  final VoidCallback? onGoToPos;
   final VoidCallback? onGoToProducts;
   final VoidCallback? onGoToCustomers;
   final VoidCallback? onGoToSalesHistory;
@@ -17,6 +18,7 @@ class DashboardPage extends ConsumerWidget {
 
   const DashboardPage({
     super.key,
+    this.onGoToPos,
     this.onGoToProducts,
     this.onGoToCustomers,
     this.onGoToSalesHistory,
@@ -76,6 +78,7 @@ class DashboardPage extends ConsumerWidget {
         ),
         data: (stats) => _DashboardBody(
           stats: stats,
+          onGoToPos: onGoToPos,
           onGoToProducts: onGoToProducts,
           onGoToCustomers: onGoToCustomers,
           onGoToSalesHistory: onGoToSalesHistory,
@@ -91,6 +94,7 @@ class DashboardPage extends ConsumerWidget {
 // ─────────────────────────────────────────────────────────────────
 class _DashboardBody extends StatelessWidget {
   final DashboardStats stats;
+  final VoidCallback? onGoToPos;
   final VoidCallback? onGoToProducts;
   final VoidCallback? onGoToCustomers;
   final VoidCallback? onGoToSalesHistory;
@@ -98,6 +102,7 @@ class _DashboardBody extends StatelessWidget {
 
   const _DashboardBody({
     required this.stats,
+    this.onGoToPos,
     this.onGoToProducts,
     this.onGoToCustomers,
     this.onGoToSalesHistory,
@@ -121,6 +126,7 @@ class _DashboardBody extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(child: _QuickActionsCard(
+          onGoToPos: onGoToPos,
           onGoToProducts: onGoToProducts,
           onGoToCustomers: onGoToCustomers,
           onGoToSalesHistory: onGoToSalesHistory,
@@ -132,6 +138,7 @@ class _DashboardBody extends StatelessWidget {
           ] else ...[
             // ── Mobile/Tablet: เมนูด่วนก่อน → Stats → Overview ─────────
             _QuickActionsCard(
+              onGoToPos: onGoToPos,
               onGoToProducts: onGoToProducts,
               onGoToCustomers: onGoToCustomers,
               onGoToSalesHistory: onGoToSalesHistory,
@@ -363,11 +370,13 @@ class _TodayCard extends StatelessWidget {
 // Quick Actions Card
 // ─────────────────────────────────────────────────────────────────
 class _QuickActionsCard extends StatelessWidget {
+  final VoidCallback? onGoToPos;
   final VoidCallback? onGoToProducts;
   final VoidCallback? onGoToCustomers;
   final VoidCallback? onGoToSalesHistory;
 
   const _QuickActionsCard({
+    this.onGoToPos,
     this.onGoToProducts,
     this.onGoToCustomers,
     this.onGoToSalesHistory,
@@ -380,7 +389,7 @@ class _QuickActionsCard extends StatelessWidget {
         icon: Icons.add_shopping_cart,
         label: 'เปิดจุดขาย',
         color: AppTheme.primaryColor,
-        onTap: () => Navigator.pushNamed(context, '/pos'),
+        onTap: onGoToPos ?? () => Navigator.pushNamed(context, '/pos'),
       ),
       _QuickAction(
         icon: Icons.add_box_outlined,

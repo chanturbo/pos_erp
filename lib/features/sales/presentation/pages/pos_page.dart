@@ -12,9 +12,10 @@ import '../widgets/hold_orders_dialog.dart';
 import '../../../../shared/services/mobile_scanner_service.dart'; // ✅ Phase 5
 import '../../../../shared/widgets/barcode_listener.dart';        // ✅ USB Scanner
 import '../../../../shared/theme/app_theme.dart';
-
 import '../../../../shared/utils/responsive_utils.dart';           // ✅ Responsive
 import '../../../../shared/widgets/cart_toast.dart';
+import '../../../promotions/data/models/promotion_model.dart';
+import '../../../promotions/presentation/providers/promotion_provider.dart';
 
 
 
@@ -34,11 +35,37 @@ class PosPage extends ConsumerStatefulWidget {
 class _PosPageState extends ConsumerState<PosPage> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  List<PromotionModel> _buyXGetYPromos = [];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadPromos());
+  }
 
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadPromos() async {
+    final promos = await ref.read(activePromotionsProvider.future);
+    if (!mounted) return;
+    setState(() {
+      _buyXGetYPromos =
+          promos.where((p) => p.promotionType == 'BUY_X_GET_Y').toList();
+    });
+    _syncFreeItems();
+  }
+
+  void _syncFreeItems() {
+    if (_buyXGetYPromos.isEmpty) {
+      ref.read(cartProvider.notifier).syncFreeItems([], []);
+      return;
+    }
+    final products = ref.read(productListProvider).value ?? [];
+    ref.read(cartProvider.notifier).syncFreeItems(_buyXGetYPromos, products);
   }
 
   // ── Logout (Cashier Mode) ────────────────────────────────────
@@ -93,6 +120,26 @@ class _PosPageState extends ConsumerState<PosPage> {
 
   @override
   Widget build(BuildContext context) {
+    // ฟัง cart changes → คำนวณของแถมใหม่เมื่อ regular items เปลี่ยน
+    ref.listen<CartState>(cartProvider, (prev, next) {
+      if (prev?.items != next.items) _syncFreeItems();
+    });
+
+    // ฟัง activePromotionsProvider → sync ทันทีเมื่อโปรโมชั่นถูก pause/resume
+    ref.listen<AsyncValue<List<PromotionModel>>>(
+      activePromotionsProvider,
+      (prev, next) {
+        next.whenData((promos) {
+          if (!mounted) return;
+          setState(() {
+            _buyXGetYPromos =
+                promos.where((p) => p.promotionType == 'BUY_X_GET_Y').toList();
+          });
+          _syncFreeItems();
+        });
+      },
+    );
+
     final productAsync    = ref.watch(productListProvider);
     final cartState       = ref.watch(cartProvider);
     final holdOrdersState = ref.watch(holdOrdersProvider);
@@ -103,15 +150,17 @@ class _PosPageState extends ConsumerState<PosPage> {
     final hasCustomer = cartState.customerId != null &&
         cartState.customerId != 'WALK_IN';
 
-    // ── Responsive: compact = tablet/mobile ─────────────────────
-    final isCompact = !context.isDesktopOrWider;
+    // ── Responsive ───────────────────────────────────────────────
+    // Desktop/Tablet (>=768px): grid + cart split
+    // Mobile (<768px): cart only
+    final isMobile = context.isMobile;
 
     return PopScope(
       canPop: !widget.isCashierMode,
       // ✅ BarcodeListener ครอบทั้งหน้า
       child: BarcodeListener(
         onBarcodeScanned: (barcode) {
-          if (isCompact) {
+          if (isMobile) {
             // Mobile: scan → set query แล้วเปิด sheet
             setState(() => _searchQuery = barcode);
             productAsync.whenData(
@@ -167,7 +216,7 @@ class _PosPageState extends ConsumerState<PosPage> {
 
             actions: [
               // ── Mobile: ปุ่ม Search เปิด bottom sheet ────────
-              if (isCompact)
+              if (isMobile)
                 productAsync.maybeWhen(
                   data: (products) => IconButton(
                     icon: const Icon(Icons.search),
@@ -178,7 +227,7 @@ class _PosPageState extends ConsumerState<PosPage> {
                 ),
 
               // ── Mobile: ScannerButton ────────────────────────
-              if (isCompact)
+              if (isMobile)
                 ScannerButton(
                   tooltip: 'สแกนบาร์โค้ด',
                   onScanned: (value) {
@@ -392,24 +441,26 @@ class _PosPageState extends ConsumerState<PosPage> {
                     Positioned(
                       right: 8,
                       top: 8,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(
-                          color: AppTheme.primary, // Orange แทน red
-                          shape: BoxShape.circle,
-                        ),
-                        constraints: const BoxConstraints(
-                          minWidth: 16,
-                          minHeight: 16,
-                        ),
-                        child: Text(
-                          '${holdOrdersState.orders.length}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
+                      child: IgnorePointer(
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: AppTheme.primary,
+                            shape: BoxShape.circle,
                           ),
-                          textAlign: TextAlign.center,
+                          constraints: const BoxConstraints(
+                            minWidth: 16,
+                            minHeight: 16,
+                          ),
+                          child: Text(
+                            '${holdOrdersState.orders.length}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
                         ),
                       ),
                     ),
@@ -419,9 +470,11 @@ class _PosPageState extends ConsumerState<PosPage> {
           ),
 
           // ── Body ─────────────────────────────────────────────
+          // Desktop/Tablet (>=768px): grid + cart split
+          // Mobile (<768px): cart only
           body: Stack(
             children: [
-              isCompact
+              isMobile
                   ? _buildCompactBody(cartState)
                   : _buildDesktopBody(productAsync, cartState),
               const CartToastOverlay(),
@@ -433,7 +486,7 @@ class _PosPageState extends ConsumerState<PosPage> {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // DESKTOP BODY — layout เดิมทุกอย่าง: Grid(60%) + Cart(40%)
+  // TABLET / DESKTOP BODY (>=768px): Grid(60%) + Cart(40%)
   // ─────────────────────────────────────────────────────────────
   Widget _buildDesktopBody(AsyncValue productAsync, CartState cartState) {
     return Column(
@@ -534,7 +587,7 @@ class _PosPageState extends ConsumerState<PosPage> {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // COMPACT BODY (Mobile/Tablet) — Cart เต็มหน้า
+  // MOBILE BODY (<768px) — Cart เต็มหน้า
   // Search/Scan อยู่ใน AppBar → เปิด bottom sheet
   // ─────────────────────────────────────────────────────────────
   Widget _buildCompactBody(CartState cartState) {
@@ -659,9 +712,13 @@ class _HoldButton extends ConsumerWidget {
                 ref.read(cartProvider.notifier).hold(result);
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content: Text('พักบิล: $result'),
+                    content: Text('พักบิล: $result',
+                        overflow: TextOverflow.ellipsis),
                     backgroundColor: AppTheme.primary,
                     behavior: SnackBarBehavior.floating,
+                    width: 240,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
                   ));
                 }
               }
@@ -745,6 +802,7 @@ class _ProductSearchSheetState
       productName: product.productName,
       unit: product.baseUnit,
       unitPrice: unitPrice,
+      groupId: product.groupId,
       // ✅ ส่งราคาทุก level เก็บไว้ใน CartItem เพื่อ re-price ได้
       priceLevel1: product.priceLevel1,
       priceLevel2: product.priceLevel2,

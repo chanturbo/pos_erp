@@ -28,7 +28,7 @@ class Promotions extends Table {
   RealColumn get minAmount => real().withDefault(const Constant(0))();
   RealColumn get minQty => real().withDefault(const Constant(0))();
   TextColumn get applyTo => text()();
-  TextColumn get applyToIds => text().nullable().map(const JsonConverter())();
+  TextColumn get applyToIds => text().nullable().map(const StringListConverter())();
   
   // Period
   DateTimeColumn get startDate => dateTime()();

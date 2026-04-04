@@ -47,6 +47,25 @@ class MobileScannerService {
     );
   }
 
+  /// scanAsSheet() — สแกนครั้งเดียวผ่าน bottom sheet (เหมือน POS)
+  /// เปิด _ScannerSheet แล้วปิดอัตโนมัติหลังสแกนสำเร็จครั้งแรก
+  static Future<ScanResult?> scanAsSheet(BuildContext context) async {
+    ScanResult? result;
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.35),
+      builder: (sheetCtx) => _ScannerSheet(
+        onScanned: (r) {
+          result = r;
+          Navigator.pop(sheetCtx);
+        },
+      ),
+    );
+    return result;
+  }
+
   /// openContinuous() — เปิดกล้องแบบ overlay (bottom sheet)
   /// มองเห็นหน้าตะกร้าด้านหลังได้ กด ✕ เพื่อปิด
   static Future<void> openContinuous(
@@ -677,25 +696,38 @@ class _CornerPainter extends CustomPainter {
 // ─────────────────────────────────────────
 // Scanner Button Widget
 // ─────────────────────────────────────────
-class ScannerButton extends StatelessWidget {
+class ScannerButton extends StatefulWidget {
   const ScannerButton({
     super.key,
     required this.onScanned,
     this.tooltip = 'สแกนบาร์โค้ด',
+    this.useSheet = false,
   });
 
   final ValueChanged<String> onScanned;
   final String tooltip;
+  /// true = bottom sheet style (เหมือน POS), false = full-screen
+  final bool useSheet;
 
+  @override
+  State<ScannerButton> createState() => _ScannerButtonState();
+}
+
+class _ScannerButtonState extends State<ScannerButton> {
   @override
   Widget build(BuildContext context) {
     return IconButton(
       icon: const Icon(Icons.qr_code_scanner),
-      tooltip: tooltip,
+      tooltip: widget.tooltip,
       onPressed: () async {
-        final result = await MobileScannerService.scan(context);
+        // สร้าง future ก่อน (ใช้ context แบบ sync) แล้วค่อย await
+        final future = widget.useSheet
+            ? MobileScannerService.scanAsSheet(context)
+            : MobileScannerService.scan(context);
+        final result = await future;
+        if (!mounted) return;
         if (result != null) {
-          onScanned(result.value);
+          widget.onScanned(result.value);
         }
       },
     );

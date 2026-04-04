@@ -38,10 +38,11 @@ class SalesOrders extends Table {
   RealColumn get vatAmount => real().withDefault(const Constant(0))();
   RealColumn get totalAmount => real().withDefault(const Constant(0))();
   
-  // Coupon
+  // Coupon & Promotion
   RealColumn get couponDiscount => real().withDefault(const Constant(0))();
   TextColumn get couponCodes => text().nullable()(); // JSON array e.g. '["CODE1","CODE2"]'
   IntColumn get pointsUsed => integer().withDefault(const Constant(0))();
+  TextColumn get promotionIds => text().nullable()(); // JSON array e.g. '["PROMO001"]'
 
   // Payment
   TextColumn get paymentType => text().withDefault(const Constant('CASH'))();
@@ -99,7 +100,11 @@ class SalesOrderItems extends Table {
   
   // Special Instructions
   TextColumn get specialInstructions => text().nullable()();
-  
+
+  // Promotion / Free item tracking
+  BoolColumn get isFreeItem => boolean().withDefault(const Constant(false))();
+  TextColumn get promotionId => text().nullable()(); // โปรโมชั่นที่ให้ของแถมนี้
+
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
   
   @override

@@ -5,6 +5,7 @@ import '../providers/promotion_provider.dart';
 import '../../data/models/promotion_model.dart';
 import 'promotion_form_page.dart';
 import 'coupon_list_page.dart';
+import 'promotion_usage_report_page.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
 import 'package:pos_erp/shared/widgets/pagination_bar.dart';
 import 'package:pos_erp/features/settings/presentation/pages/settings_page.dart';
@@ -123,6 +124,11 @@ class _PromotionListPageState extends ConsumerState<PromotionListPage> {
             onRefresh: () =>
                 ref.read(promotionListProvider.notifier).refresh(),
             onClearFilter: _hasFilter ? _clearFilters : null,
+            onReport: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => const PromotionUsageReportPage()),
+            ),
           ),
 
           // ── Filter Bar ──────────────────────────────────────
@@ -472,6 +478,7 @@ class _TopBar extends StatelessWidget {
   final VoidCallback onSearchCleared;
   final VoidCallback onRefresh;
   final VoidCallback? onClearFilter;
+  final VoidCallback onReport;
 
   const _TopBar({
     required this.searchController,
@@ -480,6 +487,7 @@ class _TopBar extends StatelessWidget {
     required this.onSearchChanged,
     required this.onSearchCleared,
     required this.onRefresh,
+    required this.onReport,
     this.onClearFilter,
   });
 
@@ -530,6 +538,14 @@ class _TopBar extends StatelessWidget {
           _ClearFilterBtn(onTap: onClearFilter!),
         const SizedBox(width: 6),
         _RefreshBtn(onTap: onRefresh),
+        const SizedBox(width: 6),
+        Tooltip(
+          message: 'รายงานการใช้งานโปรโมชั่น',
+          child: IconButton(
+            icon: const Icon(Icons.bar_chart, size: 20),
+            onPressed: onReport,
+          ),
+        ),
       ],
     );
   }

@@ -74,6 +74,9 @@ class _HomePageState extends ConsumerState<HomePage> {
             icon: Icons.dashboard,
             title: 'แดชบอร์ด',
             page: DashboardPage(
+              onGoToPos: () => context.hasPermanentSidebar
+                  ? _selectItem(1)
+                  : _push(context, const PosPage()),
               onGoToSalesHistory: () => context.hasPermanentSidebar
                   ? _selectItem(2)
                   : _push(context, const SalesHistoryPage()),
@@ -143,8 +146,9 @@ class _HomePageState extends ConsumerState<HomePage> {
     final nav = Navigator.of(context);
     if (nav.canPop()) nav.pop();
 
-    if (item.pushAsRoute) {
-      // Push เป็น route ใหม่ แทนที่จะ swap content
+    // บนหน้าจอใหญ่ (permanent sidebar) → swap content area เสมอ แม้ pushAsRoute = true
+    // บนมือถือ/แท็บเล็ต → push เป็น route ใหม่ตามเดิม
+    if (item.pushAsRoute && !context.hasPermanentSidebar) {
       _push(context, item.page);
     } else {
       setState(() {

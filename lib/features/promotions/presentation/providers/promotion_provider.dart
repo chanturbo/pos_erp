@@ -68,6 +68,8 @@ class PromotionNotifier extends AsyncNotifier<List<PromotionModel>> {
           data: promo.toJson());
       if (res.statusCode == 200) {
         await refresh();
+        // sync หน้า POS ให้รับรู้ทันที ว่าโปรโมชั่นนี้เปลี่ยนสถานะแล้ว
+        ref.invalidate(activePromotionsProvider);
         return true;
       }
       return false;
@@ -165,9 +167,14 @@ final couponListProvider =
 class CouponNotifier extends AsyncNotifier<CouponPageState> {
   static const int _defaultLimit = 50;
 
-  int _page    = 1;
-  String _status = 'ALL';
-  String _search = '';
+  int    _page         = 1;
+  String _status       = 'ALL';
+  String _search       = '';
+  String _expiresFrom  = '';
+  String _expiresTo    = '';
+  bool   _groupMode    = false;   // โหมดจัดกลุ่ม — โหลดทั้งหมด ไม่ paginate
+
+  bool get isGroupMode => _groupMode;
 
   @override
   Future<CouponPageState> build() async {
@@ -183,10 +190,12 @@ class CouponNotifier extends AsyncNotifier<CouponPageState> {
     try {
       final api = ref.read(apiClientProvider);
       final res = await api.get('/api/promotions/coupons', queryParameters: {
-        'page':   '$_page',
-        'limit':  '$_defaultLimit',
+        'page':   _groupMode ? '1' : '$_page',
+        'limit':  _groupMode ? '9999' : '$_defaultLimit',
         'status': _status,
         'search': _search,
+        if (_expiresFrom.isNotEmpty) 'expires_from': _expiresFrom,
+        if (_expiresTo.isNotEmpty)   'expires_to':   _expiresTo,
       });
       if (res.statusCode == 200 && res.data != null) {
         final d = res.data as Map<String, dynamic>;
@@ -224,10 +233,31 @@ class CouponNotifier extends AsyncNotifier<CouponPageState> {
     state = await AsyncValue.guard(_load);
   }
 
-  Future<void> applyFilter({required String status, required String search}) async {
-    _page   = 1;
-    _status = status;
-    _search = search;
+  Future<void> applyFilter({
+    required String status,
+    required String search,
+    String expiresFrom = '',
+    String expiresTo   = '',
+  }) async {
+    _page         = 1;
+    _status       = status;
+    _search       = search;
+    _expiresFrom  = expiresFrom;
+    _expiresTo    = expiresTo;
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(_load);
+  }
+
+  Future<void> enableGroupMode() async {
+    _groupMode = true;
+    _page      = 1;
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(_load);
+  }
+
+  Future<void> disableGroupMode() async {
+    _groupMode = false;
+    _page      = 1;
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(_load);
   }

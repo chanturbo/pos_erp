@@ -91,16 +91,33 @@ class _CartPanelState extends ConsumerState<CartPanel> {
 
           // ── Cart Items ───────────────────────────────────────
           Expanded(
-            child: cartState.items.isEmpty
+            child: cartState.items.isEmpty && cartState.freeItems.isEmpty
                 ? const _EmptyCart()
                 : ListView.builder(
                     controller: _scrollController,
                     padding: EdgeInsets.zero,
-                    itemCount: cartState.items.length,
-                    itemBuilder: (_, i) => _CartRow(
-                      item: cartState.items[i],
-                      isEven: i.isEven,
-                    ),
+                    itemCount: cartState.items.length +
+                        (cartState.hasFreeItems
+                            ? 1 + cartState.freeItems.length
+                            : 0),
+                    itemBuilder: (_, i) {
+                      // regular items
+                      if (i < cartState.items.length) {
+                        return _CartRow(
+                          item: cartState.items[i],
+                          isEven: i.isEven,
+                        );
+                      }
+                      // free items header
+                      if (i == cartState.items.length) {
+                        return _FreeItemsHeader(
+                            count: cartState.freeItems.length);
+                      }
+                      // free item rows
+                      final fi =
+                          cartState.freeItems[i - cartState.items.length - 1];
+                      return _FreeItemRow(item: fi);
+                    },
                   ),
           ),
 
@@ -247,6 +264,7 @@ class _ScanRowState extends ConsumerState<_ScanRow> {
       productName: match.productName,
       unit:        match.baseUnit,
       unitPrice:   match.priceLevel1,
+      groupId:     match.groupId,
     );
 
     // ล้าง field + focus กลับทันที (พร้อมสแกนชิ้นถัดไป)
@@ -685,6 +703,135 @@ class _QtyBtn extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(3),
         child: Icon(icon, size: 14, color: _navy),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Free Items Header
+// ─────────────────────────────────────────────────────────────────
+class _FreeItemsHeader extends StatelessWidget {
+  final int count;
+  const _FreeItemsHeader({required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE8F5E9),
+        border: Border(
+          top: BorderSide(color: Colors.green.shade200),
+          bottom: BorderSide(color: Colors.green.shade200),
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.card_giftcard, size: 14, color: Colors.green),
+          const SizedBox(width: 6),
+          Text(
+            'ของแถมฟรี ($count รายการ)',
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: Colors.green,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Free Item Row — แสดงของแถม (ไม่มี qty control, ไม่มีลบ)
+// ─────────────────────────────────────────────────────────────────
+class _FreeItemRow extends StatelessWidget {
+  final CartItem item;
+  const _FreeItemRow({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: const Color(0xFFF1FFF3),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+      child: Row(
+        children: [
+          // 🎁 icon แทน delete button
+          const SizedBox(
+            width: 28,
+            child: Icon(Icons.card_giftcard, size: 15, color: Colors.green),
+          ),
+
+          // ชื่อสินค้า
+          Expanded(
+            flex: 5,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  item.productName,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF1A1A1A),
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+                const Text(
+                  'ของแถมฟรี',
+                  style: TextStyle(fontSize: 10, color: Colors.green),
+                ),
+              ],
+            ),
+          ),
+
+          // จำนวน (แสดงอย่างเดียว ไม่มี +/-)
+          SizedBox(
+            width: 92,
+            child: Center(
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade50,
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: Colors.green.shade200),
+                ),
+                child: Text(
+                  'x${item.quantity.toStringAsFixed(0)}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green,
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // ราคา ฿0
+          const SizedBox(
+            width: 68,
+            child: Padding(
+              padding: EdgeInsets.only(right: 6),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  '฿0.00',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -19,6 +19,8 @@ class PromotionRoutes {
     // Promotions — specific routes ก่อน wildcard /<id>
     router.get('/', _getPromotionsHandler);
     router.get('/active', _getActivePromotionsHandler);
+    router.get('/usage', _getPromotionUsageHandler);
+    router.get('/usage/<id>/orders', _getPromotionUsageOrdersHandler);
     router.post('/', _createPromotionHandler);
     router.post('/apply', _applyPromotionHandler);
 
@@ -108,6 +110,78 @@ class PromotionRoutes {
     }
   }
 
+  // ─── GET /usage — สรุปการใช้งานโปรโมชั่น ─────────────────────────────────
+  Future<Response> _getPromotionUsageHandler(Request request) async {
+    try {
+      final promos = await (db.select(db.promotions)
+            ..orderBy([(p) => OrderingTerm.desc(p.currentUses)]))
+          .get();
+
+      final data = promos.map((p) => {
+            'promotion_id':   p.promotionId,
+            'promotion_code': p.promotionCode,
+            'promotion_name': p.promotionName,
+            'promotion_type': p.promotionType,
+            'current_uses':   p.currentUses,
+            'max_uses':       p.maxUses,
+            'is_active':      p.isActive,
+            'start_date':     p.startDate.toIso8601String(),
+            'end_date':       p.endDate.toIso8601String(),
+          }).toList();
+
+      return Response.ok(
+        jsonEncode({'success': true, 'data': data}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    } catch (e) {
+      return Response.internalServerError(
+        body: jsonEncode({'success': false, 'message': '$e'}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+  }
+
+  // ─── GET /usage/<id>/orders — รายการใบเสร็จ/ลูกค้าที่ใช้โปรโมชั่นนี้ ──────
+  Future<Response> _getPromotionUsageOrdersHandler(
+      Request request, String id) async {
+    try {
+      // join promotion_usages → sales_orders (order_no, order_date, customer_name, total)
+      final rows = await (db.select(db.promotionUsages)
+            ..where((u) => u.promotionId.equals(id))
+            ..orderBy([(u) => OrderingTerm.desc(u.usedAt)]))
+          .get();
+
+      final result = <Map<String, dynamic>>[];
+      for (final u in rows) {
+        final order = await (db.select(db.salesOrders)
+              ..where((o) => o.orderId.equals(u.orderId)))
+            .getSingleOrNull();
+
+        result.add({
+          'usage_id':      u.usageId,
+          'order_id':      u.orderId,
+          'order_no':      order?.orderNo ?? u.orderId,
+          'order_date':    order?.orderDate.toIso8601String() ?? u.usedAt.toIso8601String(),
+          'customer_id':   u.customerId,
+          'customer_name': order?.customerName ?? 'ลูกค้าทั่วไป',
+          'total_amount':  order?.totalAmount ?? 0,
+          'discount_amount': u.discountAmount,
+          'used_at':       u.usedAt.toIso8601String(),
+        });
+      }
+
+      return Response.ok(
+        jsonEncode({'success': true, 'data': result}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    } catch (e) {
+      return Response.internalServerError(
+        body: jsonEncode({'success': false, 'message': '$e'}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+  }
+
   // ─── GET /:id ─────────────────────────────────────────────────────────────
   Future<Response> _getPromotionHandler(Request request, String id) async {
     try {
@@ -159,7 +233,9 @@ class PromotionRoutes {
                 Value((data['min_amount'] as num?)?.toDouble() ?? 0),
             minQty: Value((data['min_qty'] as num?)?.toDouble() ?? 0),
             applyTo: Value(data['apply_to'] as String? ?? 'ALL'),
-            applyToIds: Value(data['apply_to_ids']),
+            applyToIds: Value(data['apply_to_ids'] != null
+                ? List<String>.from(data['apply_to_ids'] as List)
+                : null),
             startDate:
                 Value(DateTime.parse(data['start_date'] as String)),
             endDate: Value(DateTime.parse(data['end_date'] as String)),
@@ -217,7 +293,9 @@ class PromotionRoutes {
         minAmount: Value((data['min_amount'] as num?)?.toDouble() ?? 0),
         minQty: Value((data['min_qty'] as num?)?.toDouble() ?? 0),
         applyTo: Value(data['apply_to'] as String? ?? 'ALL'),
-        applyToIds: Value(data['apply_to_ids']),
+        applyToIds: Value(data['apply_to_ids'] != null
+            ? List<String>.from(data['apply_to_ids'] as List)
+            : null),
         startDate: Value(DateTime.parse(data['start_date'] as String)),
         endDate: Value(DateTime.parse(data['end_date'] as String)),
         startTime: Value(data['start_time'] as String?),
@@ -404,7 +482,8 @@ class PromotionRoutes {
   }
 
   // ─── GET /coupons ─────────────────────────────────────────────────────────
-  // Query params: page (int), limit (int), status (ALL|VALID|USED|EXPIRED), search (string)
+  // Query params: page (int), limit (int), status (ALL|VALID|USED|EXPIRED),
+  //               search (string), expires_from (ISO), expires_to (ISO)
   Future<Response> _getCouponsHandler(Request request) async {
     try {
       final params = request.url.queryParameters;
@@ -417,6 +496,14 @@ class PromotionRoutes {
 
       // Unix seconds ณ ปัจจุบัน (Drift เก็บเป็น seconds)
       final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+
+      // Parse expiry date range
+      final expiresFrom = params['expires_from'] != null
+          ? DateTime.tryParse(params['expires_from']!)
+          : null;
+      final expiresTo = params['expires_to'] != null
+          ? DateTime.tryParse(params['expires_to']!)
+          : null;
 
       // Build filter WHERE clause for paginated query
       final filterParts = <String>[];
@@ -435,6 +522,18 @@ class PromotionRoutes {
           filterParts.add(
               "c.is_used = 0 AND c.expires_at IS NOT NULL AND c.expires_at <= $nowSec");
           break;
+      }
+      if (expiresFrom != null || expiresTo != null) {
+        filterParts.add("c.expires_at IS NOT NULL");
+        if (expiresFrom != null) {
+          final sec = expiresFrom.millisecondsSinceEpoch ~/ 1000;
+          filterParts.add("c.expires_at >= $sec");
+        }
+        if (expiresTo != null) {
+          final endOfDay = DateTime(expiresTo.year, expiresTo.month, expiresTo.day, 23, 59, 59);
+          final sec = endOfDay.millisecondsSinceEpoch ~/ 1000;
+          filterParts.add("c.expires_at <= $sec");
+        }
       }
       final filterWhere =
           filterParts.isEmpty ? '' : 'WHERE ${filterParts.join(' AND ')}';
@@ -631,16 +730,46 @@ class PromotionRoutes {
   Future<Response> _useCouponHandler(Request request, String code) async {
     try {
       final payload = await request.readAsString();
-      final data = jsonDecode(payload) as Map<String, dynamic>;
+      final data    = jsonDecode(payload) as Map<String, dynamic>;
       final customerId = data['customer_id'] as String?;
+      final orderNo    = data['order_no']    as String?;
+      final now        = DateTime.now();
 
+      // หา coupon → promotionId
+      final coupon = await (db.select(db.coupons)
+            ..where((c) => c.couponCode.equals(code.toUpperCase())))
+          .getSingleOrNull();
+
+      // mark coupon used
       await (db.update(db.coupons)
             ..where((c) => c.couponCode.equals(code.toUpperCase())))
           .write(CouponsCompanion(
         isUsed: const Value(true),
         usedBy: Value(customerId),
-        usedAt: Value(DateTime.now()),
+        usedAt: Value(now),
       ));
+
+      // บันทึก promotion_usages (ถ้าหาคูปองเจอ)
+      if (coupon != null && orderNo != null) {
+        final order = await (db.select(db.salesOrders)
+              ..where((o) => o.orderNo.equals(orderNo)))
+            .getSingleOrNull();
+
+        if (order != null) {
+          final usageId = 'PU-CPN-${now.millisecondsSinceEpoch}-${coupon.promotionId}';
+          await db.into(db.promotionUsages).insertOnConflictUpdate(
+            PromotionUsagesCompanion(
+              usageId:       Value(usageId),
+              promotionId:   Value(coupon.promotionId),
+              orderId:       Value(order.orderId),
+              customerId:    Value(customerId != null &&
+                  customerId != 'WALK_IN' &&
+                  customerId.isNotEmpty ? customerId : null),
+              discountAmount: const Value(0),
+            ),
+          );
+        }
+      }
 
       return Response.ok(
         jsonEncode({'success': true, 'message': 'Coupon used'}),

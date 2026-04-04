@@ -23,14 +23,18 @@ class CouponListPage extends ConsumerStatefulWidget {
 
 class _CouponListPageState extends ConsumerState<CouponListPage> {
   final _searchController = TextEditingController();
-  String _filter = 'ALL'; // ALL, VALID, USED, EXPIRED
-  String _searchQuery = '';
+  String    _filter = 'ALL'; // ALL, VALID, USED, EXPIRED
+  String    _searchQuery = '';
+  bool      _groupByPromotion = false;
+  DateTime? _expiresFrom;
+  DateTime? _expiresTo;
   Timer? _debounce;
   final _dateFmt = DateFormat('dd/MM/yyyy HH:mm', 'th_TH');
 
   // ── Multi-select ───────────────────────────────────────────────
   bool _selectionMode = false;
   final Set<String> _selectedIds = {};
+  final Set<String> _collapsedGroups = {};
   CouponPaperSize _batchPaperSize = CouponPaperSize.a6;
 
   void _enterSelectionMode() =>
@@ -106,7 +110,20 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
   }
 
   // ── Filter ─────────────────────────────────────────────────────
-  bool get _hasFilter => _filter != 'ALL' || _searchQuery.isNotEmpty;
+  bool get _hasFilter =>
+      _filter != 'ALL' ||
+      _searchQuery.isNotEmpty ||
+      _expiresFrom != null ||
+      _expiresTo != null;
+
+  void _applyAllFilters() {
+    ref.read(couponListProvider.notifier).applyFilter(
+          status: _filter,
+          search: _searchQuery,
+          expiresFrom: _expiresFrom?.toIso8601String() ?? '',
+          expiresTo:   _expiresTo?.toIso8601String()   ?? '',
+        );
+  }
 
   void _onSearchChanged(String v) {
     setState(() {
@@ -114,12 +131,10 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
       _selectedIds.clear();
     });
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 400), () {
-      ref.read(couponListProvider.notifier).applyFilter(
-            status: _filter,
-            search: v,
-          );
-    });
+    _debounce = Timer(
+      const Duration(milliseconds: 400),
+      _applyAllFilters,
+    );
   }
 
   void _onFilterChanged(String v) {
@@ -127,20 +142,68 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
       _filter = v;
       _selectedIds.clear();
     });
-    ref.read(couponListProvider.notifier).applyFilter(
-          status: v,
-          search: _searchQuery,
-        );
+    _applyAllFilters();
   }
 
   void _clearFilters() {
     _searchController.clear();
     setState(() {
-      _searchQuery = '';
-      _filter = 'ALL';
+      _searchQuery  = '';
+      _filter       = 'ALL';
+      _expiresFrom  = null;
+      _expiresTo    = null;
       _selectedIds.clear();
     });
     ref.read(couponListProvider.notifier).applyFilter(status: 'ALL', search: '');
+  }
+
+  Future<void> _pickExpiresFrom() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _expiresFrom ?? DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+      helpText: 'หมดอายุตั้งแต่',
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _expiresFrom = picked;
+      if (_expiresTo != null && _expiresTo!.isBefore(picked)) {
+        _expiresTo = null;
+      }
+      _selectedIds.clear();
+    });
+    _applyAllFilters();
+  }
+
+  Future<void> _pickExpiresTo() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _expiresTo ?? _expiresFrom ?? DateTime.now(),
+      firstDate: _expiresFrom ?? DateTime(2020),
+      lastDate: DateTime(2100),
+      helpText: 'หมดอายุถึง',
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _expiresTo = picked;
+      _selectedIds.clear();
+    });
+    _applyAllFilters();
+  }
+
+  void _toggleGroupMode() {
+    final next = !_groupByPromotion;
+    setState(() {
+      _groupByPromotion = next;
+      _selectionMode    = false;
+      _selectedIds.clear();
+    });
+    if (next) {
+      ref.read(couponListProvider.notifier).enableGroupMode();
+    } else {
+      ref.read(couponListProvider.notifier).disableGroupMode();
+    }
   }
 
   @override
@@ -170,6 +233,22 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
           _FilterBar(
             filter: _filter,
             onFilterChanged: _onFilterChanged,
+            groupByPromotion: _groupByPromotion,
+            onGroupToggle: _toggleGroupMode,
+            expiresFrom: _expiresFrom,
+            expiresTo: _expiresTo,
+            onPickExpiresFrom: _pickExpiresFrom,
+            onPickExpiresTo: _pickExpiresTo,
+            onClearExpiryDates: (_expiresFrom != null || _expiresTo != null)
+                ? () {
+                    setState(() {
+                      _expiresFrom = null;
+                      _expiresTo   = null;
+                      _selectedIds.clear();
+                    });
+                    _applyAllFilters();
+                  }
+                : null,
           ),
 
           // ── Body ──────────────────────────────────────────────
@@ -185,6 +264,10 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
                 }
 
                 final items = pageState.items;
+
+                if (_groupByPromotion) {
+                  return _buildGroupedView(items, pageState.summary, promotionsAsync);
+                }
 
                 return Column(
                   children: [
@@ -269,6 +352,184 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
         ],
       ),
     );
+  }
+
+  // ── Grouped view ────────────────────────────────────────────────
+  Widget _buildGroupedView(
+    List<CouponModel> items,
+    Map<String, int> summary,
+    AsyncValue<List<PromotionModel>> promotionsAsync,
+  ) {
+    // Group by promotionId — preserve order (first-seen)
+    final groupOrder  = <String>[];
+    final groupMap    = <String, List<CouponModel>>{};
+    final groupNames  = <String, String>{};
+    for (final c in items) {
+      if (!groupMap.containsKey(c.promotionId)) {
+        groupOrder.add(c.promotionId);
+        groupMap[c.promotionId]   = [];
+        groupNames[c.promotionId] = c.promotionName ?? c.promotionId;
+      }
+      groupMap[c.promotionId]!.add(c);
+    }
+
+    // Build flat list: [header, row, row, …, header, row, …]
+    final slivers = <Widget>[];
+    for (final promoId in groupOrder) {
+      final coupons   = groupMap[promoId]!;
+      final promoName = groupNames[promoId]!;
+      final valid   = coupons.where((c) => !c.isUsed && !c.isExpired).length;
+      final used    = coupons.where((c) => c.isUsed).length;
+      final expired = coupons.where((c) => !c.isUsed && c.isExpired).length;
+
+      final isCollapsed = _collapsedGroups.contains(promoId);
+
+      // Section header
+      slivers.add(SliverToBoxAdapter(
+        child: InkWell(
+          onTap: () => setState(() {
+            if (isCollapsed) {
+              _collapsedGroups.remove(promoId);
+            } else {
+              _collapsedGroups.add(promoId);
+            }
+          }),
+          borderRadius: BorderRadius.vertical(
+            top: const Radius.circular(10),
+            bottom: isCollapsed ? const Radius.circular(10) : Radius.zero,
+          ),
+          child: Container(
+            margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppTheme.primaryColor.withValues(alpha: 0.07),
+              borderRadius: BorderRadius.vertical(
+                top: const Radius.circular(10),
+                bottom: isCollapsed ? const Radius.circular(10) : Radius.zero,
+              ),
+              border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.18)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Icon(Icons.local_offer,
+                      size: 15, color: AppTheme.primaryColor),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(promoName,
+                      style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.primaryColor)),
+                ),
+                // Mini stats
+                _MiniStat(count: coupons.length, label: 'ทั้งหมด',
+                    color: AppTheme.textSub),
+                const SizedBox(width: 8),
+                if (valid > 0)
+                  _MiniStat(count: valid, label: 'ใช้ได้',
+                      color: AppTheme.successColor),
+                if (used > 0) ...[
+                  const SizedBox(width: 8),
+                  _MiniStat(count: used, label: 'ใช้แล้ว',
+                      color: AppTheme.textSub),
+                ],
+                if (expired > 0) ...[
+                  const SizedBox(width: 8),
+                  _MiniStat(count: expired, label: 'หมดอายุ',
+                      color: AppTheme.errorColor),
+                ],
+                const SizedBox(width: 8),
+                AnimatedRotation(
+                  turns: isCollapsed ? -0.25 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  child: const Icon(Icons.expand_more,
+                      size: 18, color: AppTheme.primaryColor),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ));
+
+      // Coupon rows (hidden when collapsed)
+      if (!isCollapsed) {
+        slivers.add(SliverToBoxAdapter(
+          child: Container(
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(10)),
+              border: Border(
+                left:   BorderSide(color: AppTheme.primaryColor.withValues(alpha: 0.18)),
+                right:  BorderSide(color: AppTheme.primaryColor.withValues(alpha: 0.18)),
+                bottom: BorderSide(color: AppTheme.primaryColor.withValues(alpha: 0.18)),
+              ),
+            ),
+            child: ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: coupons.length,
+              separatorBuilder: (_, _) =>
+                  const Divider(height: 1, color: AppTheme.border),
+              itemBuilder: (ctx, i) => _CouponRow(
+                coupon: coupons[i],
+                dateFmt: _dateFmt,
+                onTap: () => _showDetailDialog(context, coupons[i]),
+                onCopy: () {
+                  Clipboard.setData(ClipboardData(text: coupons[i].couponCode));
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text('คัดลอก ${coupons[i].couponCode} แล้ว')));
+                },
+                onPrint: () => _showPrintDialog(context, coupons[i]),
+              ),
+            ),
+          ),
+        ));
+      }
+    }
+
+    // Footer with create button
+    slivers.add(SliverToBoxAdapter(
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: AppTheme.headerBg,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppTheme.border),
+        ),
+        child: Row(
+          children: [
+            _Chip(
+                icon: Icons.confirmation_number,
+                label: '${summary['total'] ?? 0} ทั้งหมด',
+                color: AppTheme.info),
+            const SizedBox(width: 12),
+            _Chip(
+                icon: Icons.check_circle_outline,
+                label: '${summary['valid'] ?? 0} ใช้ได้',
+                color: AppTheme.successColor),
+            const Spacer(),
+            _CompactBtn(
+              icon: Icons.add,
+              label: 'สร้างคูปอง',
+              color: Colors.white,
+              bgColor: AppTheme.primaryColor,
+              onTap: () => _showGenerateDialog(promotionsAsync),
+            ),
+          ],
+        ),
+      ),
+    ));
+
+    return CustomScrollView(slivers: slivers);
   }
 
   Widget _buildEmpty(bool noData, AsyncValue<List<PromotionModel>> promotionsAsync) {
@@ -691,8 +952,25 @@ class _TopBar extends StatelessWidget {
 class _FilterBar extends StatelessWidget {
   final String filter;
   final ValueChanged<String> onFilterChanged;
+  final bool groupByPromotion;
+  final VoidCallback onGroupToggle;
+  final DateTime? expiresFrom;
+  final DateTime? expiresTo;
+  final VoidCallback onPickExpiresFrom;
+  final VoidCallback onPickExpiresTo;
+  final VoidCallback? onClearExpiryDates;
 
-  const _FilterBar({required this.filter, required this.onFilterChanged});
+  const _FilterBar({
+    required this.filter,
+    required this.onFilterChanged,
+    required this.groupByPromotion,
+    required this.onGroupToggle,
+    required this.expiresFrom,
+    required this.expiresTo,
+    required this.onPickExpiresFrom,
+    required this.onPickExpiresTo,
+    this.onClearExpiryDates,
+  });
 
   static const _items = [
     ('ALL',     'ทั้งหมด',  null),
@@ -701,39 +979,192 @@ class _FilterBar extends StatelessWidget {
     ('EXPIRED', 'หมดอายุ',  AppTheme.errorColor),
   ];
 
+  static final _dateFmt = DateFormat('dd/MM/yy', 'th_TH');
+
   @override
   Widget build(BuildContext context) {
+    final hasExpiry = expiresFrom != null || expiresTo != null;
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: _items.map((item) {
-            final value = item.$1;
-            final label = item.$2;
-            final color = item.$3 ?? AppTheme.primaryColor;
-            final selected = filter == value;
-            return Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: FilterChip(
-                label: Text(label,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: selected ? color : AppTheme.textSub,
-                      fontWeight:
-                          selected ? FontWeight.w600 : FontWeight.normal,
-                    )),
-                selected: selected,
-                selectedColor: color.withValues(alpha: 0.12),
-                checkmarkColor: color,
-                side: BorderSide(
-                    color: selected ? color : AppTheme.border),
-                backgroundColor: const Color(0xFFF5F5F5),
-                onSelected: (_) => onFilterChanged(value),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Row 1: Status chips + Group toggle ──────────────────
+          Row(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: _items.map((item) {
+                      final value = item.$1;
+                      final label = item.$2;
+                      final color = item.$3 ?? AppTheme.primaryColor;
+                      final selected = filter == value;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: FilterChip(
+                          label: Text(label,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: selected ? color : AppTheme.textSub,
+                                fontWeight: selected
+                                    ? FontWeight.w600
+                                    : FontWeight.normal,
+                              )),
+                          selected: selected,
+                          selectedColor: color.withValues(alpha: 0.12),
+                          checkmarkColor: color,
+                          side: BorderSide(
+                              color: selected ? color : AppTheme.border),
+                          backgroundColor: const Color(0xFFF5F5F5),
+                          onSelected: (_) => onFilterChanged(value),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
               ),
-            );
-          }).toList(),
+              const SizedBox(width: 8),
+              Tooltip(
+                message: groupByPromotion
+                    ? 'ยกเลิกการจัดกลุ่ม'
+                    : 'จัดกลุ่มตามโปรโมชั่น',
+                child: InkWell(
+                  onTap: onGroupToggle,
+                  borderRadius: BorderRadius.circular(8),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: groupByPromotion
+                          ? AppTheme.primaryColor
+                          : const Color(0xFFF5F5F5),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: groupByPromotion
+                            ? AppTheme.primaryColor
+                            : AppTheme.border,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.folder_copy_outlined,
+                            size: 14,
+                            color: groupByPromotion
+                                ? Colors.white
+                                : AppTheme.textSub),
+                        const SizedBox(width: 5),
+                        Text('จัดกลุ่ม',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: groupByPromotion
+                                  ? Colors.white
+                                  : AppTheme.textSub,
+                            )),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          // ── Row 2: Expiry date range filter ─────────────────────
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(Icons.event_outlined,
+                  size: 14,
+                  color: hasExpiry
+                      ? AppTheme.primaryColor
+                      : AppTheme.textSub),
+              const SizedBox(width: 6),
+              Text('หมดอายุ:',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: hasExpiry
+                        ? AppTheme.primaryColor
+                        : AppTheme.textSub,
+                    fontWeight: hasExpiry
+                        ? FontWeight.w600
+                        : FontWeight.normal,
+                  )),
+              const SizedBox(width: 8),
+              _DatePickerButton(
+                label: expiresFrom != null
+                    ? _dateFmt.format(expiresFrom!)
+                    : 'ตั้งแต่',
+                active: expiresFrom != null,
+                onTap: onPickExpiresFrom,
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: Text('→',
+                    style: TextStyle(
+                        fontSize: 12, color: AppTheme.textSub)),
+              ),
+              _DatePickerButton(
+                label: expiresTo != null
+                    ? _dateFmt.format(expiresTo!)
+                    : 'ถึง',
+                active: expiresTo != null,
+                onTap: onPickExpiresTo,
+              ),
+              if (hasExpiry) ...[
+                const SizedBox(width: 6),
+                InkWell(
+                  onTap: onClearExpiryDates,
+                  borderRadius: BorderRadius.circular(4),
+                  child: const Icon(Icons.close,
+                      size: 16, color: AppTheme.textSub),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DatePickerButton extends StatelessWidget {
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  const _DatePickerButton({
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: active
+              ? AppTheme.primaryColor.withValues(alpha: 0.10)
+              : const Color(0xFFF5F5F5),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: active ? AppTheme.primaryColor : AppTheme.border,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: active ? AppTheme.primaryColor : AppTheme.textSub,
+            fontWeight: active ? FontWeight.w600 : FontWeight.normal,
+          ),
         ),
       ),
     );
@@ -1800,6 +2231,27 @@ class _ClearFilterBtn extends StatelessWidget {
               ],
             ),
           ),
+        ),
+      );
+}
+
+class _MiniStat extends StatelessWidget {
+  final int count;
+  final String label;
+  final Color color;
+  const _MiniStat({required this.count, required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          '$count $label',
+          style: TextStyle(
+              fontSize: 11, fontWeight: FontWeight.w600, color: color),
         ),
       );
 }

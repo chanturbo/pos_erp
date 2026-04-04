@@ -323,22 +323,16 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                               title: 'รายงานประวัติการขาย',
                               filename: () =>
                                   PdfFilename.generate('sales_history_report'),
-                              buildPdf: () {
-                                final allOrders = ref
-                                        .read(salesHistoryProvider)
-                                        .asData
-                                        ?.value ??
-                                    [];
-                                final current =
-                                    _applySort(_applyFilter(allOrders));
-                                return SalesHistoryPdfBuilder.build(
-                                  current,
-                                  dateFrom: _dateFrom,
-                                  dateTo: _dateTo,
-                                  paymentFilter: _paymentFilter,
-                                  statusFilter: _statusFilter,
-                                );
-                              },
+                              // ✅ ใช้ filtered ที่แสดงบนหน้าจออยู่แล้ว
+                              // ไม่ใช้ ref.read() เพราะตอน provider reload
+                              // asData จะเป็น null แม้หน้าจอยังแสดงข้อมูลเดิม
+                              buildPdf: () => SalesHistoryPdfBuilder.build(
+                                List<SalesOrderModel>.from(filtered),
+                                dateFrom: _dateFrom,
+                                dateTo: _dateTo,
+                                paymentFilter: _paymentFilter,
+                                statusFilter: _statusFilter,
+                              ),
                               hasData: filtered.isNotEmpty,
                             ),
                           ),

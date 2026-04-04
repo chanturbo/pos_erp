@@ -581,6 +581,7 @@ class _ProductGridCard extends ConsumerWidget {
           productName: product.productName,
           unit: product.baseUnit,
           unitPrice: lookup.price,
+          groupId: product.groupId,
           // ✅ ส่งราคาทุก level เก็บไว้ใน CartItem เพื่อ re-price ได้
           priceLevel1: product.priceLevel1,
           priceLevel2: product.priceLevel2,
@@ -774,6 +775,7 @@ class _ProductListRow extends ConsumerWidget {
           productName: product.productName,
           unit: product.baseUnit,
           unitPrice: lookup.price,
+          groupId: product.groupId,
           // ✅ ส่งราคาทุก level เก็บไว้ใน CartItem เพื่อ re-price ได้
           priceLevel1: product.priceLevel1,
           priceLevel2: product.priceLevel2,

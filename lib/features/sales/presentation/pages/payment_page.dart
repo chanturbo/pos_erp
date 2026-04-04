@@ -13,6 +13,8 @@ import '../../../promotions/presentation/providers/promotion_provider.dart';
 import '../providers/cart_provider.dart';
 import '../providers/sales_provider.dart';
 import '../../../dashboard/presentation/providers/dashboard_provider.dart';
+import '../../../inventory/presentation/providers/stock_provider.dart';
+import '../../../products/presentation/providers/product_provider.dart';
 import '../../../../shared/services/mobile_scanner_service.dart';
 import '../../../../shared/widgets/thermal_receipt.dart';
 
@@ -781,20 +783,35 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
           'coupon_codes':
               cartState.appliedCoupons.map((c) => c.code).toList(),
         'items': cartState.items
-            .map(
-              (item) => {
-                'product_id': item.productId,
-                'product_code': item.productCode,
-                'product_name': item.productName,
-                'unit': item.unit,
-                'quantity': item.quantity,
-                'unit_price': item.unitPrice,
-                'discount_percent': 0.0,
-                'discount_amount': 0.0,
-                'amount': item.amount,
-              },
-            )
+            .map((item) => {
+                  'product_id': item.productId,
+                  'product_code': item.productCode,
+                  'product_name': item.productName,
+                  'unit': item.unit,
+                  'quantity': item.quantity,
+                  'unit_price': item.unitPrice,
+                  'discount_percent': 0.0,
+                  'discount_amount': 0.0,
+                  'amount': item.amount,
+                })
             .toList(),
+        if (cartState.freeItems.isNotEmpty) ...{
+          'free_items': cartState.freeItems
+              .map((item) => {
+                    'product_id': item.productId,
+                    'product_code': item.productCode,
+                    'product_name': item.productName,
+                    'unit': item.unit,
+                    'quantity': item.quantity,
+                    'promotion_id': item.promotionId,
+                  })
+              .toList(),
+          'promotion_ids': cartState.freeItems
+              .map((i) => i.promotionId)
+              .whereType<String>()
+              .toSet()
+              .toList(),
+        },
       };
 
       print('📦 Sending order: total=${orderData['total_amount']}');
@@ -804,12 +821,23 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
       print('✅ Response: ${response.statusCode}');
 
       if (response.statusCode == 200) {
+        // ✅ อ่านค่าจาก response ก่อน — ต้องใช้ orderNo ใน coupon use call
+        final responseData =
+            response.data is Map ? response.data as Map : {};
+        final dataMap =
+            responseData['data'] is Map ? responseData['data'] as Map : {};
+        final orderNo      = dataMap['order_no'] as String? ?? '-';
+        final earnedPoints = dataMap['earned_points'] as int? ?? 0;
+
         // ── Mark all coupons as used ──────────────────────────────
         for (final coupon in cartState.appliedCoupons) {
           try {
             await apiClient.put(
               '/api/promotions/coupons/${coupon.code.toUpperCase()}/use',
-              data: {'customer_id': cartState.customerId},
+              data: {
+                'customer_id': cartState.customerId,
+                'order_no':    orderNo,
+              },
             );
           } catch (e) {
             print('⚠️ Could not mark coupon ${coupon.code} as used: $e');
@@ -824,14 +852,9 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
         // ✅ refresh sales list & dashboard หลังบันทึกออเดอร์สำเร็จ
         ref.invalidate(salesHistoryProvider);
         ref.invalidate(dashboardProvider);
-
-        // ✅ อ่านค่าแบบ null-safe ป้องกัน crash ถ้า API response ผิดรูปแบบ
-        final responseData =
-            response.data is Map ? response.data as Map : {};
-        final dataMap =
-            responseData['data'] is Map ? responseData['data'] as Map : {};
-        final orderNo      = dataMap['order_no'] as String? ?? '-';
-        final earnedPoints = dataMap['earned_points'] as int? ?? 0;
+        // ✅ refresh stock — ตัดสต๊อกแล้วต้องให้ UI อัปเดตทันที
+        ref.invalidate(stockBalanceProvider);
+        ref.invalidate(productListProvider);
 
         // ✅ refresh customer list เพื่อให้ points อัพเดททันที
         ref.read(customerListProvider.notifier).refresh();
@@ -850,6 +873,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                 orderDate:      DateTime.now(),
                 customerName:   cartState.customerName,
                 items:          cartState.items,
+                freeItems:      cartState.freeItems,
                 subtotal:       cartState.subtotal,
                 discount:       cartState.totalDiscount,
                 appliedCoupons: cartState.appliedCoupons,
@@ -1317,6 +1341,7 @@ class ReceiptPage extends ConsumerWidget {
   final DateTime orderDate;
   final String?  customerName;
   final List<CartItem> items;
+  final List<CartItem> freeItems;
   final double   subtotal;
   final double   discount;
   final List<AppliedCoupon> appliedCoupons;
@@ -1340,6 +1365,7 @@ class ReceiptPage extends ConsumerWidget {
     required this.paidAmount,
     required this.changeAmount,
     this.customerName,
+    this.freeItems       = const [],
     this.appliedCoupons  = const [],
     this.earnedPoints    = 0,
     this.pointsUsed      = 0,
@@ -1393,6 +1419,11 @@ class ReceiptPage extends ConsumerWidget {
                       quantity:  i.quantity,
                       unitPrice: i.unitPrice,
                       amount:    i.amount,
+                    )).toList(),
+                freeItems: freeItems.map((i) => ReceiptFreeItem(
+                      name:          i.productName,
+                      quantity:      i.quantity,
+                      promotionName: i.promotionName,
                     )).toList(),
                 subtotal:     subtotal,
                 discount:     discount,

@@ -82,41 +82,34 @@ class SalesHistoryPdfBuilder {
     if (pages.isEmpty) pages.add([]);
     final totalPages = pages.length;
 
-    for (var pageIdx = 0; pageIdx < pages.length; pageIdx++) {
-      final chunk   = pages[pageIdx];
-      final startNo = pageIdx * rowsPerPage + 1;
-
-      doc.addPage(
-        pw.Page(
-          pageFormat: PdfPageFormat.a4,
-          margin: const pw.EdgeInsets.all(24),
-          build: (ctx) => pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.stretch,
-            children: [
-              _buildPageHeader(
-                companyName: companyName,
-                reportTitle: 'รายงานประวัติการขาย',
-                printedAt:   printedAt,
-                page:        pageIdx + 1,
-                totalPages:  totalPages,
-                ttf:         ttf,
-                ttfRegular:  ttfRegular,
-                subtitle:    subtitle,
-                summaryLine: summaryLine,
-              ),
-              _buildTable(
-                chunk,
-                startNo:    startNo,
-                ttf:        ttf,
-                ttfRegular: ttfRegular,
-              ),
-              pw.Spacer(),
-              _buildFooter(ttfRegular: ttfRegular),
-            ],
-          ),
+    // ใช้ MultiPage เพื่อหลีกเลี่ยง closure-capture bug ของ for-loop
+    doc.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(24),
+        header: (ctx) => _buildPageHeader(
+          companyName: companyName,
+          reportTitle: 'รายงานประวัติการขาย',
+          printedAt:   printedAt,
+          page:        ctx.pageNumber,
+          totalPages:  totalPages,
+          ttf:         ttf,
+          ttfRegular:  ttfRegular,
+          subtitle:    subtitle,
+          summaryLine: summaryLine,
         ),
-      );
-    }
+        footer: (ctx) => _buildFooter(ttfRegular: ttfRegular),
+        build: (ctx) => [
+          for (var i = 0; i < pages.length; i++)
+            _buildTable(
+              pages[i],
+              startNo:    i * rowsPerPage + 1,
+              ttf:        ttf,
+              ttfRegular: ttfRegular,
+            ),
+        ],
+      ),
+    );
 
     return doc;
   }
@@ -213,7 +206,7 @@ class SalesHistoryPdfBuilder {
             color:      color ?? _kText,
             decoration: strikethrough
                 ? pw.TextDecoration.lineThrough
-                : pw.TextDecoration.none,
+                : null,
           ),
         ),
       );

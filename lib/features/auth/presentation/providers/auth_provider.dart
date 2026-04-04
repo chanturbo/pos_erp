@@ -4,8 +4,10 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/client/api_client.dart';
+import '../../../../core/navigation/navigator_key.dart';
 import '../../../../core/utils/jwt_utils.dart';
 import '../../data/models/user_model.dart';
+import '../../../../routes/app_router.dart';
 
 // Auth State
 class AuthState {
@@ -61,17 +63,45 @@ class AuthNotifier extends Notifier<AuthState> {
     // แล้วค่อย restore token — ป้องกัน race condition กับ provider อื่น
     Future.microtask(_loadSavedAuth);
 
-    // ✅ ถ้า apiClientProvider สร้าง instance ใหม่ → sync token ทันที
-    // ป้องกัน instance ใหม่ไม่มี token ทำให้ 401
+    // ✅ ถ้า apiClientProvider สร้าง instance ใหม่ → sync token + onUnauthorized ทันที
     ref.listen(apiClientProvider, (_, client) {
       final token = state.token;
       if (token != null) {
         client.setToken(token);
         print('🔄 Token re-synced to new ApiClient instance');
       }
+      _wireOnUnauthorized(client);
     });
 
+    // ✅ Wire onUnauthorized บน client ตัวแรก (ก่อน apiClientProvider เปลี่ยน)
+    _wireOnUnauthorized(ref.read(apiClientProvider));
+
     return AuthState.initial();
+  }
+
+  /// ผูก callback 401 → logout + redirect login
+  void _wireOnUnauthorized(ApiClient client) {
+    client.onUnauthorized = () async {
+      // ป้องกัน call ซ้ำ ถ้า logout ไปแล้ว
+      if (!state.isAuthenticated) return;
+
+      print('🔒 onUnauthorized fired — clearing session & redirecting to login');
+
+      // ล้าง token ทั้งใน state, Dio header, และ SharedPreferences
+      client.setToken(null);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('auth_token');
+      await prefs.remove('user_data');
+
+      // Reset auth state → ทำให้ provider อื่นหยุดเรียก API
+      state = AuthState(isRestoring: false);
+
+      // Navigate ไป login พร้อมล้าง stack ทั้งหมด
+      ref
+          .read(navigatorKeyProvider)
+          .currentState
+          ?.pushNamedAndRemoveUntil(AppRouter.login, (_) => false);
+    };
   }
   
   /// โหลด Auth จาก SharedPreferences

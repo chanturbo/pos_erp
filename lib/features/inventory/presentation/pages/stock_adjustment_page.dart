@@ -1198,81 +1198,167 @@ class _StockTakeSubPageState extends ConsumerState<StockTakeSubPage> {
   @override
   Widget build(BuildContext context) {
     final stockAsync = ref.watch(stockBalanceProvider);
+    final canPop = Navigator.of(context).canPop();
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('ตรวจนับสต๊อก (Stock Take)'),
-        backgroundColor: Colors.orange,
-        foregroundColor: Colors.white,
-        actions: [
-          // แสดงเฉพาะที่มีผลต่าง
-          TextButton.icon(
-            onPressed: () =>
-                setState(() => _showVarianceOnly = !_showVarianceOnly),
-            icon: Icon(
-              _showVarianceOnly ? Icons.filter_alt : Icons.filter_alt_outlined,
-              color: Colors.white,
-            ),
-            label: Text(
-              _showVarianceOnly ? 'มีผลต่าง' : 'ทั้งหมด',
-              style: const TextStyle(color: Colors.white),
+      backgroundColor: const Color(0xFFF5F5F5),
+      body: Column(
+        children: [
+          // ── Top Bar ─────────────────────────────────────────────
+          Container(
+            color: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                if (canPop) ...[
+                  InkWell(
+                    onTap: () => Navigator.of(context).pop(),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF5F5F5),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppTheme.border),
+                      ),
+                      child: const Icon(Icons.arrow_back_ios_new,
+                          size: 15, color: Color(0xFF8A8A8A)),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                ],
+                Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    color: AppTheme.warningContainer,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.fact_check_outlined,
+                      color: AppTheme.warningColor, size: 18),
+                ),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text(
+                    'ตรวจนับสต๊อก',
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1A1A1A)),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                // Filter toggle
+                Tooltip(
+                  message: _showVarianceOnly ? 'แสดงทั้งหมด' : 'เฉพาะมีผลต่าง',
+                  child: InkWell(
+                    onTap: () =>
+                        setState(() => _showVarianceOnly = !_showVarianceOnly),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: _showVarianceOnly
+                            ? AppTheme.warningColor.withValues(alpha: 0.1)
+                            : const Color(0xFFF5F5F5),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                            color: _showVarianceOnly
+                                ? AppTheme.warningColor
+                                : AppTheme.border),
+                      ),
+                      child: Icon(
+                        _showVarianceOnly
+                            ? Icons.filter_alt
+                            : Icons.filter_alt_outlined,
+                        size: 17,
+                        color: _showVarianceOnly
+                            ? AppTheme.warningColor
+                            : const Color(0xFF8A8A8A),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                // Refresh
+                Tooltip(
+                  message: 'โหลดใหม่',
+                  child: InkWell(
+                    onTap: () {
+                      _clearItems();
+                      ref.read(stockBalanceProvider.notifier).refresh();
+                    },
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF5F5F5),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppTheme.border),
+                      ),
+                      child: const Icon(Icons.refresh,
+                          size: 17, color: Color(0xFF8A8A8A)),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: 'โหลดใหม่',
-            onPressed: () {
-              _clearItems();
-              ref.read(stockBalanceProvider.notifier).refresh();
-            },
+          const Divider(height: 1),
+
+          // ── Body ────────────────────────────────────────────────
+          Expanded(
+            child: stockAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(child: Text('เกิดข้อผิดพลาด: $e')),
+              data: (stocks) {
+                _initItems(stocks);
+
+                final filtered = _takeItems.where((item) {
+                  if (_showVarianceOnly && !item.hasVariance) return false;
+                  if (_searchQuery.isEmpty) return true;
+                  return item.stock.productName
+                          .toLowerCase()
+                          .contains(_searchQuery.toLowerCase()) ||
+                      item.stock.productCode
+                          .toLowerCase()
+                          .contains(_searchQuery.toLowerCase());
+                }).toList();
+
+                return Column(
+                  children: [
+                    // ── Toolbar ────────────────────────────
+                    _buildToolbar(stocks),
+
+                    // ── Summary Bar ────────────────────────
+                    if (_isInitialized) _buildSummaryBar(),
+
+                    // ── รายการสินค้า ───────────────────────
+                    Expanded(
+                      child: _takeItems.isEmpty
+                          ? _buildEmptyState()
+                          : filtered.isEmpty
+                              ? const Center(
+                                  child: Text(
+                                    'ไม่พบสินค้าที่ตรงกัน',
+                                    style: TextStyle(color: Color(0xFF8A8A8A)),
+                                  ),
+                                )
+                              : ListView.builder(
+                                  padding: const EdgeInsets.all(12),
+                                  itemCount: filtered.length,
+                                  itemBuilder: (context, index) =>
+                                      _buildItemRow(filtered[index]),
+                                ),
+                    ),
+
+                    // ── Bottom Bar ─────────────────────────
+                    if (_takeItems.isNotEmpty) _buildBottomBar(),
+                  ],
+                );
+              },
+            ),
           ),
         ],
-      ),
-      body: stockAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('เกิดข้อผิดพลาด: $e')),
-        data: (stocks) {
-          _initItems(stocks);
-
-          // กรองรายการ
-          final filtered = _takeItems.where((item) {
-            if (_showVarianceOnly && !item.hasVariance) return false;
-            if (_searchQuery.isEmpty) return true;
-            return item.stock.productName.toLowerCase().contains(
-                  _searchQuery.toLowerCase(),
-                ) ||
-                item.stock.productCode.toLowerCase().contains(
-                  _searchQuery.toLowerCase(),
-                );
-          }).toList();
-
-          return Column(
-            children: [
-              // ── Toolbar ──────────────────────────────────
-              _buildToolbar(stocks),
-
-              // ── Summary Bar ──────────────────────────────
-              if (_isInitialized) _buildSummaryBar(),
-
-              // ── รายการสินค้า ─────────────────────────────
-              Expanded(
-                child: _takeItems.isEmpty
-                    ? _buildEmptyState()
-                    : filtered.isEmpty
-                    ? const Center(child: Text('ไม่พบสินค้าที่ตรงกัน'))
-                    : ListView.builder(
-                        padding: const EdgeInsets.all(12),
-                        itemCount: filtered.length,
-                        itemBuilder: (context, index) =>
-                            _buildItemRow(filtered[index]),
-                      ),
-              ),
-
-              // ── Bottom: Remark + ปุ่มยืนยัน ─────────────
-              if (_takeItems.isNotEmpty) _buildBottomBar(),
-            ],
-          );
-        },
       ),
     );
   }
@@ -1280,50 +1366,103 @@ class _StockTakeSubPageState extends ConsumerState<StockTakeSubPage> {
   // ── Toolbar: เลือกคลัง + ค้นหา ───────────────────────────────
   Widget _buildToolbar(List<StockBalanceModel> stocks) {
     return Container(
-      padding: const EdgeInsets.all(12),
-      color: Colors.orange[50],
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
       child: Row(
         children: [
-          // Dropdown คลัง
-          const Text('คลัง:', style: TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(width: 8),
-          DropdownButton<String>(
-            value: _selectedWarehouse,
-            items: const [
-              DropdownMenuItem(value: 'WH001', child: Text('คลังหลัก')),
-              DropdownMenuItem(value: 'WH002', child: Text('คลังสยาม')),
-            ],
-            onChanged: (v) {
-              if (v != null) _changeWarehouse(v, stocks);
-            },
+          // Label
+          const Text(
+            'คลัง:',
+            style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF1A1A1A)),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 8),
+          // Dropdown คลัง
+          Builder(builder: (ctx) {
+            final cs = Theme.of(ctx).colorScheme;
+            final bgColor = cs.surface;
+            final txtColor = cs.onSurface;
+            final bdColor = cs.outline.withValues(alpha: 0.4);
+            return Container(
+              height: 38,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              decoration: BoxDecoration(
+                color: bgColor,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: bdColor),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: _selectedWarehouse,
+                  dropdownColor: bgColor,
+                  style: TextStyle(fontSize: 13, color: txtColor),
+                  iconEnabledColor: txtColor.withValues(alpha: 0.6),
+                  items: [
+                    DropdownMenuItem(
+                        value: 'WH001',
+                        child: Text('คลังหลัก',
+                            style: TextStyle(color: txtColor))),
+                    DropdownMenuItem(
+                        value: 'WH002',
+                        child: Text('คลังสยาม',
+                            style: TextStyle(color: txtColor))),
+                  ],
+                  onChanged: (v) {
+                    if (v != null) _changeWarehouse(v, stocks);
+                  },
+                ),
+              ),
+            );
+          }),
+          const SizedBox(width: 12),
           // Search
           Expanded(
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'ค้นหาสินค้า...',
-                prefixIcon: const Icon(Icons.search, size: 20),
-                isDense: true,
-                border: const OutlineInputBorder(),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear, size: 18),
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() => _searchQuery = '');
-                        },
-                      )
-                    // ✅ ScannerButton เมื่อช่องว่าง
-                    : ScannerButton(
-                        onScanned: (value) {
-                          _searchController.text = value;
-                          setState(() => _searchQuery = value);
-                        },
-                      ),
+            child: SizedBox(
+              height: 38,
+              child: TextField(
+                controller: _searchController,
+                style: const TextStyle(fontSize: 13),
+                decoration: InputDecoration(
+                  hintText: 'ค้นหาชื่อ / รหัสสินค้า...',
+                  hintStyle: const TextStyle(
+                      fontSize: 13, color: Color(0xFF8A8A8A)),
+                  prefixIcon: const Icon(Icons.search,
+                      size: 17, color: Color(0xFF8A8A8A)),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, size: 15),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() => _searchQuery = '');
+                          },
+                        )
+                      : ScannerButton(
+                          useSheet: true,
+                          onScanned: (value) {
+                            _searchController.text = value;
+                            setState(() => _searchQuery = value);
+                          },
+                        ),
+                  contentPadding: EdgeInsets.zero,
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide:
+                          const BorderSide(color: Color(0xFFE0E0E0))),
+                  enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide:
+                          const BorderSide(color: Color(0xFFE0E0E0))),
+                  focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(
+                          color: AppTheme.primary, width: 1.5)),
+                  filled: true,
+                  fillColor: Colors.white,
+                ),
+                onChanged: (v) => setState(() => _searchQuery = v),
               ),
-              onChanged: (v) => setState(() => _searchQuery = v),
             ),
           ),
         ],
@@ -1334,28 +1473,43 @@ class _StockTakeSubPageState extends ConsumerState<StockTakeSubPage> {
   // ── Summary Bar ───────────────────────────────────────────────
   Widget _buildSummaryBar() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: Colors.grey[100],
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
       child: Row(
         children: [
-          Text(
-            'ทั้งหมด $_totalItems รายการ',
-            style: const TextStyle(fontWeight: FontWeight.bold),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: AppTheme.warningContainer,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                  color: AppTheme.warningColor.withValues(alpha: 0.4)),
+            ),
+            child: Text(
+              'ทั้งหมด $_totalItems รายการ',
+              style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.warningColor),
+            ),
           ),
           const Spacer(),
           _SummaryChip(
             label: 'ตรงกัน',
             count: _matchCount,
-            color: Colors.green,
+            color: AppTheme.successColor,
           ),
           const SizedBox(width: 8),
           _SummaryChip(
             label: 'เกิน',
             count: _increaseCount,
-            color: Colors.blue,
+            color: AppTheme.infoColor,
           ),
           const SizedBox(width: 8),
-          _SummaryChip(label: 'ขาด', count: _decreaseCount, color: Colors.red),
+          _SummaryChip(
+              label: 'ขาด',
+              count: _decreaseCount,
+              color: AppTheme.errorColor),
         ],
       ),
     );
@@ -1364,15 +1518,31 @@ class _StockTakeSubPageState extends ConsumerState<StockTakeSubPage> {
   // ── แถวสินค้าแต่ละรายการ ──────────────────────────────────────
   Widget _buildItemRow(_StockTakeItem item) {
     final variance = item.variance;
-    Color rowColor = Colors.transparent;
-    if (variance > 0) rowColor = Colors.blue[50]!;
-    if (variance < 0) rowColor = Colors.red[50]!;
+    Color cardColor = Colors.white;
+    Color borderColor = AppTheme.border;
+    if (variance > 0) {
+      cardColor = AppTheme.infoContainer;
+      borderColor = AppTheme.infoColor.withValues(alpha: 0.3);
+    } else if (variance < 0) {
+      cardColor = AppTheme.errorContainer;
+      borderColor = AppTheme.errorColor.withValues(alpha: 0.3);
+    }
 
-    return Card(
+    final varColor = variance > 0
+        ? AppTheme.infoColor
+        : variance < 0
+            ? AppTheme.errorColor
+            : AppTheme.successColor;
+
+    return Container(
       margin: const EdgeInsets.only(bottom: 6),
-      color: rowColor,
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: borderColor),
+      ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         child: Row(
           children: [
             // ชื่อสินค้า
@@ -1383,11 +1553,16 @@ class _StockTakeSubPageState extends ConsumerState<StockTakeSubPage> {
                 children: [
                   Text(
                     item.stock.productName,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                        color: Color(0xFF1A1A1A)),
                   ),
+                  const SizedBox(height: 2),
                   Text(
                     item.stock.productCode,
-                    style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                    style: const TextStyle(
+                        fontSize: 11, color: Color(0xFF8A8A8A)),
                   ),
                 ],
               ),
@@ -1399,20 +1574,22 @@ class _StockTakeSubPageState extends ConsumerState<StockTakeSubPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Text(
+                  const Text(
                     'ในระบบ',
-                    style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                    style: TextStyle(fontSize: 10, color: Color(0xFF8A8A8A)),
                   ),
+                  const SizedBox(height: 2),
                   Text(
                     item.stock.balance.toStringAsFixed(0),
                     style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1A1A1A)),
                   ),
                   Text(
                     item.stock.baseUnit,
-                    style: const TextStyle(fontSize: 10),
+                    style: const TextStyle(
+                        fontSize: 10, color: Color(0xFF8A8A8A)),
                   ),
                 ],
               ),
@@ -1423,29 +1600,48 @@ class _StockTakeSubPageState extends ConsumerState<StockTakeSubPage> {
               flex: 2,
               child: Column(
                 children: [
-                  Text(
+                  const Text(
                     'นับจริง',
-                    style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                    style: TextStyle(fontSize: 10, color: Color(0xFF8A8A8A)),
                   ),
+                  const SizedBox(height: 2),
                   SizedBox(
                     height: 36,
-                    child: TextField(
-                      controller: item.countController,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                      decoration: InputDecoration(
-                        isDense: true,
-                        border: const OutlineInputBorder(),
-                        suffixText: item.stock.baseUnit,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 8,
+                    child: Builder(builder: (ctx) {
+                      final cs = Theme.of(ctx).colorScheme;
+                      final bdColor = cs.outline.withValues(alpha: 0.4);
+                      return TextField(
+                        controller: item.countController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            color: cs.onSurface),
+                        decoration: InputDecoration(
+                          isDense: true,
+                          suffixText: item.stock.baseUnit,
+                          suffixStyle: TextStyle(
+                              fontSize: 11, color: cs.onSurface.withValues(alpha: 0.6)),
+                          contentPadding:
+                              const EdgeInsets.symmetric(horizontal: 8),
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(6),
+                              borderSide: BorderSide(color: bdColor)),
+                          enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(6),
+                              borderSide: BorderSide(color: bdColor)),
+                          focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(6),
+                              borderSide: const BorderSide(
+                                  color: AppTheme.primary, width: 1.5)),
+                          filled: true,
+                          fillColor: cs.surfaceContainerHighest,
                         ),
-                      ),
-                      onChanged: (_) => setState(() {}),
-                    ),
+                        onChanged: (_) => setState(() {}),
+                      );
+                    }),
                   ),
                 ],
               ),
@@ -1455,13 +1651,14 @@ class _StockTakeSubPageState extends ConsumerState<StockTakeSubPage> {
 
             // ผลต่าง
             SizedBox(
-              width: 80,
+              width: 72,
               child: Column(
                 children: [
-                  Text(
+                  const Text(
                     'ผลต่าง',
-                    style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                    style: TextStyle(fontSize: 10, color: Color(0xFF8A8A8A)),
                   ),
+                  const SizedBox(height: 2),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -1469,14 +1666,10 @@ class _StockTakeSubPageState extends ConsumerState<StockTakeSubPage> {
                         variance > 0
                             ? Icons.arrow_upward
                             : variance < 0
-                            ? Icons.arrow_downward
-                            : Icons.check,
-                        size: 14,
-                        color: variance > 0
-                            ? Colors.blue
-                            : variance < 0
-                            ? Colors.red
-                            : Colors.green,
+                                ? Icons.arrow_downward
+                                : Icons.check,
+                        size: 13,
+                        color: varColor,
                       ),
                       const SizedBox(width: 2),
                       Text(
@@ -1484,13 +1677,9 @@ class _StockTakeSubPageState extends ConsumerState<StockTakeSubPage> {
                             ? 'ตรง'
                             : '${variance > 0 ? '+' : ''}${variance.toStringAsFixed(0)}',
                         style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: variance > 0
-                              ? Colors.blue
-                              : variance < 0
-                              ? Colors.red
-                              : Colors.green,
-                        ),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            color: varColor),
                       ),
                     ],
                   ),
@@ -1509,11 +1698,27 @@ class _StockTakeSubPageState extends ConsumerState<StockTakeSubPage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey[400]),
-          const SizedBox(height: 12),
-          Text(
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppTheme.warningContainer,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.inventory_2_outlined,
+                size: 48, color: AppTheme.warningColor),
+          ),
+          const SizedBox(height: 16),
+          const Text(
             'ไม่มีสินค้าในคลังนี้',
-            style: TextStyle(color: Colors.grey[600]),
+            style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF1A1A1A)),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'ลองเลือกคลังอื่น หรือเพิ่มสินค้าก่อน',
+            style: TextStyle(fontSize: 13, color: Color(0xFF8A8A8A)),
           ),
         ],
       ),
@@ -1556,7 +1761,8 @@ class _StockTakeSubPageState extends ConsumerState<StockTakeSubPage> {
           // ปุ่มยืนยัน
           ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
-              backgroundColor: hasAnyVariance ? Colors.orange : Colors.green,
+              backgroundColor:
+                  hasAnyVariance ? AppTheme.warningColor : AppTheme.successColor,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
             ),
@@ -1593,7 +1799,8 @@ class _StockTakeSubPageState extends ConsumerState<StockTakeSubPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('✅ สต๊อกตรงทั้งหมด ไม่มีรายการที่ต้องปรับ'),
-          backgroundColor: Colors.green,
+          backgroundColor: AppTheme.successColor,
+          behavior: SnackBarBehavior.floating,
         ),
       );
       return;
@@ -1629,7 +1836,7 @@ class _StockTakeSubPageState extends ConsumerState<StockTakeSubPage> {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange,
+              backgroundColor: AppTheme.warningColor,
               foregroundColor: Colors.white,
             ),
             onPressed: () => Navigator.pop(context, true),
@@ -1675,7 +1882,8 @@ class _StockTakeSubPageState extends ConsumerState<StockTakeSubPage> {
                 ? '✅ ปรับสต๊อกสำเร็จ $successCount รายการ (อ้างอิง: $refNo)'
                 : '⚠️ ปรับสำเร็จ $successCount/${itemsWithVariance.length} รายการ',
           ),
-          backgroundColor: allOk ? Colors.green : Colors.orange,
+          backgroundColor: allOk ? AppTheme.successColor : AppTheme.warningColor,
+          behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 4),
         ),
       );
@@ -1776,75 +1984,162 @@ class _StockTransferSubPageState extends ConsumerState<StockTransferSubPage> {
   @override
   Widget build(BuildContext context) {
     final stockAsync = ref.watch(stockBalanceProvider);
+    final canPop = Navigator.of(context).canPop();
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('โอนย้ายสต๊อก (Transfer)'),
-        backgroundColor: Colors.purple,
-        foregroundColor: Colors.white,
-      ),
-      body: stockAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('เกิดข้อผิดพลาด: $e')),
-        data: (stocks) {
-          // สินค้าในคลังต้นทาง
-          final fromStocks = stocks
-              .where((s) => s.warehouseId == _fromWarehouseId && s.balance > 0)
-              .toList();
+      backgroundColor: const Color(0xFFF5F5F5),
+      body: Column(
+        children: [
+          // ── Top Bar ───────────────────────────────────────���─────
+          Container(
+            color: Colors.white,
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                if (canPop) ...[
+                  InkWell(
+                    onTap: () => Navigator.of(context).pop(),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF5F5F5),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppTheme.border),
+                      ),
+                      child: const Icon(Icons.arrow_back_ios_new,
+                          size: 15, color: Color(0xFF8A8A8A)),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                ],
+                Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    color: AppTheme.tealColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.swap_horiz,
+                      color: AppTheme.tealColor, size: 18),
+                ),
+                const SizedBox(width: 10),
+                const Text(
+                  'โอนย้ายสต๊อก',
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1A1A1A)),
+                ),
+                const Spacer(),
+                // Search field
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 260),
+                  child: SizedBox(
+                    height: 38,
+                    child: TextField(
+                      controller: _searchController,
+                      style: const TextStyle(fontSize: 13),
+                      decoration: InputDecoration(
+                        hintText: 'ค้นหาชื่อ / รหัสสินค้า...',
+                        hintStyle: const TextStyle(
+                            fontSize: 13, color: Color(0xFF8A8A8A)),
+                        prefixIcon: const Icon(Icons.search,
+                            size: 17, color: Color(0xFF8A8A8A)),
+                        suffixIcon: _searchQuery.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear, size: 15),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  setState(() => _searchQuery = '');
+                                },
+                              )
+                            : ScannerButton(
+                                useSheet: true,
+                                onScanned: (value) {
+                                  _searchController.text = value;
+                                  setState(() => _searchQuery = value);
+                                },
+                              ),
+                        contentPadding: EdgeInsets.zero,
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide:
+                                const BorderSide(color: Color(0xFFE0E0E0))),
+                        enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide:
+                                const BorderSide(color: Color(0xFFE0E0E0))),
+                        focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(
+                                color: AppTheme.tealColor, width: 1.5)),
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
+                      onChanged: (v) => setState(() => _searchQuery = v),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Refresh
+                Tooltip(
+                  message: 'รีเฟรช',
+                  child: InkWell(
+                    onTap: () =>
+                        ref.read(stockBalanceProvider.notifier).refresh(),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF5F5F5),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppTheme.border),
+                      ),
+                      child: const Icon(Icons.refresh,
+                          size: 17, color: Color(0xFF8A8A8A)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
 
-          final filtered = _searchQuery.isEmpty
-              ? fromStocks
-              : fromStocks
-                    .where(
-                      (s) =>
-                          s.productName.toLowerCase().contains(
-                            _searchQuery.toLowerCase(),
-                          ) ||
-                          s.productCode.toLowerCase().contains(
-                            _searchQuery.toLowerCase(),
-                          ),
-                    )
+          // ── Body ────────────────────────────────────────────────
+          Expanded(
+            child: stockAsync.when(
+              loading: () =>
+                  const Center(child: CircularProgressIndicator()),
+              error: (e, _) =>
+                  Center(child: Text('เกิดข้อผิดพลาด: $e')),
+              data: (stocks) {
+                final fromStocks = stocks
+                    .where((s) =>
+                        s.warehouseId == _fromWarehouseId &&
+                        s.balance > 0)
                     .toList();
 
-          return Row(
+                final filtered = _searchQuery.isEmpty
+                    ? fromStocks
+                    : fromStocks
+                        .where((s) =>
+                            s.productName.toLowerCase().contains(
+                                _searchQuery.toLowerCase()) ||
+                            s.productCode.toLowerCase().contains(
+                                _searchQuery.toLowerCase()))
+                        .toList();
+
+                return Row(
             children: [
               // ── ซ้าย: เลือกสินค้า ───────────────────────
               SizedBox(
                 width: 380,
                 child: Column(
                   children: [
-                    // Warehouse selector
+                    // Warehouse selector (header ขาว)
                     _buildWarehouseSelector(stocks),
-
-                    // Search
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-                      child: TextField(
-                        controller: _searchController,
-                        decoration: InputDecoration(
-                          hintText: 'ค้นหาสินค้า...',
-                          prefixIcon: const Icon(Icons.search),
-                          border: const OutlineInputBorder(),
-                          isDense: true,
-                          suffixIcon: _searchQuery.isNotEmpty
-                              ? IconButton(
-                                  icon: const Icon(Icons.clear),
-                                  onPressed: () {
-                                    _searchController.clear();
-                                    setState(() => _searchQuery = '');
-                                  },
-                                )
-                              // ✅ ScannerButton เมื่อช่องว่าง
-                              : ScannerButton(
-                                  onScanned: (value) {
-                                    _searchController.text = value;
-                                    setState(() => _searchQuery = value);
-                                  },
-                                ),
-                        ),
-                        onChanged: (v) => setState(() => _searchQuery = v),
-                      ),
-                    ),
+                    const Divider(height: 1),
 
                     // รายการสินค้า
                     Expanded(
@@ -1854,78 +2149,40 @@ class _StockTransferSubPageState extends ConsumerState<StockTransferSubPage> {
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Icon(
-                                    Icons.inventory_2_outlined,
-                                    size: 48,
-                                    color: Colors.grey[400],
+                                    _searchQuery.isEmpty
+                                        ? Icons.inventory_2_outlined
+                                        : Icons.search_off_outlined,
+                                    size: 56,
+                                    color: Colors.grey[300],
                                   ),
-                                  const SizedBox(height: 8),
+                                  const SizedBox(height: 10),
                                   Text(
-                                    fromStocks.isEmpty
+                                    _searchQuery.isEmpty
                                         ? 'ไม่มีสินค้าในคลังนี้'
-                                        : 'ไม่พบสินค้าที่ค้นหา',
-                                    style: TextStyle(color: Colors.grey[600]),
+                                        : 'ไม่พบสินค้า "$_searchQuery"',
+                                    style: TextStyle(
+                                        color: Colors.grey[500]),
                                   ),
                                 ],
                               ),
                             )
-                          : ListView.builder(
+                          : ListView.separated(
+                              padding: const EdgeInsets.all(8),
                               itemCount: filtered.length,
+                              separatorBuilder: (_, _) =>
+                                  const SizedBox(height: 6),
                               itemBuilder: (context, index) {
                                 final stock = filtered[index];
                                 final isSelected =
                                     _selectedStock?.productId ==
                                     stock.productId;
-                                return ListTile(
-                                  selected: isSelected,
-                                  selectedTileColor: Colors.purple.withValues(
-                                    alpha: 0.1,
-                                  ),
-                                  leading: CircleAvatar(
-                                    backgroundColor: isSelected
-                                        ? Colors.purple
-                                        : Colors.grey[200],
-                                    child: Icon(
-                                      Icons.inventory_2,
-                                      size: 18,
-                                      color: isSelected
-                                          ? Colors.white
-                                          : Colors.grey[600],
-                                    ),
-                                  ),
-                                  title: Text(
-                                    stock.productName,
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                  subtitle: Text(
-                                    stock.productCode,
-                                    style: const TextStyle(fontSize: 11),
-                                  ),
-                                  trailing: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    crossAxisAlignment: CrossAxisAlignment.end,
-                                    children: [
-                                      Text(
-                                        stock.balance.toStringAsFixed(0),
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.green[700],
-                                        ),
-                                      ),
-                                      Text(
-                                        stock.baseUnit,
-                                        style: const TextStyle(fontSize: 10),
-                                      ),
-                                    ],
-                                  ),
-                                  onTap: () {
-                                    setState(() {
-                                      _selectedStock = stock;
-                                      _qtyController.clear();
-                                    });
-                                  },
+                                return _TransferItemCard(
+                                  stock: stock,
+                                  isSelected: isSelected,
+                                  onTap: () => setState(() {
+                                    _selectedStock = stock;
+                                    _qtyController.clear();
+                                  }),
                                 );
                               },
                             ),
@@ -1946,146 +2203,124 @@ class _StockTransferSubPageState extends ConsumerState<StockTransferSubPage> {
           );
         },
       ),
+          ),
+        ],
+      ),
     );
   }
 
   // ── Warehouse Selector ────────────────────────────────────────
   Widget _buildWarehouseSelector(List<StockBalanceModel> stocks) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      color: Colors.purple[50],
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'เลือกคลัง',
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          Row(
+    return Builder(builder: (ctx) {
+      final cs = Theme.of(ctx).colorScheme;
+      final bgColor = cs.surface;
+      final borderColor = cs.outline.withValues(alpha: 0.35);
+
+      Widget warehouseDropdown({
+        required String label,
+        required String value,
+        required List<Map<String, String>> items,
+        required ValueChanged<String?> onChanged,
+      }) {
+        return Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ต้นทาง
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'ต้นทาง',
-                      style: TextStyle(fontSize: 11, color: Colors.grey),
-                    ),
-                    DropdownButtonFormField<String>(
-                      initialValue: _fromWarehouseId,
-                      isDense: true,
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 8,
-                        ),
-                      ),
-                      items: _warehouses
-                          .map(
-                            (w) => DropdownMenuItem(
-                              value: w['id'],
-                              child: Text(
-                                w['name']!,
-                                style: const TextStyle(fontSize: 13),
-                              ),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (v) {
-                        if (v != null && v != _fromWarehouseId) {
-                          setState(() {
-                            _fromWarehouseId = v;
-
-                            // ถ้า from == to → swap
-                            if (_fromWarehouseId == _toWarehouseId) {
-                              _toWarehouseId = _warehouses.firstWhere(
-                                (w) => w['id'] != _fromWarehouseId,
-                              )['id']!;
-                            }
-
-                            _selectedStock = null;
-                            _qtyController.clear();
-                          });
-                        }
-                      },
-                    ),
-                  ],
+              Text(label,
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: cs.onSurface.withValues(alpha: 0.5))),
+              const SizedBox(height: 4),
+              Container(
+                height: 36,
+                decoration: BoxDecoration(
+                  color: bgColor,
+                  border: Border.all(color: borderColor),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-              ),
-
-              // ลูกศร swap
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Column(
-                  children: [
-                    const SizedBox(height: 16),
-                    IconButton(
-                      icon: const Icon(Icons.swap_horiz, color: Colors.purple),
-                      tooltip: 'สลับคลัง',
-                      onPressed: () {
-                        setState(() {
-                          final tmp = _fromWarehouseId;
-                          _fromWarehouseId = _toWarehouseId;
-                          _toWarehouseId = tmp;
-                          _selectedStock = null;
-                          _qtyController.clear();
-                        });
-                      },
-                    ),
-                  ],
-                ),
-              ),
-
-              // ปลายทาง
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'ปลายทาง',
-                      style: TextStyle(fontSize: 11, color: Colors.grey),
-                    ),
-                    DropdownButtonFormField<String>(
-                      initialValue: _toWarehouseId,
-                      isDense: true,
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 8,
-                        ),
-                      ),
-                      items: _warehouses
-                          .where((w) => w['id'] != _fromWarehouseId)
-                          .map(
-                            (w) => DropdownMenuItem(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: value,
+                    isDense: true,
+                    isExpanded: true,
+                    dropdownColor: bgColor,
+                    style: TextStyle(fontSize: 13, color: cs.onSurface),
+                    icon: Icon(Icons.arrow_drop_down,
+                        size: 18, color: cs.onSurface.withValues(alpha: 0.6)),
+                    items: items
+                        .map((w) => DropdownMenuItem(
                               value: w['id'],
-                              child: Text(
-                                w['name']!,
-                                style: const TextStyle(fontSize: 13),
-                              ),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (v) {
-                        if (v != null) {
-                          setState(() {
-                            _toWarehouseId = v;
-                          });
-                        }
-                      },
-                    ),
-                  ],
+                              child: Text(w['name']!,
+                                  style: TextStyle(
+                                      fontSize: 13, color: cs.onSurface)),
+                            ))
+                        .toList(),
+                    onChanged: onChanged,
+                  ),
                 ),
               ),
             ],
           ),
-        ],
-      ),
-    );
+        );
+      }
+
+      return Container(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+        color: cs.surface,
+        child: Row(
+          children: [
+            warehouseDropdown(
+              label: 'ต้นทาง',
+              value: _fromWarehouseId,
+              items: _warehouses,
+              onChanged: (v) {
+                if (v != null && v != _fromWarehouseId) {
+                  setState(() {
+                    _fromWarehouseId = v;
+                    if (_fromWarehouseId == _toWarehouseId) {
+                      _toWarehouseId = _warehouses
+                          .firstWhere((w) => w['id'] != _fromWarehouseId)['id']!;
+                    }
+                    _selectedStock = null;
+                    _qtyController.clear();
+                  });
+                }
+              },
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: 18, left: 6, right: 6),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () {
+                  setState(() {
+                    final tmp = _fromWarehouseId;
+                    _fromWarehouseId = _toWarehouseId;
+                    _toWarehouseId = tmp;
+                    _selectedStock = null;
+                    _qtyController.clear();
+                  });
+                },
+                child: const Padding(
+                  padding: EdgeInsets.all(4),
+                  child: Icon(Icons.swap_horiz,
+                      size: 20, color: AppTheme.tealColor),
+                ),
+              ),
+            ),
+            warehouseDropdown(
+              label: 'ปลายทาง',
+              value: _toWarehouseId,
+              items:
+                  _warehouses.where((w) => w['id'] != _fromWarehouseId).toList(),
+              onChanged: (v) {
+                if (v != null) setState(() => _toWarehouseId = v);
+              },
+            ),
+          ],
+        ),
+      );
+    });
   }
 
   // ── Empty State ───────────────────────────────────────────────
@@ -2094,16 +2329,27 @@ class _StockTransferSubPageState extends ConsumerState<StockTransferSubPage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.touch_app, size: 64, color: Colors.grey[400]),
-          const SizedBox(height: 16),
-          Text(
-            'เลือกสินค้าที่ต้องการโอนย้าย',
-            style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppTheme.tealColor.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.swap_horiz,
+                size: 48, color: AppTheme.tealColor),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 16),
+          const Text(
+            'เลือกสินค้าที่ต้องการโอนย้าย',
+            style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF1A1A1A)),
+          ),
+          const SizedBox(height: 6),
           Text(
             'จาก ${_warehouseName(_fromWarehouseId)} → ${_warehouseName(_toWarehouseId)}',
-            style: TextStyle(fontSize: 13, color: Colors.purple[400]),
+            style: const TextStyle(fontSize: 13, color: AppTheme.tealColor),
           ),
         ],
       ),
@@ -2123,62 +2369,68 @@ class _StockTransferSubPageState extends ConsumerState<StockTransferSubPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ── Product Info Card ──────────────────────────
-            Card(
-              color: Colors.purple[50],
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.inventory_2,
-                      color: Colors.purple,
-                      size: 40,
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppTheme.tealColor.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                    color: AppTheme.tealColor.withValues(alpha: 0.25)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppTheme.tealColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            stock.productName,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Text(
-                            'รหัส: ${stock.productCode}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
+                    child: const Icon(Icons.inventory_2,
+                        color: AppTheme.tealColor, size: 32),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'สต๊อกในคลังต้นทาง',
-                          style: TextStyle(fontSize: 11),
-                        ),
                         Text(
-                          stock.balance.toStringAsFixed(0),
+                          stock.productName,
                           style: const TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.purple,
-                          ),
+                              fontSize: 15, fontWeight: FontWeight.bold,
+                              color: Color(0xFF1A1A1A)),
                         ),
+                        const SizedBox(height: 2),
                         Text(
-                          stock.baseUnit,
-                          style: TextStyle(color: Colors.grey[600]),
+                          'รหัส: ${stock.productCode}',
+                          style: const TextStyle(
+                              fontSize: 12, color: Color(0xFF8A8A8A)),
                         ),
                       ],
                     ),
-                  ],
-                ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      const Text(
+                        'สต๊อกต้นทาง',
+                        style: TextStyle(
+                            fontSize: 11, color: Color(0xFF8A8A8A)),
+                      ),
+                      Text(
+                        stock.balance.toStringAsFixed(0),
+                        style: const TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.tealColor),
+                      ),
+                      Text(
+                        stock.baseUnit,
+                        style: const TextStyle(
+                            fontSize: 12, color: Color(0xFF8A8A8A)),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 20),
@@ -2196,11 +2448,8 @@ class _StockTransferSubPageState extends ConsumerState<StockTransferSubPage> {
                 ),
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 12),
-                  child: Icon(
-                    Icons.arrow_forward,
-                    color: Colors.purple,
-                    size: 32,
-                  ),
+                  child: Icon(Icons.arrow_forward,
+                      color: AppTheme.tealColor, size: 32),
                 ),
                 Expanded(
                   child: _RouteCard(
@@ -2225,7 +2474,8 @@ class _StockTransferSubPageState extends ConsumerState<StockTransferSubPage> {
                 labelText: 'จำนวนที่ต้องการโอน *',
                 border: const OutlineInputBorder(),
                 suffixText: stock.baseUnit,
-                prefixIcon: const Icon(Icons.swap_horiz, color: Colors.purple),
+                prefixIcon: const Icon(Icons.swap_horiz,
+                    color: AppTheme.tealColor),
                 helperText:
                     'โอนได้สูงสุด ${stock.balance.toStringAsFixed(0)} ${stock.baseUnit}',
               ),
@@ -2249,11 +2499,10 @@ class _StockTransferSubPageState extends ConsumerState<StockTransferSubPage> {
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: Colors.purple[50],
+                  color: AppTheme.tealColor.withValues(alpha: 0.06),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: Colors.purple.withValues(alpha: 0.3),
-                  ),
+                      color: AppTheme.tealColor.withValues(alpha: 0.25)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -2261,9 +2510,8 @@ class _StockTransferSubPageState extends ConsumerState<StockTransferSubPage> {
                     const Text(
                       'ผลลัพธ์หลังโอน',
                       style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.purple,
-                      ),
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.tealColor),
                     ),
                     const SizedBox(height: 10),
                     Row(
@@ -2277,7 +2525,8 @@ class _StockTransferSubPageState extends ConsumerState<StockTransferSubPage> {
                           unit: stock.baseUnit,
                           color: Colors.red,
                         ),
-                        const Icon(Icons.arrow_forward, color: Colors.purple),
+                        const Icon(Icons.arrow_forward,
+                            color: AppTheme.tealColor),
                         _PreviewTransferItem(
                           label: '${_warehouseName(_toWarehouseId)}\n(ปลายทาง)',
                           before: null,
@@ -2330,7 +2579,7 @@ class _StockTransferSubPageState extends ConsumerState<StockTransferSubPage> {
                   flex: 2,
                   child: ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.purple,
+                      backgroundColor: AppTheme.tealColor,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
@@ -2389,7 +2638,7 @@ class _StockTransferSubPageState extends ConsumerState<StockTransferSubPage> {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.purple,
+              backgroundColor: AppTheme.tealColor,
               foregroundColor: Colors.white,
             ),
             onPressed: () => Navigator.pop(context, true),
@@ -2425,7 +2674,9 @@ class _StockTransferSubPageState extends ConsumerState<StockTransferSubPage> {
                 ? '✅ โอนย้าย ${_selectedStock!.productName} ${qty.toStringAsFixed(0)} ${_selectedStock!.baseUnit} สำเร็จ'
                 : '❌ เกิดข้อผิดพลาด กรุณาลองใหม่',
           ),
-          backgroundColor: success ? Colors.green : Colors.red,
+          backgroundColor:
+              success ? AppTheme.successColor : AppTheme.errorColor,
+          behavior: SnackBarBehavior.floating,
         ),
       );
 
@@ -2437,6 +2688,117 @@ class _StockTransferSubPageState extends ConsumerState<StockTransferSubPage> {
         });
       }
     }
+  }
+}
+
+// ── Widget: Transfer Item Card ─────────────────────────────────
+class _TransferItemCard extends StatelessWidget {
+  final StockBalanceModel stock;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _TransferItemCard({
+    required this.stock,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  static final _avatarColors = [
+    AppTheme.tealColor,
+    AppTheme.successColor,
+    AppTheme.infoColor,
+    AppTheme.warningColor,
+    AppTheme.purpleColor,
+    AppTheme.primaryColor,
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final initial = stock.productName.isNotEmpty
+        ? stock.productName.substring(0, 1).toUpperCase()
+        : '?';
+    final avatarColor =
+        _avatarColors[stock.productName.codeUnitAt(0) % _avatarColors.length];
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppTheme.tealColor.withValues(alpha: 0.06)
+              : Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected ? AppTheme.tealColor : AppTheme.border,
+            width: isSelected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 18,
+              backgroundColor:
+                  isSelected ? AppTheme.tealColor : avatarColor,
+              child: Text(
+                initial,
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    stock.productName,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: isSelected
+                          ? AppTheme.tealColor
+                          : const Color(0xFF1A1A1A),
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${stock.productCode} • ${stock.warehouseName}',
+                    style: const TextStyle(
+                        fontSize: 11, color: AppTheme.textSub),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  stock.balance.toStringAsFixed(0),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: stock.balance > 0
+                        ? AppTheme.success
+                        : AppTheme.error,
+                  ),
+                ),
+                Text(
+                  stock.baseUnit,
+                  style: const TextStyle(
+                      fontSize: 10, color: AppTheme.textSub),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -2662,29 +3024,91 @@ class _VarianceReportPageState extends ConsumerState<VarianceReportPage> {
   Widget build(BuildContext context) {
     final movementsAsync = ref.watch(movementHistoryProvider);
     final stockAsync = ref.watch(stockBalanceProvider);
+    final canPop = Navigator.of(context).canPop();
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('รายงานผลต่าง (Variance Report)'),
-        backgroundColor: Colors.teal,
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              ref.invalidate(movementHistoryProvider);
-              ref.read(stockBalanceProvider.notifier).refresh();
-            },
+      backgroundColor: const Color(0xFFF5F5F5),
+      body: Column(
+        children: [
+          // ── Top Bar ────────────────────────────────────────────
+          Container(
+            color: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                if (canPop) ...[
+                  InkWell(
+                    onTap: () => Navigator.of(context).pop(),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF5F5F5),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppTheme.border),
+                      ),
+                      child: const Icon(Icons.arrow_back_ios_new,
+                          size: 15, color: Color(0xFF8A8A8A)),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                ],
+                Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    color: AppTheme.purpleColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.analytics_outlined,
+                      color: AppTheme.purpleColor, size: 18),
+                ),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text(
+                    'รายงานผลต่าง',
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1A1A1A)),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Tooltip(
+                  message: 'รีเฟรช',
+                  child: InkWell(
+                    onTap: () {
+                      ref.invalidate(movementHistoryProvider);
+                      ref.read(stockBalanceProvider.notifier).refresh();
+                    },
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF5F5F5),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppTheme.border),
+                      ),
+                      child: const Icon(Icons.refresh,
+                          size: 17, color: Color(0xFF8A8A8A)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ],
-      ),
-      body: movementsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('เกิดข้อผิดพลาด: $e')),
-        data: (movements) => stockAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Text('เกิดข้อผิดพลาด: $e')),
-          data: (stocks) {
+          const Divider(height: 1),
+
+          // ── Body ────────────────────────────────────────────────
+          Expanded(
+            child: movementsAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(child: Text('เกิดข้อผิดพลาด: $e')),
+              data: (movements) => stockAsync.when(
+                loading: () =>
+                    const Center(child: CircularProgressIndicator()),
+                error: (e, _) =>
+                    Center(child: Text('เกิดข้อผิดพลาด: $e')),
+                data: (stocks) {
             // สร้าง lookup map: productId → stock info
             final stockMap = <String, StockBalanceModel>{};
             for (final s in stocks) {
@@ -2768,8 +3192,11 @@ class _VarianceReportPageState extends ConsumerState<VarianceReportPage> {
                 ),
               ],
             );
-          },
-        ),
+                },
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -2778,33 +3205,36 @@ class _VarianceReportPageState extends ConsumerState<VarianceReportPage> {
   Widget _buildFilterBar() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      color: Colors.teal[50],
+      color: Colors.white,
       child: Row(
         children: [
           // ประเภท
           const Text(
             'ประเภท:',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+            style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF1A1A1A)),
           ),
           const SizedBox(width: 8),
           _FilterChip(
             label: 'ทั้งหมด',
             selected: _filterType == 'ALL',
-            color: Colors.teal,
+            color: AppTheme.purpleColor,
             onTap: () => setState(() => _filterType = 'ALL'),
           ),
           const SizedBox(width: 4),
           _FilterChip(
             label: '↑ เกิน',
             selected: _filterType == 'INCREASE',
-            color: Colors.blue,
+            color: AppTheme.infoColor,
             onTap: () => setState(() => _filterType = 'INCREASE'),
           ),
           const SizedBox(width: 4),
           _FilterChip(
             label: '↓ ขาด',
             selected: _filterType == 'DECREASE',
-            color: Colors.red,
+            color: AppTheme.errorColor,
             onTap: () => setState(() => _filterType = 'DECREASE'),
           ),
           const SizedBox(width: 16),
@@ -2812,25 +3242,44 @@ class _VarianceReportPageState extends ConsumerState<VarianceReportPage> {
           // คลัง
           const Text(
             'คลัง:',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+            style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF1A1A1A)),
           ),
           const SizedBox(width: 8),
-          DropdownButton<String>(
-            value: _filterWarehouse,
-            isDense: true,
-            items: _warehouses
-                .map(
-                  (w) => DropdownMenuItem(
-                    value: w['id'],
-                    child: Text(
-                      w['name']!,
-                      style: const TextStyle(fontSize: 13),
-                    ),
-                  ),
-                )
-                .toList(),
-            onChanged: (v) => setState(() => _filterWarehouse = v ?? 'ALL'),
-          ),
+          Builder(builder: (ctx) {
+            final cs = Theme.of(ctx).colorScheme;
+            return Container(
+              height: 34,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              decoration: BoxDecoration(
+                color: cs.surface,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                    color: cs.outline.withValues(alpha: 0.4)),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: _filterWarehouse,
+                  isDense: true,
+                  dropdownColor: cs.surface,
+                  style: TextStyle(fontSize: 13, color: cs.onSurface),
+                  iconEnabledColor: cs.onSurface.withValues(alpha: 0.6),
+                  items: _warehouses
+                      .map((w) => DropdownMenuItem(
+                            value: w['id'],
+                            child: Text(w['name']!,
+                                style: TextStyle(
+                                    fontSize: 13, color: cs.onSurface)),
+                          ))
+                      .toList(),
+                  onChanged: (v) =>
+                      setState(() => _filterWarehouse = v ?? 'ALL'),
+                ),
+              ),
+            );
+          }),
           const SizedBox(width: 16),
 
           // ช่วงวันที่
@@ -2844,8 +3293,11 @@ class _VarianceReportPageState extends ConsumerState<VarianceReportPage> {
               style: const TextStyle(fontSize: 12),
             ),
             style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              side: BorderSide(color: Colors.teal.shade300),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              side: BorderSide(
+                  color: AppTheme.purpleColor.withValues(alpha: 0.5)),
+              foregroundColor: AppTheme.purpleColor,
             ),
           ),
           if (_dateRange != null) ...[
@@ -2929,7 +3381,7 @@ class _VarianceReportPageState extends ConsumerState<VarianceReportPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.teal[700],
+        color: AppTheme.purpleColor,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
       ),
       child: const Row(
@@ -2955,14 +3407,20 @@ class _VarianceReportPageState extends ConsumerState<VarianceReportPage> {
 
   Widget _buildTableRow(_VarianceItem item) {
     final isIncrease = item.variance > 0;
-    final varColor = isIncrease ? Colors.blue[700]! : Colors.red[700]!;
-    final rowBg = isIncrease ? Colors.blue[50]! : Colors.red[50]!;
+    final varColor =
+        isIncrease ? AppTheme.infoColor : AppTheme.errorColor;
+    final rowBg = isIncrease
+        ? AppTheme.infoContainer
+        : AppTheme.errorContainer;
+    final borderColor = isIncrease
+        ? AppTheme.infoColor.withValues(alpha: 0.2)
+        : AppTheme.errorColor.withValues(alpha: 0.2);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: rowBg,
-        border: Border(bottom: BorderSide(color: Colors.grey[200]!)),
+        border: Border(bottom: BorderSide(color: borderColor)),
       ),
       child: Row(
         children: [
@@ -2975,13 +3433,14 @@ class _VarianceReportPageState extends ConsumerState<VarianceReportPage> {
                 Text(
                   item.productName,
                   style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1A1A1A)),
                 ),
                 Text(
                   item.productCode,
-                  style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                  style: const TextStyle(
+                      fontSize: 11, color: Color(0xFF8A8A8A)),
                 ),
               ],
             ),
@@ -2993,7 +3452,8 @@ class _VarianceReportPageState extends ConsumerState<VarianceReportPage> {
             flex: 2,
             child: Text(
               item.warehouseName,
-              style: const TextStyle(fontSize: 12),
+              style: const TextStyle(
+                  fontSize: 12, color: Color(0xFF1A1A1A)),
             ),
           ),
           const SizedBox(width: 8),
@@ -3013,10 +3473,9 @@ class _VarianceReportPageState extends ConsumerState<VarianceReportPage> {
                 Text(
                   '${isIncrease ? '+' : ''}${item.variance.toStringAsFixed(0)} ${item.baseUnit}',
                   style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: varColor,
-                    fontSize: 13,
-                  ),
+                      fontWeight: FontWeight.bold,
+                      color: varColor,
+                      fontSize: 13),
                 ),
               ],
             ),
@@ -3028,7 +3487,8 @@ class _VarianceReportPageState extends ConsumerState<VarianceReportPage> {
             width: 100,
             child: Text(
               item.referenceNo ?? '-',
-              style: const TextStyle(fontSize: 12),
+              style: const TextStyle(
+                  fontSize: 12, color: Color(0xFF1A1A1A)),
             ),
           ),
           const SizedBox(width: 8),
@@ -3038,7 +3498,8 @@ class _VarianceReportPageState extends ConsumerState<VarianceReportPage> {
             flex: 2,
             child: Text(
               item.remark ?? '-',
-              style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+              style: const TextStyle(
+                  fontSize: 12, color: Color(0xFF8A8A8A)),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -3050,7 +3511,8 @@ class _VarianceReportPageState extends ConsumerState<VarianceReportPage> {
             width: 100,
             child: Text(
               _formatDateTime(item.date),
-              style: const TextStyle(fontSize: 11),
+              style: const TextStyle(
+                  fontSize: 11, color: Color(0xFF1A1A1A)),
             ),
           ),
         ],
@@ -3064,15 +3526,32 @@ class _VarianceReportPageState extends ConsumerState<VarianceReportPage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.analytics_outlined, size: 64, color: Colors.grey[400]),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppTheme.purpleColor.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.analytics_outlined,
+                size: 48, color: AppTheme.purpleColor),
+          ),
           const SizedBox(height: 16),
           Text(
             noAdjustAtAll
-                ? 'ยังไม่มีการปรับสต๊อก\nกรุณานับสต๊อกผ่านหน้า "ตรวจนับสต๊อก" ก่อน'
+                ? 'ยังไม่มีการปรับสต๊อก'
                 : 'ไม่พบข้อมูลในช่วงที่เลือก',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.grey[600], height: 1.6),
+            style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF1A1A1A)),
           ),
+          if (noAdjustAtAll) ...[
+            const SizedBox(height: 6),
+            const Text(
+              'กรุณานับสต๊อกผ่านหน้า "ตรวจนับสต๊อก" ก่อน',
+              style: TextStyle(fontSize: 13, color: Color(0xFF8A8A8A)),
+            ),
+          ],
         ],
       ),
     );
@@ -3092,9 +3571,11 @@ class _VarianceReportPageState extends ConsumerState<VarianceReportPage> {
             end: now,
           ),
       builder: (context, child) => Theme(
-        data: Theme.of(
-          context,
-        ).copyWith(colorScheme: const ColorScheme.light(primary: Colors.teal)),
+        data: Theme.of(context).copyWith(
+          colorScheme: Theme.of(context).colorScheme.copyWith(
+                primary: AppTheme.purpleColor,
+              ),
+        ),
         child: child!,
       ),
     );
@@ -3131,13 +3612,18 @@ class _FilterChip extends StatelessWidget {
         decoration: BoxDecoration(
           color: selected ? color : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: selected ? color : Colors.grey[400]!),
+          border: Border.all(
+              color: selected
+                  ? color
+                  : Theme.of(context).colorScheme.outline.withValues(alpha: 0.4)),
         ),
         child: Text(
           label,
           style: TextStyle(
             fontSize: 12,
-            color: selected ? Colors.white : Colors.grey[700],
+            color: selected
+                ? Colors.white
+                : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
             fontWeight: selected ? FontWeight.bold : FontWeight.normal,
           ),
         ),
@@ -3179,22 +3665,17 @@ class _SummaryStatCard extends StatelessWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  label,
-                  style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                ),
-                Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: color,
-                  ),
-                ),
-                Text(
-                  unit,
-                  style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                ),
+                Text(label,
+                    style: const TextStyle(
+                        fontSize: 11, color: Color(0xFF8A8A8A))),
+                Text(value,
+                    style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: color)),
+                Text(unit,
+                    style: const TextStyle(
+                        fontSize: 11, color: Color(0xFF8A8A8A))),
               ],
             ),
           ],

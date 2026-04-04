@@ -15,6 +15,7 @@ class ProductRoutes {
     final router = Router();
 
     router.get('/', _getProductsHandler);
+    router.get('/groups', _getGroupsHandler);
     router.get('/<id>/check-delete', _checkDeleteProductHandler);
     router.get('/<id>', _getProductHandler);
     router.post('/', _createProductHandler);
@@ -46,6 +47,33 @@ class ProductRoutes {
         'is_active': p.isActive,
         'image_path': p.imagePath,
       };
+
+  // ─────────────────────────────────────────────────────────────
+  // GET /api/products/groups — คืน product groups ทั้งหมด
+  // ─────────────────────────────────────────────────────────────
+  Future<Response> _getGroupsHandler(Request request) async {
+    try {
+      final rows = await db.select(db.productGroups).get();
+      final data = rows
+          .map((g) => {
+                'group_id': g.groupId,
+                'group_code': g.groupCode,
+                'group_name': g.groupName,
+              })
+          .toList()
+        ..sort((a, b) =>
+            (a['group_name'] as String).compareTo(b['group_name'] as String));
+      return Response.ok(
+        jsonEncode({'success': true, 'data': data}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    } catch (e) {
+      return Response.internalServerError(
+        body: jsonEncode({'success': false, 'message': '$e'}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+  }
 
   // ─────────────────────────────────────────────────────────────
   // GET /api/products

@@ -12,9 +12,10 @@ class SalesOrderModel {
   final double changeAmount;
   final String status;
   final List<SalesOrderItemModel>? items;
-  final List<String>? couponCodes;   // รหัสคูปองที่ใช้
-  final double couponDiscount;       // ส่วนลดรวมจากคูปอง
-  final int pointsUsed;              // แต้มที่แลกในใบขายนี้
+  final List<String>? couponCodes;           // รหัสคูปองที่ใช้
+  final Map<String, String>? couponPromotionNames; // code → promotionName
+  final double couponDiscount;               // ส่วนลดรวมจากคูปอง
+  final int pointsUsed;                      // แต้มที่แลกในใบขายนี้
 
   SalesOrderModel({
     required this.orderId,
@@ -31,10 +32,11 @@ class SalesOrderModel {
     required this.status,
     this.items,
     this.couponCodes,
+    this.couponPromotionNames,
     this.couponDiscount = 0.0,
     this.pointsUsed = 0,
   });
-  
+
   factory SalesOrderModel.fromJson(Map<String, dynamic> json) {
     return SalesOrderModel(
       orderId: json['order_id'] as String,
@@ -56,6 +58,8 @@ class SalesOrderModel {
               .toList()
           : null,
       couponCodes: (json['coupon_codes'] as List?)?.map((e) => e.toString()).toList(),
+      couponPromotionNames: (json['coupon_promotion_names'] as Map<String, dynamic>?)
+          ?.map((k, v) => MapEntry(k, v.toString())),
       couponDiscount: (json['coupon_discount'] as num?)?.toDouble() ?? 0.0,
       pointsUsed: (json['points_used'] as int?) ?? 0,
     );
@@ -92,7 +96,9 @@ class SalesOrderItemModel {
   final double quantity;
   final double unitPrice;
   final double amount;
-  
+  final bool isFreeItem;
+  final String? promotionName;
+
   SalesOrderItemModel({
     required this.itemId,
     required this.orderId,
@@ -102,8 +108,10 @@ class SalesOrderItemModel {
     required this.quantity,
     required this.unitPrice,
     required this.amount,
+    this.isFreeItem = false,
+    this.promotionName,
   });
-  
+
   factory SalesOrderItemModel.fromJson(Map<String, dynamic> json) {
     return SalesOrderItemModel(
       itemId: json['item_id'] as String? ?? '',
@@ -114,9 +122,11 @@ class SalesOrderItemModel {
       quantity: (json['quantity'] as num).toDouble(),
       unitPrice: (json['unit_price'] as num).toDouble(),
       amount: (json['amount'] as num).toDouble(),
+      isFreeItem: (json['is_free_item'] as bool?) ?? false,
+      promotionName: json['promotion_name'] as String?,
     );
   }
-  
+
   Map<String, dynamic> toJson() {
     return {
       'item_id': itemId,
@@ -127,6 +137,8 @@ class SalesOrderItemModel {
       'quantity': quantity,
       'unit_price': unitPrice,
       'amount': amount,
+      'is_free_item': isFreeItem,
+      'promotion_name': promotionName,
     };
   }
 }

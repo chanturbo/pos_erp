@@ -67,6 +67,10 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
         order.customerId!.isEmpty;
     final hasMember = !isWalkIn;
 
+    final allItems     = order.items ?? [];
+    final regularItems = allItems.where((i) => !i.isFreeItem).toList();
+    final freeItems    = allItems.where((i) => i.isFreeItem).toList();
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Center(
@@ -169,26 +173,46 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'รายการสินค้า',
-                        style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold),
+                      Row(
+                        children: [
+                          const Text(
+                            'รายการสินค้า',
+                            style: TextStyle(
+                                fontSize: 18, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.blue[100],
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '${regularItems.length} รายการ',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.blue[800],
+                                  fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ],
                       ),
                       const Divider(),
-                      ...?order.items?.map((item) => _buildItemRow(item)),
+                      ...regularItems.map((item) => _buildItemRow(item)),
                     ],
                   ),
                 ),
               ),
               const SizedBox(height: 16),
 
-              // ── Coupon Card ───────────────────────────────────
-              if (order.couponCodes != null &&
-                  order.couponCodes!.isNotEmpty)
-                _buildCouponCard(order),
+              // ── Promotion Card ───────────────────────────────
+              if ((order.couponCodes != null && order.couponCodes!.isNotEmpty) ||
+                  freeItems.isNotEmpty)
+                _buildPromotionCard(order, freeItems),
 
-              if (order.couponCodes != null &&
-                  order.couponCodes!.isNotEmpty)
+              if ((order.couponCodes != null && order.couponCodes!.isNotEmpty) ||
+                  freeItems.isNotEmpty)
                 const SizedBox(height: 16),
 
               // ── Summary Card ─────────────────────────────────
@@ -287,119 +311,236 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
     );
   }
 
-  Widget _buildCouponCard(SalesOrderModel order) {
+  Widget _buildPromotionCard(SalesOrderModel order, List<SalesOrderItemModel> freeItems) {
     final fmt = NumberFormat('#,##0.00', 'th_TH');
-    final codes = order.couponCodes!;
+    final codes = order.couponCodes ?? [];
     final totalDiscount = order.couponDiscount;
+    final hasCoupons = codes.isNotEmpty;
 
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: const Color(0xFFE8F5E9),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFF4CAF50)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ── Header ──────────────────────────────────────
-              Row(
-                children: [
-                  const Icon(Icons.confirmation_number_outlined,
-                      size: 18, color: Color(0xFF1565C0)),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'คูปองส่วนลด',
-                    style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF1565C0)),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF4CAF50),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      '${codes.length} ใบ',
-                      style: const TextStyle(
-                          fontSize: 11,
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    'ส่วนลดรวม ฿${fmt.format(totalDiscount)}',
-                    style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF2E7D32)),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              // ── Coupon chips ─────────────────────────────────
-              Wrap(
-                spacing: 8,
-                runSpacing: 6,
-                children: codes.asMap().entries.map((e) {
-                  final perCoupon = totalDiscount / codes.length;
-                  final isLast = e.key == codes.length - 1;
-                  final amt = isLast
-                      ? totalDiscount - perCoupon * e.key
-                      : perCoupon;
-                  return Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF4CAF50).withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                          color: const Color(0xFF4CAF50)
-                              .withValues(alpha: 0.4)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.local_offer, size: 18, color: Colors.deepPurple),
+                const SizedBox(width: 8),
+                const Text(
+                  'โปรโมชั่นที่ใช้',
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const Divider(),
+
+            // ── คูปองส่วนลด ──────────────────────────────────
+            if (hasCoupons) ...[
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F5E9),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFF4CAF50)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       children: [
-                        const Icon(Icons.check_circle,
-                            size: 13, color: Color(0xFF2E7D32)),
-                        const SizedBox(width: 5),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              e.value,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 1,
-                                color: Color(0xFF1B5E20),
-                              ),
-                            ),
-                            Text(
-                              'ลด ฿${fmt.format(amt)}',
-                              style: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF2E7D32)),
-                            ),
-                          ],
+                        const Icon(Icons.confirmation_number_outlined,
+                            size: 18, color: Color(0xFF1565C0)),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'คูปองส่วนลด',
+                          style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF1565C0)),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF4CAF50),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            '${codes.length} ใบ',
+                            style: const TextStyle(
+                                fontSize: 11,
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          'ส่วนลดรวม ฿${fmt.format(totalDiscount)}',
+                          style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF2E7D32)),
                         ),
                       ],
                     ),
-                  );
-                }).toList(),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: codes.asMap().entries.map((e) {
+                        final perCoupon = totalDiscount / codes.length;
+                        final isLast = e.key == codes.length - 1;
+                        final amt = isLast
+                            ? totalDiscount - perCoupon * e.key
+                            : perCoupon;
+                        final promoName = order.couponPromotionNames?[e.value];
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF4CAF50).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                                color: const Color(0xFF4CAF50)
+                                    .withValues(alpha: 0.4)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.check_circle,
+                                  size: 13, color: Color(0xFF2E7D32)),
+                              const SizedBox(width: 5),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    e.value,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 1,
+                                      color: Color(0xFF1B5E20),
+                                    ),
+                                  ),
+                                  if (promoName != null && promoName.isNotEmpty)
+                                    Text(
+                                      promoName,
+                                      style: const TextStyle(
+                                          fontSize: 10,
+                                          color: Color(0xFF388E3C)),
+                                    ),
+                                  Text(
+                                    'ลด ฿${fmt.format(amt)}',
+                                    style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFF2E7D32)),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
               ),
             ],
-          ),
+
+            // ── สินค้าแถมฟรี (BUY_X_GET_Y) ──────────────────
+            if (freeItems.isNotEmpty) ...[
+              if (hasCoupons) const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.green[50],
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.green[300]!),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.card_giftcard,
+                            size: 18, color: Colors.green),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'ของแถมฟรี',
+                          style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.green),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.green,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            '${freeItems.length} รายการ',
+                            style: const TextStyle(
+                                fontSize: 11,
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    ...freeItems.map((item) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          children: [
+                            const Text('🎁 ', style: TextStyle(fontSize: 14)),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    item.productName,
+                                    style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500,
+                                        color: Color(0xFF1B5E20)),
+                                  ),
+                                  if (item.promotionName != null &&
+                                      item.promotionName!.isNotEmpty)
+                                    Text(
+                                      item.promotionName!,
+                                      style: TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.green[700]),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            Text(
+                              'x${item.quantity.toStringAsFixed(0)}  ฿0.00',
+                              style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.green,
+                                  fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -571,15 +712,16 @@ class _OrderReceiptPage extends ConsumerWidget {
       };
 
   static List<ReceiptCoupon> _buildCoupons(
-      List<String> codes, double total) {
+      List<String> codes, double total, Map<String, String>? promoNames) {
     if (codes.isEmpty || total <= 0) return [];
     final perCoupon = total / codes.length;
     return codes.asMap().entries.map((e) {
       final isLast = e.key == codes.length - 1;
       final already = perCoupon * e.key;
       return ReceiptCoupon(
-        code:     e.value,
-        discount: isLast ? total - already : perCoupon,
+        code:          e.value,
+        discount:      isLast ? total - already : perCoupon,
+        promotionName: promoNames?[e.value],
       );
     }).toList();
   }
@@ -594,6 +736,10 @@ class _OrderReceiptPage extends ConsumerWidget {
         order.customerId == 'WALK_IN' ||
         order.customerId!.isEmpty;
     final earnedPoints = isWalkIn ? 0 : calculateEarnedPoints(order.totalAmount);
+
+    final allItems    = order.items ?? [];
+    final regularItems = allItems.where((i) => !i.isFreeItem).toList();
+    final freeItems    = allItems.where((i) => i.isFreeItem).toList();
 
     return Scaffold(
       backgroundColor: const Color(0xFFEEEEEE),
@@ -611,16 +757,23 @@ class _OrderReceiptPage extends ConsumerWidget {
             orderNo:      order.orderNo,
             orderDate:    dateFmt.format(order.orderDate),
             customerName: order.customerName,
-            items: (order.items ?? []).map((i) => ReceiptItem(
+            items: regularItems.map((i) => ReceiptItem(
                   name:      i.productName,
                   quantity:  i.quantity,
                   unitPrice: i.unitPrice,
                   amount:    i.amount,
                 )).toList(),
+            freeItems: freeItems.map((i) => ReceiptFreeItem(
+                  name:          i.productName,
+                  quantity:      i.quantity,
+                  promotionName: i.promotionName,
+                )).toList(),
             subtotal:     order.subtotal,
             discount:     order.discountAmount - order.couponDiscount,
             coupons: _buildCoupons(
-                order.couponCodes ?? [], order.couponDiscount),
+                order.couponCodes ?? [],
+                order.couponDiscount,
+                order.couponPromotionNames),
             total:        order.totalAmount,
             paymentLabel: _paymentLabel(order.paymentType),
             paymentType:  order.paymentType,

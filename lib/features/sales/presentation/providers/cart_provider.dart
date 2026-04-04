@@ -1,4 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../promotions/data/models/promotion_model.dart';
+import '../../../products/data/models/product_model.dart';
 
 // ─── Applied Coupon ───────────────────────────────────────────────
 class AppliedCoupon {
@@ -26,6 +28,9 @@ class CartItem {
   final double quantity;
   final double unitPrice;
   final double amount;
+  final String? groupId;      // สำหรับ CATEGORY matching ใน BUY_X_GET_Y
+  final String? promotionId;  // โปรโมชั่นที่ให้ของแถมนี้ (freeItems เท่านั้น)
+  final String? promotionName;
 
   // ✅ เก็บราคาทุก level ไว้ เพื่อให้ re-price ได้เมื่อเปลี่ยนลูกค้า
   final double priceLevel1;
@@ -42,6 +47,9 @@ class CartItem {
     required this.quantity,
     required this.unitPrice,
     required this.amount,
+    this.groupId,
+    this.promotionId,
+    this.promotionName,
     this.priceLevel1 = 0,
     this.priceLevel2 = 0,
     this.priceLevel3 = 0,
@@ -73,6 +81,9 @@ class CartItem {
       quantity: quantity ?? this.quantity,
       unitPrice: unitPrice ?? this.unitPrice,
       amount: amount ?? this.amount,
+      groupId: groupId,
+      promotionId: promotionId,
+      promotionName: promotionName,
       priceLevel1: priceLevel1,
       priceLevel2: priceLevel2,
       priceLevel3: priceLevel3,
@@ -85,6 +96,7 @@ class CartItem {
 // Cart State
 class CartState {
   final List<CartItem> items;
+  final List<CartItem> freeItems; // ของแถมจาก BUY_X_GET_Y
   final String? customerId;
   final String? customerName;
   final int customerPriceLevel; // ✅ เพิ่ม: ระดับราคาของลูกค้า (1-5)
@@ -94,6 +106,7 @@ class CartState {
 
   CartState({
     this.items = const [],
+    this.freeItems = const [],
     this.customerId = 'WALK_IN',
     this.customerName = 'ลูกค้าทั่วไป',
     this.customerPriceLevel = 1,
@@ -118,9 +131,11 @@ class CartState {
   double get total => subtotal - totalDiscount - totalCouponDiscount;
 
   int get itemCount => items.length;
+  bool get hasFreeItems => freeItems.isNotEmpty;
 
   CartState copyWith({
     List<CartItem>? items,
+    List<CartItem>? freeItems,
     String? customerId,
     String? customerName,
     int? customerPriceLevel,
@@ -131,6 +146,7 @@ class CartState {
   }) {
     return CartState(
       items: items ?? this.items,
+      freeItems: freeItems ?? this.freeItems,
       customerId: clearCustomer ? 'WALK_IN' : (customerId ?? this.customerId),
       customerName:
           clearCustomer ? 'ลูกค้าทั่วไป' : (customerName ?? this.customerName),
@@ -162,6 +178,7 @@ class CartNotifier extends Notifier<CartState> {
     required String unit,
     required double unitPrice,
     double quantity = 1,
+    String? groupId,
     // ✅ รับราคาทุก level เพื่อให้ re-price ได้
     double priceLevel1 = 0,
     double priceLevel2 = 0,
@@ -192,6 +209,7 @@ class CartNotifier extends Notifier<CartState> {
         quantity: quantity,
         unitPrice: unitPrice,
         amount: quantity * unitPrice,
+        groupId: groupId,
         priceLevel1: p1,
         priceLevel2: priceLevel2,
         priceLevel3: priceLevel3,
@@ -324,7 +342,100 @@ class CartNotifier extends Notifier<CartState> {
 
   /// เคลียร์ตะกร้า
   void clear() {
-    state = CartState(); // Reset เป็น default
+    state = CartState(); // Reset เป็น default (freeItems = [] ด้วย)
+  }
+
+  /// คำนวณของแถม BUY_X_GET_Y และอัปเดต freeItems
+  void syncFreeItems(
+    List<PromotionModel> promos,
+    List<ProductModel> allProducts,
+  ) {
+    final regularItems = state.items;
+    // (promoId, freeProductId) → accumulated qty
+    final freeMap = <String, _FreeEntry>{};
+
+    for (final promo in promos) {
+      if (promo.promotionType != 'BUY_X_GET_Y') continue;
+      if (promo.buyQty == null || promo.getQty == null) continue;
+      if (!promo.isRunning) continue;
+
+      final buyQty = promo.buyQty!.toDouble();
+      final getQty = promo.getQty!.toDouble();
+
+      // กรองรายการที่ qualify
+      List<CartItem> qualifying;
+      switch (promo.applyTo) {
+        case 'PRODUCT':
+          final ids = Set<String>.from(promo.applyToIds ?? []);
+          qualifying =
+              regularItems.where((i) => ids.contains(i.productId)).toList();
+          break;
+        case 'CATEGORY':
+          final gids = Set<String>.from(promo.applyToIds ?? []);
+          qualifying =
+              regularItems.where((i) => gids.contains(i.groupId)).toList();
+          break;
+        default: // ALL
+          qualifying = regularItems;
+      }
+
+      for (final item in qualifying) {
+        final freeQty = (item.quantity / buyQty).floor() * getQty;
+        if (freeQty <= 0) continue;
+
+        // หาสินค้าแถม
+        String freeProductId;
+        String freeProductName;
+        String freeProductCode;
+        String freeProductUnit;
+
+        if (promo.getProductId != null) {
+          final fp = allProducts.where((p) => p.productId == promo.getProductId).firstOrNull;
+          if (fp == null) continue; // ไม่พบสินค้าแถม → ข้าม
+          freeProductId = fp.productId;
+          freeProductName = fp.productName;
+          freeProductCode = fp.productCode;
+          freeProductUnit = fp.baseUnit;
+        } else {
+          // สินค้าเดิมที่ซื้อ
+          freeProductId = item.productId;
+          freeProductName = item.productName;
+          freeProductCode = item.productCode;
+          freeProductUnit = item.unit;
+        }
+
+        final key = '${promo.promotionId}__$freeProductId';
+        if (freeMap.containsKey(key)) {
+          freeMap[key] = freeMap[key]!.addQty(freeQty);
+        } else {
+          freeMap[key] = _FreeEntry(
+            productId: freeProductId,
+            productName: freeProductName,
+            productCode: freeProductCode,
+            unit: freeProductUnit,
+            qty: freeQty,
+            promoId: promo.promotionId,
+            promoName: promo.promotionName,
+          );
+        }
+      }
+    }
+
+    final newFreeItems = freeMap.values
+        .map((e) => CartItem(
+              productId: e.productId,
+              productCode: e.productCode,
+              productName: e.productName,
+              unit: e.unit,
+              quantity: e.qty,
+              unitPrice: 0,
+              amount: 0,
+              promotionId: e.promoId,
+              promotionName: e.promoName,
+            ))
+        .toList();
+
+    state = state.copyWith(freeItems: newFreeItems);
   }
 
   /// พักบิล
@@ -332,6 +443,37 @@ class CartNotifier extends Notifier<CartState> {
     ref.read(holdOrdersProvider.notifier).addOrder(name, state);
     clear();
   }
+}
+
+// ─── internal helper for syncFreeItems ──────────────────────────
+class _FreeEntry {
+  final String productId;
+  final String productName;
+  final String productCode;
+  final String unit;
+  final double qty;
+  final String promoId;
+  final String promoName;
+
+  const _FreeEntry({
+    required this.productId,
+    required this.productName,
+    required this.productCode,
+    required this.unit,
+    required this.qty,
+    required this.promoId,
+    required this.promoName,
+  });
+
+  _FreeEntry addQty(double extra) => _FreeEntry(
+        productId: productId,
+        productName: productName,
+        productCode: productCode,
+        unit: unit,
+        qty: qty + extra,
+        promoId: promoId,
+        promoName: promoName,
+      );
 }
 
 // Hold Order Model
