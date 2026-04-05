@@ -18,6 +18,7 @@ class GoodsReceiptModel {
   
   // Related data
   final List<GoodsReceiptItemModel>? items;
+  final int itemCount; // จำนวนรายการ (จาก COUNT query, ไม่ต้องโหลด items เต็ม)
 
   GoodsReceiptModel({
     required this.grId,
@@ -35,6 +36,7 @@ class GoodsReceiptModel {
     required this.createdAt,
     required this.updatedAt,
     this.items,
+    this.itemCount = 0,
   });
 
   factory GoodsReceiptModel.fromJson(Map<String, dynamic> json) {
@@ -58,6 +60,8 @@ class GoodsReceiptModel {
               .map((item) => GoodsReceiptItemModel.fromJson(item))
               .toList()
           : null,
+      itemCount: (json['item_count'] as num?)?.toInt() ??
+          (json['items'] as List?)?.length ?? 0,
     );
   }
 

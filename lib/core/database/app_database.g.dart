@@ -19155,6 +19155,28 @@ class $StockMovementsTable extends StockMovements
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _lotNumberMeta = const VerificationMeta(
+    'lotNumber',
+  );
+  @override
+  late final GeneratedColumn<String> lotNumber = GeneratedColumn<String>(
+    'lot_number',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _expiryDateMeta = const VerificationMeta(
+    'expiryDate',
+  );
+  @override
+  late final GeneratedColumn<DateTime> expiryDate = GeneratedColumn<DateTime>(
+    'expiry_date',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _referenceTypeMeta = const VerificationMeta(
     'referenceType',
   );
@@ -19179,6 +19201,17 @@ class $StockMovementsTable extends StockMovements
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _referenceNoMeta = const VerificationMeta(
+    'referenceNo',
+  );
+  @override
+  late final GeneratedColumn<String> referenceNo = GeneratedColumn<String>(
+    'reference_no',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _userIdMeta = const VerificationMeta('userId');
   @override
   late final GeneratedColumn<String> userId = GeneratedColumn<String>(
@@ -19195,17 +19228,6 @@ class $StockMovementsTable extends StockMovements
   @override
   late final GeneratedColumn<String> remark = GeneratedColumn<String>(
     'remark',
-    aliasedName,
-    true,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-  );
-  static const VerificationMeta _referenceNoMeta = const VerificationMeta(
-    'referenceNo',
-  );
-  @override
-  late final GeneratedColumn<String> referenceNo = GeneratedColumn<String>(
-    'reference_no',
     aliasedName,
     true,
     type: DriftSqlType.string,
@@ -19245,11 +19267,13 @@ class $StockMovementsTable extends StockMovements
     warehouseId,
     quantity,
     unitCost,
+    lotNumber,
+    expiryDate,
     referenceType,
     referenceId,
+    referenceNo,
     userId,
     remark,
-    referenceNo,
     createdAt,
     updatedAt,
   ];
@@ -19336,6 +19360,18 @@ class $StockMovementsTable extends StockMovements
         unitCost.isAcceptableOrUnknown(data['unit_cost']!, _unitCostMeta),
       );
     }
+    if (data.containsKey('lot_number')) {
+      context.handle(
+        _lotNumberMeta,
+        lotNumber.isAcceptableOrUnknown(data['lot_number']!, _lotNumberMeta),
+      );
+    }
+    if (data.containsKey('expiry_date')) {
+      context.handle(
+        _expiryDateMeta,
+        expiryDate.isAcceptableOrUnknown(data['expiry_date']!, _expiryDateMeta),
+      );
+    }
     if (data.containsKey('reference_type')) {
       context.handle(
         _referenceTypeMeta,
@@ -19354,6 +19390,15 @@ class $StockMovementsTable extends StockMovements
         ),
       );
     }
+    if (data.containsKey('reference_no')) {
+      context.handle(
+        _referenceNoMeta,
+        referenceNo.isAcceptableOrUnknown(
+          data['reference_no']!,
+          _referenceNoMeta,
+        ),
+      );
+    }
     if (data.containsKey('user_id')) {
       context.handle(
         _userIdMeta,
@@ -19366,15 +19411,6 @@ class $StockMovementsTable extends StockMovements
       context.handle(
         _remarkMeta,
         remark.isAcceptableOrUnknown(data['remark']!, _remarkMeta),
-      );
-    }
-    if (data.containsKey('reference_no')) {
-      context.handle(
-        _referenceNoMeta,
-        referenceNo.isAcceptableOrUnknown(
-          data['reference_no']!,
-          _referenceNoMeta,
-        ),
       );
     }
     if (data.containsKey('created_at')) {
@@ -19434,6 +19470,14 @@ class $StockMovementsTable extends StockMovements
         DriftSqlType.double,
         data['${effectivePrefix}unit_cost'],
       )!,
+      lotNumber: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}lot_number'],
+      ),
+      expiryDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}expiry_date'],
+      ),
       referenceType: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}reference_type'],
@@ -19442,6 +19486,10 @@ class $StockMovementsTable extends StockMovements
         DriftSqlType.string,
         data['${effectivePrefix}reference_id'],
       ),
+      referenceNo: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}reference_no'],
+      ),
       userId: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}user_id'],
@@ -19449,10 +19497,6 @@ class $StockMovementsTable extends StockMovements
       remark: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}remark'],
-      ),
-      referenceNo: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}reference_no'],
       ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
@@ -19480,11 +19524,13 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
   final String warehouseId;
   final double quantity;
   final double unitCost;
+  final String? lotNumber;
+  final DateTime? expiryDate;
   final String? referenceType;
   final String? referenceId;
+  final String? referenceNo;
   final String userId;
   final String? remark;
-  final String? referenceNo;
   final DateTime createdAt;
   final DateTime updatedAt;
   const StockMovement({
@@ -19496,11 +19542,13 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
     required this.warehouseId,
     required this.quantity,
     required this.unitCost,
+    this.lotNumber,
+    this.expiryDate,
     this.referenceType,
     this.referenceId,
+    this.referenceNo,
     required this.userId,
     this.remark,
-    this.referenceNo,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -19515,18 +19563,24 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
     map['warehouse_id'] = Variable<String>(warehouseId);
     map['quantity'] = Variable<double>(quantity);
     map['unit_cost'] = Variable<double>(unitCost);
+    if (!nullToAbsent || lotNumber != null) {
+      map['lot_number'] = Variable<String>(lotNumber);
+    }
+    if (!nullToAbsent || expiryDate != null) {
+      map['expiry_date'] = Variable<DateTime>(expiryDate);
+    }
     if (!nullToAbsent || referenceType != null) {
       map['reference_type'] = Variable<String>(referenceType);
     }
     if (!nullToAbsent || referenceId != null) {
       map['reference_id'] = Variable<String>(referenceId);
     }
+    if (!nullToAbsent || referenceNo != null) {
+      map['reference_no'] = Variable<String>(referenceNo);
+    }
     map['user_id'] = Variable<String>(userId);
     if (!nullToAbsent || remark != null) {
       map['remark'] = Variable<String>(remark);
-    }
-    if (!nullToAbsent || referenceNo != null) {
-      map['reference_no'] = Variable<String>(referenceNo);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
@@ -19543,19 +19597,25 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
       warehouseId: Value(warehouseId),
       quantity: Value(quantity),
       unitCost: Value(unitCost),
+      lotNumber: lotNumber == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lotNumber),
+      expiryDate: expiryDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(expiryDate),
       referenceType: referenceType == null && nullToAbsent
           ? const Value.absent()
           : Value(referenceType),
       referenceId: referenceId == null && nullToAbsent
           ? const Value.absent()
           : Value(referenceId),
+      referenceNo: referenceNo == null && nullToAbsent
+          ? const Value.absent()
+          : Value(referenceNo),
       userId: Value(userId),
       remark: remark == null && nullToAbsent
           ? const Value.absent()
           : Value(remark),
-      referenceNo: referenceNo == null && nullToAbsent
-          ? const Value.absent()
-          : Value(referenceNo),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -19575,11 +19635,13 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
       warehouseId: serializer.fromJson<String>(json['warehouseId']),
       quantity: serializer.fromJson<double>(json['quantity']),
       unitCost: serializer.fromJson<double>(json['unitCost']),
+      lotNumber: serializer.fromJson<String?>(json['lotNumber']),
+      expiryDate: serializer.fromJson<DateTime?>(json['expiryDate']),
       referenceType: serializer.fromJson<String?>(json['referenceType']),
       referenceId: serializer.fromJson<String?>(json['referenceId']),
+      referenceNo: serializer.fromJson<String?>(json['referenceNo']),
       userId: serializer.fromJson<String>(json['userId']),
       remark: serializer.fromJson<String?>(json['remark']),
-      referenceNo: serializer.fromJson<String?>(json['referenceNo']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -19596,11 +19658,13 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
       'warehouseId': serializer.toJson<String>(warehouseId),
       'quantity': serializer.toJson<double>(quantity),
       'unitCost': serializer.toJson<double>(unitCost),
+      'lotNumber': serializer.toJson<String?>(lotNumber),
+      'expiryDate': serializer.toJson<DateTime?>(expiryDate),
       'referenceType': serializer.toJson<String?>(referenceType),
       'referenceId': serializer.toJson<String?>(referenceId),
+      'referenceNo': serializer.toJson<String?>(referenceNo),
       'userId': serializer.toJson<String>(userId),
       'remark': serializer.toJson<String?>(remark),
-      'referenceNo': serializer.toJson<String?>(referenceNo),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -19615,11 +19679,13 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
     String? warehouseId,
     double? quantity,
     double? unitCost,
+    Value<String?> lotNumber = const Value.absent(),
+    Value<DateTime?> expiryDate = const Value.absent(),
     Value<String?> referenceType = const Value.absent(),
     Value<String?> referenceId = const Value.absent(),
+    Value<String?> referenceNo = const Value.absent(),
     String? userId,
     Value<String?> remark = const Value.absent(),
-    Value<String?> referenceNo = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
   }) => StockMovement(
@@ -19631,13 +19697,15 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
     warehouseId: warehouseId ?? this.warehouseId,
     quantity: quantity ?? this.quantity,
     unitCost: unitCost ?? this.unitCost,
+    lotNumber: lotNumber.present ? lotNumber.value : this.lotNumber,
+    expiryDate: expiryDate.present ? expiryDate.value : this.expiryDate,
     referenceType: referenceType.present
         ? referenceType.value
         : this.referenceType,
     referenceId: referenceId.present ? referenceId.value : this.referenceId,
+    referenceNo: referenceNo.present ? referenceNo.value : this.referenceNo,
     userId: userId ?? this.userId,
     remark: remark.present ? remark.value : this.remark,
-    referenceNo: referenceNo.present ? referenceNo.value : this.referenceNo,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -19661,17 +19729,21 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
           : this.warehouseId,
       quantity: data.quantity.present ? data.quantity.value : this.quantity,
       unitCost: data.unitCost.present ? data.unitCost.value : this.unitCost,
+      lotNumber: data.lotNumber.present ? data.lotNumber.value : this.lotNumber,
+      expiryDate: data.expiryDate.present
+          ? data.expiryDate.value
+          : this.expiryDate,
       referenceType: data.referenceType.present
           ? data.referenceType.value
           : this.referenceType,
       referenceId: data.referenceId.present
           ? data.referenceId.value
           : this.referenceId,
-      userId: data.userId.present ? data.userId.value : this.userId,
-      remark: data.remark.present ? data.remark.value : this.remark,
       referenceNo: data.referenceNo.present
           ? data.referenceNo.value
           : this.referenceNo,
+      userId: data.userId.present ? data.userId.value : this.userId,
+      remark: data.remark.present ? data.remark.value : this.remark,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -19688,11 +19760,13 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
           ..write('warehouseId: $warehouseId, ')
           ..write('quantity: $quantity, ')
           ..write('unitCost: $unitCost, ')
+          ..write('lotNumber: $lotNumber, ')
+          ..write('expiryDate: $expiryDate, ')
           ..write('referenceType: $referenceType, ')
           ..write('referenceId: $referenceId, ')
+          ..write('referenceNo: $referenceNo, ')
           ..write('userId: $userId, ')
           ..write('remark: $remark, ')
-          ..write('referenceNo: $referenceNo, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -19709,11 +19783,13 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
     warehouseId,
     quantity,
     unitCost,
+    lotNumber,
+    expiryDate,
     referenceType,
     referenceId,
+    referenceNo,
     userId,
     remark,
-    referenceNo,
     createdAt,
     updatedAt,
   );
@@ -19729,11 +19805,13 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
           other.warehouseId == this.warehouseId &&
           other.quantity == this.quantity &&
           other.unitCost == this.unitCost &&
+          other.lotNumber == this.lotNumber &&
+          other.expiryDate == this.expiryDate &&
           other.referenceType == this.referenceType &&
           other.referenceId == this.referenceId &&
+          other.referenceNo == this.referenceNo &&
           other.userId == this.userId &&
           other.remark == this.remark &&
-          other.referenceNo == this.referenceNo &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -19747,11 +19825,13 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovement> {
   final Value<String> warehouseId;
   final Value<double> quantity;
   final Value<double> unitCost;
+  final Value<String?> lotNumber;
+  final Value<DateTime?> expiryDate;
   final Value<String?> referenceType;
   final Value<String?> referenceId;
+  final Value<String?> referenceNo;
   final Value<String> userId;
   final Value<String?> remark;
-  final Value<String?> referenceNo;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
@@ -19764,11 +19844,13 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovement> {
     this.warehouseId = const Value.absent(),
     this.quantity = const Value.absent(),
     this.unitCost = const Value.absent(),
+    this.lotNumber = const Value.absent(),
+    this.expiryDate = const Value.absent(),
     this.referenceType = const Value.absent(),
     this.referenceId = const Value.absent(),
+    this.referenceNo = const Value.absent(),
     this.userId = const Value.absent(),
     this.remark = const Value.absent(),
-    this.referenceNo = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -19782,11 +19864,13 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovement> {
     required String warehouseId,
     required double quantity,
     this.unitCost = const Value.absent(),
+    this.lotNumber = const Value.absent(),
+    this.expiryDate = const Value.absent(),
     this.referenceType = const Value.absent(),
     this.referenceId = const Value.absent(),
+    this.referenceNo = const Value.absent(),
     required String userId,
     this.remark = const Value.absent(),
-    this.referenceNo = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -19807,11 +19891,13 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovement> {
     Expression<String>? warehouseId,
     Expression<double>? quantity,
     Expression<double>? unitCost,
+    Expression<String>? lotNumber,
+    Expression<DateTime>? expiryDate,
     Expression<String>? referenceType,
     Expression<String>? referenceId,
+    Expression<String>? referenceNo,
     Expression<String>? userId,
     Expression<String>? remark,
-    Expression<String>? referenceNo,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
@@ -19825,11 +19911,13 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovement> {
       if (warehouseId != null) 'warehouse_id': warehouseId,
       if (quantity != null) 'quantity': quantity,
       if (unitCost != null) 'unit_cost': unitCost,
+      if (lotNumber != null) 'lot_number': lotNumber,
+      if (expiryDate != null) 'expiry_date': expiryDate,
       if (referenceType != null) 'reference_type': referenceType,
       if (referenceId != null) 'reference_id': referenceId,
+      if (referenceNo != null) 'reference_no': referenceNo,
       if (userId != null) 'user_id': userId,
       if (remark != null) 'remark': remark,
-      if (referenceNo != null) 'reference_no': referenceNo,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
@@ -19845,11 +19933,13 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovement> {
     Value<String>? warehouseId,
     Value<double>? quantity,
     Value<double>? unitCost,
+    Value<String?>? lotNumber,
+    Value<DateTime?>? expiryDate,
     Value<String?>? referenceType,
     Value<String?>? referenceId,
+    Value<String?>? referenceNo,
     Value<String>? userId,
     Value<String?>? remark,
-    Value<String?>? referenceNo,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
@@ -19863,11 +19953,13 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovement> {
       warehouseId: warehouseId ?? this.warehouseId,
       quantity: quantity ?? this.quantity,
       unitCost: unitCost ?? this.unitCost,
+      lotNumber: lotNumber ?? this.lotNumber,
+      expiryDate: expiryDate ?? this.expiryDate,
       referenceType: referenceType ?? this.referenceType,
       referenceId: referenceId ?? this.referenceId,
+      referenceNo: referenceNo ?? this.referenceNo,
       userId: userId ?? this.userId,
       remark: remark ?? this.remark,
-      referenceNo: referenceNo ?? this.referenceNo,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
@@ -19901,20 +19993,26 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovement> {
     if (unitCost.present) {
       map['unit_cost'] = Variable<double>(unitCost.value);
     }
+    if (lotNumber.present) {
+      map['lot_number'] = Variable<String>(lotNumber.value);
+    }
+    if (expiryDate.present) {
+      map['expiry_date'] = Variable<DateTime>(expiryDate.value);
+    }
     if (referenceType.present) {
       map['reference_type'] = Variable<String>(referenceType.value);
     }
     if (referenceId.present) {
       map['reference_id'] = Variable<String>(referenceId.value);
     }
+    if (referenceNo.present) {
+      map['reference_no'] = Variable<String>(referenceNo.value);
+    }
     if (userId.present) {
       map['user_id'] = Variable<String>(userId.value);
     }
     if (remark.present) {
       map['remark'] = Variable<String>(remark.value);
-    }
-    if (referenceNo.present) {
-      map['reference_no'] = Variable<String>(referenceNo.value);
     }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
@@ -19939,11 +20037,13 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovement> {
           ..write('warehouseId: $warehouseId, ')
           ..write('quantity: $quantity, ')
           ..write('unitCost: $unitCost, ')
+          ..write('lotNumber: $lotNumber, ')
+          ..write('expiryDate: $expiryDate, ')
           ..write('referenceType: $referenceType, ')
           ..write('referenceId: $referenceId, ')
+          ..write('referenceNo: $referenceNo, ')
           ..write('userId: $userId, ')
           ..write('remark: $remark, ')
-          ..write('referenceNo: $referenceNo, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
@@ -47056,11 +47156,13 @@ typedef $$StockMovementsTableCreateCompanionBuilder =
       required String warehouseId,
       required double quantity,
       Value<double> unitCost,
+      Value<String?> lotNumber,
+      Value<DateTime?> expiryDate,
       Value<String?> referenceType,
       Value<String?> referenceId,
+      Value<String?> referenceNo,
       required String userId,
       Value<String?> remark,
-      Value<String?> referenceNo,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
       Value<int> rowid,
@@ -47075,11 +47177,13 @@ typedef $$StockMovementsTableUpdateCompanionBuilder =
       Value<String> warehouseId,
       Value<double> quantity,
       Value<double> unitCost,
+      Value<String?> lotNumber,
+      Value<DateTime?> expiryDate,
       Value<String?> referenceType,
       Value<String?> referenceId,
+      Value<String?> referenceNo,
       Value<String> userId,
       Value<String?> remark,
-      Value<String?> referenceNo,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
       Value<int> rowid,
@@ -47195,6 +47299,16 @@ class $$StockMovementsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get lotNumber => $composableBuilder(
+    column: $table.lotNumber,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get expiryDate => $composableBuilder(
+    column: $table.expiryDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get referenceType => $composableBuilder(
     column: $table.referenceType,
     builder: (column) => ColumnFilters(column),
@@ -47205,13 +47319,13 @@ class $$StockMovementsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get remark => $composableBuilder(
-    column: $table.remark,
+  ColumnFilters<String> get referenceNo => $composableBuilder(
+    column: $table.referenceNo,
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get referenceNo => $composableBuilder(
-    column: $table.referenceNo,
+  ColumnFilters<String> get remark => $composableBuilder(
+    column: $table.remark,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -47334,6 +47448,16 @@ class $$StockMovementsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get lotNumber => $composableBuilder(
+    column: $table.lotNumber,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get expiryDate => $composableBuilder(
+    column: $table.expiryDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get referenceType => $composableBuilder(
     column: $table.referenceType,
     builder: (column) => ColumnOrderings(column),
@@ -47344,13 +47468,13 @@ class $$StockMovementsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get remark => $composableBuilder(
-    column: $table.remark,
+  ColumnOrderings<String> get referenceNo => $composableBuilder(
+    column: $table.referenceNo,
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get referenceNo => $composableBuilder(
-    column: $table.referenceNo,
+  ColumnOrderings<String> get remark => $composableBuilder(
+    column: $table.remark,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -47469,6 +47593,14 @@ class $$StockMovementsTableAnnotationComposer
   GeneratedColumn<double> get unitCost =>
       $composableBuilder(column: $table.unitCost, builder: (column) => column);
 
+  GeneratedColumn<String> get lotNumber =>
+      $composableBuilder(column: $table.lotNumber, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get expiryDate => $composableBuilder(
+    column: $table.expiryDate,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get referenceType => $composableBuilder(
     column: $table.referenceType,
     builder: (column) => column,
@@ -47479,13 +47611,13 @@ class $$StockMovementsTableAnnotationComposer
     builder: (column) => column,
   );
 
-  GeneratedColumn<String> get remark =>
-      $composableBuilder(column: $table.remark, builder: (column) => column);
-
   GeneratedColumn<String> get referenceNo => $composableBuilder(
     column: $table.referenceNo,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get remark =>
+      $composableBuilder(column: $table.remark, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -47605,11 +47737,13 @@ class $$StockMovementsTableTableManager
                 Value<String> warehouseId = const Value.absent(),
                 Value<double> quantity = const Value.absent(),
                 Value<double> unitCost = const Value.absent(),
+                Value<String?> lotNumber = const Value.absent(),
+                Value<DateTime?> expiryDate = const Value.absent(),
                 Value<String?> referenceType = const Value.absent(),
                 Value<String?> referenceId = const Value.absent(),
+                Value<String?> referenceNo = const Value.absent(),
                 Value<String> userId = const Value.absent(),
                 Value<String?> remark = const Value.absent(),
-                Value<String?> referenceNo = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -47622,11 +47756,13 @@ class $$StockMovementsTableTableManager
                 warehouseId: warehouseId,
                 quantity: quantity,
                 unitCost: unitCost,
+                lotNumber: lotNumber,
+                expiryDate: expiryDate,
                 referenceType: referenceType,
                 referenceId: referenceId,
+                referenceNo: referenceNo,
                 userId: userId,
                 remark: remark,
-                referenceNo: referenceNo,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -47641,11 +47777,13 @@ class $$StockMovementsTableTableManager
                 required String warehouseId,
                 required double quantity,
                 Value<double> unitCost = const Value.absent(),
+                Value<String?> lotNumber = const Value.absent(),
+                Value<DateTime?> expiryDate = const Value.absent(),
                 Value<String?> referenceType = const Value.absent(),
                 Value<String?> referenceId = const Value.absent(),
+                Value<String?> referenceNo = const Value.absent(),
                 required String userId,
                 Value<String?> remark = const Value.absent(),
-                Value<String?> referenceNo = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -47658,11 +47796,13 @@ class $$StockMovementsTableTableManager
                 warehouseId: warehouseId,
                 quantity: quantity,
                 unitCost: unitCost,
+                lotNumber: lotNumber,
+                expiryDate: expiryDate,
                 referenceType: referenceType,
                 referenceId: referenceId,
+                referenceNo: referenceNo,
                 userId: userId,
                 remark: remark,
-                referenceNo: referenceNo,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,

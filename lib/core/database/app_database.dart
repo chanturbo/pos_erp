@@ -105,7 +105,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration {
@@ -126,6 +126,10 @@ class AppDatabase extends _$AppDatabase {
           await m.addColumn(salesOrders, salesOrders.promotionIds);
           await m.addColumn(salesOrderItems, salesOrderItems.isFreeItem);
           await m.addColumn(salesOrderItems, salesOrderItems.promotionId);
+        }
+        if (from < 5) {
+          await m.addColumn(stockMovements, stockMovements.lotNumber);
+          await m.addColumn(stockMovements, stockMovements.expiryDate);
         }
       },
     );

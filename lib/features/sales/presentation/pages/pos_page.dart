@@ -521,6 +521,7 @@ class _PosPageState extends ConsumerState<PosPage> {
                           // ✅ ScannerButton เมื่อช่องว่าง
                           : ScannerButton(
                               tooltip: 'สแกนบาร์โค้ดสินค้า',
+                              useSheet: true,
                               onScanned: (value) {
                                 _searchController.text = value;
                                 setState(() => _searchQuery = value);

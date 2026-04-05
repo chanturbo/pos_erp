@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
 
+import '../../../inventory/presentation/providers/stock_provider.dart';
 import '../../../products/presentation/providers/product_provider.dart';
 import '../../../suppliers/presentation/providers/supplier_provider.dart';
 import '../../data/models/goods_receipt_model.dart';
@@ -35,6 +36,7 @@ class _GoodsReceiptFormPageState
 
   final List<GoodsReceiptItemModel> _items = [];
   bool _isLoading = false;
+  bool _isLoadingItems = false;
   bool _isViewMode = false;
   bool _isCardView = false;
 
@@ -42,12 +44,14 @@ class _GoodsReceiptFormPageState
   void initState() {
     super.initState();
     if (widget.receipt != null) {
-      _loadReceiptData();
+      _loadReceiptHeaderData();
       _isViewMode = widget.receipt!.status == 'CONFIRMED';
+      WidgetsBinding.instance.addPostFrameCallback((_) => _fetchReceiptItems());
     }
   }
 
-  void _loadReceiptData() {
+  /// โหลด header data ทันที
+  void _loadReceiptHeaderData() {
     final r = widget.receipt!;
     _grDate = r.grDate;
     _poId = r.poId;
@@ -57,7 +61,24 @@ class _GoodsReceiptFormPageState
     _warehouseId = r.warehouseId;
     _warehouseName = r.warehouseName;
     _remarkController.text = r.remark ?? '';
-    if (r.items != null) _items.addAll(r.items!);
+    if (r.items != null && r.items!.isNotEmpty) _items.addAll(r.items!);
+  }
+
+  /// fetch รายการสินค้าจาก API (items ไม่มาใน list endpoint)
+  Future<void> _fetchReceiptItems() async {
+    if (!mounted) return;
+    setState(() => _isLoadingItems = true);
+    final grId = widget.receipt!.grId;
+    final notifier = ref.read(goodsReceiptListProvider.notifier);
+    final full = await notifier.getGoodsReceiptDetails(grId);
+    if (!mounted) return;
+    setState(() {
+      _isLoadingItems = false;
+      if (full?.items != null && full!.items!.isNotEmpty) {
+        _items.clear();
+        _items.addAll(full.items!);
+      }
+    });
   }
 
   @override
@@ -145,14 +166,14 @@ class _GoodsReceiptFormPageState
                                 const SizedBox(width: 6),
                                 ElevatedButton.icon(
                                   onPressed: _addItem,
-                                  icon: const Icon(Icons.add, size: 15),
+                                  icon: const Icon(Icons.add, size: 16),
                                   label: const Text('เพิ่ม',
-                                      style: TextStyle(fontSize: 12)),
+                                      style: TextStyle(fontSize: 13)),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: AppTheme.info,
                                     foregroundColor: Colors.white,
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 12, vertical: 8),
+                                        horizontal: 14, vertical: 14),
                                     minimumSize: Size.zero,
                                     tapTargetSize:
                                         MaterialTapTargetSize.shrinkWrap,
@@ -430,32 +451,98 @@ class _GoodsReceiptFormPageState
         // คลังสินค้า
         _GRFieldLabel(label: 'คลังสินค้า', isDark: isDark),
         const SizedBox(height: 6),
-        Container(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          decoration: BoxDecoration(
-            color: isDark
-                ? AppTheme.darkCard
-                : const Color(0xFFF5F5F5),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-                color: isDark ? Colors.white12 : AppTheme.border),
+        if (_isViewMode)
+          Container(
+            padding: const EdgeInsets.symmetric(
+                horizontal: 12, vertical: 12),
+            decoration: BoxDecoration(
+              color: isDark
+                  ? AppTheme.darkCard
+                  : const Color(0xFFF5F5F5),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                  color: isDark ? Colors.white12 : AppTheme.border),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.warehouse_outlined,
+                    size: 17,
+                    color:
+                        isDark ? Colors.white38 : AppTheme.textSub),
+                const SizedBox(width: 8),
+                Text(
+                  _warehouseName,
+                  style: TextStyle(
+                      fontSize: 13,
+                      color: isDark
+                          ? Colors.white54
+                          : AppTheme.textSub),
+                ),
+              ],
+            ),
+          )
+        else
+          ref.watch(stockBalanceProvider).when(
+            data: (stocks) {
+              final seen = <String>{};
+              final warehouses = stocks
+                  .where((s) => seen.add(s.warehouseId))
+                  .map((s) =>
+                      {'id': s.warehouseId, 'name': s.warehouseName})
+                  .toList();
+              if (warehouses.isEmpty) {
+                warehouses
+                    .add({'id': 'WH001', 'name': 'คลังสาขาหลัก'});
+              }
+              return _GRDialogDropdown<String>(
+                value: _warehouseId,
+                hint: 'เลือกคลังสินค้า',
+                icon: Icons.warehouse_outlined,
+                isDark: isDark,
+                items: warehouses
+                    .map((w) => DropdownMenuItem(
+                          value: w['id'],
+                          child: Text(w['name']!,
+                              style: TextStyle(
+                                  fontSize: 13,
+                                  color: isDark
+                                      ? Colors.white
+                                      : Colors.black87)),
+                        ))
+                    .toList(),
+                onChanged: (v) {
+                  final w = warehouses
+                      .firstWhere((w) => w['id'] == v);
+                  setState(() {
+                    _warehouseId = v!;
+                    _warehouseName = w['name']!;
+                  });
+                },
+              );
+            },
+            loading: () => LinearProgressIndicator(
+                color: AppTheme.success,
+                backgroundColor:
+                    isDark ? AppTheme.darkElement : AppTheme.border),
+            error: (_, _) => _GRDialogDropdown<String>(
+              value: _warehouseId,
+              hint: 'คลังสินค้า',
+              icon: Icons.warehouse_outlined,
+              isDark: isDark,
+              items: [
+                DropdownMenuItem(
+                  value: 'WH001',
+                  child: Text('คลังสาขาหลัก',
+                      style: TextStyle(
+                          fontSize: 13,
+                          color: isDark
+                              ? Colors.white
+                              : Colors.black87)),
+                )
+              ],
+              onChanged: (v) {},
+            ),
           ),
-          child: Row(
-            children: [
-              Icon(Icons.warehouse_outlined,
-                  size: 17,
-                  color: isDark ? Colors.white38 : AppTheme.textSub),
-              const SizedBox(width: 8),
-              Text(
-                _warehouseName,
-                style: TextStyle(
-                    fontSize: 13,
-                    color: isDark ? Colors.white54 : AppTheme.textSub),
-              ),
-            ],
-          ),
-        ),
       ],
     );
   }
@@ -464,6 +551,13 @@ class _GoodsReceiptFormPageState
   // Items Section
   // ─────────────────────────────────────────────────────────────
   Widget _buildItemsSection(bool isDark) {
+    if (_isLoadingItems) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 32),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     if (_items.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 24),
@@ -1845,6 +1939,7 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
           const Spacer(),
           ScannerButton(
             tooltip: 'สแกนบาร์โค้ด',
+            useSheet: true,
             onScanned: (value) {
               setState(() {
                 _productSearch = value;

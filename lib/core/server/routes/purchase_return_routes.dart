@@ -299,10 +299,19 @@ class PurchaseReturnRoutes {
                   warehouseId: Value(item.warehouseId),
                   userId: Value(returnDoc.userId),
                   quantity: Value(-item.quantity), // ลบ = ลดสต๊อก
+                  unitCost: Value(item.unitPrice),
                   referenceNo: Value(returnDoc.returnNo),
                   remark: Value('คืนสินค้า: ${returnDoc.returnNo}'),
                 ),
               );
+
+          // อัปเดต stock_balances (avg_cost คงเดิม ตอนออก)
+          await _upsertStockBalance(
+            item.warehouseId,
+            item.productId,
+            -item.quantity,
+            0, // avg_cost ไม่เปลี่ยนตอนออก
+          );
 
           print(
             '✅ Stock movement: $movementNo (-${item.quantity} ${item.productId})',
@@ -412,6 +421,62 @@ class PurchaseReturnRoutes {
         .getSingle();
 
     return result.read<double>('balance');
+  }
+
+  /// Helper: upsert stock_balances พร้อม weighted average cost
+  Future<void> _upsertStockBalance(
+    String warehouseId,
+    String productId,
+    double qtyDelta,
+    double unitCost,
+  ) async {
+    final existing = await (db.select(db.stockBalances)
+          ..where(
+            (s) =>
+                s.productId.equals(productId) &
+                s.warehouseId.equals(warehouseId),
+          ))
+        .getSingleOrNull();
+
+    if (existing == null) {
+      final newAvg = (qtyDelta > 0 && unitCost > 0) ? unitCost : 0.0;
+      await db.into(db.stockBalances).insert(
+            StockBalancesCompanion(
+              stockId: Value('SB_${productId}_$warehouseId'),
+              productId: Value(productId),
+              warehouseId: Value(warehouseId),
+              quantity: Value(qtyDelta),
+              avgCost: Value(newAvg),
+              lastCost: Value(unitCost > 0 ? unitCost : 0.0),
+              updatedAt: Value(DateTime.now()),
+            ),
+          );
+    } else {
+      final oldQty = existing.quantity;
+      final newQty = oldQty + qtyDelta;
+
+      double newAvg = existing.avgCost;
+      double newLast = existing.lastCost;
+
+      if (qtyDelta > 0 && unitCost > 0) {
+        final totalQty = oldQty + qtyDelta;
+        newAvg = totalQty > 0
+            ? (oldQty * existing.avgCost + qtyDelta * unitCost) / totalQty
+            : unitCost;
+        newLast = unitCost;
+      }
+
+      await (db.update(db.stockBalances)
+            ..where((s) => s.stockId.equals(existing.stockId)))
+          .write(
+        StockBalancesCompanion(
+          quantity: Value(newQty),
+          avgCost: Value(newAvg),
+          lastCost: Value(newLast),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
+    }
   }
 }
 

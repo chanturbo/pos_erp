@@ -97,8 +97,23 @@ class SupplierNotifier extends AsyncNotifier<List<SupplierModel>> {
     }
   }
 
-  /// ลบซัพพลายเออร์
-  Future<bool> deleteSupplier(String supplierId) async {
+  /// ตรวจก่อนลบ — คืน {has_history, order_count}
+  Future<Map<String, dynamic>> checkDeleteSupplier(String supplierId) async {
+    try {
+      final api = ref.read(apiClientProvider);
+      final res = await api.get('/api/suppliers/$supplierId/check-delete');
+      if (res.statusCode == 200) {
+        return Map<String, dynamic>.from(res.data as Map);
+      }
+      return {'success': false};
+    } catch (e) {
+      print('❌ Error checking supplier delete: $e');
+      return {'success': false, 'message': '$e'};
+    }
+  }
+
+  /// ลบซัพพลายเออร์ — server จัดการ soft-delete ถ้ามีประวัติ
+  Future<String?> deleteSupplier(String supplierId) async {
     try {
       print('🗑️ Deleting supplier: $supplierId');
 
@@ -108,12 +123,13 @@ class SupplierNotifier extends AsyncNotifier<List<SupplierModel>> {
       if (response.statusCode == 200) {
         print('✅ Supplier deleted successfully');
         await refresh();
-        return true;
+        final msg = response.data?['message'];
+        return (msg is String && msg.isNotEmpty) ? msg : 'ดำเนินการสำเร็จ';
       }
-      return false;
+      return null;
     } catch (e) {
       print('❌ Error deleting supplier: $e');
-      return false;
+      return null;
     }
   }
 }

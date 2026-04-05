@@ -7,6 +7,7 @@ import '../../data/models/purchase_order_item_model.dart';
 import '../providers/purchase_provider.dart';
 import '../../../suppliers/presentation/providers/supplier_provider.dart';
 import '../../../products/presentation/providers/product_provider.dart';
+import '../../../inventory/presentation/providers/stock_provider.dart';
 import '../../../../../shared/services/mobile_scanner_service.dart';
 
 class PurchaseOrderFormPage extends ConsumerStatefulWidget {
@@ -25,31 +26,56 @@ class _PurchaseOrderFormPageState
   DateTime _poDate = DateTime.now();
   String? _supplierId;
   String? _supplierName;
-  final String _warehouseId = 'WH001';
-  final String _warehouseName = 'คลังสาขาหลัก';
+  String _warehouseId = 'WH001';
+  String _warehouseName = 'คลังสาขาหลัก';
   String? _remark;
   final _remarkController = TextEditingController();
 
   final List<PurchaseOrderItemModel> _items = [];
   bool _isLoading = false;
-  bool _isCardView = false; // toggle items view
+  bool _isLoadingItems = false;
+  bool _isCardView = false;
+  bool _includeVat = false; // toggle VAT 7%
 
   @override
   void initState() {
     super.initState();
     if (widget.order != null) {
-      _loadOrderData();
+      _loadOrderHeaderData();
+      // fetch full details (with items) from API
+      WidgetsBinding.instance.addPostFrameCallback((_) => _fetchOrderItems());
     }
   }
 
-  void _loadOrderData() {
+  /// โหลด header data ทันที (ไม่ต้องรอ API)
+  void _loadOrderHeaderData() {
     final order = widget.order!;
     _poDate = order.poDate;
     _supplierId = order.supplierId;
     _supplierName = order.supplierName;
     _remark = order.remark;
     _remarkController.text = order.remark ?? '';
-    if (order.items != null) _items.addAll(order.items!);
+    // ถ้า order มี items มาแล้ว (จาก navigate with full data)
+    if (order.items != null && order.items!.isNotEmpty) {
+      _items.addAll(order.items!);
+    }
+  }
+
+  /// fetch รายการสินค้าจาก API (items มักไม่มาใน list endpoint)
+  Future<void> _fetchOrderItems() async {
+    if (!mounted) return;
+    setState(() => _isLoadingItems = true);
+    final poId = widget.order!.poId;
+    final notifier = ref.read(purchaseListProvider.notifier);
+    final fullOrder = await notifier.getPurchaseOrderDetails(poId);
+    if (!mounted) return;
+    setState(() {
+      _isLoadingItems = false;
+      if (fullOrder?.items != null && fullOrder!.items!.isNotEmpty) {
+        _items.clear();
+        _items.addAll(fullOrder.items!);
+      }
+    });
   }
 
   @override
@@ -115,14 +141,14 @@ class _PurchaseOrderFormPageState
                           // Add item
                           ElevatedButton.icon(
                             onPressed: _addItem,
-                            icon: const Icon(Icons.add, size: 15),
+                            icon: const Icon(Icons.add, size: 16),
                             label: const Text('เพิ่ม',
-                                style: TextStyle(fontSize: 12)),
+                                style: TextStyle(fontSize: 13)),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppTheme.info,
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 8),
+                                  horizontal: 14, vertical: 14),
                               minimumSize: Size.zero,
                               tapTargetSize:
                                   MaterialTapTargetSize.shrinkWrap,
@@ -331,35 +357,65 @@ class _PurchaseOrderFormPageState
         ),
         const SizedBox(height: 14),
 
-        // คลังสินค้า (read-only display)
-        _POFieldLabel(label: 'คลังสินค้า', isDark: isDark),
+        // คลังสินค้าเริ่มต้น (dropdown)
+        _POFieldLabel(label: 'คลังสินค้าเริ่มต้น *', isDark: isDark),
         const SizedBox(height: 6),
-        Container(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          decoration: BoxDecoration(
-            color: isDark ? AppTheme.darkCard : const Color(0xFFF5F5F5),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-                color: isDark ? Colors.white12 : AppTheme.border),
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.warehouse_outlined,
-                  size: 17,
-                  color: isDark
-                      ? Colors.white38
-                      : AppTheme.textSub),
-              const SizedBox(width: 8),
-              Text(
-                _warehouseName,
-                style: TextStyle(
-                    fontSize: 13,
-                    color: isDark
-                        ? Colors.white54
-                        : AppTheme.textSub),
-              ),
+        ref.watch(stockBalanceProvider).when(
+          data: (stocks) {
+            // unique warehouses from stock balance
+            final seen = <String>{};
+            final warehouses = stocks
+                .where((s) => seen.add(s.warehouseId))
+                .map((s) => {'id': s.warehouseId, 'name': s.warehouseName})
+                .toList();
+            if (warehouses.isEmpty) {
+              warehouses.add({'id': 'WH001', 'name': 'คลังสาขาหลัก'});
+            }
+            return _PODropdown<String>(
+              value: _warehouseId,
+              hint: 'เลือกคลังสินค้า',
+              icon: Icons.warehouse_outlined,
+              isDark: isDark,
+              items: warehouses
+                  .map((w) => DropdownMenuItem(
+                        value: w['id'],
+                        child: Text(w['name']!,
+                            style: TextStyle(
+                                fontSize: 13,
+                                color: isDark
+                                    ? Colors.white
+                                    : Colors.black87)),
+                      ))
+                  .toList(),
+              onChanged: (v) {
+                final w = warehouses.firstWhere((w) => w['id'] == v);
+                setState(() {
+                  _warehouseId = v!;
+                  _warehouseName = w['name']!;
+                });
+              },
+            );
+          },
+          loading: () => LinearProgressIndicator(
+              color: AppTheme.primary,
+              backgroundColor:
+                  isDark ? AppTheme.darkElement : AppTheme.border),
+          error: (_, _) => _PODropdown<String>(
+            value: _warehouseId,
+            hint: 'คลังสินค้า',
+            icon: Icons.warehouse_outlined,
+            isDark: isDark,
+            items: [
+              DropdownMenuItem(
+                value: 'WH001',
+                child: Text('คลังสาขาหลัก',
+                    style: TextStyle(
+                        fontSize: 13,
+                        color:
+                            isDark ? Colors.white : Colors.black87)),
+              )
             ],
+            onChanged: (v) {},
           ),
         ),
       ],
@@ -371,6 +427,13 @@ class _PurchaseOrderFormPageState
   // ─────────────────────────────────────────────────────────────
   Widget _buildItemsSection() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    if (_isLoadingItems) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 32),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
 
     if (_items.isEmpty) {
       return Padding(
@@ -625,12 +688,31 @@ class _PurchaseOrderFormPageState
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final subtotal =
         _items.fold<double>(0, (s, item) => s + item.amount);
-    final vat = subtotal * 0.07;
+    final vat = _includeVat ? subtotal * 0.07 : 0.0;
     final total = subtotal + vat;
     final fmt = NumberFormat('#,##0.00', 'th_TH');
 
     return Column(
       children: [
+        // ── VAT Toggle ──────────────────────────────────────────
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'คิด VAT 7%',
+              style: TextStyle(
+                fontSize: 13,
+                color: isDark ? Colors.white70 : AppTheme.textSub,
+              ),
+            ),
+            Switch.adaptive(
+              value: _includeVat,
+              activeThumbColor: AppTheme.info,
+              activeTrackColor: AppTheme.info.withValues(alpha: 0.4),
+              onChanged: (v) => setState(() => _includeVat = v),
+            ),
+          ],
+        ),
         _SummaryRow(
             label: 'ยอดรวมก่อน VAT',
             value: '฿${fmt.format(subtotal)}',
@@ -711,7 +793,7 @@ class _PurchaseOrderFormPageState
 
     final subtotal =
         _items.fold<double>(0, (s, item) => s + item.amount);
-    final vat = subtotal * 0.07;
+    final vat = _includeVat ? subtotal * 0.07 : 0.0;
     final total = subtotal + vat;
 
     final order = PurchaseOrderModel(
@@ -1234,6 +1316,7 @@ class _ProductSelectionDialogState
           const Spacer(),
           ScannerButton(
             tooltip: 'สแกนบาร์โค้ดสินค้า',
+            useSheet: true,
             onScanned: (value) {
               setState(() {
                 _productSearch = value;

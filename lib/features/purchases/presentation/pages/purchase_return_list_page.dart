@@ -22,7 +22,7 @@ class _PurchaseReturnListPageState
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   String _statusFilter = 'ALL';
-  bool _isCardView = true;
+  bool _isCardView = false;
   int _currentPage = 1;
   static const int _pageSize = 20;
 

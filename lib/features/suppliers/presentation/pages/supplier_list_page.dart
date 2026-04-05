@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/pagination_bar.dart';
+import '../../../../shared/pdf/pdf_report_button.dart';
 import '../../../settings/presentation/pages/settings_page.dart';
 import '../providers/supplier_provider.dart';
 import '../../../suppliers/data/models/supplier_model.dart';
 import 'supplier_form_page.dart';
+import 'supplier_pdf_report.dart';
 
 class SupplierListPage extends ConsumerStatefulWidget {
   const SupplierListPage({super.key});
@@ -139,6 +141,14 @@ class _SupplierListPageState extends ConsumerState<SupplierListPage> {
                         totalItems:  filtered.length,
                         pageSize:    pageSize,
                         onPageChanged: (p) => setState(() => _currentPage = p),
+                        trailing: PdfReportButton(
+                          emptyMessage: 'ไม่มีข้อมูลซัพพลายเออร์',
+                          title:    'รายงานซัพพลายเออร์',
+                          filename: () => PdfFilename.generate('supplier_report'),
+                          buildPdf: () => SupplierPdfBuilder.build(
+                              List<SupplierModel>.from(filtered)),
+                          hasData:  filtered.isNotEmpty,
+                        ),
                       ),
                     ],
                   );
@@ -241,6 +251,14 @@ class _SupplierListPageState extends ConsumerState<SupplierListPage> {
                           totalItems:  filtered.length,
                           pageSize:    pageSize,
                           onPageChanged: (p) => setState(() => _currentPage = p),
+                          trailing: PdfReportButton(
+                            emptyMessage: 'ไม่มีข้อมูลซัพพลายเออร์',
+                            title:    'รายงานซัพพลายเออร์',
+                            filename: () => PdfFilename.generate('supplier_report'),
+                            buildPdf: () => SupplierPdfBuilder.build(
+                                List<SupplierModel>.from(filtered)),
+                            hasData:  filtered.isNotEmpty,
+                          ),
                         ),
                       ],
                     ),
@@ -538,25 +556,52 @@ class _SupplierListPageState extends ConsumerState<SupplierListPage> {
   }
 
   Future<void> _confirmDelete(SupplierModel s) async {
+    // ── Pre-check ก่อนแสดง dialog ────────────────────────────────
+    final check = await ref
+        .read(supplierListProvider.notifier)
+        .checkDeleteSupplier(s.supplierId);
+    if (!mounted) return;
+
+    final hasHistory = check['has_history'] == true;
+    final orderCount = (check['order_count'] as int?) ?? 0;
+
+    final details = orderCount > 0 ? 'ประวัติการสั่งซื้อ $orderCount รายการ' : '';
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         title: Row(children: [
-          const Icon(Icons.delete_outline, color: AppTheme.error, size: 20),
+          Icon(
+            hasHistory ? Icons.archive_outlined : Icons.delete_outline,
+            color: hasHistory ? AppTheme.warningColor : AppTheme.error,
+            size: 20,
+          ),
           const SizedBox(width: 8),
-          const Text('ลบซัพพลายเออร์'),
+          Text(hasHistory ? 'ปิดการใช้งานซัพพลายเออร์' : 'ลบซัพพลายเออร์ถาวร'),
         ]),
-        content: Text('ต้องการลบ "${s.supplierName}" ออกจากระบบอย่างถาวรใช่หรือไม่?'),
+        content: hasHistory
+            ? Text(
+                'ซัพพลายเออร์ "${s.supplierName}" มี$details\n\n'
+                'ไม่สามารถลบได้ ระบบจะปิดการใช้งานแทนเพื่อเก็บประวัติไว้',
+              )
+            : Text(
+                'ต้องการลบ "${s.supplierName}" '
+                'ออกจากระบบอย่างถาวรใช่หรือไม่?',
+              ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: const Text('ยกเลิก'),
           ),
           ElevatedButton.icon(
-            icon: const Icon(Icons.delete_forever, size: 16),
-            label: const Text('ลบถาวร'),
+            icon: Icon(
+              hasHistory ? Icons.pause_circle_outline : Icons.delete_forever,
+              size: 16,
+            ),
+            label: Text(hasHistory ? 'ปิดการใช้งาน' : 'ลบถาวร'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.error,
+              backgroundColor:
+                  hasHistory ? AppTheme.warningColor : AppTheme.error,
               foregroundColor: Colors.white,
             ),
             onPressed: () => Navigator.pop(context, true),
@@ -566,15 +611,16 @@ class _SupplierListPageState extends ConsumerState<SupplierListPage> {
     );
     if (confirmed != true || !mounted) return;
 
-    final success = await ref
+    final message = await ref
         .read(supplierListProvider.notifier)
         .deleteSupplier(s.supplierId);
     if (!mounted) return;
+    final success = message != null;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(success ? 'ลบซัพพลายเออร์สำเร็จ' : 'ดำเนินการไม่สำเร็จ'),
+      content: Text(success ? message : 'ดำเนินการไม่สำเร็จ'),
       backgroundColor: success ? AppTheme.success : AppTheme.error,
+      behavior: SnackBarBehavior.floating,
     ));
-    if (success) ref.read(supplierListProvider.notifier).refresh();
   }
 
   Widget _buildEmpty() {

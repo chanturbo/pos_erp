@@ -41,30 +41,40 @@ class GoodsReceiptRoutes {
     try {
       print('📡 GoodsReceiptRoutes: GET /');
 
-      final receipts = await db.select(db.goodsReceipts).get();
+      // JOIN กับ COUNT items เพื่อไม่ต้องโหลด items ทั้งหมด
+      final rows = await db.customSelect('''
+        SELECT
+          gr.*,
+          COUNT(gi.item_id) AS item_count
+        FROM goods_receipts gr
+        LEFT JOIN goods_receipt_items gi ON gi.gr_id = gr.gr_id
+        GROUP BY gr.gr_id
+        ORDER BY gr.gr_date DESC, gr.created_at DESC
+      ''').get();
 
-      final data = receipts
+      final data = rows
           .map(
-            (gr) => {
-              'gr_id': gr.grId,
-              'gr_no': gr.grNo,
-              'gr_date': gr.grDate.toIso8601String(),
-              'po_id': gr.poId,
-              'po_no': gr.poNo,
-              'supplier_id': gr.supplierId,
-              'supplier_name': gr.supplierName,
-              'warehouse_id': gr.warehouseId,
-              'warehouse_name': gr.warehouseName,
-              'user_id': gr.userId,
-              'status': gr.status,
-              'remark': gr.remark,
-              'created_at': gr.createdAt.toIso8601String(),
-              'updated_at': gr.updatedAt.toIso8601String(),
+            (row) => {
+              'gr_id': row.read<String>('gr_id'),
+              'gr_no': row.read<String>('gr_no'),
+              'gr_date': row.read<DateTime>('gr_date').toIso8601String(),
+              'po_id': row.readNullable<String>('po_id'),
+              'po_no': row.readNullable<String>('po_no'),
+              'supplier_id': row.read<String>('supplier_id'),
+              'supplier_name': row.read<String>('supplier_name'),
+              'warehouse_id': row.read<String>('warehouse_id'),
+              'warehouse_name': row.read<String>('warehouse_name'),
+              'user_id': row.read<String>('user_id'),
+              'status': row.read<String>('status'),
+              'remark': row.readNullable<String>('remark'),
+              'created_at': row.read<DateTime>('created_at').toIso8601String(),
+              'updated_at': row.read<DateTime>('updated_at').toIso8601String(),
+              'item_count': row.read<int>('item_count'),
             },
           )
           .toList();
 
-      print('✅ GoodsReceiptRoutes: Found ${receipts.length} goods receipts');
+      print('✅ GoodsReceiptRoutes: Found ${rows.length} goods receipts');
 
       return Response.ok(
         jsonEncode({'success': true, 'data': data}),
@@ -407,9 +417,10 @@ class GoodsReceiptRoutes {
       // ─────────────────────────────────────────────────────────────
       // ทุก operation ใน transaction เดียว:
       // 1) insert stock_movements ทุกรายการ
-      // 2) update สถานะ GR → CONFIRMED
-      // 3) update PO item quantities (ถ้ามี)
-      // 4) update PO status (ถ้ามี)
+      // 2) upsert stock_balances (quantity + weighted avg_cost)
+      // 3) update สถานะ GR → CONFIRMED
+      // 4) update PO item quantities (ถ้ามี)
+      // 5) update PO status (ถ้ามี)
       // ─────────────────────────────────────────────────────────────
       await db.transaction(() async {
         // --- 1) บันทึก stock movements (source of truth) ---
@@ -427,13 +438,24 @@ class GoodsReceiptRoutes {
                   warehouseId: Value(gr.warehouseId),
                   userId: Value(gr.userId),
                   quantity: Value(item.receivedQuantity), // บวก = รับเข้า
+                  unitCost: Value(item.unitPrice),
+                  lotNumber: Value(item.lotNumber),
+                  expiryDate: Value(item.expiryDate),
                   referenceNo: Value(gr.grNo),
                   remark: Value('รับสินค้าจาก ${gr.supplierName}'),
                 ),
               );
 
+          // --- 2) upsert stock_balances (weighted avg cost) ---
+          await _upsertStockBalance(
+            gr.warehouseId,
+            item.productId,
+            item.receivedQuantity,
+            item.unitPrice,
+          );
+
           print(
-            '✅ Stock movement: $movementNo (+${item.receivedQuantity} ${item.productId})',
+            '✅ Stock movement: $movementNo (+${item.receivedQuantity} ${item.productId} @${item.unitPrice})',
           );
         }
 
@@ -509,6 +531,65 @@ class GoodsReceiptRoutes {
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': '$e'}),
         headers: {'Content-Type': 'application/json'},
+      );
+    }
+  }
+
+  /// Helper: upsert stock_balances พร้อม weighted average cost
+  /// - รับสินค้า (+qty): คำนวณ avg_cost ใหม่
+  /// - จ่ายสินค้า (-qty): avg_cost คงเดิม
+  Future<void> _upsertStockBalance(
+    String warehouseId,
+    String productId,
+    double qtyDelta,
+    double unitCost,
+  ) async {
+    final existing = await (db.select(db.stockBalances)
+          ..where(
+            (s) =>
+                s.productId.equals(productId) &
+                s.warehouseId.equals(warehouseId),
+          ))
+        .getSingleOrNull();
+
+    if (existing == null) {
+      final newAvg = (qtyDelta > 0 && unitCost > 0) ? unitCost : 0.0;
+      await db.into(db.stockBalances).insert(
+            StockBalancesCompanion(
+              stockId: Value('SB_${productId}_$warehouseId'),
+              productId: Value(productId),
+              warehouseId: Value(warehouseId),
+              quantity: Value(qtyDelta),
+              avgCost: Value(newAvg),
+              lastCost: Value(unitCost > 0 ? unitCost : 0.0),
+              updatedAt: Value(DateTime.now()),
+            ),
+          );
+    } else {
+      final oldQty = existing.quantity;
+      final newQty = oldQty + qtyDelta;
+
+      double newAvg = existing.avgCost;
+      double newLast = existing.lastCost;
+
+      if (qtyDelta > 0 && unitCost > 0) {
+        // Weighted average cost เฉพาะตอนรับเข้า
+        final totalQty = oldQty + qtyDelta;
+        newAvg = totalQty > 0
+            ? (oldQty * existing.avgCost + qtyDelta * unitCost) / totalQty
+            : unitCost;
+        newLast = unitCost;
+      }
+
+      await (db.update(db.stockBalances)
+            ..where((s) => s.stockId.equals(existing.stockId)))
+          .write(
+        StockBalancesCompanion(
+          quantity: Value(newQty),
+          avgCost: Value(newAvg),
+          lastCost: Value(newLast),
+          updatedAt: Value(DateTime.now()),
+        ),
       );
     }
   }

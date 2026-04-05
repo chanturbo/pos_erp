@@ -17,19 +17,21 @@ class StockMovements extends Table {
   TextColumn get productId => text().references(Products, #productId)();
   TextColumn get warehouseId => text().references(Warehouses, #warehouseId)();
 
-  // Quantity
+  // Quantity & Cost
   RealColumn get quantity => real()();
   RealColumn get unitCost => real().withDefault(const Constant(0))();
+
+  // Lot / Expiry (จาก GR)
+  TextColumn get lotNumber => text().nullable()();
+  DateTimeColumn get expiryDate => dateTime().nullable()();
 
   // Reference
   TextColumn get referenceType => text().nullable().withLength(max: 20)();
   TextColumn get referenceId => text().nullable().withLength(max: 20)();
+  TextColumn get referenceNo => text().nullable()();
 
   TextColumn get userId => text().references(Users, #userId)();
   TextColumn get remark => text().nullable()();
-
-  // ✅ เพิ่ม 2 columns นี้
-  TextColumn get referenceNo => text().nullable()();
 
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();

@@ -19,6 +19,8 @@ class SalesRoutes {
     router.get('/', _getSalesOrdersHandler);
     router.get('/<id>', _getSalesOrderHandler);
     router.post('/', _createSalesOrderHandler);
+    router.post('/<id>/complete', _completeOrderHandler);
+    router.post('/<id>/cancel', _cancelOrderHandler);
     router.put('/<id>', _updateSalesOrderHandler);
     router.delete('/<id>', _deleteSalesOrderHandler);
 
@@ -242,8 +244,12 @@ class SalesRoutes {
       // ─────────────────────────────────────────────────────────────
       print('💾 Starting transaction...');
 
+      // กำหนดสถานะ order: 'OPEN' = จองสต๊อก, 'COMPLETED' = ตัดสต๊อกทันที (POS)
+      final orderStatus = data['status'] as String? ?? 'COMPLETED';
+      final isOpenOrder = orderStatus == 'OPEN';
+
       await db.transaction(() async {
-        // --- Stock check ภายใน transaction ---
+        // --- Stock check ภายใน transaction (ใช้ available = balance - reserved) ---
         for (var i = 0; i < items.length; i++) {
           final item = items[i] as Map<String, dynamic>;
           final productId = item['product_id'] as String;
@@ -258,13 +264,13 @@ class SalesRoutes {
           }
 
           if (product.isStockControl && !product.allowNegativeStock) {
-            final currentStock = await _getCurrentStock(productId, warehouseId);
-            print('📊 Stock $productId: $currentStock (need: $quantity)');
+            final availableStock = await _getAvailableStock(productId, warehouseId);
+            print('📊 Available stock $productId: $availableStock (need: $quantity)');
 
-            if (currentStock < quantity) {
+            if (availableStock < quantity) {
               throw _ValidationException(
                 'สต๊อกสินค้า ${product.productName} ไม่เพียงพอ '
-                '(คงเหลือ: $currentStock, ต้องการ: $quantity)',
+                '(คงเหลือ: $availableStock, ต้องการ: $quantity)',
               );
             }
           }
@@ -298,12 +304,12 @@ class SalesRoutes {
                 paymentType: Value(data['payment_type'] as String? ?? 'CASH'),
                 paidAmount: Value((data['paid_amount'] as num?)?.toDouble() ?? 0),
                 changeAmount: Value((data['change_amount'] as num?)?.toDouble() ?? 0),
-                status: const Value('COMPLETED'),
+                status: Value(orderStatus),
               ),
             );
-        print('✅ Order inserted: $orderNo');
+        print('✅ Order inserted: $orderNo (status: $orderStatus)');
 
-        // --- Insert Items + Stock Movements ---
+        // --- Insert Items ---
         for (var i = 0; i < items.length; i++) {
           final item = items[i] as Map<String, dynamic>;
           final lineNo = i + 1;
@@ -334,22 +340,30 @@ class SalesRoutes {
               .getSingleOrNull();
 
           if (product != null && product.isStockControl) {
-            final movementNo = 'SM-$datePart-$ts-$lineNo';
-            await db.into(db.stockMovements).insert(
-                  StockMovementsCompanion(
-                    movementId: Value(itemId),
-                    movementNo: Value(movementNo),
-                    movementDate: Value(now),
-                    movementType: const Value('SALE'),
-                    productId: Value(productId),
-                    warehouseId: Value(warehouseId),
-                    userId: Value(userId),
-                    quantity: Value(-quantity),
-                    referenceNo: Value(orderNo),
-                    remark: const Value('ขายสินค้า'),
-                  ),
-                );
-            print('✅ Stock movement: $movementNo (-$quantity)');
+            if (isOpenOrder) {
+              // OPEN: จองสต๊อก (ยังไม่ตัด)
+              await _reserveStock(warehouseId, productId, quantity);
+              print('🔒 Reserved: $productId +$quantity');
+            } else {
+              // COMPLETED: ตัดสต๊อกทันที (POS flow เดิม)
+              final movementNo = 'SM-$datePart-$ts-$lineNo';
+              await db.into(db.stockMovements).insert(
+                    StockMovementsCompanion(
+                      movementId: Value(itemId),
+                      movementNo: Value(movementNo),
+                      movementDate: Value(now),
+                      movementType: const Value('SALE'),
+                      productId: Value(productId),
+                      warehouseId: Value(warehouseId),
+                      userId: Value(userId),
+                      quantity: Value(-quantity),
+                      referenceNo: Value(orderNo),
+                      remark: const Value('ขายสินค้า'),
+                    ),
+                  );
+              await _upsertStockBalance(warehouseId, productId, -quantity, 0);
+              print('✅ Stock movement: $movementNo (-$quantity)');
+            }
           }
         }
 
@@ -388,22 +402,27 @@ class SalesRoutes {
               .getSingleOrNull();
 
           if (product != null && product.isStockControl) {
-            final movementNo = 'SM-$datePart-$ts-F$lineNo';
-            await db.into(db.stockMovements).insert(
-                  StockMovementsCompanion(
-                    movementId: Value(itemId),
-                    movementNo: Value(movementNo),
-                    movementDate: Value(now),
-                    movementType: const Value('SALE'),
-                    productId: Value(productId),
-                    warehouseId: Value(warehouseId),
-                    userId: Value(userId),
-                    quantity: Value(-quantity),
-                    referenceNo: Value(orderNo),
-                    remark: const Value('สินค้าแถมฟรี'),
-                  ),
-                );
-            print('✅ Free item stock movement: $movementNo (-$quantity)');
+            if (isOpenOrder) {
+              await _reserveStock(warehouseId, productId, quantity);
+            } else {
+              final movementNo = 'SM-$datePart-$ts-F$lineNo';
+              await db.into(db.stockMovements).insert(
+                    StockMovementsCompanion(
+                      movementId: Value(itemId),
+                      movementNo: Value(movementNo),
+                      movementDate: Value(now),
+                      movementType: const Value('SALE'),
+                      productId: Value(productId),
+                      warehouseId: Value(warehouseId),
+                      userId: Value(userId),
+                      quantity: Value(-quantity),
+                      referenceNo: Value(orderNo),
+                      remark: const Value('สินค้าแถมฟรี'),
+                    ),
+                  );
+              await _upsertStockBalance(warehouseId, productId, -quantity, 0);
+              print('✅ Free item stock movement: $movementNo (-$quantity)');
+            }
           }
         }
       });
@@ -539,23 +558,280 @@ class SalesRoutes {
     }
   }
 
-  /// Helper: คำนวณสต๊อกปัจจุบันจาก stock_movements (single source of truth)
-  Future<double> _getCurrentStock(String productId, String warehouseId) async {
-    final result = await db
-        .customSelect(
-          '''
-      SELECT COALESCE(SUM(quantity), 0) as balance
-      FROM stock_movements
-      WHERE product_id = ? AND warehouse_id = ?
-      ''',
-          variables: [
-            Variable.withString(productId),
-            Variable.withString(warehouseId),
-          ],
-        )
-        .getSingle();
+  /// POST /api/sales/:id/complete - ชำระเงิน/สรุป order จาก OPEN → COMPLETED
+  /// ตัดสต๊อกตาม items, คืนการจอง, อัปเดต payment info
+  Future<Response> _completeOrderHandler(Request request, String id) async {
+    try {
+      final authUser = getAuthUser(request);
+      if (authUser == null) {
+        return Response(401,
+            body: jsonEncode({'success': false, 'message': 'Unauthorized'}),
+            headers: {'Content-Type': 'application/json'});
+      }
 
-    return result.read<double>('balance');
+      final order = await (db.select(db.salesOrders)
+            ..where((t) => t.orderId.equals(id)))
+          .getSingleOrNull();
+
+      if (order == null) {
+        return Response.notFound(
+          jsonEncode({'success': false, 'message': 'ไม่พบใบขาย'}),
+          headers: {'Content-Type': 'application/json'},
+        );
+      }
+
+      if (order.status != 'OPEN') {
+        return Response(400,
+            body: jsonEncode({
+              'success': false,
+              'message': 'ใบขายต้องอยู่ในสถานะ OPEN เท่านั้น (ปัจจุบัน: ${order.status})',
+            }),
+            headers: {'Content-Type': 'application/json'});
+      }
+
+      final payload = await request.readAsString();
+      final data = payload.isNotEmpty
+          ? jsonDecode(payload) as Map<String, dynamic>
+          : <String, dynamic>{};
+
+      final items = await (db.select(db.salesOrderItems)
+            ..where((t) => t.orderId.equals(id)))
+          .get();
+
+      final ts = DateTime.now().millisecondsSinceEpoch;
+      final datePart =
+          '${order.orderDate.year}${order.orderDate.month.toString().padLeft(2, '0')}${order.orderDate.day.toString().padLeft(2, '0')}';
+
+      await db.transaction(() async {
+        // ตัดสต๊อก + คืนการจอง ต่อรายการ
+        for (final item in items) {
+          final product = await (db.select(db.products)
+                ..where((t) => t.productId.equals(item.productId)))
+              .getSingleOrNull();
+
+          if (product != null && product.isStockControl) {
+            final movementNo = 'SM-$datePart-$ts-${item.lineNo}';
+            await db.into(db.stockMovements).insert(
+                  StockMovementsCompanion(
+                    movementId: Value('${id}_C${item.lineNo}'),
+                    movementNo: Value(movementNo),
+                    movementDate: Value(DateTime.now()),
+                    movementType: const Value('SALE'),
+                    productId: Value(item.productId),
+                    warehouseId: Value(order.warehouseId),
+                    userId: Value(authUser.userId),
+                    quantity: Value(-item.quantity),
+                    referenceNo: Value(order.orderNo),
+                    remark: const Value('ขายสินค้า (complete)'),
+                  ),
+                );
+
+            // คืนการจอง + อัปเดต qty จริง
+            await _releaseReservation(order.warehouseId, item.productId, item.quantity);
+            await _upsertStockBalance(order.warehouseId, item.productId, -item.quantity, 0);
+            print('✅ Complete: ${item.productId} -${item.quantity}, released reserve');
+          }
+        }
+
+        // อัปเดตสถานะ order + payment info
+        await (db.update(db.salesOrders)
+              ..where((t) => t.orderId.equals(id)))
+            .write(SalesOrdersCompanion(
+          status: const Value('COMPLETED'),
+          paymentType: Value(data['payment_type'] as String? ?? order.paymentType),
+          paidAmount: Value((data['paid_amount'] as num?)?.toDouble() ?? order.paidAmount),
+          changeAmount: Value((data['change_amount'] as num?)?.toDouble() ?? order.changeAmount),
+          updatedAt: Value(DateTime.now()),
+        ));
+      });
+
+      print('✅ SalesRoutes: Order $id completed');
+
+      return Response.ok(
+        jsonEncode({'success': true, 'message': 'ชำระเงินสำเร็จ สต๊อกได้รับการอัพเดทแล้ว'}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    } on _ValidationException catch (e) {
+      return Response(400,
+          body: jsonEncode({'success': false, 'message': e.message}),
+          headers: {'Content-Type': 'application/json'});
+    } catch (e) {
+      print('❌ POST /api/sales/$id/complete error: $e');
+      return Response.internalServerError(
+        body: jsonEncode({'success': false, 'message': 'เกิดข้อผิดพลาดภายใน'}),
+      );
+    }
+  }
+
+  /// POST /api/sales/:id/cancel - ยกเลิก OPEN order (คืนการจองสต๊อก)
+  Future<Response> _cancelOrderHandler(Request request, String id) async {
+    try {
+      final order = await (db.select(db.salesOrders)
+            ..where((t) => t.orderId.equals(id)))
+          .getSingleOrNull();
+
+      if (order == null) {
+        return Response.notFound(
+          jsonEncode({'success': false, 'message': 'ไม่พบใบขาย'}),
+          headers: {'Content-Type': 'application/json'},
+        );
+      }
+
+      if (order.status != 'OPEN') {
+        return Response(400,
+            body: jsonEncode({
+              'success': false,
+              'message': 'ยกเลิกได้เฉพาะ order ที่อยู่ในสถานะ OPEN เท่านั้น',
+            }),
+            headers: {'Content-Type': 'application/json'});
+      }
+
+      final items = await (db.select(db.salesOrderItems)
+            ..where((t) => t.orderId.equals(id)))
+          .get();
+
+      await db.transaction(() async {
+        // คืนการจองสต๊อกทุกรายการ
+        for (final item in items) {
+          final product = await (db.select(db.products)
+                ..where((t) => t.productId.equals(item.productId)))
+              .getSingleOrNull();
+
+          if (product != null && product.isStockControl) {
+            await _releaseReservation(order.warehouseId, item.productId, item.quantity);
+            print('🔓 Released reserve: ${item.productId} -${item.quantity}');
+          }
+        }
+
+        // อัปเดตสถานะ → CANCELLED
+        await (db.update(db.salesOrders)
+              ..where((t) => t.orderId.equals(id)))
+            .write(SalesOrdersCompanion(
+          status: const Value('CANCELLED'),
+          updatedAt: Value(DateTime.now()),
+        ));
+      });
+
+      print('✅ SalesRoutes: Order $id cancelled, reservations released');
+
+      return Response.ok(
+        jsonEncode({'success': true, 'message': 'ยกเลิก order สำเร็จ สต๊อกที่จองถูกคืนแล้ว'}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    } catch (e) {
+      print('❌ POST /api/sales/$id/cancel error: $e');
+      return Response.internalServerError(
+        body: jsonEncode({'success': false, 'message': 'เกิดข้อผิดพลาดภายใน'}),
+      );
+    }
+  }
+
+  /// Helper: available stock = balance (movements) - reserved_qty (stock_balances)
+  Future<double> _getAvailableStock(String productId, String warehouseId) async {
+    final balanceResult = await db.customSelect(
+      'SELECT COALESCE(SUM(quantity), 0) as balance FROM stock_movements WHERE product_id = ? AND warehouse_id = ?',
+      variables: [Variable.withString(productId), Variable.withString(warehouseId)],
+    ).getSingle();
+
+    final balance = balanceResult.read<double>('balance');
+    final reserved = await _getReservedQty(productId, warehouseId);
+    return balance - reserved;
+  }
+
+  /// Helper: ดึง reserved_qty จาก stock_balances
+  Future<double> _getReservedQty(String productId, String warehouseId) async {
+    final sb = await (db.select(db.stockBalances)
+          ..where((s) => s.productId.equals(productId) & s.warehouseId.equals(warehouseId)))
+        .getSingleOrNull();
+    return sb?.reservedQty ?? 0.0;
+  }
+
+  /// Helper: จองสต๊อก (reserved_qty += qty)
+  Future<void> _reserveStock(String warehouseId, String productId, double qty) async {
+    final existing = await (db.select(db.stockBalances)
+          ..where((s) => s.productId.equals(productId) & s.warehouseId.equals(warehouseId)))
+        .getSingleOrNull();
+
+    if (existing == null) {
+      await db.into(db.stockBalances).insert(StockBalancesCompanion(
+        stockId: Value('SB_${productId}_$warehouseId'),
+        productId: Value(productId),
+        warehouseId: Value(warehouseId),
+        reservedQty: Value(qty),
+        updatedAt: Value(DateTime.now()),
+      ));
+    } else {
+      await (db.update(db.stockBalances)
+            ..where((s) => s.stockId.equals(existing.stockId)))
+          .write(StockBalancesCompanion(
+        reservedQty: Value(existing.reservedQty + qty),
+        updatedAt: Value(DateTime.now()),
+      ));
+    }
+  }
+
+  /// Helper: คืนการจองสต๊อก (reserved_qty -= qty, ไม่ต่ำกว่า 0)
+  Future<void> _releaseReservation(String warehouseId, String productId, double qty) async {
+    final existing = await (db.select(db.stockBalances)
+          ..where((s) => s.productId.equals(productId) & s.warehouseId.equals(warehouseId)))
+        .getSingleOrNull();
+
+    if (existing != null) {
+      final newReserved = (existing.reservedQty - qty).clamp(0.0, double.infinity);
+      await (db.update(db.stockBalances)
+            ..where((s) => s.stockId.equals(existing.stockId)))
+          .write(StockBalancesCompanion(
+        reservedQty: Value(newReserved),
+        updatedAt: Value(DateTime.now()),
+      ));
+    }
+  }
+
+  /// Helper: upsert stock_balances quantity + weighted avg cost
+  Future<void> _upsertStockBalance(
+    String warehouseId,
+    String productId,
+    double qtyDelta,
+    double unitCost,
+  ) async {
+    final existing = await (db.select(db.stockBalances)
+          ..where((s) => s.productId.equals(productId) & s.warehouseId.equals(warehouseId)))
+        .getSingleOrNull();
+
+    if (existing == null) {
+      final newAvg = (qtyDelta > 0 && unitCost > 0) ? unitCost : 0.0;
+      await db.into(db.stockBalances).insert(StockBalancesCompanion(
+        stockId: Value('SB_${productId}_$warehouseId'),
+        productId: Value(productId),
+        warehouseId: Value(warehouseId),
+        quantity: Value(qtyDelta),
+        avgCost: Value(newAvg),
+        lastCost: Value(unitCost > 0 ? unitCost : 0.0),
+        updatedAt: Value(DateTime.now()),
+      ));
+    } else {
+      final oldQty = existing.quantity;
+      final newQty = oldQty + qtyDelta;
+      double newAvg = existing.avgCost;
+      double newLast = existing.lastCost;
+
+      if (qtyDelta > 0 && unitCost > 0) {
+        final totalQty = oldQty + qtyDelta;
+        newAvg = totalQty > 0
+            ? (oldQty * existing.avgCost + qtyDelta * unitCost) / totalQty
+            : unitCost;
+        newLast = unitCost;
+      }
+
+      await (db.update(db.stockBalances)
+            ..where((s) => s.stockId.equals(existing.stockId)))
+          .write(StockBalancesCompanion(
+        quantity: Value(newQty),
+        avgCost: Value(newAvg),
+        lastCost: Value(newLast),
+        updatedAt: Value(DateTime.now()),
+      ));
+    }
   }
 
   /// PUT /api/sales/:id - แก้ไขสถานะใบขาย

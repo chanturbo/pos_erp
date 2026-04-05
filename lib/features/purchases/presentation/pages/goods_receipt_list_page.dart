@@ -19,7 +19,7 @@ class _GoodsReceiptListPageState
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   String _statusFilter = 'ALL';
-  bool _isCardView = true;
+  bool _isCardView = false;
 
   @override
   void dispose() {
@@ -161,7 +161,7 @@ class _GoodsReceiptListPageState
                   _GRValueStat(
                     label: 'รายการสินค้า',
                     value:
-                        '${filtered.fold(0, (s, r) => s + (r.items?.length ?? 0))} รายการ',
+                        '${filtered.fold(0, (s, r) => s + r.itemCount)} รายการ',
                     color: AppTheme.info,
                   ),
                 ],
@@ -290,72 +290,129 @@ class _GoodsReceiptListPageState
                       ),
                     ),
                   ),
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        width: 4,
-                        height: 34,
-                        decoration: BoxDecoration(
-                          color: statusColor,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        flex: 3,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(r.grNo,
-                                style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: isDark
-                                        ? Colors.white
-                                        : const Color(0xFF1A1A1A))),
-                            Text(
-                              r.poNo != null
-                                  ? 'PO: ${r.poNo}'
-                                  : r.supplierName,
+                      // ── แถว 1: ข้อมูลหลัก ────────────────────
+                      Row(
+                        children: [
+                          Container(
+                            width: 4,
+                            height: 34,
+                            decoration: BoxDecoration(
+                              color: statusColor,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            flex: 3,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(r.grNo,
+                                    style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        color: isDark
+                                            ? Colors.white
+                                            : const Color(0xFF1A1A1A))),
+                                Text(
+                                  r.poNo != null
+                                      ? 'PO: ${r.poNo}'
+                                      : r.supplierName,
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      color: isDark
+                                          ? const Color(0xFFAAAAAA)
+                                          : AppTheme.textSub),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                          SizedBox(
+                            width: 72,
+                            child: Text(
+                              DateFormat('dd/MM/yy').format(r.grDate),
                               style: TextStyle(
                                   fontSize: 11,
                                   color: isDark
                                       ? const Color(0xFFAAAAAA)
                                       : AppTheme.textSub),
-                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                          SizedBox(
+                            width: 80,
+                            child: Center(
+                              child: _GRStatusBadge(status: r.status),
+                            ),
+                          ),
+                          SizedBox(
+                            width: 50,
+                            child: Text(
+                              '${r.itemCount}',
+                              style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppTheme.info),
+                              textAlign: TextAlign.right,
+                            ),
+                          ),
+                        ],
+                      ),
+                      // ── แถว 2: ปุ่ม DRAFT ────────────────────
+                      if (r.status == 'DRAFT') ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            SizedBox(
+                              width: 52,
+                              height: 34,
+                              child: OutlinedButton(
+                                onPressed: () => _deleteReceipt(receipts[i]),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppTheme.error,
+                                  side: const BorderSide(
+                                      color: AppTheme.error),
+                                  padding: EdgeInsets.zero,
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius:
+                                          BorderRadius.circular(8)),
+                                ),
+                                child: const Icon(
+                                    Icons.delete_outline, size: 18),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            SizedBox(
+                              width: 96,
+                              height: 34,
+                              child: ElevatedButton.icon(
+                                onPressed: () =>
+                                    _confirmReceipt(receipts[i]),
+                                icon: const Icon(
+                                    Icons.check_circle_outline,
+                                    size: 14),
+                                label: const Text('ยืนยันรับ',
+                                    style: TextStyle(fontSize: 12)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppTheme.success,
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8),
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius:
+                                          BorderRadius.circular(8)),
+                                ),
+                              ),
                             ),
                           ],
                         ),
-                      ),
-                      SizedBox(
-                        width: 72,
-                        child: Text(
-                          DateFormat('dd/MM/yy').format(r.grDate),
-                          style: TextStyle(
-                              fontSize: 11,
-                              color: isDark
-                                  ? const Color(0xFFAAAAAA)
-                                  : AppTheme.textSub),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                      SizedBox(
-                        width: 80,
-                        child: Center(
-                          child: _GRStatusBadge(status: r.status),
-                        ),
-                      ),
-                      SizedBox(
-                        width: 50,
-                        child: Text(
-                          '${r.items?.length ?? 0}',
-                          style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: AppTheme.info),
-                          textAlign: TextAlign.right,
-                        ),
-                      ),
+                      ],
                     ],
                   ),
                 ),
@@ -755,7 +812,7 @@ class _GRCard extends StatelessWidget {
                               ? const Color(0xFFAAAAAA)
                               : AppTheme.textSub)),
                   Text(
-                    '${receipt.items?.length ?? 0} รายการ',
+                    '${receipt.itemCount} รายการ',
                     style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
@@ -768,42 +825,41 @@ class _GRCard extends StatelessWidget {
               if (receipt.status == 'DRAFT') ...[
                 const SizedBox(height: 10),
                 Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
+                    SizedBox(
+                      width: 52,
+                      height: 34,
+                      child: OutlinedButton(
                         onPressed: onDelete,
-                        icon: const Icon(Icons.delete_outline, size: 16),
-                        label: const Text('ลบ',
-                            style: TextStyle(fontSize: 12)),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppTheme.error,
-                          side:
-                              const BorderSide(color: AppTheme.error),
-                          padding:
-                              const EdgeInsets.symmetric(vertical: 8),
-                          tapTargetSize:
-                              MaterialTapTargetSize.shrinkWrap,
-                          minimumSize: Size.zero,
+                          side: const BorderSide(color: AppTheme.error),
+                          padding: EdgeInsets.zero,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8)),
                         ),
+                        child: const Icon(Icons.delete_outline, size: 18),
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Expanded(
+                    SizedBox(
+                      width: 96,
+                      height: 34,
                       child: ElevatedButton.icon(
                         onPressed: onConfirm,
                         icon: const Icon(Icons.check_circle_outline,
-                            size: 16),
+                            size: 14),
                         label: const Text('ยืนยันรับ',
                             style: TextStyle(fontSize: 12)),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppTheme.success,
                           foregroundColor: Colors.white,
                           elevation: 0,
-                          padding:
-                              const EdgeInsets.symmetric(vertical: 8),
-                          tapTargetSize:
-                              MaterialTapTargetSize.shrinkWrap,
-                          minimumSize: Size.zero,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8)),
                         ),
                       ),
                     ),

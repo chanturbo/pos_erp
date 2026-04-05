@@ -14,7 +14,9 @@ class PurchaseOrderItemModel {
   // Related data
   final String? productCode;
   final String? productName;
-  final String? unit; // ✅ เพิ่ม
+  final String? unit;
+  final String? warehouseId;
+  final String? warehouseName;
 
   PurchaseOrderItemModel({
     required this.itemId,
@@ -30,7 +32,9 @@ class PurchaseOrderItemModel {
     this.remainingQuantity = 0,
     this.productCode,
     this.productName,
-    this.unit, // ✅ เพิ่ม
+    this.unit,
+    this.warehouseId,
+    this.warehouseName,
   });
 
   factory PurchaseOrderItemModel.fromJson(Map<String, dynamic> json) {
@@ -48,7 +52,9 @@ class PurchaseOrderItemModel {
       remainingQuantity: (json['remaining_quantity'] as num?)?.toDouble() ?? 0,
       productCode: json['product_code'] as String?,
       productName: json['product_name'] as String?,
-      unit: json['unit'] as String?, // ✅ เพิ่ม
+      unit: json['unit'] as String?,
+      warehouseId: json['warehouse_id'] as String?,
+      warehouseName: json['warehouse_name'] as String?,
     );
   }
 
@@ -65,9 +71,11 @@ class PurchaseOrderItemModel {
       'amount': amount,
       'received_quantity': receivedQuantity,
       'remaining_quantity': remainingQuantity,
-      'product_code': productCode, // ✅ เพิ่ม
-      'product_name': productName, // ✅ เพิ่ม
-      'unit': unit, // ✅ เพิ่ม
+      'product_code': productCode,
+      'product_name': productName,
+      'unit': unit,
+      'warehouse_id': warehouseId,
+      'warehouse_name': warehouseName,
     };
   }
 
@@ -85,7 +93,9 @@ class PurchaseOrderItemModel {
     double? remainingQuantity,
     String? productCode,
     String? productName,
-    String? unit, // ✅ เพิ่ม
+    String? unit,
+    String? warehouseId,
+    String? warehouseName,
   }) {
     return PurchaseOrderItemModel(
       itemId: itemId ?? this.itemId,
@@ -101,7 +111,9 @@ class PurchaseOrderItemModel {
       remainingQuantity: remainingQuantity ?? this.remainingQuantity,
       productCode: productCode ?? this.productCode,
       productName: productName ?? this.productName,
-      unit: unit ?? this.unit, // ✅ เพิ่ม
+      unit: unit ?? this.unit,
+      warehouseId: warehouseId ?? this.warehouseId,
+      warehouseName: warehouseName ?? this.warehouseName,
     );
   }
 }

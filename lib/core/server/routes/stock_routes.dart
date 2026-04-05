@@ -24,7 +24,9 @@ class StockRoutes {
     return router;
   }
 
-  /// GET /api/stock/balance - ดูสต๊อกคงเหลือ (คำนวณจาก stock_movements)
+  /// GET /api/stock/balance - ดูสต๊อกคงเหลือพร้อมราคาต้นทุน
+  /// ใช้ stock_balances (cache) สำหรับ quantity + cost
+  /// และ stock_movements (ledger) สำหรับ quantity ที่แม่นยำ
   Future<Response> _getStockBalanceHandler(Request request) async {
     try {
       final query = '''
@@ -36,11 +38,16 @@ class StockRoutes {
           p.base_unit,
           w.warehouse_id,
           w.warehouse_name,
-          COALESCE(SUM(sm.quantity), 0) as balance
+          COALESCE(SUM(sm.quantity), 0) as balance,
+          COALESCE(sb.avg_cost, 0) as avg_cost,
+          COALESCE(sb.last_cost, 0) as last_cost,
+          COALESCE(sb.reserved_qty, 0) as reserved_qty
         FROM products p
         CROSS JOIN warehouses w
-        LEFT JOIN stock_movements sm ON sm.product_id = p.product_id 
+        LEFT JOIN stock_movements sm ON sm.product_id = p.product_id
           AND sm.warehouse_id = w.warehouse_id
+        LEFT JOIN stock_balances sb ON sb.product_id = p.product_id
+          AND sb.warehouse_id = w.warehouse_id
         WHERE p.is_stock_control = 1
         GROUP BY p.product_id, w.warehouse_id
         HAVING balance > 0 OR p.is_active = 1
@@ -51,15 +58,23 @@ class StockRoutes {
 
       final stockData = result
           .map(
-            (row) => {
-              'product_id': row.read<String>('product_id'),
-              'product_code': row.read<String>('product_code'),
-              'product_name': row.read<String>('product_name'),
-              'barcode': row.readNullable<String>('barcode'),
-              'base_unit': row.read<String>('base_unit'),
-              'warehouse_id': row.read<String>('warehouse_id'),
-              'warehouse_name': row.read<String>('warehouse_name'),
-              'balance': row.read<double>('balance'),
+            (row) {
+              final balance = row.read<double>('balance');
+              final reservedQty = row.read<double>('reserved_qty');
+              return {
+                'product_id': row.read<String>('product_id'),
+                'product_code': row.read<String>('product_code'),
+                'product_name': row.read<String>('product_name'),
+                'barcode': row.readNullable<String>('barcode'),
+                'base_unit': row.read<String>('base_unit'),
+                'warehouse_id': row.read<String>('warehouse_id'),
+                'warehouse_name': row.read<String>('warehouse_name'),
+                'balance': balance,
+                'reserved_qty': reservedQty,
+                'available_qty': (balance - reservedQty).clamp(0.0, double.infinity),
+                'avg_cost': row.read<double>('avg_cost'),
+                'last_cost': row.read<double>('last_cost'),
+              };
             },
           )
           .toList();
@@ -178,20 +193,28 @@ class StockRoutes {
       final movementId = 'STK$ts';
       final userId = getAuthUser(request)?.userId ?? 'USR001';
 
+      final productId = data['product_id'] as String;
+      final warehouseId = data['warehouse_id'] as String;
+      final quantity = (data['quantity'] as num).toDouble();
+      final unitCost = (data['unit_cost'] as num?)?.toDouble() ?? 0.0;
+
       await db.into(db.stockMovements).insert(
             StockMovementsCompanion(
               movementId: Value(movementId),
               movementNo: Value('IN-$ts'),
               movementDate: Value(DateTime.now()),
               movementType: const Value('IN'),
-              productId: Value(data['product_id'] as String),
-              warehouseId: Value(data['warehouse_id'] as String),
-              quantity: Value((data['quantity'] as num).toDouble()),
+              productId: Value(productId),
+              warehouseId: Value(warehouseId),
+              quantity: Value(quantity),
+              unitCost: Value(unitCost),
               referenceNo: Value(data['reference_no'] as String?),
               remark: Value(data['remark'] as String?),
               userId: Value(userId),
             ),
           );
+
+      await _upsertStockBalance(warehouseId, productId, quantity, unitCost);
 
       return Response.ok(
         jsonEncode({
@@ -251,6 +274,8 @@ class StockRoutes {
             ),
           );
 
+      await _upsertStockBalance(warehouseId, productId, -quantity, 0);
+
       return Response.ok(
         jsonEncode({
           'success': true,
@@ -298,6 +323,8 @@ class StockRoutes {
               userId: Value(userId),
             ),
           );
+
+      await _upsertStockBalance(warehouseId, productId, adjustQty, 0);
 
       return Response.ok(
         jsonEncode({
@@ -380,6 +407,10 @@ class StockRoutes {
                 userId: Value(userId),
               ),
             );
+
+        // อัปเดต stock_balances ทั้งสองคลัง (cost คงเดิมตอน transfer)
+        await _upsertStockBalance(fromWarehouseId, productId, -quantity, 0);
+        await _upsertStockBalance(toWarehouseId, productId, quantity, 0);
       });
 
       return Response.ok(
@@ -414,5 +445,61 @@ class StockRoutes {
         .getSingle();
 
     return result.read<double>('balance');
+  }
+
+  /// Helper: upsert stock_balances พร้อม weighted average cost
+  Future<void> _upsertStockBalance(
+    String warehouseId,
+    String productId,
+    double qtyDelta,
+    double unitCost,
+  ) async {
+    final existing = await (db.select(db.stockBalances)
+          ..where(
+            (s) =>
+                s.productId.equals(productId) &
+                s.warehouseId.equals(warehouseId),
+          ))
+        .getSingleOrNull();
+
+    if (existing == null) {
+      final newAvg = (qtyDelta > 0 && unitCost > 0) ? unitCost : 0.0;
+      await db.into(db.stockBalances).insert(
+            StockBalancesCompanion(
+              stockId: Value('SB_${productId}_$warehouseId'),
+              productId: Value(productId),
+              warehouseId: Value(warehouseId),
+              quantity: Value(qtyDelta),
+              avgCost: Value(newAvg),
+              lastCost: Value(unitCost > 0 ? unitCost : 0.0),
+              updatedAt: Value(DateTime.now()),
+            ),
+          );
+    } else {
+      final oldQty = existing.quantity;
+      final newQty = oldQty + qtyDelta;
+
+      double newAvg = existing.avgCost;
+      double newLast = existing.lastCost;
+
+      if (qtyDelta > 0 && unitCost > 0) {
+        final totalQty = oldQty + qtyDelta;
+        newAvg = totalQty > 0
+            ? (oldQty * existing.avgCost + qtyDelta * unitCost) / totalQty
+            : unitCost;
+        newLast = unitCost;
+      }
+
+      await (db.update(db.stockBalances)
+            ..where((s) => s.stockId.equals(existing.stockId)))
+          .write(
+        StockBalancesCompanion(
+          quantity: Value(newQty),
+          avgCost: Value(newAvg),
+          lastCost: Value(newLast),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
+    }
   }
 }
