@@ -98,6 +98,11 @@ class SalesOrderItemModel {
   final double amount;
   final bool isFreeItem;
   final String? promotionName;
+  final double unitCost;    // ต้นทุนเฉลี่ย (WAC) ณ เวลาขาย
+  final double cogsAmount;  // ต้นทุนสินค้าที่ขาย = unitCost × quantity
+
+  /// กำไรขั้นต้น = รายได้ - ต้นทุน
+  double get grossProfit => amount - cogsAmount;
 
   SalesOrderItemModel({
     required this.itemId,
@@ -110,6 +115,8 @@ class SalesOrderItemModel {
     required this.amount,
     this.isFreeItem = false,
     this.promotionName,
+    this.unitCost = 0,
+    this.cogsAmount = 0,
   });
 
   factory SalesOrderItemModel.fromJson(Map<String, dynamic> json) {
@@ -124,6 +131,8 @@ class SalesOrderItemModel {
       amount: (json['amount'] as num).toDouble(),
       isFreeItem: (json['is_free_item'] as bool?) ?? false,
       promotionName: json['promotion_name'] as String?,
+      unitCost: (json['unit_cost'] as num?)?.toDouble() ?? 0,
+      cogsAmount: (json['cogs_amount'] as num?)?.toDouble() ?? 0,
     );
   }
 
@@ -139,6 +148,8 @@ class SalesOrderItemModel {
       'amount': amount,
       'is_free_item': isFreeItem,
       'promotion_name': promotionName,
+      'unit_cost': unitCost,
+      'cogs_amount': cogsAmount,
     };
   }
 }

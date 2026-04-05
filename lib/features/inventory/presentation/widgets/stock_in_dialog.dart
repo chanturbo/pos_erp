@@ -15,13 +15,36 @@ class StockInDialog extends ConsumerStatefulWidget {
 class _StockInDialogState extends ConsumerState<StockInDialog> {
   final _formKey = GlobalKey<FormState>();
   final _quantityController = TextEditingController();
+  final _costController     = TextEditingController();
   final _referenceController = TextEditingController();
   final _remarkController = TextEditingController();
   bool _isLoading = false;
-  
+
+  /// WAC ที่จะได้หลังรับของ (แสดง preview แบบ real-time)
+  double get _previewWac {
+    final qty     = double.tryParse(_quantityController.text) ?? 0;
+    final newCost = double.tryParse(_costController.text) ?? 0;
+    final oldQty  = widget.stock.balance;
+    final oldCost = widget.stock.avgCost;
+    if (qty <= 0) return oldCost;
+    final totalQty = oldQty + qty;
+    if (totalQty == 0) return 0;
+    return (oldQty * oldCost + qty * newCost) / totalQty;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // pre-fill ด้วย avgCost ปัจจุบัน (ถ้ามี)
+    if (widget.stock.avgCost > 0) {
+      _costController.text = widget.stock.avgCost.toStringAsFixed(2);
+    }
+  }
+
   @override
   void dispose() {
     _quantityController.dispose();
+    _costController.dispose();
     _referenceController.dispose();
     _remarkController.dispose();
     super.dispose();
@@ -70,53 +93,128 @@ class _StockInDialogState extends ConsumerState<StockInDialog> {
               ),
               const Divider(height: 32),
               
-              // Current Stock
+              // Current Stock + WAC summary
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: Colors.blue[50],
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                child: Column(
                   children: [
-                    const Text('สต๊อกปัจจุบัน:', style: TextStyle(color: Colors.black87)),
-                    Text(
-                      '${widget.stock.balance.toStringAsFixed(0)} ${widget.stock.baseUnit}',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('สต๊อกปัจจุบัน:', style: TextStyle(color: Colors.black87)),
+                        Text(
+                          '${widget.stock.balance.toStringAsFixed(0)} ${widget.stock.baseUnit}',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ],
                     ),
+                    if (widget.stock.avgCost > 0) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('ต้นทุนเฉลี่ย (WAC) ปัจจุบัน:', style: TextStyle(fontSize: 12, color: Colors.black54)),
+                          Text(
+                            '฿${widget.stock.avgCost.toStringAsFixed(2)}',
+                            style: const TextStyle(fontSize: 12, color: Colors.black54),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
-              const SizedBox(height: 24),
-              
-              // Quantity
-              TextFormField(
-                controller: _quantityController,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: 'จำนวนที่รับเข้า *',
-                  border: const OutlineInputBorder(),
-                  suffixText: widget.stock.baseUnit,
+              const SizedBox(height: 16),
+
+              // Quantity + Cost (side by side)
+              StatefulBuilder(
+                builder: (_, setInner) => Column(
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // จำนวน
+                        Expanded(
+                          child: TextFormField(
+                            controller: _quantityController,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              labelText: 'จำนวนที่รับเข้า *',
+                              border: const OutlineInputBorder(),
+                              suffixText: widget.stock.baseUnit,
+                            ),
+                            validator: (value) {
+                              if (value == null || value.isEmpty) return 'กรุณากรอกจำนวน';
+                              final qty = double.tryParse(value);
+                              if (qty == null || qty <= 0) return 'ต้องมากกว่า 0';
+                              return null;
+                            },
+                            autofocus: true,
+                            onChanged: (_) => setInner(() {}),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        // ราคาต้นทุน/หน่วย
+                        Expanded(
+                          child: TextFormField(
+                            controller: _costController,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: const InputDecoration(
+                              labelText: 'ราคาต้นทุน/หน่วย *',
+                              border: OutlineInputBorder(),
+                              prefixText: '฿',
+                            ),
+                            validator: (value) {
+                              if (value == null || value.isEmpty) return 'กรุณากรอกราคา';
+                              final cost = double.tryParse(value);
+                              if (cost == null || cost < 0) return 'ราคาต้องไม่ติดลบ';
+                              return null;
+                            },
+                            onChanged: (_) => setInner(() {}),
+                          ),
+                        ),
+                      ],
+                    ),
+                    // Preview WAC ใหม่
+                    if ((double.tryParse(_quantityController.text) ?? 0) > 0 &&
+                        (double.tryParse(_costController.text) ?? 0) >= 0) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.green[50],
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.green.shade200),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('WAC ใหม่ (หลังรับ):', style: TextStyle(fontSize: 12, color: Colors.black54)),
+                            Text(
+                              '฿${_previewWac.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'กรุณากรอกจำนวน';
-                  }
-                  final qty = double.tryParse(value);
-                  if (qty == null || qty <= 0) {
-                    return 'จำนวนต้องมากกว่า 0';
-                  }
-                  return null;
-                },
-                autofocus: true,
               ),
               const SizedBox(height: 16),
-              
+
               // Reference No
               TextFormField(
                 controller: _referenceController,
@@ -127,7 +225,7 @@ class _StockInDialogState extends ConsumerState<StockInDialog> {
                 ),
               ),
               const SizedBox(height: 16),
-              
+
               // Remark
               TextFormField(
                 controller: _remarkController,
@@ -182,14 +280,16 @@ class _StockInDialogState extends ConsumerState<StockInDialog> {
       _isLoading = true;
     });
     
-    final quantity = double.parse(_quantityController.text);
+    final quantity  = double.parse(_quantityController.text);
+    final unitCost  = double.tryParse(_costController.text) ?? 0;
     final reference = _referenceController.text.trim();
-    final remark = _remarkController.text.trim();
-    
+    final remark    = _remarkController.text.trim();
+
     final success = await ref.read(stockBalanceProvider.notifier).stockIn(
       productId: widget.stock.productId,
       warehouseId: widget.stock.warehouseId,
       quantity: quantity,
+      unitCost: unitCost,
       referenceNo: reference.isEmpty ? null : reference,
       remark: remark.isEmpty ? null : remark,
     );

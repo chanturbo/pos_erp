@@ -109,6 +109,7 @@ class StockRoutes {
                   'product_id': m.productId,
                   'warehouse_id': m.warehouseId,
                   'quantity': m.quantity,
+                  'unit_cost': m.unitCost,
                   'reference_no': m.referenceNo,
                   'remark': m.remark,
                 },
@@ -142,6 +143,7 @@ class StockRoutes {
           sm.warehouse_id,
           w.warehouse_name,
           sm.quantity,
+          COALESCE(sm.unit_cost, 0) as unit_cost,
           sm.reference_no,
           sm.remark
         FROM stock_movements sm
@@ -167,6 +169,7 @@ class StockRoutes {
                 'warehouse_id': row.read<String>('warehouse_id'),
                 'warehouse_name': row.readNullable<String>('warehouse_name'),
                 'quantity': row.read<double>('quantity'),
+                'unit_cost': row.read<double>('unit_cost'),
                 'reference_no': row.readNullable<String>('reference_no'),
                 'remark': row.readNullable<String>('remark'),
               })

@@ -6,6 +6,7 @@ import '../../data/models/purchase_return_model.dart';
 import '../../data/models/purchase_return_item_model.dart';
 import '../providers/purchase_return_provider.dart';
 import '../../../suppliers/presentation/providers/supplier_provider.dart';
+import '../../../products/data/models/product_model.dart';
 import '../../../products/presentation/providers/product_provider.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 
@@ -1357,6 +1358,25 @@ class _ItemDialogState extends State<_ItemDialog> {
   final _qtyCtrl    = TextEditingController(text: '1');
   final _priceCtrl  = TextEditingController(text: '0');
   final _reasonCtrl = TextEditingController();
+  ProductUnitOption? _selectedUnit;
+
+  dynamic get _product => _selectedProductId == null
+      ? null
+      : widget.products.firstWhere(
+          (p) => p.productId == _selectedProductId,
+          orElse: () => null,
+        );
+
+  double get _baseQty {
+    final qty = double.tryParse(_qtyCtrl.text) ?? 0;
+    return qty * (_selectedUnit?.factor ?? 1);
+  }
+
+  double get _baseCost {
+    final price = double.tryParse(_priceCtrl.text) ?? 0;
+    final factor = _selectedUnit?.factor ?? 1;
+    return factor == 0 ? price : price / factor;
+  }
 
   @override
   void dispose() {
@@ -1461,8 +1481,10 @@ class _ItemDialogState extends State<_ItemDialog> {
                           final isSelected =
                               _selectedProductId == p.productId;
                           return InkWell(
-                            onTap: () => setState(
-                                () => _selectedProductId = p.productId),
+                            onTap: () => setState(() {
+                              _selectedProductId = p.productId;
+                              _selectedUnit = null;
+                            }),
                             child: Container(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 12, vertical: 8),
@@ -1501,6 +1523,60 @@ class _ItemDialogState extends State<_ItemDialog> {
                     ),
                     const SizedBox(height: 14),
 
+                    // Unit dropdown
+                    if (_product != null) ...[
+                      _DialogFieldLabel('หน่วย', isDark: isDark),
+                      const SizedBox(height: 4),
+                      DropdownButtonFormField<String>(
+                        initialValue: _selectedUnit?.unit,
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: isDark ? AppTheme.darkElement : Colors.white,
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(
+                                  color: isDark
+                                      ? const Color(0xFF3A3A3A)
+                                      : AppTheme.border)),
+                          enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(
+                                  color: isDark
+                                      ? const Color(0xFF3A3A3A)
+                                      : AppTheme.border)),
+                          focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(
+                                  color: AppTheme.error, width: 1.5)),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
+                        ),
+                        items: (_product!.allUnits as List<ProductUnitOption>)
+                            .map<DropdownMenuItem<String>>((u) =>
+                                DropdownMenuItem(
+                                  value: u.unit,
+                                  child: Text(
+                                    u.factor == 1
+                                        ? u.unit
+                                        : '${u.unit}  (1 ${u.unit} = ${u.factor.toStringAsFixed(0)} ${_product!.baseUnit})',
+                                    style: TextStyle(
+                                        fontSize: 12,
+                                        color: isDark
+                                            ? Colors.white
+                                            : Colors.black87),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ))
+                            .toList(),
+                        onChanged: (v) => setState(() {
+                          _selectedUnit =
+                              (_product!.allUnits as List<ProductUnitOption>)
+                                  .firstWhere((u) => u.unit == v);
+                        }),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+
                     // Qty + Price
                     Row(
                       children: [
@@ -1513,7 +1589,8 @@ class _ItemDialogState extends State<_ItemDialog> {
                               _DialogTextField(
                                   controller: _qtyCtrl,
                                   keyboardType: TextInputType.number,
-                                  isDark: isDark),
+                                  isDark: isDark,
+                                  onChanged: (_) => setState(() {})),
                             ],
                           ),
                         ),
@@ -1527,12 +1604,45 @@ class _ItemDialogState extends State<_ItemDialog> {
                               _DialogTextField(
                                   controller: _priceCtrl,
                                   keyboardType: TextInputType.number,
-                                  isDark: isDark),
+                                  isDark: isDark,
+                                  onChanged: (_) => setState(() {})),
                             ],
                           ),
                         ),
                       ],
                     ),
+
+                    // Conversion preview card
+                    if (_product != null &&
+                        _selectedUnit != null &&
+                        _selectedUnit!.factor != 1) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: AppTheme.error.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                              color: AppTheme.error.withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.swap_horiz,
+                                size: 14, color: AppTheme.error),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                'คืนจริง ${_baseQty.toStringAsFixed(0)} ${_product!.baseUnit}'
+                                '  •  ต้นทุน/ฐาน ${_baseCost.toStringAsFixed(2)} บาท',
+                                style: const TextStyle(
+                                    fontSize: 11, color: AppTheme.error),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 12),
 
                     // Reason
@@ -1595,9 +1705,9 @@ class _ItemDialogState extends State<_ItemDialog> {
       ));
       return;
     }
-    final qty   = double.tryParse(_qtyCtrl.text) ?? 0;
-    final price = double.tryParse(_priceCtrl.text) ?? 0;
-    if (qty <= 0 || price <= 0) {
+    final baseQty   = _baseQty;
+    final baseCost  = _baseCost;
+    if (baseQty <= 0 || baseCost <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('กรุณาระบุจำนวนและราคาที่ถูกต้อง'),
         backgroundColor: AppTheme.error,
@@ -1619,9 +1729,9 @@ class _ItemDialogState extends State<_ItemDialog> {
         unit: product.baseUnit,
         warehouseId: 'WH001',
         warehouseName: 'คลังหลัก',
-        quantity: qty,
-        unitPrice: price,
-        amount: qty * price,
+        quantity: baseQty,
+        unitPrice: baseCost,
+        amount: baseCost * baseQty,
         reason: _reasonCtrl.text.trim().isEmpty
             ? null
             : _reasonCtrl.text.trim(),
@@ -1666,6 +1776,7 @@ class _DialogTextField extends StatelessWidget {
   final TextInputType keyboardType;
   final int maxLines;
   final bool isDark;
+  final ValueChanged<String>? onChanged;
 
   const _DialogTextField({
     required this.controller,
@@ -1673,6 +1784,7 @@ class _DialogTextField extends StatelessWidget {
     this.keyboardType = TextInputType.text,
     this.maxLines = 1,
     required this.isDark,
+    this.onChanged,
   });
 
   @override
@@ -1680,6 +1792,7 @@ class _DialogTextField extends StatelessWidget {
         controller: controller,
         keyboardType: keyboardType,
         maxLines: maxLines,
+        onChanged: onChanged,
         style: TextStyle(
             fontSize: 13,
             color: isDark ? Colors.white : Colors.black87),

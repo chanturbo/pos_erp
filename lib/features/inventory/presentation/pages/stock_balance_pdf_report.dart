@@ -35,7 +35,12 @@ class StockBalancePdfBuilder {
         ? stocks.where((s) => s.balance < lowStockThreshold).length
         : 0;
 
+    final totalStockValue = stocks.fold<double>(0, (s, e) => s + e.stockValue);
+
     var summaryLine = 'ทั้งหมด ${stocks.length} รายการ';
+    if (totalStockValue > 0) {
+      summaryLine += '   มูลค่าสต๊อกรวม: ฿${NumberFormat('#,##0.00', 'th').format(totalStockValue)}';
+    }
     if (lowCount > 0) {
       summaryLine += '   สต๊อกต่ำกว่า $lowStockThreshold : $lowCount รายการ';
     }
@@ -155,12 +160,14 @@ class StockBalancePdfBuilder {
     required pw.Font ttfRegular,
   }) {
     const colWidths = {
-      0: pw.FixedColumnWidth(36),   // #
-      1: pw.FixedColumnWidth(80),   // รหัส
+      0: pw.FixedColumnWidth(28),   // #
+      1: pw.FixedColumnWidth(72),   // รหัส
       2: pw.FlexColumnWidth(2.5),   // ชื่อ
-      3: pw.FlexColumnWidth(1.5),   // คลัง
-      4: pw.FixedColumnWidth(80),   // คงเหลือ
-      5: pw.FixedColumnWidth(55),   // หน่วย
+      3: pw.FlexColumnWidth(1.4),   // คลัง
+      4: pw.FixedColumnWidth(62),   // คงเหลือ
+      5: pw.FixedColumnWidth(42),   // หน่วย
+      6: pw.FixedColumnWidth(72),   // ต้นทุน/หน่วย
+      7: pw.FixedColumnWidth(80),   // มูลค่าสต๊อก
     };
 
     pw.Widget cell(String text, pw.Font font,
@@ -176,44 +183,66 @@ class StockBalancePdfBuilder {
       );
     }
 
-    return pw.Table(
-      columnWidths: colWidths,
-      border: pw.TableBorder.all(color: _kBorder, width: 0.5),
-      children: [
-        pw.TableRow(
-          decoration: pw.BoxDecoration(color: _kHdrBg),
-          children: ['#', 'รหัสสินค้า', 'ชื่อสินค้า', 'คลัง', 'คงเหลือ', 'หน่วย']
-              .map((h) => pw.Container(
-                    padding: const pw.EdgeInsets.symmetric(
-                        horizontal: 5, vertical: 6),
-                    child: pw.Text(h,
-                        style: pw.TextStyle(
-                            font: ttf, fontSize: 8, color: _kText)),
-                  ))
-              .toList(),
-        ),
-        ...stocks.asMap().entries.map((e) {
-          final i     = e.key;
-          final s     = e.value;
-          final isLow = highlightLowStock && s.balance < lowStockThreshold;
-          // Low stock rows keep _kWarnBg background (functionally important)
-          final rowBg = isLow ? _kWarnBg : (i.isEven ? _kAltRow : null);
-          final balanceColor = isLow ? _kWarning : _kText;
+    // แถว summary มูลค่ารวม
+    final totalValue = stocks.fold<double>(0, (s, e) => s + e.stockValue);
 
-          return pw.TableRow(children: [
-            cell('${startNo + i}', ttfRegular,
-                align: pw.Alignment.center, bgColor: rowBg),
-            cell(s.productCode, ttfRegular, bgColor: rowBg),
-            cell(s.productName, ttf, bgColor: rowBg),
-            cell(s.warehouseName, ttfRegular, bgColor: rowBg),
-            cell(_fmt(s.balance), ttfRegular,
-                align: pw.Alignment.centerRight,
-                color: balanceColor,
-                bgColor: rowBg),
-            cell(s.baseUnit, ttfRegular,
-                align: pw.Alignment.center, bgColor: rowBg),
-          ]);
-        }),
+    return pw.Column(
+      children: [
+        pw.Table(
+          columnWidths: colWidths,
+          border: pw.TableBorder.all(color: _kBorder, width: 0.5),
+          children: [
+            pw.TableRow(
+              decoration: pw.BoxDecoration(color: _kHdrBg),
+              children: ['#', 'รหัสสินค้า', 'ชื่อสินค้า', 'คลัง', 'คงเหลือ', 'หน่วย', 'ต้นทุน/หน่วย', 'มูลค่าสต๊อก']
+                  .map((h) => pw.Container(
+                        padding: const pw.EdgeInsets.symmetric(
+                            horizontal: 5, vertical: 6),
+                        child: pw.Text(h,
+                            style: pw.TextStyle(
+                                font: ttf, fontSize: 8, color: _kText)),
+                      ))
+                  .toList(),
+            ),
+            ...stocks.asMap().entries.map((e) {
+              final i     = e.key;
+              final s     = e.value;
+              final isLow = highlightLowStock && s.balance < lowStockThreshold;
+              final rowBg = isLow ? _kWarnBg : (i.isEven ? _kAltRow : null);
+              final balanceColor = isLow ? _kWarning : _kText;
+
+              return pw.TableRow(children: [
+                cell('${startNo + i}', ttfRegular,
+                    align: pw.Alignment.center, bgColor: rowBg),
+                cell(s.productCode, ttfRegular, bgColor: rowBg),
+                cell(s.productName, ttf, bgColor: rowBg),
+                cell(s.warehouseName, ttfRegular, bgColor: rowBg),
+                cell(_fmt(s.balance), ttfRegular,
+                    align: pw.Alignment.centerRight,
+                    color: balanceColor,
+                    bgColor: rowBg),
+                cell(s.baseUnit, ttfRegular,
+                    align: pw.Alignment.center, bgColor: rowBg),
+                cell(s.avgCost > 0 ? '฿${_fmt(s.avgCost)}' : '-', ttfRegular,
+                    align: pw.Alignment.centerRight,
+                    color: const PdfColor.fromInt(0xFF1565C0),
+                    bgColor: rowBg),
+                cell(s.avgCost > 0 ? '฿${_fmt(s.stockValue)}' : '-', ttfRegular,
+                    align: pw.Alignment.centerRight, bgColor: rowBg),
+              ]);
+            }),
+          ],
+        ),
+        if (totalValue > 0) ...[
+          pw.SizedBox(height: 4),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.end,
+            children: [
+              pw.Text('มูลค่าสต๊อกรวม: ฿${_fmt(totalValue)}',
+                  style: pw.TextStyle(font: ttf, fontSize: 9, color: _kText)),
+            ],
+          ),
+        ],
       ],
     );
   }

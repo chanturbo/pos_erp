@@ -317,6 +317,10 @@ class SalesRoutes {
           final productId = item['product_id'] as String;
           final quantity = (item['quantity'] as num).toDouble();
 
+          // ── WAC: ดึง avg_cost ณ เวลาขาย → บันทึกเป็น COGS ──
+          final avgCost   = await _getAvgCost(productId, warehouseId);
+          final cogsAmt   = avgCost * quantity;
+
           await db.into(db.salesOrderItems).insert(
                 SalesOrderItemsCompanion(
                   itemId: Value(itemId),
@@ -331,6 +335,7 @@ class SalesRoutes {
                   discountPercent: Value((item['discount_percent'] as num?)?.toDouble() ?? 0),
                   discountAmount: Value((item['discount_amount'] as num?)?.toDouble() ?? 0),
                   amount: Value((item['amount'] as num).toDouble()),
+                  cost: Value(cogsAmt), // ✅ COGS = avgCost × qty
                   warehouseId: Value(warehouseId),
                 ),
               );
@@ -357,12 +362,13 @@ class SalesRoutes {
                       warehouseId: Value(warehouseId),
                       userId: Value(userId),
                       quantity: Value(-quantity),
+                      unitCost: Value(avgCost), // ✅ บันทึก WAC ตอนขาย
                       referenceNo: Value(orderNo),
                       remark: const Value('ขายสินค้า'),
                     ),
                   );
               await _upsertStockBalance(warehouseId, productId, -quantity, 0);
-              print('✅ Stock movement: $movementNo (-$quantity)');
+              print('✅ Stock movement: $movementNo (-$quantity @ cost $avgCost)');
             }
           }
         }
@@ -376,6 +382,9 @@ class SalesRoutes {
           final productId = item['product_id'] as String;
           final quantity = (item['quantity'] as num).toDouble();
           final promoId = item['promotion_id'] as String?;
+
+          // ── WAC: ดึง avg_cost ของ free item ด้วย (ต้นทุนยังเกิดขึ้นจริง) ──
+          final freeAvgCost = await _getAvgCost(productId, warehouseId);
 
           await db.into(db.salesOrderItems).insert(
                 SalesOrderItemsCompanion(
@@ -391,6 +400,7 @@ class SalesRoutes {
                   discountPercent: const Value(0),
                   discountAmount: const Value(0),
                   amount: const Value(0),
+                  cost: Value(freeAvgCost * quantity), // ✅ COGS free item
                   warehouseId: Value(warehouseId),
                   isFreeItem: const Value(true),
                   promotionId: Value(promoId),
@@ -416,12 +426,13 @@ class SalesRoutes {
                       warehouseId: Value(warehouseId),
                       userId: Value(userId),
                       quantity: Value(-quantity),
+                      unitCost: Value(freeAvgCost), // ✅ บันทึก WAC
                       referenceNo: Value(orderNo),
                       remark: const Value('สินค้าแถมฟรี'),
                     ),
                   );
               await _upsertStockBalance(warehouseId, productId, -quantity, 0);
-              print('✅ Free item stock movement: $movementNo (-$quantity)');
+              print('✅ Free item stock movement: $movementNo (-$quantity @ cost $freeAvgCost)');
             }
           }
         }
@@ -610,6 +621,10 @@ class SalesRoutes {
               .getSingleOrNull();
 
           if (product != null && product.isStockControl) {
+            // ── WAC: ดึง avg_cost ณ เวลา complete (อาจต่างจากตอน OPEN) ──
+            final avgCost  = await _getAvgCost(item.productId, order.warehouseId);
+            final cogsAmt  = avgCost * item.quantity;
+
             final movementNo = 'SM-$datePart-$ts-${item.lineNo}';
             await db.into(db.stockMovements).insert(
                   StockMovementsCompanion(
@@ -621,15 +636,21 @@ class SalesRoutes {
                     warehouseId: Value(order.warehouseId),
                     userId: Value(authUser.userId),
                     quantity: Value(-item.quantity),
+                    unitCost: Value(avgCost), // ✅ WAC ตอนขาย
                     referenceNo: Value(order.orderNo),
                     remark: const Value('ขายสินค้า (complete)'),
                   ),
                 );
 
+            // ✅ อัปเดต cost (COGS) ใน sales_order_items ด้วย avg_cost จริง
+            await (db.update(db.salesOrderItems)
+                  ..where((t) => t.itemId.equals(item.itemId)))
+                .write(SalesOrderItemsCompanion(cost: Value(cogsAmt)));
+
             // คืนการจอง + อัปเดต qty จริง
             await _releaseReservation(order.warehouseId, item.productId, item.quantity);
             await _upsertStockBalance(order.warehouseId, item.productId, -item.quantity, 0);
-            print('✅ Complete: ${item.productId} -${item.quantity}, released reserve');
+            print('✅ Complete: ${item.productId} -${item.quantity} @ cost $avgCost, released reserve');
           }
         }
 
@@ -785,6 +806,18 @@ class SalesRoutes {
         updatedAt: Value(DateTime.now()),
       ));
     }
+  }
+
+  /// Helper: ดึง avg_cost ปัจจุบันของสินค้าในคลัง
+  Future<double> _getAvgCost(String productId, String warehouseId) async {
+    final sb = await (db.select(db.stockBalances)
+          ..where(
+            (s) =>
+                s.productId.equals(productId) &
+                s.warehouseId.equals(warehouseId),
+          ))
+        .getSingleOrNull();
+    return sb?.avgCost ?? 0.0;
   }
 
   /// Helper: upsert stock_balances quantity + weighted avg cost

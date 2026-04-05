@@ -6,6 +6,7 @@ import '../../data/models/purchase_order_model.dart';
 import '../../data/models/purchase_order_item_model.dart';
 import '../providers/purchase_provider.dart';
 import '../../../suppliers/presentation/providers/supplier_provider.dart';
+import '../../../products/data/models/product_model.dart';
 import '../../../products/presentation/providers/product_provider.dart';
 import '../../../inventory/presentation/providers/stock_provider.dart';
 import '../../../../../shared/services/mobile_scanner_service.dart';
@@ -1269,6 +1270,25 @@ class _ProductSelectionDialogState
   final _quantityController = TextEditingController(text: '1');
   final _priceController = TextEditingController();
   String _productSearch = '';
+  ProductUnitOption? _selectedUnit;
+
+  dynamic get _product => _selectedProductId == null
+      ? null
+      : widget.products.firstWhere(
+          (p) => p.productId == _selectedProductId,
+          orElse: () => null,
+        );
+
+  double get _baseQty {
+    final qty = double.tryParse(_quantityController.text) ?? 0;
+    return qty * (_selectedUnit?.factor ?? 1);
+  }
+
+  double get _baseCost {
+    final price = double.tryParse(_priceController.text) ?? 0;
+    final factor = _selectedUnit?.factor ?? 1;
+    return factor == 0 ? price : price / factor;
+  }
 
   @override
   void dispose() {
@@ -1408,10 +1428,40 @@ class _ProductSelectionDialogState
                   .toList(),
               onChanged: (v) => setState(() {
                 _selectedProductId = v;
+                _selectedUnit = null;
                 _priceController.text = '0';
               }),
             ),
             const SizedBox(height: 12),
+
+            // Unit dropdown (shown when product selected)
+            if (_product != null) ...[
+              _PODropdown<String>(
+                value: _selectedUnit?.unit,
+                hint: 'หน่วย',
+                icon: Icons.straighten_outlined,
+                isDark: isDark,
+                items: (_product!.allUnits as List<ProductUnitOption>)
+                    .map<DropdownMenuItem<String>>((u) => DropdownMenuItem(
+                          value: u.unit,
+                          child: Text(
+                            u.factor == 1
+                                ? u.unit
+                                : '${u.unit}  (1 ${u.unit} = ${u.factor.toStringAsFixed(0)} ${_product!.baseUnit})',
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: isDark ? Colors.white : Colors.black87),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ))
+                    .toList(),
+                onChanged: (v) => setState(() {
+                  _selectedUnit = (_product!.allUnits as List<ProductUnitOption>)
+                      .firstWhere((u) => u.unit == v);
+                }),
+              ),
+              const SizedBox(height: 12),
+            ],
 
             Row(
               children: [
@@ -1421,6 +1471,7 @@ class _ProductSelectionDialogState
                     hint: 'จำนวน',
                     icon: Icons.numbers,
                     isDark: isDark,
+                    onChanged: (_) => setState(() {}),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -1430,10 +1481,43 @@ class _ProductSelectionDialogState
                     hint: 'ราคา/หน่วย',
                     icon: Icons.attach_money,
                     isDark: isDark,
+                    onChanged: (_) => setState(() {}),
                   ),
                 ),
               ],
             ),
+
+            // Conversion preview card
+            if (_product != null &&
+                _selectedUnit != null &&
+                _selectedUnit!.factor != 1) ...[
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppTheme.info.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                      color: AppTheme.info.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.swap_horiz,
+                        size: 14, color: AppTheme.info),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'รับจริง ${_baseQty.toStringAsFixed(0)} ${_product!.baseUnit}'
+                        '  •  ต้นทุน/ฐาน ${_baseCost.toStringAsFixed(2)} บาท',
+                        style: const TextStyle(
+                            fontSize: 11, color: AppTheme.info),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -1459,10 +1543,8 @@ class _ProductSelectionDialogState
             if (_selectedProductId == null) return;
             final product = widget.products
                 .firstWhere((p) => p.productId == _selectedProductId);
-            final qty =
-                double.tryParse(_quantityController.text) ?? 0;
-            final price =
-                double.tryParse(_priceController.text) ?? 0;
+            final baseQty = _baseQty;
+            final baseCost = _baseCost;
             Navigator.pop(context, {
               'item': PurchaseOrderItemModel(
                 itemId: '',
@@ -1472,10 +1554,10 @@ class _ProductSelectionDialogState
                 productCode: product.productCode,
                 productName: product.productName,
                 unit: product.baseUnit,
-                quantity: qty,
-                unitPrice: price,
-                amount: qty * price,
-                remainingQuantity: qty,
+                quantity: baseQty,
+                unitPrice: baseCost,
+                amount: baseCost * baseQty,
+                remainingQuantity: baseQty,
               ),
             });
           },

@@ -105,7 +105,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration {
@@ -130,6 +130,21 @@ class AppDatabase extends _$AppDatabase {
         if (from < 5) {
           await m.addColumn(stockMovements, stockMovements.lotNumber);
           await m.addColumn(stockMovements, stockMovements.expiryDate);
+        }
+        if (from < 6) {
+          // WAC: เพิ่ม avg_cost, last_cost ใน stock_balances (ถ้ายังไม่มี)
+          // และ unit_cost ใน stock_movements (ถ้ายังไม่มี)
+          // หมายเหตุ: ถ้า schema สร้างใหม่ตั้งแต่ต้น columns เหล่านี้มีอยู่แล้ว
+          // migration นี้ใช้สำหรับ DB เก่าที่ upgrade ขึ้นมา
+          await customStatement('''
+            ALTER TABLE stock_balances ADD COLUMN avg_cost REAL NOT NULL DEFAULT 0
+          ''').catchError((_) {}); // ignore ถ้ามีอยู่แล้ว
+          await customStatement('''
+            ALTER TABLE stock_balances ADD COLUMN last_cost REAL NOT NULL DEFAULT 0
+          ''').catchError((_) {});
+          await customStatement('''
+            ALTER TABLE stock_movements ADD COLUMN unit_cost REAL NOT NULL DEFAULT 0
+          ''').catchError((_) {});
         }
       },
     );

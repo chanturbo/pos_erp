@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
 
 import '../../../inventory/presentation/providers/stock_provider.dart';
+import '../../../products/data/models/product_model.dart';
 import '../../../products/presentation/providers/product_provider.dart';
 import '../../../suppliers/presentation/providers/supplier_provider.dart';
 import '../../data/models/goods_receipt_model.dart';
@@ -1889,15 +1890,39 @@ class _ItemDialog extends ConsumerStatefulWidget {
 
 class _ItemDialogState extends ConsumerState<_ItemDialog> {
   String? _selectedProductId;
-  final _quantityController = TextEditingController(text: '1');
-  final _lotController = TextEditingController();
-  final _remarkController = TextEditingController();
+  ProductUnitOption? _selectedUnit; // หน่วยที่เลือก (null = base unit)
+  final _quantityController  = TextEditingController(text: '1');
+  final _unitPriceController = TextEditingController(text: '0');
+  final _lotController       = TextEditingController();
+  final _remarkController    = TextEditingController();
   DateTime? _expiryDate;
   String _productSearch = '';
+
+  ProductModel? get _product => _selectedProductId == null
+      ? null
+      : widget.products.firstWhere(
+          (p) => p.productId == _selectedProductId,
+          orElse: () => widget.products.first,
+        );
+
+  /// จำนวนใน base unit = qty × factor
+  double get _baseQty {
+    final qty    = double.tryParse(_quantityController.text) ?? 0;
+    final factor = _selectedUnit?.factor ?? 1;
+    return qty * factor;
+  }
+
+  /// ราคาต้นทุน/base unit = unitPrice / factor
+  double get _baseCost {
+    final price  = double.tryParse(_unitPriceController.text) ?? 0;
+    final factor = _selectedUnit?.factor ?? 1;
+    return factor > 0 ? price / factor : price;
+  }
 
   @override
   void dispose() {
     _quantityController.dispose();
+    _unitPriceController.dispose();
     _lotController.dispose();
     _remarkController.dispose();
     super.dispose();
@@ -1992,19 +2017,129 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
                               overflow: TextOverflow.ellipsis),
                         ))
                     .toList(),
-                onChanged: (v) =>
-                    setState(() => _selectedProductId = v),
+                onChanged: (v) => setState(() {
+                  _selectedProductId = v;
+                  _selectedUnit = null; // reset unit เมื่อเปลี่ยนสินค้า
+                }),
               ),
               const SizedBox(height: 10),
 
-              // Quantity
-              _GRDialogField(
-                controller: _quantityController,
-                hint: 'จำนวนที่รับ *',
-                icon: Icons.numbers,
-                isDark: isDark,
-                keyboardType: TextInputType.number,
+              // Unit dropdown (แสดงเมื่อเลือกสินค้าแล้ว)
+              if (_product != null) ...[
+                _GRDialogDropdown<String>(
+                  value: _selectedUnit?.unit ?? _product!.baseUnit,
+                  hint: 'หน่วยรับสินค้า *',
+                  icon: Icons.straighten_outlined,
+                  isDark: isDark,
+                  items: _product!.allUnits
+                      .map<DropdownMenuItem<String>>((u) => DropdownMenuItem(
+                            value: u.unit,
+                            child: Row(
+                              children: [
+                                Text(u.unit,
+                                    style: TextStyle(
+                                        fontSize: 13,
+                                        color: isDark
+                                            ? Colors.white
+                                            : Colors.black87)),
+                                if (u.factor > 1) ...[
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    '(1 ${u.unit} = ${u.factor.toStringAsFixed(u.factor == u.factor.truncate() ? 0 : 2)} ${_product!.baseUnit})',
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        color: isDark
+                                            ? Colors.white38
+                                            : AppTheme.textSub),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ))
+                      .toList(),
+                  onChanged: (v) => setState(() {
+                    _selectedUnit = _product!.allUnits
+                        .firstWhere((u) => u.unit == v);
+                  }),
+                ),
+                const SizedBox(height: 10),
+              ],
+
+              // Quantity + Unit Price (side by side)
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: _GRDialogField(
+                      controller: _quantityController,
+                      hint: 'จำนวนที่รับ *',
+                      icon: Icons.numbers,
+                      isDark: isDark,
+                      keyboardType: TextInputType.number,
+                      onChanged: (_) => setState(() {}),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _GRDialogField(
+                      controller: _unitPriceController,
+                      hint: 'ราคา/หน่วย',
+                      icon: Icons.attach_money,
+                      isDark: isDark,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      onChanged: (_) => setState(() {}),
+                    ),
+                  ),
+                ],
               ),
+
+              // Conversion preview card
+              if (_product != null &&
+                  (_selectedUnit?.factor ?? 1) > 1 &&
+                  (double.tryParse(_quantityController.text) ?? 0) > 0) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.info.withValues(alpha: 0.07),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppTheme.info.withValues(alpha: 0.25)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.swap_horiz, size: 14, color: AppTheme.info),
+                          const SizedBox(width: 6),
+                          Text(
+                            '${_quantityController.text} ${_selectedUnit!.unit} = ${_baseQty.toStringAsFixed(_baseQty == _baseQty.truncate() ? 0 : 2)} ${_product!.baseUnit}',
+                            style: const TextStyle(fontSize: 12, color: AppTheme.info, fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                      if ((double.tryParse(_unitPriceController.text) ?? 0) > 0) ...[
+                        const SizedBox(height: 3),
+                        Row(
+                          children: [
+                            const Icon(Icons.monetization_on_outlined, size: 14, color: AppTheme.success),
+                            const SizedBox(width: 6),
+                            Text(
+                              'ต้นทุน/${_product!.baseUnit}: ฿${_baseCost.toStringAsFixed(2)}',
+                              style: const TextStyle(fontSize: 12, color: AppTheme.success),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'รวม: ฿${(_baseCost * _baseQty).toStringAsFixed(2)}',
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.success),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 10),
 
               // Lot Number
@@ -2137,8 +2272,15 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
       ));
       return;
     }
+
     final product = widget.products
         .firstWhere((p) => p.productId == _selectedProductId);
+
+    // แปลงเป็น base unit เสมอ
+    final baseQty   = _baseQty;       // qty × factor
+    final baseCost  = _baseCost;      // unitPrice / factor (ต้นทุน/base unit)
+    final totalAmt  = baseCost * baseQty;
+
     Navigator.pop(
       context,
       GoodsReceiptItemModel(
@@ -2148,11 +2290,11 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
         productId: product.productId,
         productCode: product.productCode,
         productName: product.productName,
-        unit: product.baseUnit,
+        unit: product.baseUnit, // เก็บเป็น base unit เสมอ
         orderedQuantity: 0,
-        receivedQuantity: qty,
-        unitPrice: 0,
-        amount: 0,
+        receivedQuantity: baseQty,  // จำนวนใน base unit
+        unitPrice: baseCost,        // ราคาต้นทุน/base unit
+        amount: totalAmt,
         lotNumber:
             _lotController.text.isEmpty ? null : _lotController.text,
         expiryDate: _expiryDate,

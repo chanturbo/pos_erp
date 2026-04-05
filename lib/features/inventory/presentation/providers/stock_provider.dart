@@ -45,22 +45,24 @@ class StockBalanceNotifier extends AsyncNotifier<List<StockBalanceModel>> {
     state = await AsyncValue.guard(() => loadStockBalance());
   }
   
-  /// รับสินค้าเข้า
+  /// รับสินค้าเข้า — [unitCost] คือราคาต้นทุนต่อหน่วย Backend จะคำนวณ WAC ใหม่
   Future<bool> stockIn({
     required String productId,
     required String warehouseId,
     required double quantity,
+    double unitCost = 0,
     String? referenceNo,
     String? remark,
   }) async {
     try {
-      print('📦 Stock in: $quantity');
-      
+      print('📦 Stock in: $quantity @ cost $unitCost');
+
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.post('/api/stock/in', data: {
         'product_id': productId,
         'warehouse_id': warehouseId,
         'quantity': quantity,
+        'unit_cost': unitCost,
         'reference_no': referenceNo,
         'remark': remark,
       });

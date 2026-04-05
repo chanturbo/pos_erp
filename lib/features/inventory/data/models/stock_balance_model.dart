@@ -7,6 +7,10 @@ class StockBalanceModel {
   final String warehouseId;
   final String warehouseName;
   final double balance;
+  final double avgCost; // ต้นทุนเฉลี่ยถ่วงน้ำหนัก (WAC)
+
+  /// มูลค่าสินค้าในคลัง = balance × avgCost
+  double get stockValue => balance * avgCost;
 
   StockBalanceModel({
     required this.productId,
@@ -17,6 +21,7 @@ class StockBalanceModel {
     required this.warehouseId,
     required this.warehouseName,
     required this.balance,
+    this.avgCost = 0,
   });
 
   factory StockBalanceModel.fromJson(Map<String, dynamic> json) {
@@ -29,6 +34,7 @@ class StockBalanceModel {
       warehouseId: json['warehouse_id'] as String,
       warehouseName: json['warehouse_name'] as String,
       balance: (json['balance'] as num).toDouble(),
+      avgCost: (json['avg_cost'] as num?)?.toDouble() ?? 0,
     );
   }
 
@@ -42,6 +48,7 @@ class StockBalanceModel {
       'warehouse_id': warehouseId,
       'warehouse_name': warehouseName,
       'balance': balance,
+      'avg_cost': avgCost,
     };
   }
 
@@ -54,6 +61,7 @@ class StockBalanceModel {
     String? warehouseId,
     String? warehouseName,
     double? balance,
+    double? avgCost,
   }) {
     return StockBalanceModel(
       productId: productId ?? this.productId,
@@ -64,6 +72,7 @@ class StockBalanceModel {
       warehouseId: warehouseId ?? this.warehouseId,
       warehouseName: warehouseName ?? this.warehouseName,
       balance: balance ?? this.balance,
+      avgCost: avgCost ?? this.avgCost,
     );
   }
 }

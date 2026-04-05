@@ -36,6 +36,7 @@ class ProductRoutes {
         'barcode': p.barcode,
         'group_id': p.groupId,
         'base_unit': p.baseUnit,
+        'unit_conversion': p.unitConversion, // JSON: [{"unit":"ลัง","factor":24}]
         'price_level1': p.priceLevel1,
         'price_level2': p.priceLevel2,
         'price_level3': p.priceLevel3,

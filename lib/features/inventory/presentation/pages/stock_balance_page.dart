@@ -74,12 +74,17 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
       return true;
     }).toList();
 
-    // 2. รวมยอด "ทุกคลัง" — เหมือน logic เดิม ✅
+    // 2. รวมยอด "ทุกคลัง" — WAC ถ่วงน้ำหนักจากทุกคลัง
     if (_selectedWarehouse == 'ALL') {
       final Map<String, StockBalanceModel> combined = {};
       for (var s in result) {
         if (combined.containsKey(s.productId)) {
-          final ex = combined[s.productId]!;
+          final ex       = combined[s.productId]!;
+          final newBal   = ex.balance + s.balance;
+          // WAC = (qty_A × cost_A + qty_B × cost_B) / (qty_A + qty_B)
+          final newWac   = newBal > 0
+              ? (ex.balance * ex.avgCost + s.balance * s.avgCost) / newBal
+              : 0.0;
           combined[s.productId] = StockBalanceModel(
             productId: ex.productId,
             productCode: ex.productCode,
@@ -88,10 +93,21 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
             baseUnit: ex.baseUnit,
             warehouseId: 'ALL',
             warehouseName: 'ทุกคลัง',
-            balance: ex.balance + s.balance,
+            balance: newBal,
+            avgCost: newWac,
           );
         } else {
-          combined[s.productId] = s;
+          combined[s.productId] = StockBalanceModel(
+            productId: s.productId,
+            productCode: s.productCode,
+            productName: s.productName,
+            barcode: s.barcode,
+            baseUnit: s.baseUnit,
+            warehouseId: 'ALL',
+            warehouseName: 'ทุกคลัง',
+            balance: s.balance,
+            avgCost: s.avgCost,
+          );
         }
       }
       result = combined.values.toList();
@@ -104,6 +120,8 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
         case 'productCode': c = a.productCode.compareTo(b.productCode); break;
         case 'productName': c = a.productName.compareTo(b.productName); break;
         case 'balance':     c = a.balance.compareTo(b.balance); break;
+        case 'avgCost':     c = a.avgCost.compareTo(b.avgCost); break;
+        case 'stockValue':  c = a.stockValue.compareTo(b.stockValue); break;
         default: c = 0;
       }
       return _sortAsc ? c : -c;
@@ -360,11 +378,17 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
                           settings.enableLowStockAlert &&
                           s.balance < settings.lowStockThreshold)
                       .length;
+                  final totalValue = filtered.fold<double>(
+                      0, (sum, s) => sum + s.stockValue);
                   return Padding(
                     padding: const EdgeInsets.only(top: 6),
                     child: Row(
                       children: [
                         _SummaryChip('รายการ', filtered.length, _navy),
+                        if (totalValue > 0) ...[
+                          const SizedBox(width: 8),
+                          _ValueChip(totalValue),
+                        ],
                         if (lowCount > 0) ...[
                           const SizedBox(width: 8),
                           _SummaryChip('สต๊อกต่ำ', lowCount, _error),
@@ -399,12 +423,18 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
                 _SortableHeader('รหัสสินค้า', 'productCode',
                     _sortColumn, _sortAsc, _onSort, flex: 2),
                 _SortableHeader('ชื่อสินค้า', 'productName',
-                    _sortColumn, _sortAsc, _onSort, flex: 4),
+                    _sortColumn, _sortAsc, _onSort, flex: 3),
                 const _HeaderCell('คลัง', flex: 2),
                 _SortableHeader('คงเหลือ', 'balance',
                     _sortColumn, _sortAsc, _onSort,
                     flex: 2, rightAlign: true),
                 const _HeaderCell('หน่วย', flex: 1, center: true),
+                _SortableHeader('ต้นทุน/หน่วย', 'avgCost',
+                    _sortColumn, _sortAsc, _onSort,
+                    flex: 2, rightAlign: true),
+                _SortableHeader('มูลค่าสต๊อก', 'stockValue',
+                    _sortColumn, _sortAsc, _onSort,
+                    flex: 2, rightAlign: true),
                 const _HeaderCell('สถานะ', flex: 2, center: true),
                 const _HeaderCell('', width: 120),
               ],
@@ -607,7 +637,7 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
                       ),
                     ),
 
-                    // ── Balance column (เหมือน price column ใน product card) ──
+                    // ── Balance + WAC column ──────────────────────────────
                     const SizedBox(width: 8),
                     Column(
                       mainAxisSize: MainAxisSize.min,
@@ -626,6 +656,16 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
                           style: const TextStyle(
                               fontSize: 11, color: AppTheme.textSub),
                         ),
+                        if (s.avgCost > 0) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            'ต้นทุน ฿${s.avgCost.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: Color(0xFF1565C0),
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 4),
                         Icon(Icons.chevron_right,
                             size: 16,
@@ -851,7 +891,7 @@ class _StockTableRowState extends State<_StockTableRow> {
             ),
             // ชื่อ + barcode
             Expanded(
-              flex: 4,
+              flex: 3,
               child: Padding(
                 padding: const EdgeInsets.symmetric(
                     vertical: 10, horizontal: 8),
@@ -907,6 +947,45 @@ class _StockTableRowState extends State<_StockTableRow> {
                       style: TextStyle(
                           fontSize: 12,
                           color: unitColor))),
+            ),
+            // ต้นทุน/หน่วย (WAC)
+            Expanded(
+              flex: 2,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    stock.avgCost > 0
+                        ? '฿${stock.avgCost.toStringAsFixed(2)}'
+                        : '-',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF1565C0),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            // มูลค่าสต๊อก
+            Expanded(
+              flex: 2,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    stock.avgCost > 0
+                        ? '฿${stock.stockValue.toStringAsFixed(0)}'
+                        : '-',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1A1A1A),
+                    ),
+                  ),
+                ),
+              ),
             ),
             Expanded(
               flex: 2,
@@ -1089,6 +1168,46 @@ class _SortableHeader extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// แสดงมูลค่าสต๊อกรวม (฿ format)
+class _ValueChip extends StatelessWidget {
+  final double value;
+  const _ValueChip(this.value);
+
+  @override
+  Widget build(BuildContext context) {
+    final formatted = value >= 1000000
+        ? '฿${(value / 1000000).toStringAsFixed(2)}M'
+        : value >= 1000
+            ? '฿${(value / 1000).toStringAsFixed(1)}K'
+            : '฿${value.toStringAsFixed(0)}';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppTheme.info.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.info.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('มูลค่าสต๊อก', style: TextStyle(fontSize: 11, color: AppTheme.info)),
+          const SizedBox(width: 4),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+            decoration: BoxDecoration(
+                color: AppTheme.info, borderRadius: BorderRadius.circular(8)),
+            child: Text(formatted,
+                style: const TextStyle(
+                    fontSize: 11,
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold)),
+          ),
+        ],
       ),
     );
   }
