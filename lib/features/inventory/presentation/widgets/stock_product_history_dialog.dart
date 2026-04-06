@@ -5,43 +5,63 @@ import '../../../../core/client/api_client.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/pdf/pdf_report_button.dart';
 import '../../../../shared/widgets/pagination_bar.dart';
+import '../../../settings/presentation/pages/settings_page.dart';
 import '../../data/models/stock_balance_model.dart';
 import '../pages/stock_product_history_pdf_report.dart';
 
 // ── helpers ────────────────────────────────────────────────────────
 Color _typeColor(String t) {
   switch (t) {
-    case 'IN':           return const Color(0xFF2E7D32);
-    case 'OUT':          return const Color(0xFFE65100);
-    case 'ADJUST':       return const Color(0xFF1565C0);
+    case 'IN':
+      return const Color(0xFF2E7D32);
+    case 'OUT':
+      return const Color(0xFFE65100);
+    case 'ADJUST':
+      return const Color(0xFF1565C0);
     case 'TRANSFER_IN':
-    case 'TRANSFER_OUT': return const Color(0xFF6A1B9A);
-    case 'SALE':         return const Color(0xFFC62828);
-    default:             return Colors.grey;
+    case 'TRANSFER_OUT':
+      return const Color(0xFF6A1B9A);
+    case 'SALE':
+      return const Color(0xFFC62828);
+    default:
+      return Colors.grey;
   }
 }
 
 IconData _typeIcon(String t) {
   switch (t) {
-    case 'IN':           return Icons.add_box_rounded;
-    case 'OUT':          return Icons.remove_circle_rounded;
-    case 'ADJUST':       return Icons.tune_rounded;
+    case 'IN':
+      return Icons.add_box_rounded;
+    case 'OUT':
+      return Icons.remove_circle_rounded;
+    case 'ADJUST':
+      return Icons.tune_rounded;
     case 'TRANSFER_IN':
-    case 'TRANSFER_OUT': return Icons.swap_horiz_rounded;
-    case 'SALE':         return Icons.shopping_cart_rounded;
-    default:             return Icons.history;
+    case 'TRANSFER_OUT':
+      return Icons.swap_horiz_rounded;
+    case 'SALE':
+      return Icons.shopping_cart_rounded;
+    default:
+      return Icons.history;
   }
 }
 
 String _typeLabel(String t) {
   switch (t) {
-    case 'IN':           return 'รับเข้า';
-    case 'OUT':          return 'เบิกออก';
-    case 'ADJUST':       return 'ปรับสต๊อก';
-    case 'TRANSFER_IN':  return 'รับโอน';
-    case 'TRANSFER_OUT': return 'โอนออก';
-    case 'SALE':         return 'ขาย';
-    default:             return t;
+    case 'IN':
+      return 'รับเข้า';
+    case 'OUT':
+      return 'เบิกออก';
+    case 'ADJUST':
+      return 'ปรับสต๊อก';
+    case 'TRANSFER_IN':
+      return 'รับโอน';
+    case 'TRANSFER_OUT':
+      return 'โอนออก';
+    case 'SALE':
+      return 'ขาย';
+    default:
+      return t;
   }
 }
 
@@ -70,26 +90,31 @@ class _Movement {
   });
 
   factory _Movement.fromJson(Map<String, dynamic> j) => _Movement(
-        movementId:   j['movement_id'] as String,
-        movementDate: DateTime.parse(j['movement_date'] as String),
-        movementType: j['movement_type'] as String,
-        warehouseId:  j['warehouse_id'] as String,
-        warehouseName: j['warehouse_name'] as String? ?? j['warehouse_id'] as String,
-        quantity:     (j['quantity'] as num).toDouble(),
-        referenceNo:  j['reference_no'] as String?,
-        remark:       j['remark'] as String?,
-        baseUnit:     j['base_unit'] as String?,
-      );
+    movementId: j['movement_id'] as String,
+    movementDate: DateTime.parse(j['movement_date'] as String),
+    movementType: j['movement_type'] as String,
+    warehouseId: j['warehouse_id'] as String,
+    warehouseName:
+        j['warehouse_name'] as String? ?? j['warehouse_id'] as String,
+    quantity: (j['quantity'] as num).toDouble(),
+    referenceNo: j['reference_no'] as String?,
+    remark: j['remark'] as String?,
+    baseUnit: j['base_unit'] as String?,
+  );
 }
 
 // ── Provider ───────────────────────────────────────────────────────
-final _productHistoryProvider =
-    FutureProvider.family<List<_Movement>, String>((ref, productId) async {
+final _productHistoryProvider = FutureProvider.family<List<_Movement>, String>((
+  ref,
+  productId,
+) async {
   final api = ref.read(apiClientProvider);
   final res = await api.get('/api/stock/movements/product/$productId');
   if (res.statusCode == 200) {
     final data = res.data['data'] as List;
-    return data.map((j) => _Movement.fromJson(j as Map<String, dynamic>)).toList();
+    return data
+        .map((j) => _Movement.fromJson(j as Map<String, dynamic>))
+        .toList();
   }
   return [];
 });
@@ -110,16 +135,15 @@ class _StockProductHistoryDialogState
   late final TabController _tabController;
 
   static const _tabs = [
-    ('ALL',          'ทั้งหมด',   Icons.history,            Colors.blueGrey),
-    ('IN',           'รับเข้า',   Icons.add_box_rounded,    Color(0xFF2E7D32)),
-    ('OUT',          'เบิกออก',   Icons.remove_circle_rounded, Color(0xFFE65100)),
-    ('ADJUST',       'ปรับสต๊อก', Icons.tune_rounded,       Color(0xFF1565C0)),
-    ('SALE',         'ขาย',       Icons.shopping_cart_rounded, Color(0xFFC62828)),
+    ('ALL', 'ทั้งหมด', Icons.history, Colors.blueGrey),
+    ('IN', 'รับเข้า', Icons.add_box_rounded, Color(0xFF2E7D32)),
+    ('OUT', 'เบิกออก', Icons.remove_circle_rounded, Color(0xFFE65100)),
+    ('ADJUST', 'ปรับสต๊อก', Icons.tune_rounded, Color(0xFF1565C0)),
+    ('SALE', 'ขาย', Icons.shopping_cart_rounded, Color(0xFFC62828)),
   ];
 
-  int _tabIndex   = 0;
+  int _tabIndex = 0;
   int _currentPage = 1;
-  static const _pageSize = 15;
 
   @override
   void initState() {
@@ -128,7 +152,7 @@ class _StockProductHistoryDialogState
     _tabController.addListener(() {
       if (_tabController.indexIsChanging) return;
       setState(() {
-        _tabIndex    = _tabController.index;
+        _tabIndex = _tabController.index;
         _currentPage = 1; // reset หน้าเมื่อเปลี่ยน tab
       });
     });
@@ -147,8 +171,9 @@ class _StockProductHistoryDialogState
 
   @override
   Widget build(BuildContext context) {
-    final productId   = widget.stock.productId;
+    final productId = widget.stock.productId;
     final historyAsync = ref.watch(_productHistoryProvider(productId));
+    final dialogPageSize = ref.watch(settingsProvider).dialogPageSize;
 
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
@@ -164,31 +189,44 @@ class _StockProductHistoryDialogState
               padding: const EdgeInsets.fromLTRB(20, 16, 12, 16),
               decoration: BoxDecoration(
                 color: AppTheme.primaryContainer,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(12),
+                ),
               ),
               child: Row(
                 children: [
                   Container(
-                    width: 38, height: 38,
+                    width: 38,
+                    height: 38,
                     decoration: BoxDecoration(
                       color: AppTheme.primaryColor.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(Icons.history, color: AppTheme.primaryColor, size: 20),
+                    child: const Icon(
+                      Icons.history,
+                      color: AppTheme.primaryColor,
+                      size: 20,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('ประวัติสต๊อกสินค้า',
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15,
-                                color: AppTheme.navyColor)),
+                        const Text(
+                          'ประวัติสต๊อกสินค้า',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                            color: AppTheme.navyColor,
+                          ),
+                        ),
                         Text(
                           '${widget.stock.productCode}  ${widget.stock.productName}',
-                          style: const TextStyle(fontSize: 12, color: Color(0xFF555555)),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF555555),
+                          ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ],
@@ -196,18 +234,24 @@ class _StockProductHistoryDialogState
                   ),
                   // สต๊อกคงเหลือ badge
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: AppTheme.successColor.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: AppTheme.successColor.withValues(alpha: 0.4)),
+                      border: Border.all(
+                        color: AppTheme.successColor.withValues(alpha: 0.4),
+                      ),
                     ),
                     child: Text(
                       'คงเหลือ ${widget.stock.balance.toStringAsFixed(0)} ${widget.stock.baseUnit}',
                       style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.successColor),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.successColor,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -230,7 +274,10 @@ class _StockProductHistoryDialogState
                 indicatorColor: AppTheme.primaryColor,
                 labelColor: AppTheme.primaryColor,
                 unselectedLabelColor: const Color(0xFF888888),
-                labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                labelStyle: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
                 tabs: _tabs.map((t) {
                   final (type, label, icon, color) = t;
                   return Tab(
@@ -248,13 +295,22 @@ class _StockProductHistoryDialogState
                             if (cnt > 0) ...[
                               const SizedBox(width: 5),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 5,
+                                  vertical: 1,
+                                ),
                                 decoration: BoxDecoration(
                                   color: color.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(10),
                                 ),
-                                child: Text('$cnt',
-                                    style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.bold)),
+                                child: Text(
+                                  '$cnt',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: color,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                               ),
                             ],
                           ],
@@ -275,13 +331,20 @@ class _StockProductHistoryDialogState
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                      const Icon(
+                        Icons.error_outline,
+                        size: 48,
+                        color: Colors.red,
+                      ),
                       const SizedBox(height: 12),
-                      Text('เกิดข้อผิดพลาด: $e',
-                          style: const TextStyle(color: Colors.red)),
+                      Text(
+                        'เกิดข้อผิดพลาด: $e',
+                        style: const TextStyle(color: Colors.red),
+                      ),
                       const SizedBox(height: 12),
                       TextButton.icon(
-                        onPressed: () => ref.invalidate(_productHistoryProvider(productId)),
+                        onPressed: () =>
+                            ref.invalidate(_productHistoryProvider(productId)),
                         icon: const Icon(Icons.refresh),
                         label: const Text('ลองใหม่'),
                       ),
@@ -290,9 +353,11 @@ class _StockProductHistoryDialogState
                 ),
                 data: (all) {
                   final (tabType, tabLabel, _, _) = _tabs[_tabIndex];
-                  final filtered   = _filter(all, tabType);
-                  final totalPages = filtered.isEmpty ? 1 : (filtered.length / _pageSize).ceil();
-                  final safePage   = _currentPage.clamp(1, totalPages);
+                  final filtered = _filter(all, tabType);
+                  final totalPages = filtered.isEmpty
+                      ? 1
+                      : (filtered.length / dialogPageSize).ceil();
+                  final safePage = _currentPage.clamp(1, totalPages);
 
                   return Column(
                     children: [
@@ -305,8 +370,11 @@ class _StockProductHistoryDialogState
                             final tabFiltered = _filter(all, type);
 
                             // คำนวณ page เฉพาะ active tab เพื่อ performance
-                            final tStart = (safePage - 1) * _pageSize;
-                            final tEnd   = (tStart + _pageSize).clamp(0, tabFiltered.length);
+                            final tStart = (safePage - 1) * dialogPageSize;
+                            final tEnd = (tStart + dialogPageSize).clamp(
+                              0,
+                              tabFiltered.length,
+                            );
                             final pageItems = tabFiltered.isEmpty
                                 ? <_Movement>[]
                                 : tabFiltered.sublist(tStart, tEnd);
@@ -315,7 +383,8 @@ class _StockProductHistoryDialogState
                             return ListView.separated(
                               padding: const EdgeInsets.all(12),
                               itemCount: pageItems.length,
-                              separatorBuilder: (_, _) => const SizedBox(height: 6),
+                              separatorBuilder: (_, _) =>
+                                  const SizedBox(height: 6),
                               itemBuilder: (_, i) => _HistoryCard(
                                 movement: pageItems[i],
                                 baseUnit: widget.stock.baseUnit,
@@ -328,13 +397,14 @@ class _StockProductHistoryDialogState
                       PaginationBar(
                         currentPage: safePage,
                         totalItems: filtered.length,
-                        pageSize: _pageSize,
+                        pageSize: dialogPageSize,
                         onPageChanged: (p) => setState(() => _currentPage = p),
                         trailing: PdfReportButton(
                           emptyMessage: 'ไม่มีรายการประวัติสต๊อก',
                           title: 'ประวัติสต๊อก ${widget.stock.productName}',
                           filename: () => PdfFilename.generate(
-                              'stock_history_${widget.stock.productCode}'),
+                            'stock_history_${widget.stock.productCode}',
+                          ),
                           hasData: filtered.isNotEmpty,
                           buildPdf: () => StockProductHistoryPdfBuilder.build(
                             productCode: widget.stock.productCode,
@@ -343,14 +413,16 @@ class _StockProductHistoryDialogState
                             currentBalance: widget.stock.balance,
                             filterLabel: tabLabel,
                             items: filtered
-                                .map((m) => StockHistoryPdfItem(
-                                      movementDate: m.movementDate,
-                                      movementType: m.movementType,
-                                      warehouseName: m.warehouseName,
-                                      quantity: m.quantity,
-                                      referenceNo: m.referenceNo,
-                                      remark: m.remark,
-                                    ))
+                                .map(
+                                  (m) => StockHistoryPdfItem(
+                                    movementDate: m.movementDate,
+                                    movementType: m.movementType,
+                                    warehouseName: m.warehouseName,
+                                    quantity: m.quantity,
+                                    referenceNo: m.referenceNo,
+                                    remark: m.remark,
+                                  ),
+                                )
                                 .toList(),
                           ),
                         ),
@@ -367,24 +439,27 @@ class _StockProductHistoryDialogState
   }
 
   Widget _buildEmpty() => Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 64, height: 64,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF5F5F5),
-                shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFFE0E0E0)),
-              ),
-              child: const Icon(Icons.history, size: 28, color: Colors.grey),
-            ),
-            const SizedBox(height: 12),
-            const Text('ไม่มีประวัติในหมวดนี้',
-                style: TextStyle(fontSize: 14, color: Color(0xFF888888))),
-          ],
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Container(
+          width: 64,
+          height: 64,
+          decoration: BoxDecoration(
+            color: const Color(0xFFF5F5F5),
+            shape: BoxShape.circle,
+            border: Border.all(color: const Color(0xFFE0E0E0)),
+          ),
+          child: const Icon(Icons.history, size: 28, color: Colors.grey),
         ),
-      );
+        const SizedBox(height: 12),
+        const Text(
+          'ไม่มีประวัติในหมวดนี้',
+          style: TextStyle(fontSize: 14, color: Color(0xFF888888)),
+        ),
+      ],
+    ),
+  );
 }
 
 // ── HistoryCard ────────────────────────────────────────────────────
@@ -395,10 +470,12 @@ class _HistoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color      = _typeColor(movement.movementType);
-    final icon       = _typeIcon(movement.movementType);
+    final color = _typeColor(movement.movementType);
+    final icon = _typeIcon(movement.movementType);
     final isPositive = movement.quantity >= 0;
-    final qtyColor   = isPositive ? const Color(0xFF2E7D32) : const Color(0xFFC62828);
+    final qtyColor = isPositive
+        ? const Color(0xFF2E7D32)
+        : const Color(0xFFC62828);
 
     return Container(
       decoration: BoxDecoration(
@@ -431,9 +508,10 @@ class _HistoryCard extends StatelessWidget {
                     Text(
                       '${isPositive ? '+' : ''}${movement.quantity.toStringAsFixed(0)} $baseUnit',
                       style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: qtyColor),
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: qtyColor,
+                      ),
                     ),
                   ],
                 ),
@@ -442,24 +520,41 @@ class _HistoryCard extends StatelessWidget {
                 // date + warehouse
                 Row(
                   children: [
-                    const Icon(Icons.access_time, size: 11, color: Color(0xFF9E9E9E)),
+                    const Icon(
+                      Icons.access_time,
+                      size: 11,
+                      color: Color(0xFF9E9E9E),
+                    ),
                     const SizedBox(width: 3),
                     Text(
-                      DateFormat('dd/MM/yyyy HH:mm').format(movement.movementDate),
-                      style: const TextStyle(fontSize: 11, color: Color(0xFF777777)),
+                      DateFormat(
+                        'dd/MM/yyyy HH:mm',
+                      ).format(movement.movementDate),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF777777),
+                      ),
                     ),
                     const SizedBox(width: 10),
-                    const Icon(Icons.warehouse_outlined, size: 11, color: Color(0xFF9E9E9E)),
+                    const Icon(
+                      Icons.warehouse_outlined,
+                      size: 11,
+                      color: Color(0xFF9E9E9E),
+                    ),
                     const SizedBox(width: 3),
                     Text(
                       movement.warehouseName,
-                      style: const TextStyle(fontSize: 11, color: Color(0xFF777777)),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF777777),
+                      ),
                     ),
                   ],
                 ),
 
                 // reference / remark
-                if (movement.referenceNo != null && movement.referenceNo!.isNotEmpty) ...[
+                if (movement.referenceNo != null &&
+                    movement.referenceNo!.isNotEmpty) ...[
                   const SizedBox(height: 2),
                   Row(
                     children: [
@@ -468,7 +563,10 @@ class _HistoryCard extends StatelessWidget {
                       Expanded(
                         child: Text(
                           movement.referenceNo!,
-                          style: const TextStyle(fontSize: 11, color: Color(0xFF555555)),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF555555),
+                          ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -479,15 +577,20 @@ class _HistoryCard extends StatelessWidget {
                   const SizedBox(height: 2),
                   Row(
                     children: [
-                      const Icon(Icons.notes, size: 11, color: Color(0xFF9E9E9E)),
+                      const Icon(
+                        Icons.notes,
+                        size: 11,
+                        color: Color(0xFF9E9E9E),
+                      ),
                       const SizedBox(width: 3),
                       Expanded(
                         child: Text(
                           movement.remark!,
                           style: const TextStyle(
-                              fontSize: 11,
-                              color: Color(0xFF888888),
-                              fontStyle: FontStyle.italic),
+                            fontSize: 11,
+                            color: Color(0xFF888888),
+                            fontStyle: FontStyle.italic,
+                          ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -520,7 +623,11 @@ class _TypeBadge extends StatelessWidget {
       ),
       child: Text(
         _typeLabel(type),
-        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: color),
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
       ),
     );
   }

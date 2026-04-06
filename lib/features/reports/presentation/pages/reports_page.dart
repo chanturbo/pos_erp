@@ -4,15 +4,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:pdf/widgets.dart' as pw;
 import '../../../../core/client/api_client.dart';
+import '../../../../shared/pdf/pdf_report_button.dart';
+import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/utils/responsive_utils.dart';
 import '../../data/models/sales_summary_model.dart';
+import 'reports_pdf_report.dart';
 import 'sales_chart_page.dart';
 import '../../../../core/utils/csv_export.dart';
 
 // ── Providers ─────────────────────────────────────────────────────────────────
 
-final salesSummaryProvider =
-    FutureProvider<SalesSummaryModel>((ref) async {
+final salesSummaryProvider = FutureProvider<SalesSummaryModel>((ref) async {
   final api = ref.read(apiClientProvider);
   final res = await api.get('/api/reports/sales-summary');
   if (res.statusCode == 200) {
@@ -21,8 +25,7 @@ final salesSummaryProvider =
   throw Exception('Failed to load summary');
 });
 
-final topProductsProvider =
-    FutureProvider<List<TopProductModel>>((ref) async {
+final topProductsProvider = FutureProvider<List<TopProductModel>>((ref) async {
   final api = ref.read(apiClientProvider);
   final res = await api.get('/api/reports/top-products?limit=5');
   if (res.statusCode == 200) {
@@ -33,8 +36,9 @@ final topProductsProvider =
   return [];
 });
 
-final topCustomersProvider =
-    FutureProvider<List<TopCustomerModel>>((ref) async {
+final topCustomersProvider = FutureProvider<List<TopCustomerModel>>((
+  ref,
+) async {
   final api = ref.read(apiClientProvider);
   final res = await api.get('/api/reports/top-customers?limit=5');
   if (res.statusCode == 200) {
@@ -45,27 +49,29 @@ final topCustomersProvider =
   return [];
 });
 
-final purchaseSummaryProvider =
-    FutureProvider<Map<String, dynamic>>((ref) async {
+final purchaseSummaryProvider = FutureProvider<Map<String, dynamic>>((
+  ref,
+) async {
   final api = ref.read(apiClientProvider);
   final res = await api.get('/api/reports/purchase-summary');
   if (res.statusCode == 200) return res.data['data'] as Map<String, dynamic>;
   return {};
 });
 
-final topSuppliersProvider =
-    FutureProvider<List<Map<String, dynamic>>>((ref) async {
+final topSuppliersProvider = FutureProvider<List<Map<String, dynamic>>>((
+  ref,
+) async {
   final api = ref.read(apiClientProvider);
-  final res =
-      await api.get('/api/reports/purchase-by-supplier?limit=5');
+  final res = await api.get('/api/reports/purchase-by-supplier?limit=5');
   if (res.statusCode == 200) {
     return (res.data['data'] as List).cast<Map<String, dynamic>>();
   }
   return [];
 });
 
-final lowStockProvider =
-    FutureProvider<List<Map<String, dynamic>>>((ref) async {
+final lowStockProvider = FutureProvider<List<Map<String, dynamic>>>((
+  ref,
+) async {
   final api = ref.read(apiClientProvider);
   final res = await api.get('/api/reports/low-stock?threshold=10');
   if (res.statusCode == 200) {
@@ -74,8 +80,9 @@ final lowStockProvider =
   return [];
 });
 
-final stockAgingProvider =
-    FutureProvider<List<Map<String, dynamic>>>((ref) async {
+final stockAgingProvider = FutureProvider<List<Map<String, dynamic>>>((
+  ref,
+) async {
   final api = ref.read(apiClientProvider);
   final res = await api.get('/api/reports/stock-aging?days=90');
   if (res.statusCode == 200) {
@@ -84,41 +91,97 @@ final stockAgingProvider =
   return [];
 });
 
+class FinancialDateFilter {
+  final String preset;
+  final DateTime? dateFrom;
+  final DateTime? dateTo;
+
+  const FinancialDateFilter({required this.preset, this.dateFrom, this.dateTo});
+
+  String _formatDate(DateTime date) => DateFormat('yyyy-MM-dd').format(date);
+
+  Map<String, dynamic> toQuery() {
+    final query = <String, dynamic>{};
+    if (dateFrom != null) query['start_date'] = _formatDate(dateFrom!);
+    if (dateTo != null) query['end_date'] = _formatDate(dateTo!);
+    return query;
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is FinancialDateFilter &&
+        other.preset == preset &&
+        other.dateFrom == dateFrom &&
+        other.dateTo == dateTo;
+  }
+
+  @override
+  int get hashCode => Object.hash(preset, dateFrom, dateTo);
+}
+
 final profitLossProvider =
-    FutureProvider<Map<String, dynamic>>((ref) async {
-  final api = ref.read(apiClientProvider);
-  final res = await api.get('/api/reports/profit-loss');
-  if (res.statusCode == 200) return res.data['data'] as Map<String, dynamic>;
-  return {};
-});
+    FutureProvider.family<Map<String, dynamic>, FinancialDateFilter>((
+      ref,
+      filter,
+    ) async {
+      final api = ref.read(apiClientProvider);
+      final res = await api.get(
+        '/api/reports/profit-loss',
+        queryParameters: filter.toQuery(),
+      );
+      if (res.statusCode == 200) {
+        return res.data['data'] as Map<String, dynamic>;
+      }
+      return {};
+    });
 
 final arAgingProvider =
-    FutureProvider<List<Map<String, dynamic>>>((ref) async {
-  final api = ref.read(apiClientProvider);
-  final res = await api.get('/api/reports/ar-aging');
-  if (res.statusCode == 200) {
-    return (res.data['data'] as List).cast<Map<String, dynamic>>();
-  }
-  return [];
-});
+    FutureProvider.family<List<Map<String, dynamic>>, FinancialDateFilter>((
+      ref,
+      filter,
+    ) async {
+      final api = ref.read(apiClientProvider);
+      final res = await api.get(
+        '/api/reports/ar-aging',
+        queryParameters: filter.toQuery(),
+      );
+      if (res.statusCode == 200) {
+        return (res.data['data'] as List).cast<Map<String, dynamic>>();
+      }
+      return [];
+    });
 
 final apAgingProvider =
-    FutureProvider<List<Map<String, dynamic>>>((ref) async {
-  final api = ref.read(apiClientProvider);
-  final res = await api.get('/api/reports/ap-aging');
-  if (res.statusCode == 200) {
-    return (res.data['data'] as List).cast<Map<String, dynamic>>();
-  }
-  return [];
-});
+    FutureProvider.family<List<Map<String, dynamic>>, FinancialDateFilter>((
+      ref,
+      filter,
+    ) async {
+      final api = ref.read(apiClientProvider);
+      final res = await api.get(
+        '/api/reports/ap-aging',
+        queryParameters: filter.toQuery(),
+      );
+      if (res.statusCode == 200) {
+        return (res.data['data'] as List).cast<Map<String, dynamic>>();
+      }
+      return [];
+    });
 
 final cashFlowProvider =
-    FutureProvider<Map<String, dynamic>>((ref) async {
-  final api = ref.read(apiClientProvider);
-  final res = await api.get('/api/reports/cash-flow');
-  if (res.statusCode == 200) return res.data['data'] as Map<String, dynamic>;
-  return {};
-});
+    FutureProvider.family<Map<String, dynamic>, FinancialDateFilter>((
+      ref,
+      filter,
+    ) async {
+      final api = ref.read(apiClientProvider);
+      final res = await api.get(
+        '/api/reports/cash-flow',
+        queryParameters: filter.toQuery(),
+      );
+      if (res.statusCode == 200) {
+        return res.data['data'] as Map<String, dynamic>;
+      }
+      return {};
+    });
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
@@ -132,13 +195,24 @@ class ReportsPage extends ConsumerStatefulWidget {
 class _ReportsPageState extends ConsumerState<ReportsPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  int _currentTab = 0;
   final _fmt = NumberFormat('#,##0.00', 'th_TH');
   final _fmtInt = NumberFormat('#,##0', 'th_TH');
+  final _fmtQty = NumberFormat('#,##0.##', 'th_TH');
+  String _financialDatePreset = 'THIS_YEAR';
+  DateTime? _financialDateFrom;
+  DateTime? _financialDateTo;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging &&
+          _currentTab != _tabController.index) {
+        setState(() => _currentTab = _tabController.index);
+      }
+    });
   }
 
   @override
@@ -155,37 +229,140 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
     ref.invalidate(topSuppliersProvider);
     ref.invalidate(lowStockProvider);
     ref.invalidate(stockAgingProvider);
-    ref.invalidate(profitLossProvider);
-    ref.invalidate(arAgingProvider);
-    ref.invalidate(apAgingProvider);
-    ref.invalidate(cashFlowProvider);
+    ref.invalidate(profitLossProvider(_financialFilter));
+    ref.invalidate(arAgingProvider(_financialFilter));
+    ref.invalidate(apAgingProvider(_financialFilter));
+    ref.invalidate(cashFlowProvider(_financialFilter));
+  }
+
+  FinancialDateFilter get _financialFilter {
+    final now = DateTime.now();
+    switch (_financialDatePreset) {
+      case 'TODAY':
+        final today = DateTime(now.year, now.month, now.day);
+        return FinancialDateFilter(
+          preset: _financialDatePreset,
+          dateFrom: today,
+          dateTo: today,
+        );
+      case 'LAST_7_DAYS':
+        return FinancialDateFilter(
+          preset: _financialDatePreset,
+          dateFrom: DateTime(
+            now.year,
+            now.month,
+            now.day,
+          ).subtract(const Duration(days: 6)),
+          dateTo: DateTime(now.year, now.month, now.day),
+        );
+      case 'LAST_30_DAYS':
+        return FinancialDateFilter(
+          preset: _financialDatePreset,
+          dateFrom: DateTime(
+            now.year,
+            now.month,
+            now.day,
+          ).subtract(const Duration(days: 29)),
+          dateTo: DateTime(now.year, now.month, now.day),
+        );
+      case 'THIS_MONTH':
+        return FinancialDateFilter(
+          preset: _financialDatePreset,
+          dateFrom: DateTime(now.year, now.month, 1),
+          dateTo: DateTime(now.year, now.month, now.day),
+        );
+      case 'THIS_YEAR':
+        return FinancialDateFilter(
+          preset: _financialDatePreset,
+          dateFrom: DateTime(now.year, 1, 1),
+          dateTo: DateTime(now.year, now.month, now.day),
+        );
+      case 'CUSTOM':
+        return FinancialDateFilter(
+          preset: _financialDatePreset,
+          dateFrom: _financialDateFrom,
+          dateTo: _financialDateTo,
+        );
+      default:
+        return const FinancialDateFilter(preset: 'ALL');
+    }
+  }
+
+  Future<void> _pickFinancialDate(bool isFrom) async {
+    final now = DateTime.now();
+    final initial = isFrom
+        ? (_financialDateFrom ?? now)
+        : (_financialDateTo ?? _financialDateFrom ?? now);
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2035),
+    );
+    if (picked == null) return;
+    setState(() {
+      _financialDatePreset = 'CUSTOM';
+      if (isFrom) {
+        _financialDateFrom = picked;
+      } else {
+        _financialDateTo = picked;
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppTheme.surfaceColorOf(context),
       appBar: AppBar(
-        title: const Text('รายงาน'),
+        automaticallyImplyLeading: !context.hasPermanentSidebar,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('รายงาน'),
+            Text(
+              'ภาพรวมธุรกิจและการวิเคราะห์',
+              style: TextStyle(
+                fontSize: 11,
+                color: Colors.white.withValues(alpha: 0.65),
+                fontWeight: FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.bar_chart),
             tooltip: 'กราฟยอดขาย',
-            onPressed: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const SalesChartPage())),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SalesChartPage()),
+            ),
           ),
           IconButton(
             icon: const Icon(Icons.file_download),
             tooltip: 'Export CSV',
             onPressed: () => _exportReport(context),
           ),
+          _buildPdfAction(),
           IconButton(
             icon: const Icon(Icons.refresh),
+            tooltip: 'รีเฟรชข้อมูล',
             onPressed: _refreshAll,
           ),
         ],
         bottom: TabBar(
           controller: _tabController,
           isScrollable: true,
+          tabAlignment: TabAlignment.start,
+          labelStyle: TextStyle(
+            fontSize: context.isMobile ? 12 : 13,
+            fontWeight: FontWeight.w600,
+          ),
+          unselectedLabelStyle: TextStyle(
+            fontSize: context.isMobile ? 12 : 13,
+            fontWeight: FontWeight.w500,
+          ),
           tabs: const [
             Tab(icon: Icon(Icons.shopping_cart), text: 'การขาย'),
             Tab(icon: Icon(Icons.shopping_bag), text: 'การซื้อ'),
@@ -197,38 +374,148 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildSalesTab(),
-          _buildPurchaseTab(),
-          _buildInventoryTab(),
-          _buildFinancialTab(),
+          _tabShell(context, _buildSalesTab()),
+          _tabShell(context, _buildPurchaseTab()),
+          _tabShell(context, _buildInventoryTab()),
+          _tabShell(context, _buildFinancialTab()),
         ],
       ),
     );
   }
 
+  Widget _tabShell(BuildContext context, Widget child) {
+    return Align(
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: context.contentMaxWidth),
+        child: child,
+      ),
+    );
+  }
+
+  Widget _buildPdfAction() {
+    return Padding(
+      padding: const EdgeInsets.only(right: 4),
+      child: PdfReportButton(
+        emptyMessage: 'ไม่มีข้อมูลสำหรับสร้างรายงาน',
+        title: _pdfTitle,
+        filename: () => PdfFilename.generate(_pdfFilenamePrefix),
+        buildPdf: _buildCurrentTabPdf,
+        hasData: true,
+      ),
+    );
+  }
+
+  String get _pdfTitle {
+    switch (_currentTab) {
+      case 0:
+        return 'รายงานภาพรวมการขาย';
+      case 1:
+        return 'รายงานภาพรวมการซื้อ';
+      case 2:
+        return 'รายงานภาพรวมสต๊อก';
+      case 3:
+        return 'รายงานภาพรวมการเงิน';
+      default:
+        return 'รายงาน';
+    }
+  }
+
+  String get _pdfFilenamePrefix {
+    switch (_currentTab) {
+      case 0:
+        return 'reports_sales_overview';
+      case 1:
+        return 'reports_purchase_overview';
+      case 2:
+        return 'reports_inventory_overview';
+      case 3:
+        return 'reports_financial_overview';
+      default:
+        return 'reports_overview';
+    }
+  }
+
+  Future<pw.Document> _buildCurrentTabPdf() async {
+    switch (_currentTab) {
+      case 0:
+        final summary = await ref.read(salesSummaryProvider.future);
+        final topProducts = await ref.read(topProductsProvider.future);
+        final topCustomers = await ref.read(topCustomersProvider.future);
+        return ReportsPdfBuilder.buildSales(
+          summary: summary,
+          topProducts: topProducts,
+          topCustomers: topCustomers,
+        );
+      case 1:
+        final summary = await ref.read(purchaseSummaryProvider.future);
+        final topSuppliers = await ref.read(topSuppliersProvider.future);
+        return ReportsPdfBuilder.buildPurchase(
+          summary: summary,
+          topSuppliers: topSuppliers,
+        );
+      case 2:
+        final lowStock = await ref.read(lowStockProvider.future);
+        final stockAging = await ref.read(stockAgingProvider.future);
+        return ReportsPdfBuilder.buildInventory(
+          lowStock: lowStock,
+          stockAging: stockAging,
+        );
+      case 3:
+        final filter = _financialFilter;
+        final profitLoss = await ref.read(profitLossProvider(filter).future);
+        final cashFlow = await ref.read(cashFlowProvider(filter).future);
+        final arAging = await ref.read(arAgingProvider(filter).future);
+        final apAging = await ref.read(apAgingProvider(filter).future);
+        return ReportsPdfBuilder.buildFinancial(
+          profitLoss: profitLoss,
+          cashFlow: cashFlow,
+          arAging: arAging,
+          apAging: apAging,
+          dateFrom: filter.dateFrom,
+          dateTo: filter.dateTo,
+        );
+      default:
+        final summary = await ref.read(salesSummaryProvider.future);
+        final topProducts = await ref.read(topProductsProvider.future);
+        final topCustomers = await ref.read(topCustomersProvider.future);
+        return ReportsPdfBuilder.buildSales(
+          summary: summary,
+          topProducts: topProducts,
+          topCustomers: topCustomers,
+        );
+    }
+  }
+
   // ── Tab 1: Sales ───────────────────────────────────────────────────────────
   Widget _buildSalesTab() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: context.pagePadding,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _sectionTitle('สรุปยอดขาย', Icons.attach_money, Colors.green),
-          ref.watch(salesSummaryProvider).when(
+          ref
+              .watch(salesSummaryProvider)
+              .when(
                 data: _buildSalesSummaryCards,
                 loading: _loadingWidget,
                 error: (e, _) => _errorWidget('$e'),
               ),
           const SizedBox(height: 24),
           _sectionTitle('สินค้าขายดี Top 5', Icons.star, Colors.amber),
-          ref.watch(topProductsProvider).when(
+          ref
+              .watch(topProductsProvider)
+              .when(
                 data: _buildTopProducts,
                 loading: _loadingWidget,
                 error: (e, _) => _errorWidget('$e'),
               ),
           const SizedBox(height: 24),
           _sectionTitle('ลูกค้าซื้อบ่อย Top 5', Icons.people, Colors.purple),
-          ref.watch(topCustomersProvider).when(
+          ref
+              .watch(topCustomersProvider)
+              .when(
                 data: _buildTopCustomers,
                 loading: _loadingWidget,
                 error: (e, _) => _errorWidget('$e'),
@@ -239,22 +526,41 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
   }
 
   Widget _buildSalesSummaryCards(SalesSummaryModel s) {
+    final cols = context.isDesktopOrWider ? 4 : 2;
+    final aspectRatio = context.isMobile ? 2.2 : 2.6;
+
     return GridView.count(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      childAspectRatio: 2.0,
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
+      crossAxisCount: cols,
+      childAspectRatio: aspectRatio,
+      crossAxisSpacing: context.isMobile ? 10 : 14,
+      mainAxisSpacing: context.isMobile ? 10 : 14,
       children: [
-        _summaryCard('ยอดขายรวม', '฿${_fmt.format(s.totalSales)}',
-            Icons.attach_money, Colors.green),
-        _summaryCard('จำนวนออเดอร์', _fmtInt.format(s.totalOrders),
-            Icons.shopping_cart, Colors.blue),
-        _summaryCard('เฉลี่ย/ออเดอร์', '฿${_fmt.format(s.avgOrderValue)}',
-            Icons.analytics, Colors.orange),
-        _summaryCard('ส่วนลดรวม', '฿${_fmt.format(s.totalDiscount)}',
-            Icons.discount, Colors.red),
+        _summaryCard(
+          'ยอดขายรวม',
+          '฿${_fmt.format(s.totalSales)}',
+          Icons.attach_money,
+          Colors.green,
+        ),
+        _summaryCard(
+          'จำนวนออเดอร์',
+          _fmtInt.format(s.totalOrders),
+          Icons.shopping_cart,
+          Colors.blue,
+        ),
+        _summaryCard(
+          'เฉลี่ย/ออเดอร์',
+          '฿${_fmt.format(s.avgOrderValue)}',
+          Icons.analytics,
+          Colors.orange,
+        ),
+        _summaryCard(
+          'ส่วนลดรวม',
+          '฿${_fmt.format(s.totalDiscount)}',
+          Icons.discount,
+          Colors.red,
+        ),
       ],
     );
   }
@@ -295,20 +601,27 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
   // ── Tab 2: Purchase ────────────────────────────────────────────────────────
   Widget _buildPurchaseTab() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: context.pagePadding,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _sectionTitle('สรุปการจัดซื้อ', Icons.shopping_bag, Colors.red),
-          ref.watch(purchaseSummaryProvider).when(
+          ref
+              .watch(purchaseSummaryProvider)
+              .when(
                 data: _buildPurchaseSummaryCards,
                 loading: _loadingWidget,
                 error: (e, _) => _errorWidget('$e'),
               ),
           const SizedBox(height: 24),
           _sectionTitle(
-              'ซัพพลายเออร์สูงสุด Top 5', Icons.business, Colors.cyan),
-          ref.watch(topSuppliersProvider).when(
+            'ซัพพลายเออร์สูงสุด Top 5',
+            Icons.business,
+            Colors.cyan,
+          ),
+          ref
+              .watch(topSuppliersProvider)
+              .when(
                 data: _buildTopSuppliers,
                 loading: _loadingWidget,
                 error: (e, _) => _errorWidget('$e'),
@@ -320,29 +633,35 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
 
   Widget _buildPurchaseSummaryCards(Map<String, dynamic> data) {
     if (data.isEmpty) return _emptyWidget('ยังไม่มีข้อมูล');
+    final cols = context.isDesktopOrWider ? 3 : 2;
+    final aspectRatio = context.isMobile ? 2.2 : 2.6;
+
     return GridView.count(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      childAspectRatio: 2.0,
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
+      crossAxisCount: cols,
+      childAspectRatio: aspectRatio,
+      crossAxisSpacing: context.isMobile ? 10 : 14,
+      mainAxisSpacing: context.isMobile ? 10 : 14,
       children: [
         _summaryCard(
-            'ใบสั่งซื้อทั้งหมด',
-            _fmtInt.format(data['total_po'] ?? 0),
-            Icons.receipt,
-            Colors.red),
+          'ใบสั่งซื้อทั้งหมด',
+          _fmtInt.format(data['total_po'] ?? 0),
+          Icons.receipt,
+          Colors.red,
+        ),
         _summaryCard(
-            'มูลค่าสั่งซื้อรวม',
-            '฿${_fmt.format((data['total_po_amount'] ?? 0.0) as num)}',
-            Icons.payments,
-            Colors.orange),
+          'มูลค่าสั่งซื้อรวม',
+          '฿${_fmt.format((data['total_po_amount'] ?? 0.0) as num)}',
+          Icons.payments,
+          Colors.orange,
+        ),
         _summaryCard(
-            'ใบรับสินค้า',
-            _fmtInt.format(data['total_gr'] ?? 0),
-            Icons.inventory_2,
-            Colors.blue),
+          'ใบรับสินค้า',
+          _fmtInt.format(data['total_gr'] ?? 0),
+          Icons.inventory_2,
+          Colors.blue,
+        ),
       ],
     );
   }
@@ -366,21 +685,31 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
   // ── Tab 3: Inventory ───────────────────────────────────────────────────────
   Widget _buildInventoryTab() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: context.pagePadding,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _sectionTitle(
-              'สินค้าใกล้หมด (≤10 ชิ้น)', Icons.warning, Colors.orange),
-          ref.watch(lowStockProvider).when(
+            'สินค้าใกล้หมด (≤10 ชิ้น)',
+            Icons.warning,
+            Colors.orange,
+          ),
+          ref
+              .watch(lowStockProvider)
+              .when(
                 data: _buildLowStock,
                 loading: _loadingWidget,
                 error: (e, _) => _errorWidget('$e'),
               ),
           const SizedBox(height: 24),
           _sectionTitle(
-              'สินค้าค้างสต๊อก (≥90 วัน)', Icons.hourglass_empty, Colors.brown),
-          ref.watch(stockAgingProvider).when(
+            'สินค้าค้างสต๊อก (≥90 วัน)',
+            Icons.hourglass_empty,
+            Colors.brown,
+          ),
+          ref
+              .watch(stockAgingProvider)
+              .when(
                 data: _buildStockAging,
                 loading: _loadingWidget,
                 error: (e, _) => _errorWidget('$e'),
@@ -397,27 +726,26 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
     return Column(
       children: list.map((item) {
         final qty = (item['current_stock'] as num).toDouble();
-        return Card(
-          margin: const EdgeInsets.only(bottom: 8),
-          color: qty <= 0 ? Colors.red[50] : Colors.orange[50],
+        final accent = qty <= 0 ? AppTheme.errorColor : AppTheme.warningColor;
+        return _dataCard(
           child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: qty <= 0 ? Colors.red : Colors.orange,
-              child: Text(
-                qty <= 0 ? '0' : _fmtInt.format(qty),
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold),
-              ),
+            dense: context.isMobile,
+            leading: _metricBadge(label: _formatQty(qty), color: accent),
+            title: Text(
+              item['product_name'] as String? ?? '',
+              style: _cardTitleStyle(),
             ),
-            title: Text(item['product_name'] as String? ?? ''),
-            subtitle: Text(item['product_code'] as String? ?? ''),
+            subtitle: Text(
+              item['product_code'] as String? ?? '',
+              style: _cardSubtitleStyle(),
+            ),
             trailing: Text(
               item['base_unit'] as String? ?? '',
               style: TextStyle(
-                  color: qty <= 0 ? Colors.red : Colors.orange,
-                  fontWeight: FontWeight.bold),
+                fontSize: 12,
+                color: accent,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         );
@@ -439,34 +767,26 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
           badgeColor = Colors.brown;
         }
 
-        return Card(
-          margin: const EdgeInsets.only(bottom: 8),
+        return _dataCard(
           child: ListTile(
-            leading: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: badgeColor.withValues(alpha:0.15),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                '${days}d',
-                style: TextStyle(
-                    color: badgeColor, fontWeight: FontWeight.bold),
-              ),
+            dense: context.isMobile,
+            leading: _metricBadge(label: '${days}d', color: badgeColor),
+            title: Text(
+              item['product_name'] as String? ?? '',
+              style: _cardTitleStyle(),
             ),
-            title: Text(item['product_name'] as String? ?? ''),
             subtitle: Text(
-                'คงเหลือ: ${_fmtInt.format((item['quantity'] as num?) ?? 0)} ${item['base_unit'] ?? ''}'),
+              'คงเหลือ: ${_formatQty((item['quantity'] as num?) ?? 0)} ${item['base_unit'] ?? ''}',
+              style: _cardSubtitleStyle(),
+            ),
             trailing: item['last_movement'] != null
                 ? Text(
-                    DateFormat('dd/MM/yy').format(
-                        DateTime.parse(item['last_movement'] as String)),
-                    style:
-                        TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    DateFormat(
+                      'dd/MM/yy',
+                    ).format(DateTime.parse(item['last_movement'] as String)),
+                    style: _metaTextStyle(),
                   )
-                : const Text('ไม่มีข้อมูล',
-                    style: TextStyle(fontSize: 12, color: Colors.grey)),
+                : Text('ไม่มีข้อมูล', style: _metaTextStyle()),
           ),
         );
       }).toList(),
@@ -475,41 +795,159 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
 
   // ── Tab 4: Financial ───────────────────────────────────────────────────────
   Widget _buildFinancialTab() {
+    final filter = _financialFilter;
+
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: context.pagePadding,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _sectionTitle('กำไร-ขาดทุน (ปีนี้)', Icons.trending_up, Colors.green),
-          ref.watch(profitLossProvider).when(
+          _financialFilterBar(),
+          const SizedBox(height: 16),
+          _sectionTitle('กำไร-ขาดทุน', Icons.trending_up, Colors.green),
+          ref
+              .watch(profitLossProvider(filter))
+              .when(
                 data: _buildProfitLoss,
                 loading: _loadingWidget,
                 error: (e, _) => _errorWidget('$e'),
               ),
           const SizedBox(height: 24),
-          _sectionTitle('กระแสเงินสด (ปีนี้)', Icons.water_drop, Colors.blue),
-          ref.watch(cashFlowProvider).when(
+          _sectionTitle('กระแสเงินสด', Icons.water_drop, Colors.blue),
+          ref
+              .watch(cashFlowProvider(filter))
+              .when(
                 data: _buildCashFlow,
                 loading: _loadingWidget,
                 error: (e, _) => _errorWidget('$e'),
               ),
           const SizedBox(height: 24),
-          _sectionTitle('ลูกหนี้คงค้าง (AR Aging)', Icons.person_outline,
-              Colors.teal),
-          ref.watch(arAgingProvider).when(
+          _sectionTitle(
+            'ลูกหนี้คงค้าง (AR Aging)',
+            Icons.person_outline,
+            Colors.teal,
+          ),
+          ref
+              .watch(arAgingProvider(filter))
+              .when(
                 data: (list) => _buildAgingTable(list, isAR: true),
                 loading: _loadingWidget,
                 error: (e, _) => _errorWidget('$e'),
               ),
           const SizedBox(height: 24),
           _sectionTitle(
-              'เจ้าหนี้คงค้าง (AP Aging)', Icons.business, Colors.brown),
-          ref.watch(apAgingProvider).when(
+            'เจ้าหนี้คงค้าง (AP Aging)',
+            Icons.business,
+            Colors.brown,
+          ),
+          ref
+              .watch(apAgingProvider(filter))
+              .when(
                 data: (list) => _buildAgingTable(list, isAR: false),
                 loading: _loadingWidget,
                 error: (e, _) => _errorWidget('$e'),
               ),
         ],
+      ),
+    );
+  }
+
+  Widget _financialFilterBar() {
+    const options = [
+      ('ALL', 'ทั้งหมด'),
+      ('TODAY', 'วันนี้'),
+      ('LAST_7_DAYS', '7 วัน'),
+      ('LAST_30_DAYS', '30 วัน'),
+      ('THIS_MONTH', 'เดือนนี้'),
+      ('THIS_YEAR', 'ปีนี้'),
+      ('CUSTOM', 'กำหนดเอง'),
+    ];
+
+    return _panelCard(
+      child: Padding(
+        padding: context.cardPadding,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('ประเภทวันที่', style: _cardTitleStyle(fontSize: 13)),
+            const SizedBox(height: 4),
+            Text(
+              'ใช้กับรายงานการเงินทั้งหมดในแท็บนี้',
+              style: _cardSubtitleStyle(),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: options
+                  .map(
+                    (option) => ChoiceChip(
+                      label: Text(option.$2),
+                      selected: _financialDatePreset == option.$1,
+                      labelStyle: TextStyle(
+                        fontSize: 12,
+                        fontWeight: _financialDatePreset == option.$1
+                            ? FontWeight.w600
+                            : FontWeight.w500,
+                        color: _financialDatePreset == option.$1
+                            ? AppTheme.primary
+                            : AppTheme.subtextColorOf(context),
+                      ),
+                      selectedColor: AppTheme.primary.withValues(alpha: 0.12),
+                      side: BorderSide(color: AppTheme.borderColorOf(context)),
+                      backgroundColor: Theme.of(context).cardColor,
+                      onSelected: (_) {
+                        setState(() {
+                          _financialDatePreset = option.$1;
+                          if (option.$1 != 'CUSTOM') {
+                            _financialDateFrom = null;
+                            _financialDateTo = null;
+                          }
+                        });
+                      },
+                    ),
+                  )
+                  .toList(),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _dateFilterChip(
+                  label: _financialDateFrom != null
+                      ? 'ตั้งแต่: ${DateFormat('dd/MM/yyyy').format(_financialDateFrom!)}'
+                      : 'ตั้งแต่วันที่',
+                  active: _financialDateFrom != null,
+                  onTap: () => _pickFinancialDate(true),
+                  onClear: _financialDateFrom != null
+                      ? () {
+                          setState(() {
+                            _financialDatePreset = 'CUSTOM';
+                            _financialDateFrom = null;
+                          });
+                        }
+                      : null,
+                ),
+                _dateFilterChip(
+                  label: _financialDateTo != null
+                      ? 'ถึง: ${DateFormat('dd/MM/yyyy').format(_financialDateTo!)}'
+                      : 'ถึงวันที่',
+                  active: _financialDateTo != null,
+                  onTap: () => _pickFinancialDate(false),
+                  onClear: _financialDateTo != null
+                      ? () {
+                          setState(() {
+                            _financialDatePreset = 'CUSTOM';
+                            _financialDateTo = null;
+                          });
+                        }
+                      : null,
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -521,69 +959,101 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
     final netRevenue = (data['net_revenue'] as num?)?.toDouble() ?? 0;
     final cogs = (data['cogs'] as num?)?.toDouble() ?? 0;
     final grossProfit = (data['gross_profit'] as num?)?.toDouble() ?? 0;
-    final grossMargin =
-        (data['gross_margin_pct'] as num?)?.toDouble() ?? 0;
+    final grossMargin = (data['gross_margin_pct'] as num?)?.toDouble() ?? 0;
     final netProfit = (data['net_profit'] as num?)?.toDouble() ?? 0;
 
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    return _panelCard(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: context.cardPadding,
         child: Column(
           children: [
-            _plRow('รายได้รวม', revenue, Colors.green, bold: false),
-            _plRow('(-) ส่วนลด', data['discount'] as num? ?? 0,
-                Colors.red,
-                isNegative: true),
-            _plRow('รายได้สุทธิ', netRevenue, Colors.green, bold: true),
+            _plRow('รายได้รวม', revenue, AppTheme.successColor, bold: false),
+            _plRow(
+              '(-) ส่วนลด',
+              data['discount'] as num? ?? 0,
+              AppTheme.errorColor,
+              isNegative: true,
+            ),
+            _plRow(
+              'รายได้สุทธิ',
+              netRevenue,
+              AppTheme.successColor,
+              bold: true,
+            ),
             const Divider(),
-            _plRow('(-) ต้นทุนสินค้า (COGS)', cogs, Colors.red,
-                isNegative: true),
-            _plRow('กำไรขั้นต้น', grossProfit,
-                grossProfit >= 0 ? Colors.green : Colors.red,
-                bold: true),
+            _plRow(
+              '(-) ต้นทุนสินค้า (COGS)',
+              cogs,
+              AppTheme.errorColor,
+              isNegative: true,
+            ),
+            _plRow(
+              'กำไรขั้นต้น',
+              grossProfit,
+              grossProfit >= 0 ? AppTheme.successColor : AppTheme.errorColor,
+              bold: true,
+            ),
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 2),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('อัตรากำไรขั้นต้น',
-                      style: TextStyle(color: Colors.grey[600])),
-                  Text('${grossMargin.toStringAsFixed(1)}%',
-                      style: TextStyle(
-                          color: grossMargin >= 0 ? Colors.green : Colors.red,
-                          fontWeight: FontWeight.w500)),
+                  Text(
+                    'อัตรากำไรขั้นต้น',
+                    style: TextStyle(color: AppTheme.subtextColorOf(context)),
+                  ),
+                  Text(
+                    '${grossMargin.toStringAsFixed(1)}%',
+                    style: TextStyle(
+                      color: grossMargin >= 0
+                          ? AppTheme.successColor
+                          : AppTheme.errorColor,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ],
               ),
             ),
             const Divider(),
-            _plRow('กำไรสุทธิ', netProfit,
-                netProfit >= 0 ? Colors.green : Colors.red,
-                bold: true),
+            _plRow(
+              'กำไรสุทธิ',
+              netProfit,
+              netProfit >= 0 ? AppTheme.successColor : AppTheme.errorColor,
+              bold: true,
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _plRow(String label, num value, Color color,
-      {bool bold = false, bool isNegative = false}) {
+  Widget _plRow(
+    String label,
+    num value,
+    Color color, {
+    bool bold = false,
+    bool isNegative = false,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label,
-              style: TextStyle(
-                  fontWeight:
-                      bold ? FontWeight.bold : FontWeight.normal)),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
           Text(
             '${isNegative ? '-' : ''}฿${_fmt.format(value.abs())}',
             style: TextStyle(
-                color: color,
-                fontWeight:
-                    bold ? FontWeight.bold : FontWeight.normal,
-                fontSize: bold ? 16 : 14),
+              color: color,
+              fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+              fontSize: bold ? 15 : 13,
+            ),
           ),
         ],
       ),
@@ -597,51 +1067,81 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
     final outflow = data['outflow'] as Map<String, dynamic>? ?? {};
     final netCash = (data['net_cash_flow'] as num?)?.toDouble() ?? 0;
 
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    return _panelCard(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: context.cardPadding,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('รายรับ (Inflow)',
-                style: TextStyle(
-                    color: Colors.green[700],
-                    fontWeight: FontWeight.bold)),
+            Text(
+              'รายรับ (Inflow)',
+              style: TextStyle(
+                fontSize: 13,
+                color: AppTheme.successColor,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
             const SizedBox(height: 4),
-            _plRow('  ยอดขาย POS',
-                (inflow['pos_sales'] as num?) ?? 0, Colors.green),
-            _plRow('  รับชำระ AR',
-                (inflow['ar_receipts'] as num?) ?? 0, Colors.green),
-            _plRow('รวมรายรับ', (inflow['total'] as num?) ?? 0,
-                Colors.green,
-                bold: true),
+            _plRow(
+              '  ยอดขาย POS',
+              (inflow['pos_sales'] as num?) ?? 0,
+              AppTheme.successColor,
+            ),
+            _plRow(
+              '  รับชำระ AR',
+              (inflow['ar_receipts'] as num?) ?? 0,
+              AppTheme.successColor,
+            ),
+            _plRow(
+              'รวมรายรับ',
+              (inflow['total'] as num?) ?? 0,
+              AppTheme.successColor,
+              bold: true,
+            ),
             const Divider(),
-            Text('รายจ่าย (Outflow)',
-                style: TextStyle(
-                    color: Colors.red[700],
-                    fontWeight: FontWeight.bold)),
+            Text(
+              'รายจ่าย (Outflow)',
+              style: TextStyle(
+                fontSize: 13,
+                color: AppTheme.errorColor,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
             const SizedBox(height: 4),
-            _plRow('  จ่ายชำระ AP',
-                (outflow['ap_payments'] as num?) ?? 0, Colors.red,
-                isNegative: true),
-            _plRow('รวมรายจ่าย', (outflow['total'] as num?) ?? 0,
-                Colors.red,
-                bold: true, isNegative: true),
+            _plRow(
+              '  จ่ายชำระ AP',
+              (outflow['ap_payments'] as num?) ?? 0,
+              AppTheme.errorColor,
+              isNegative: true,
+            ),
+            _plRow(
+              'รวมรายจ่าย',
+              (outflow['total'] as num?) ?? 0,
+              AppTheme.errorColor,
+              bold: true,
+              isNegative: true,
+            ),
             const Divider(),
-            _plRow('กระแสเงินสดสุทธิ', netCash,
-                netCash >= 0 ? Colors.green : Colors.red,
-                bold: true),
+            _plRow(
+              'กระแสเงินสดสุทธิ',
+              netCash,
+              netCash >= 0 ? AppTheme.successColor : AppTheme.errorColor,
+              bold: true,
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildAgingTable(List<Map<String, dynamic>> list,
-      {required bool isAR}) {
+  Widget _buildAgingTable(
+    List<Map<String, dynamic>> list, {
+    required bool isAR,
+  }) {
     if (list.isEmpty) {
-      return _emptyWidget(isAR ? 'ไม่มีลูกหนี้คงค้าง ✅' : 'ไม่มีเจ้าหนี้คงค้าง ✅');
+      return _emptyWidget(
+        isAR ? 'ไม่มีลูกหนี้คงค้าง ✅' : 'ไม่มีเจ้าหนี้คงค้าง ✅',
+      );
     }
 
     // สรุปตาม bucket
@@ -660,22 +1160,20 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
       'เกิน 90 วัน',
     ];
 
-    final totalOutstanding =
-        list.fold<double>(0, (s, i) => s + ((i['outstanding'] as num?)?.toDouble() ?? 0));
+    final totalOutstanding = list.fold<double>(
+      0,
+      (s, i) => s + ((i['outstanding'] as num?)?.toDouble() ?? 0),
+    );
 
     return Column(
       children: [
         // Summary by bucket
-        Card(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        _panelCard(
           child: Padding(
-            padding: const EdgeInsets.all(12),
+            padding: context.cardPadding,
             child: Column(
               children: [
-                ...bucketOrder
-                    .where((b) => buckets.containsKey(b))
-                    .map((b) {
+                ...bucketOrder.where((b) => buckets.containsKey(b)).map((b) {
                   final color = _agingBucketColor(b);
                   return Padding(
                     padding: const EdgeInsets.symmetric(vertical: 3),
@@ -685,19 +1183,25 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
                         Row(
                           children: [
                             Container(
-                                width: 10,
-                                height: 10,
-                                decoration: BoxDecoration(
-                                    color: color,
-                                    shape: BoxShape.circle)),
+                              width: 10,
+                              height: 10,
+                              decoration: BoxDecoration(
+                                color: color,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
                             const SizedBox(width: 8),
-                            Text(b),
+                            Text(b, style: _cardTitleStyle(fontSize: 12)),
                           ],
                         ),
-                        Text('฿${_fmt.format(buckets[b]!)}',
-                            style: TextStyle(
-                                color: color,
-                                fontWeight: FontWeight.w600)),
+                        Text(
+                          '฿${_fmt.format(buckets[b]!)}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: color,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ],
                     ),
                   );
@@ -706,13 +1210,21 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('รวมค้างชำระ',
-                        style: TextStyle(fontWeight: FontWeight.bold)),
-                    Text('฿${_fmt.format(totalOutstanding)}',
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                            color: Colors.red)),
+                    const Text(
+                      'รวมค้างชำระ',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      '฿${_fmt.format(totalOutstanding)}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: AppTheme.errorColor,
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -723,32 +1235,75 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
         // Detail list
         ...list.take(10).map((item) {
           final overdue = item['overdue_days'] as int? ?? 0;
-          final outstanding =
-              (item['outstanding'] as num?)?.toDouble() ?? 0;
+          final outstanding = (item['outstanding'] as num?)?.toDouble() ?? 0;
           final name = isAR
               ? item['customer_name'] as String? ?? ''
               : item['supplier_name'] as String? ?? '';
+          final bucket = item['aging_bucket'] as String? ?? '';
+          final amountColor = _agingBucketColor(bucket);
 
-          return Card(
-            margin: const EdgeInsets.only(bottom: 6),
-            child: ListTile(
-              dense: true,
-              title: Text(name),
-              subtitle: Text(
-                  '${item[isAR ? 'invoice_no' : 'invoice_no'] ?? ''} | ${item['aging_bucket']}'),
-              trailing: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.end,
+          return _dataCard(
+            child: Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: context.isMobile ? 12 : 14,
+                vertical: context.isMobile ? 10 : 12,
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('฿${_fmt.format(outstanding)}',
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: _agingBucketColor(
-                              item['aging_bucket'] as String? ?? ''))),
-                  if (overdue > 0)
-                    Text('เกิน $overdue วัน',
-                        style: const TextStyle(
-                            fontSize: 11, color: Colors.red)),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          name,
+                          style: _cardTitleStyle(),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${item['invoice_no'] ?? ''} | $bucket',
+                          style: _cardSubtitleStyle(),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minWidth: context.isMobile ? 84 : 96,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '฿${_fmt.format(outstanding)}',
+                          textAlign: TextAlign.right,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: amountColor,
+                          ),
+                        ),
+                        if (overdue > 0) ...[
+                          const SizedBox(height: 4),
+                          const Text(
+                            'เลยกำหนด',
+                            textAlign: TextAlign.right,
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: AppTheme.errorColor,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -759,7 +1314,10 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
             padding: const EdgeInsets.only(top: 4),
             child: Text(
               '... และอีก ${list.length - 10} รายการ',
-              style: TextStyle(color: Colors.grey[600], fontSize: 12),
+              style: TextStyle(
+                color: AppTheme.subtextColorOf(context),
+                fontSize: 11,
+              ),
             ),
           ),
       ],
@@ -789,40 +1347,76 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         children: [
-          Icon(icon, color: color, size: 20),
-          const SizedBox(width: 8),
-          Text(title,
-              style: const TextStyle(
-                  fontSize: 16, fontWeight: FontWeight.bold)),
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: color, size: 18),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              title,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _summaryCard(
-      String title, String value, IconData icon, Color color) {
-    return Card(
-      elevation: 3,
-      shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+  Widget _summaryCard(String title, String value, IconData icon, Color color) {
+    final iconBoxSize = context.isMobile ? 38.0 : 42.0;
+    final valueFontSize = context.isMobile ? 14.0 : 18.0;
+
+    return _panelCard(
       child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+        padding: context.cardPadding,
+        child: Row(
           children: [
-            Icon(icon, size: 28, color: color),
-            const SizedBox(height: 6),
-            Text(title,
-                style:
-                    const TextStyle(fontSize: 12, color: Colors.grey),
-                textAlign: TextAlign.center),
-            const SizedBox(height: 4),
-            Text(value,
-                style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: color),
-                textAlign: TextAlign.center),
+            Container(
+              width: iconBoxSize,
+              height: iconBoxSize,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, size: 20, color: color),
+            ),
+            SizedBox(width: context.isMobile ? 10 : 12),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: valueFontSize,
+                      fontWeight: FontWeight.w700,
+                      color: color,
+                      height: 1,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: _cardSubtitleStyle(),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -844,46 +1438,198 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
       Colors.blue,
     ];
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
+    return _dataCard(
       child: ListTile(
+        dense: context.isMobile,
         leading: CircleAvatar(
           backgroundColor: rankColors[(rank - 1).clamp(0, 4)],
-          child: Text('$rank',
-              style: const TextStyle(
-                  color: Colors.white, fontWeight: FontWeight.bold)),
+          child: Text(
+            '$rank',
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
         ),
-        title: Text(title),
-        subtitle: Text(subtitle,
-            style: const TextStyle(fontSize: 12)),
-        trailing: Text(trailing,
-            style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-                color: trailingColor)),
+        title: Text(title, style: _cardTitleStyle()),
+        subtitle: Text(subtitle, style: _cardSubtitleStyle()),
+        trailing: Text(
+          trailing,
+          style: TextStyle(
+            fontSize: context.isMobile ? 13 : 14,
+            fontWeight: FontWeight.bold,
+            color: trailingColor,
+          ),
+        ),
       ),
     );
   }
 
-  Widget _loadingWidget() =>
-      const Padding(
-        padding: EdgeInsets.all(24),
-        child: Center(child: CircularProgressIndicator()),
-      );
-
-  Widget _errorWidget(String msg) => Padding(
-        padding: const EdgeInsets.all(12),
-        child: Text('เกิดข้อผิดพลาด: $msg',
-            style: const TextStyle(color: Colors.red)),
-      );
-
-  Widget _emptyWidget(String msg) => Padding(
-        padding: const EdgeInsets.all(16),
-        child: Center(
-          child: Text(msg,
-              style: TextStyle(color: Colors.grey[500])),
+  Widget _loadingWidget() => _panelCard(
+    child: Padding(
+      padding: const EdgeInsets.all(24),
+      child: Center(
+        child: SizedBox(
+          width: context.isMobile ? 24 : 28,
+          height: context.isMobile ? 24 : 28,
+          child: const CircularProgressIndicator(strokeWidth: 2.5),
         ),
-      );
+      ),
+    ),
+  );
+
+  Widget _errorWidget(String msg) => _panelCard(
+    child: Padding(
+      padding: context.cardPadding,
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline, color: AppTheme.errorColor, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'เกิดข้อผิดพลาด: $msg',
+              style: const TextStyle(color: AppTheme.errorColor),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  Widget _emptyWidget(String msg) => _panelCard(
+    child: Padding(
+      padding: const EdgeInsets.all(18),
+      child: Center(
+        child: Text(
+          msg,
+          style: TextStyle(color: AppTheme.subtextColorOf(context)),
+        ),
+      ),
+    ),
+  );
+
+  Widget _panelCard({required Widget child}) {
+    return Card(
+      elevation: 0,
+      color: Theme.of(context).cardColor,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: AppTheme.borderColorOf(context)),
+      ),
+      child: child,
+    );
+  }
+
+  Widget _dataCard({required Widget child}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: _panelCard(child: child),
+    );
+  }
+
+  Widget _metricBadge({required String label, required Color color}) {
+    return Container(
+      constraints: const BoxConstraints(minWidth: 38),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        label,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.w700,
+          fontSize: 10,
+        ),
+      ),
+    );
+  }
+
+  Widget _dateFilterChip({
+    required String label,
+    required bool active,
+    required VoidCallback onTap,
+    VoidCallback? onClear,
+  }) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: active
+              ? AppTheme.primary.withValues(alpha: 0.10)
+              : Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: active ? AppTheme.primary : AppTheme.borderColorOf(context),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.calendar_today_outlined,
+              size: 14,
+              color: active
+                  ? AppTheme.primary
+                  : AppTheme.subtextColorOf(context),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: active ? FontWeight.w600 : FontWeight.w500,
+                color: active
+                    ? AppTheme.primary
+                    : AppTheme.subtextColorOf(context),
+              ),
+            ),
+            if (onClear != null) ...[
+              const SizedBox(width: 6),
+              GestureDetector(
+                onTap: onClear,
+                child: Icon(
+                  Icons.close,
+                  size: 14,
+                  color: active
+                      ? AppTheme.primary
+                      : AppTheme.subtextColorOf(context),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  TextStyle _cardTitleStyle({double fontSize = 13}) {
+    return TextStyle(
+      fontSize: fontSize,
+      fontWeight: FontWeight.w600,
+      color: Theme.of(context).colorScheme.onSurface,
+    );
+  }
+
+  TextStyle _cardSubtitleStyle() {
+    return TextStyle(fontSize: 11, color: AppTheme.subtextColorOf(context));
+  }
+
+  TextStyle _metaTextStyle() {
+    return TextStyle(fontSize: 11, color: AppTheme.subtextColorOf(context));
+  }
+
+  String _formatQty(num value) {
+    final quantity = value.toDouble();
+    if (quantity == quantity.roundToDouble()) {
+      return _fmtInt.format(quantity);
+    }
+    return _fmtQty.format(quantity);
+  }
 
   // ── Export ─────────────────────────────────────────────────────────────────
   Future<void> _exportReport(BuildContext context) async {
@@ -900,24 +1646,30 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
           ['ส่วนลดรวม', '฿${_fmt.format(s.totalDiscount)}'],
           [''],
           ['สินค้าขายดี Top 5', ''],
-          ...products.map((p) => [
-                p.productName,
-                '฿${_fmt.format(p.totalSales)} (${_fmtInt.format(p.totalQuantity)} ชิ้น)',
-              ]),
+          ...products.map(
+            (p) => [
+              p.productName,
+              '฿${_fmt.format(p.totalSales)} (${_fmtInt.format(p.totalQuantity)} ชิ้น)',
+            ],
+          ),
         ];
 
         final path = await CsvExport.exportToCsv(
           filename: 'sales_report',
           headers: headers,
           rows: rows,
+          chooseLocation: true,
         );
 
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(
-                path != null ? 'Export สำเร็จ: $path' : 'Export ไม่สำเร็จ'),
-            backgroundColor: path != null ? null : Colors.red,
-          ));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                path != null ? 'Export สำเร็จ: $path' : 'Export ไม่สำเร็จ',
+              ),
+              backgroundColor: path != null ? null : Colors.red,
+            ),
+          );
         }
       });
     });

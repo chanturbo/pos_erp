@@ -57,27 +57,33 @@ class _PdfReportButtonState extends State<PdfReportButton> {
       itemBuilder: (_) => const [
         PopupMenuItem(
           value: _PdfAction.preview,
-          child: Row(children: [
-            Icon(Icons.picture_as_pdf, size: 18, color: Color(0xFFE8622A)),
-            SizedBox(width: 10),
-            Text('แสดง PDF', style: TextStyle(fontSize: 13)),
-          ]),
+          child: Row(
+            children: [
+              Icon(Icons.picture_as_pdf, size: 18, color: Color(0xFFE8622A)),
+              SizedBox(width: 10),
+              Text('แสดง PDF', style: TextStyle(fontSize: 13)),
+            ],
+          ),
         ),
         PopupMenuItem(
           value: _PdfAction.share,
-          child: Row(children: [
-            Icon(Icons.share, size: 18, color: Color(0xFF1565C0)),
-            SizedBox(width: 10),
-            Text('แชร์ PDF', style: TextStyle(fontSize: 13)),
-          ]),
+          child: Row(
+            children: [
+              Icon(Icons.share, size: 18, color: Color(0xFF1565C0)),
+              SizedBox(width: 10),
+              Text('แชร์ PDF', style: TextStyle(fontSize: 13)),
+            ],
+          ),
         ),
         PopupMenuItem(
           value: _PdfAction.save,
-          child: Row(children: [
-            Icon(Icons.save_alt, size: 18, color: Color(0xFF388E3C)),
-            SizedBox(width: 10),
-            Text('บันทึก PDF', style: TextStyle(fontSize: 13)),
-          ]),
+          child: Row(
+            children: [
+              Icon(Icons.save_alt, size: 18, color: Color(0xFF388E3C)),
+              SizedBox(width: 10),
+              Text('บันทึก PDF', style: TextStyle(fontSize: 13)),
+            ],
+          ),
         ),
       ],
       child: _loading
@@ -98,8 +104,11 @@ class _PdfReportButtonState extends State<PdfReportButton> {
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.picture_as_pdf,
-                      size: 17, color: Color(0xFFE8622A)),
+                  Icon(
+                    Icons.picture_as_pdf,
+                    size: 17,
+                    color: Color(0xFFE8622A),
+                  ),
                   SizedBox(width: 6),
                   Text(
                     'PDF',
@@ -117,9 +126,9 @@ class _PdfReportButtonState extends State<PdfReportButton> {
 
   Future<void> _onAction(_PdfAction action) async {
     if (!widget.hasData) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(widget.emptyMessage)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(widget.emptyMessage)));
       return;
     }
 
@@ -131,14 +140,14 @@ class _PdfReportButtonState extends State<PdfReportButton> {
         case _PdfAction.preview:
           await PdfExportService.showPreview(
             context,
-            title:    widget.title,
+            title: widget.title,
             filename: fname,
             buildPdf: widget.buildPdf,
           );
 
         case _PdfAction.share:
           await PdfExportService.shareFile(
-            title:    widget.title,
+            title: widget.title,
             filename: fname,
             buildPdf: widget.buildPdf,
           );
@@ -148,20 +157,31 @@ class _PdfReportButtonState extends State<PdfReportButton> {
             filename: fname,
             buildPdf: widget.buildPdf,
           );
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: Text('บันทึก PDF แล้ว: $path'),
-              backgroundColor: Colors.green,
-              duration: const Duration(seconds: 4),
-            ));
+          if (mounted && path != null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('บันทึก PDF แล้ว: $path'),
+                backgroundColor: Colors.green,
+                duration: const Duration(seconds: 4),
+              ),
+            );
+          } else if (mounted && path == null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('ยกเลิกการบันทึก PDF'),
+                duration: Duration(seconds: 2),
+              ),
+            );
           }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('เกิดข้อผิดพลาด: $e'),
-          backgroundColor: Colors.red,
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('เกิดข้อผิดพลาด: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     } finally {
       if (mounted) setState(() => _loading = false);

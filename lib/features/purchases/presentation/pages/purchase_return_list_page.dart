@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
 import 'package:pos_erp/shared/widgets/pagination_bar.dart';
 import 'package:pos_erp/shared/pdf/pdf_report_button.dart';
+import '../../../settings/presentation/pages/settings_page.dart';
 import '../providers/purchase_return_provider.dart';
 import '../../data/models/purchase_return_model.dart';
 import 'purchase_return_form_page.dart';
@@ -24,7 +25,6 @@ class _PurchaseReturnListPageState
   String _statusFilter = 'ALL';
   bool _isCardView = false;
   int _currentPage = 1;
-  static const int _pageSize = 20;
 
   @override
   void dispose() {
@@ -36,17 +36,16 @@ class _PurchaseReturnListPageState
     return src.where((r) {
       final matchesSearch =
           r.returnNo.toLowerCase().contains(_searchQuery) ||
-              r.supplierName.toLowerCase().contains(_searchQuery);
-      final matchesStatus =
-          _statusFilter == 'ALL' || r.status == _statusFilter;
+          r.supplierName.toLowerCase().contains(_searchQuery);
+      final matchesStatus = _statusFilter == 'ALL' || r.status == _statusFilter;
       return matchesSearch && matchesStatus;
-    }).toList()
-      ..sort((a, b) => b.returnDate.compareTo(a.returnDate));
+    }).toList()..sort((a, b) => b.returnDate.compareTo(a.returnDate));
   }
 
   @override
   Widget build(BuildContext context) {
     final returnsAsync = ref.watch(purchaseReturnListProvider);
+    final pageSize = ref.watch(settingsProvider).listPageSize;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
@@ -58,22 +57,30 @@ class _PurchaseReturnListPageState
             searchController: _searchController,
             searchQuery: _searchQuery,
             isCardView: _isCardView,
-            onSearchChanged: (v) =>
-                setState(() { _searchQuery = v.toLowerCase(); _currentPage = 1; }),
+            onSearchChanged: (v) => setState(() {
+              _searchQuery = v.toLowerCase();
+              _currentPage = 1;
+            }),
             onSearchCleared: () {
               _searchController.clear();
-              setState(() { _searchQuery = ''; _currentPage = 1; });
+              setState(() {
+                _searchQuery = '';
+                _currentPage = 1;
+              });
             },
-            onToggleView: () =>
-                setState(() => _isCardView = !_isCardView),
+            onToggleView: () => setState(() => _isCardView = !_isCardView),
             onRefresh: () =>
                 ref.read(purchaseReturnListProvider.notifier).refresh(),
-            onAdd: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) => const PurchaseReturnFormPage()),
-            ).then((_) =>
-                ref.read(purchaseReturnListProvider.notifier).refresh()),
+            onAdd: () =>
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const PurchaseReturnFormPage(),
+                  ),
+                ).then(
+                  (_) =>
+                      ref.read(purchaseReturnListProvider.notifier).refresh(),
+                ),
           ),
 
           // ── Summary + Status Filter Bar ──────────────────────
@@ -82,17 +89,18 @@ class _PurchaseReturnListPageState
           // ── Content ─────────────────────────────────────────
           Expanded(
             child: returnsAsync.when(
-              loading: () =>
-                  const Center(child: CircularProgressIndicator()),
+              loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => _buildError(e),
               data: (returns) {
                 final filtered = _filter(returns);
                 if (filtered.isEmpty) return _buildEmpty();
-                final totalPages =
-                    (filtered.length / _pageSize).ceil().clamp(1, 9999);
+                final totalPages = (filtered.length / pageSize).ceil().clamp(
+                  1,
+                  9999,
+                );
                 final safePage = _currentPage.clamp(1, totalPages);
-                final start = (safePage - 1) * _pageSize;
-                final end = (start + _pageSize).clamp(0, filtered.length);
+                final start = (safePage - 1) * pageSize;
+                final end = (start + pageSize).clamp(0, filtered.length);
                 final pageItems = filtered.sublist(start, end);
                 return Column(
                   children: [
@@ -104,9 +112,8 @@ class _PurchaseReturnListPageState
                     PaginationBar(
                       currentPage: safePage,
                       totalItems: filtered.length,
-                      pageSize: _pageSize,
-                      onPageChanged: (p) =>
-                          setState(() => _currentPage = p),
+                      pageSize: pageSize,
+                      onPageChanged: (p) => setState(() => _currentPage = p),
                       trailing: PdfReportButton(
                         emptyMessage: 'ไม่มีข้อมูลการคืนสินค้า',
                         title: 'รายงานการคืนสินค้า',
@@ -136,11 +143,9 @@ class _PurchaseReturnListPageState
         final filtered = _filter(all);
         final isDark = Theme.of(context).brightness == Brightness.dark;
         final fmt = NumberFormat('#,##0.00', 'th_TH');
-        final totalAmt =
-            filtered.fold<double>(0, (s, r) => s + r.totalAmount);
+        final totalAmt = filtered.fold<double>(0, (s, r) => s + r.totalAmount);
 
-        int countByStatus(String s) =>
-            all.where((r) => r.status == s).length;
+        int countByStatus(String s) => all.where((r) => r.status == s).length;
 
         return Container(
           color: isDark ? AppTheme.darkCard : Colors.white,
@@ -158,8 +163,10 @@ class _PurchaseReturnListPageState
                       count: all.length,
                       color: AppTheme.navy,
                       selected: _statusFilter == 'ALL',
-                      onTap: () =>
-                          setState(() { _statusFilter = 'ALL'; _currentPage = 1; }),
+                      onTap: () => setState(() {
+                        _statusFilter = 'ALL';
+                        _currentPage = 1;
+                      }),
                     ),
                     const SizedBox(width: 6),
                     _PRFilterChip(
@@ -167,8 +174,10 @@ class _PurchaseReturnListPageState
                       count: countByStatus('DRAFT'),
                       color: AppTheme.warning,
                       selected: _statusFilter == 'DRAFT',
-                      onTap: () =>
-                          setState(() { _statusFilter = 'DRAFT'; _currentPage = 1; }),
+                      onTap: () => setState(() {
+                        _statusFilter = 'DRAFT';
+                        _currentPage = 1;
+                      }),
                     ),
                     const SizedBox(width: 6),
                     _PRFilterChip(
@@ -176,8 +185,10 @@ class _PurchaseReturnListPageState
                       count: countByStatus('CONFIRMED'),
                       color: AppTheme.success,
                       selected: _statusFilter == 'CONFIRMED',
-                      onTap: () => setState(
-                          () { _statusFilter = 'CONFIRMED'; _currentPage = 1; }),
+                      onTap: () => setState(() {
+                        _statusFilter = 'CONFIRMED';
+                        _currentPage = 1;
+                      }),
                     ),
                   ],
                 ),
@@ -247,46 +258,50 @@ class _PurchaseReturnListPageState
               const SizedBox(width: 14),
               Expanded(
                 flex: 3,
-                child: Text('เลขที่ / ซัพพลายเออร์',
-                    style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: isDark
-                            ? const Color(0xFFAAAAAA)
-                            : AppTheme.textSub)),
+                child: Text(
+                  'เลขที่ / ซัพพลายเออร์',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? const Color(0xFFAAAAAA) : AppTheme.textSub,
+                  ),
+                ),
               ),
               SizedBox(
                 width: 72,
-                child: Text('วันที่',
-                    style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: isDark
-                            ? const Color(0xFFAAAAAA)
-                            : AppTheme.textSub),
-                    textAlign: TextAlign.center),
+                child: Text(
+                  'วันที่',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? const Color(0xFFAAAAAA) : AppTheme.textSub,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
               ),
               SizedBox(
                 width: 80,
-                child: Text('สถานะ',
-                    style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: isDark
-                            ? const Color(0xFFAAAAAA)
-                            : AppTheme.textSub),
-                    textAlign: TextAlign.center),
+                child: Text(
+                  'สถานะ',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? const Color(0xFFAAAAAA) : AppTheme.textSub,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
               ),
               SizedBox(
                 width: 86,
-                child: Text('ยอดรวม',
-                    style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: isDark
-                            ? const Color(0xFFAAAAAA)
-                            : AppTheme.textSub),
-                    textAlign: TextAlign.right),
+                child: Text(
+                  'ยอดรวม',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? const Color(0xFFAAAAAA) : AppTheme.textSub,
+                  ),
+                  textAlign: TextAlign.right,
+                ),
               ),
             ],
           ),
@@ -297,19 +312,22 @@ class _PurchaseReturnListPageState
             itemBuilder: (context, i) {
               final r = items[i];
               final isEven = i.isEven;
-              final statusColor =
-                  r.isConfirmed ? AppTheme.success : AppTheme.warning;
+              final statusColor = r.isConfirmed
+                  ? AppTheme.success
+                  : AppTheme.warning;
               return InkWell(
                 onTap: () => _openForm(r),
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 10),
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
                     color: isEven
                         ? (isDark ? AppTheme.darkCard : Colors.white)
                         : (isDark
-                            ? AppTheme.darkElement
-                            : const Color(0xFFF9F9F9)),
+                              ? AppTheme.darkElement
+                              : const Color(0xFFF9F9F9)),
                     border: Border(
                       bottom: BorderSide(
                         color: isDark
@@ -335,21 +353,25 @@ class _PurchaseReturnListPageState
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(r.returnNo,
-                                style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: isDark
-                                        ? Colors.white
-                                        : Colors.black87),
-                                overflow: TextOverflow.ellipsis),
-                            Text(r.supplierName,
-                                style: TextStyle(
-                                    fontSize: 11,
-                                    color: isDark
-                                        ? const Color(0xFFAAAAAA)
-                                        : AppTheme.textSub),
-                                overflow: TextOverflow.ellipsis),
+                            Text(
+                              r.returnNo,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: isDark ? Colors.white : Colors.black87,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              r.supplierName,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isDark
+                                    ? const Color(0xFFAAAAAA)
+                                    : AppTheme.textSub,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ],
                         ),
                       ),
@@ -358,29 +380,29 @@ class _PurchaseReturnListPageState
                         child: Text(
                           DateFormat('dd/MM/yy').format(r.returnDate),
                           style: TextStyle(
-                              fontSize: 11,
-                              color: isDark
-                                  ? const Color(0xFFAAAAAA)
-                                  : AppTheme.textSub),
+                            fontSize: 11,
+                            color: isDark
+                                ? const Color(0xFFAAAAAA)
+                                : AppTheme.textSub,
+                          ),
                           textAlign: TextAlign.center,
                         ),
                       ),
                       SizedBox(
                         width: 80,
-                        child: Center(
-                          child: _PRStatusBadge(status: r.status),
-                        ),
+                        child: Center(child: _PRStatusBadge(status: r.status)),
                       ),
                       SizedBox(
                         width: 86,
                         child: Text(
                           '฿${NumberFormat('#,##0.00', 'th_TH').format(r.totalAmount)}',
                           style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: isDark
-                                  ? const Color(0xFFEF9A9A)
-                                  : AppTheme.error),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: isDark
+                                ? const Color(0xFFEF9A9A)
+                                : AppTheme.error,
+                          ),
                           textAlign: TextAlign.right,
                         ),
                       ),
@@ -404,23 +426,31 @@ class _PurchaseReturnListPageState
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.assignment_return_outlined,
-              size: 64,
-              color: isDark ? const Color(0xFF555555) : Colors.grey[300]),
+          Icon(
+            Icons.assignment_return_outlined,
+            size: 64,
+            color: isDark ? const Color(0xFF555555) : Colors.grey[300],
+          ),
           const SizedBox(height: 16),
-          Text('ไม่มีรายการคืนสินค้า',
-              style: TextStyle(
-                  fontSize: 16,
-                  color:
-                      isDark ? const Color(0xFF888888) : AppTheme.textSub)),
+          Text(
+            'ไม่มีรายการคืนสินค้า',
+            style: TextStyle(
+              fontSize: 16,
+              color: isDark ? const Color(0xFF888888) : AppTheme.textSub,
+            ),
+          ),
           const SizedBox(height: 8),
           TextButton.icon(
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) => const PurchaseReturnFormPage()),
-            ).then((_) =>
-                ref.read(purchaseReturnListProvider.notifier).refresh()),
+            onPressed: () =>
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const PurchaseReturnFormPage(),
+                  ),
+                ).then(
+                  (_) =>
+                      ref.read(purchaseReturnListProvider.notifier).refresh(),
+                ),
             icon: const Icon(Icons.add, size: 16),
             label: const Text('สร้างใบคืนสินค้า'),
           ),
@@ -436,8 +466,10 @@ class _PurchaseReturnListPageState
         children: [
           const Icon(Icons.error_outline, size: 48, color: AppTheme.error),
           const SizedBox(height: 12),
-          Text('เกิดข้อผิดพลาด: $error',
-              style: const TextStyle(color: AppTheme.textSub)),
+          Text(
+            'เกิดข้อผิดพลาด: $error',
+            style: const TextStyle(color: AppTheme.textSub),
+          ),
           const SizedBox(height: 12),
           ElevatedButton(
             onPressed: () =>
@@ -465,21 +497,26 @@ class _PurchaseReturnListPageState
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text('ยืนยันการคืนสินค้า',
-            style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: isDark ? Colors.white : Colors.black87)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Text(
+          'ยืนยันการคืนสินค้า',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: isDark ? Colors.white : Colors.black87,
+          ),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('ยืนยันใบคืนสินค้า ${r.returnNo}?',
-                style: TextStyle(
-                    fontSize: 14,
-                    color: isDark ? Colors.white70 : AppTheme.textSub)),
+            Text(
+              'ยืนยันใบคืนสินค้า ${r.returnNo}?',
+              style: TextStyle(
+                fontSize: 14,
+                color: isDark ? Colors.white70 : AppTheme.textSub,
+              ),
+            ),
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(10),
@@ -487,17 +524,22 @@ class _PurchaseReturnListPageState
                 color: AppTheme.warning.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                    color: AppTheme.warning.withValues(alpha: 0.3)),
+                  color: AppTheme.warning.withValues(alpha: 0.3),
+                ),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.warning_amber,
-                      size: 18, color: AppTheme.warning),
+                  const Icon(
+                    Icons.warning_amber,
+                    size: 18,
+                    color: AppTheme.warning,
+                  ),
                   const SizedBox(width: 8),
                   const Expanded(
-                    child: Text('ระบบจะลดสต๊อกสินค้าตามจำนวนที่คืน',
-                        style:
-                            TextStyle(fontSize: 12, color: AppTheme.warning)),
+                    child: Text(
+                      'ระบบจะลดสต๊อกสินค้าตามจำนวนที่คืน',
+                      style: TextStyle(fontSize: 12, color: AppTheme.warning),
+                    ),
                   ),
                 ],
               ),
@@ -512,10 +554,12 @@ class _PurchaseReturnListPageState
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.success,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8))),
+              backgroundColor: AppTheme.success,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
             child: const Text('ยืนยัน'),
           ),
         ],
@@ -527,11 +571,13 @@ class _PurchaseReturnListPageState
           .read(purchaseReturnListProvider.notifier)
           .confirmReturn(r.returnId);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(success ? 'ยืนยันสำเร็จ' : 'ยืนยันไม่สำเร็จ'),
-          backgroundColor: success ? AppTheme.success : AppTheme.error,
-          behavior: SnackBarBehavior.floating,
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(success ? 'ยืนยันสำเร็จ' : 'ยืนยันไม่สำเร็จ'),
+            backgroundColor: success ? AppTheme.success : AppTheme.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
     }
   }
@@ -542,17 +588,22 @@ class _PurchaseReturnListPageState
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text('ลบใบคืนสินค้า',
-            style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: isDark ? Colors.white : Colors.black87)),
-        content: Text('ต้องการลบใบคืนสินค้า ${r.returnNo} ใช่หรือไม่?',
-            style: TextStyle(
-                fontSize: 14,
-                color: isDark ? Colors.white70 : AppTheme.textSub)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Text(
+          'ลบใบคืนสินค้า',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: isDark ? Colors.white : Colors.black87,
+          ),
+        ),
+        content: Text(
+          'ต้องการลบใบคืนสินค้า ${r.returnNo} ใช่หรือไม่?',
+          style: TextStyle(
+            fontSize: 14,
+            color: isDark ? Colors.white70 : AppTheme.textSub,
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -561,10 +612,12 @@ class _PurchaseReturnListPageState
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.error,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8))),
+              backgroundColor: AppTheme.error,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
             child: const Text('ลบ'),
           ),
         ],
@@ -576,11 +629,13 @@ class _PurchaseReturnListPageState
           .read(purchaseReturnListProvider.notifier)
           .deleteReturn(r.returnId);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(success ? 'ลบสำเร็จ' : 'ลบไม่สำเร็จ'),
-          backgroundColor: success ? AppTheme.success : AppTheme.error,
-          behavior: SnackBarBehavior.floating,
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(success ? 'ลบสำเร็จ' : 'ลบไม่สำเร็จ'),
+            backgroundColor: success ? AppTheme.success : AppTheme.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
     }
   }
@@ -633,11 +688,14 @@ class _PRListTopBarState extends State<_PRListTopBar> {
                 _PRPageIcon(),
                 const SizedBox(width: 10),
                 const Expanded(
-                  child: Text('คืนสินค้า',
-                      style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white)),
+                  child: Text(
+                    'คืนสินค้า',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
                 ),
                 _PRSearchField(
                   controller: widget.searchController,
@@ -646,16 +704,16 @@ class _PRListTopBarState extends State<_PRListTopBar> {
                 ),
                 const SizedBox(width: 6),
                 _PRIconBtn(
-                    icon: widget.isCardView
-                        ? Icons.view_list
-                        : Icons.grid_view,
-                    tooltip: widget.isCardView ? 'ListView' : 'CardView',
-                    onTap: widget.onToggleView),
+                  icon: widget.isCardView ? Icons.view_list : Icons.grid_view,
+                  tooltip: widget.isCardView ? 'ListView' : 'CardView',
+                  onTap: widget.onToggleView,
+                ),
                 const SizedBox(width: 4),
                 _PRIconBtn(
-                    icon: Icons.refresh,
-                    tooltip: 'รีเฟรช',
-                    onTap: widget.onRefresh),
+                  icon: Icons.refresh,
+                  tooltip: 'รีเฟรช',
+                  onTap: widget.onRefresh,
+                ),
                 const SizedBox(width: 6),
                 _PRAddBtn(onTap: widget.onAdd),
               ],
@@ -670,23 +728,26 @@ class _PRListTopBarState extends State<_PRListTopBar> {
                   _PRPageIcon(),
                   const SizedBox(width: 8),
                   const Expanded(
-                    child: Text('คืนสินค้า',
-                        style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white)),
+                    child: Text(
+                      'คืนสินค้า',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
                   ),
                   _PRIconBtn(
-                      icon: widget.isCardView
-                          ? Icons.view_list
-                          : Icons.grid_view,
-                      tooltip: widget.isCardView ? 'ListView' : 'CardView',
-                      onTap: widget.onToggleView),
+                    icon: widget.isCardView ? Icons.view_list : Icons.grid_view,
+                    tooltip: widget.isCardView ? 'ListView' : 'CardView',
+                    onTap: widget.onToggleView,
+                  ),
                   const SizedBox(width: 4),
                   _PRIconBtn(
-                      icon: Icons.refresh,
-                      tooltip: 'รีเฟรช',
-                      onTap: widget.onRefresh),
+                    icon: Icons.refresh,
+                    tooltip: 'รีเฟรช',
+                    onTap: widget.onRefresh,
+                  ),
                   const SizedBox(width: 6),
                   _PRAddBtn(onTap: widget.onAdd),
                 ],
@@ -725,8 +786,9 @@ class _PRCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final statusColor =
-        returnDoc.isConfirmed ? AppTheme.success : AppTheme.warning;
+    final statusColor = returnDoc.isConfirmed
+        ? AppTheme.success
+        : AppTheme.warning;
     final fmt = NumberFormat('#,##0.00', 'th_TH');
     final dateFmt = DateFormat('dd/MM/yyyy');
 
@@ -737,32 +799,33 @@ class _PRCard extends StatelessWidget {
           color: isDark ? AppTheme.darkCard : Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-              color: isDark ? const Color(0xFF2C2C2C) : AppTheme.border),
+            color: isDark ? const Color(0xFF2C2C2C) : AppTheme.border,
+          ),
           boxShadow: isDark
               ? null
               : [
                   BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.04),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2))
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
                 ],
         ),
         child: Column(
           children: [
             // ── Header ───────────────────────────────────────
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
                 color: statusColor.withValues(alpha: isDark ? 0.12 : 0.06),
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(12)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(12),
+                ),
                 border: Border(
                   bottom: BorderSide(
-                      color: isDark
-                          ? const Color(0xFF2C2C2C)
-                          : AppTheme.border,
-                      width: 0.5),
+                    color: isDark ? const Color(0xFF2C2C2C) : AppTheme.border,
+                    width: 0.5,
+                  ),
                 ),
               ),
               child: Row(
@@ -774,28 +837,35 @@ class _PRCard extends StatelessWidget {
                       color: statusColor.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Icon(Icons.assignment_return,
-                        size: 18, color: statusColor),
+                    child: Icon(
+                      Icons.assignment_return,
+                      size: 18,
+                      color: statusColor,
+                    ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(returnDoc.returnNo,
-                            style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                                color: isDark
-                                    ? Colors.white
-                                    : Colors.black87)),
-                        Text(returnDoc.supplierName,
-                            style: TextStyle(
-                                fontSize: 12,
-                                color: isDark
-                                    ? const Color(0xFFAAAAAA)
-                                    : AppTheme.textSub),
-                            overflow: TextOverflow.ellipsis),
+                        Text(
+                          returnDoc.returnNo,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: isDark ? Colors.white : Colors.black87,
+                          ),
+                        ),
+                        Text(
+                          returnDoc.supplierName,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isDark
+                                ? const Color(0xFFAAAAAA)
+                                : AppTheme.textSub,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ],
                     ),
                   ),
@@ -812,22 +882,24 @@ class _PRCard extends StatelessWidget {
                   Row(
                     children: [
                       _PRInfoChip(
-                          icon: Icons.calendar_today,
-                          label: dateFmt.format(returnDoc.returnDate)),
+                        icon: Icons.calendar_today,
+                        label: dateFmt.format(returnDoc.returnDate),
+                      ),
                       const SizedBox(width: 8),
                       _PRInfoChip(
-                          icon: Icons.inventory_2_outlined,
-                          label:
-                              '${returnDoc.items?.length ?? 0} รายการ'),
+                        icon: Icons.inventory_2_outlined,
+                        label: '${returnDoc.items?.length ?? 0} รายการ',
+                      ),
                       if (returnDoc.reason != null &&
                           returnDoc.reason!.isNotEmpty) ...[
                         const SizedBox(width: 8),
                         Expanded(
                           child: _PRInfoChip(
-                              icon: Icons.warning_amber_outlined,
-                              label: returnDoc.reason!,
-                              color: AppTheme.warning,
-                              maxLines: 1),
+                            icon: Icons.warning_amber_outlined,
+                            label: returnDoc.reason!,
+                            color: AppTheme.warning,
+                            maxLines: 1,
+                          ),
                         ),
                       ],
                     ],
@@ -836,19 +908,25 @@ class _PRCard extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('ยอดรวมที่คืน',
-                          style: TextStyle(
-                              fontSize: 12,
-                              color: isDark
-                                  ? const Color(0xFFAAAAAA)
-                                  : AppTheme.textSub)),
-                      Text('฿${fmt.format(returnDoc.totalAmount)}',
-                          style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              color: isDark
-                                  ? const Color(0xFFEF9A9A)
-                                  : AppTheme.error)),
+                      Text(
+                        'ยอดรวมที่คืน',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isDark
+                              ? const Color(0xFFAAAAAA)
+                              : AppTheme.textSub,
+                        ),
+                      ),
+                      Text(
+                        '฿${fmt.format(returnDoc.totalAmount)}',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: isDark
+                              ? const Color(0xFFEF9A9A)
+                              : AppTheme.error,
+                        ),
+                      ),
                     ],
                   ),
                   // Draft actions
@@ -860,16 +938,20 @@ class _PRCard extends StatelessWidget {
                           child: OutlinedButton.icon(
                             onPressed: onConfirm,
                             icon: const Icon(Icons.check, size: 15),
-                            label: const Text('ยืนยัน',
-                                style: TextStyle(fontSize: 12)),
+                            label: const Text(
+                              'ยืนยัน',
+                              style: TextStyle(fontSize: 12),
+                            ),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: AppTheme.success,
                               side: const BorderSide(
-                                  color: AppTheme.success, width: 1),
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: 6),
+                                color: AppTheme.success,
+                                width: 1,
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 6),
                               shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8)),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
                             ),
                           ),
                         ),
@@ -878,16 +960,20 @@ class _PRCard extends StatelessWidget {
                           child: OutlinedButton.icon(
                             onPressed: onDelete,
                             icon: const Icon(Icons.delete_outline, size: 15),
-                            label: const Text('ลบ',
-                                style: TextStyle(fontSize: 12)),
+                            label: const Text(
+                              'ลบ',
+                              style: TextStyle(fontSize: 12),
+                            ),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: AppTheme.error,
                               side: const BorderSide(
-                                  color: AppTheme.error, width: 1),
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: 6),
+                                color: AppTheme.error,
+                                width: 1,
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 6),
                               shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8)),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
                             ),
                           ),
                         ),
@@ -943,42 +1029,39 @@ class _PRFilterChip extends StatelessWidget {
       return GestureDetector(
         onTap: onTap,
         child: Container(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(
-            color: isDark
-                ? AppTheme.darkElement
-                : const Color(0xFFF5F5F5),
+            color: isDark ? AppTheme.darkElement : const Color(0xFFF5F5F5),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-                color: isDark
-                    ? const Color(0xFF4A4A4A)
-                    : AppTheme.border),
+              color: isDark ? const Color(0xFF4A4A4A) : AppTheme.border,
+            ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(label,
-                  style: TextStyle(
-                      fontSize: 12,
-                      color: isDark
-                          ? Colors.white70
-                          : AppTheme.textSub)),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isDark ? Colors.white70 : AppTheme.textSub,
+                ),
+              ),
               const SizedBox(width: 5),
               Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 5, vertical: 1),
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                 decoration: BoxDecoration(
-                  color: isDark
-                      ? const Color(0xFF5A5A5A)
-                      : AppTheme.textSub,
+                  color: isDark ? const Color(0xFF5A5A5A) : AppTheme.textSub,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Text('$count',
-                    style: const TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white)),
+                child: Text(
+                  '$count',
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
               ),
             ],
           ),
@@ -990,8 +1073,7 @@ class _PRFilterChip extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        padding:
-            const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
           color: vc.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(20),
@@ -1000,23 +1082,29 @@ class _PRFilterChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(label,
-                style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: vc)),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: vc,
+              ),
+            ),
             const SizedBox(width: 5),
             Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 5, vertical: 1),
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
               decoration: BoxDecoration(
-                  color: vc,
-                  borderRadius: BorderRadius.circular(10)),
-              child: Text('$count',
-                  style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white)),
+                color: vc,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '$count',
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
             ),
           ],
         ),
@@ -1030,8 +1118,11 @@ class _PRValueStat extends StatelessWidget {
   final String value;
   final Color color;
 
-  const _PRValueStat(
-      {required this.label, required this.value, required this.color});
+  const _PRValueStat({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1045,14 +1136,18 @@ class _PRValueStat extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label,
-              style: const TextStyle(
-                  fontSize: 10, color: AppTheme.textSub)),
-          Text(value,
-              style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: color)),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 10, color: AppTheme.textSub),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
         ],
       ),
     );
@@ -1079,12 +1174,18 @@ class _PRStatusBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withValues(alpha: 0.4))),
-      child: Text(label,
-          style: TextStyle(
-              fontSize: 11, fontWeight: FontWeight.w600, color: color)),
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+      ),
     );
   }
 }
@@ -1095,26 +1196,28 @@ class _PRInfoChip extends StatelessWidget {
   final Color? color;
   final int maxLines;
 
-  const _PRInfoChip(
-      {required this.icon,
-      required this.label,
-      this.color,
-      this.maxLines = 1});
+  const _PRInfoChip({
+    required this.icon,
+    required this.label,
+    this.color,
+    this.maxLines = 1,
+  });
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final c = color ??
-        (isDark ? const Color(0xFFAAAAAA) : AppTheme.textSub);
+    final c = color ?? (isDark ? const Color(0xFFAAAAAA) : AppTheme.textSub);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Icon(icon, size: 13, color: c),
         const SizedBox(width: 4),
-        Text(label,
-            style: TextStyle(fontSize: 11, color: c),
-            maxLines: maxLines,
-            overflow: TextOverflow.ellipsis),
+        Text(
+          label,
+          style: TextStyle(fontSize: 11, color: c),
+          maxLines: maxLines,
+          overflow: TextOverflow.ellipsis,
+        ),
       ],
     );
   }
@@ -1130,8 +1233,7 @@ class _PRPageIcon extends StatelessWidget {
         color: AppTheme.error.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: const Icon(Icons.assignment_return,
-          size: 18, color: Colors.white),
+      child: const Icon(Icons.assignment_return, size: 18, color: Colors.white),
     );
   }
 }
@@ -1160,27 +1262,32 @@ class _PRSearchField extends StatelessWidget {
         style: const TextStyle(fontSize: 13, color: Colors.white),
         decoration: InputDecoration(
           hintText: 'ค้นหาเลขที่, ซัพพลายเออร์...',
-          hintStyle:
-              const TextStyle(fontSize: 12, color: Colors.white54),
-          prefixIcon: const Icon(Icons.search,
-              size: 18, color: Colors.white54),
+          hintStyle: const TextStyle(fontSize: 12, color: Colors.white54),
+          prefixIcon: const Icon(Icons.search, size: 18, color: Colors.white54),
           suffixIcon: controller.text.isNotEmpty
               ? GestureDetector(
                   onTap: onCleared,
-                  child: const Icon(Icons.clear,
-                      size: 16, color: Colors.white54))
+                  child: const Icon(
+                    Icons.clear,
+                    size: 16,
+                    color: Colors.white54,
+                  ),
+                )
               : null,
           filled: true,
           fillColor: Colors.white.withValues(alpha: 0.12),
           contentPadding: const EdgeInsets.symmetric(
-              horizontal: 12, vertical: 0),
+            horizontal: 12,
+            vertical: 0,
+          ),
           border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide.none),
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide.none,
+          ),
           focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide:
-                  const BorderSide(color: Colors.white38, width: 1)),
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: Colors.white38, width: 1),
+          ),
         ),
       ),
     );
@@ -1193,8 +1300,11 @@ class _PRIconBtn extends StatelessWidget {
   final String tooltip;
   final VoidCallback onTap;
 
-  const _PRIconBtn(
-      {required this.icon, required this.tooltip, required this.onTap});
+  const _PRIconBtn({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1225,8 +1335,7 @@ class _PRAddBtn extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
         decoration: BoxDecoration(
           color: AppTheme.error,
           borderRadius: BorderRadius.circular(8),
@@ -1236,11 +1345,14 @@ class _PRAddBtn extends StatelessWidget {
           children: [
             Icon(Icons.add, size: 16, color: Colors.white),
             SizedBox(width: 4),
-            Text('คืนสินค้า',
-                style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white)),
+            Text(
+              'คืนสินค้า',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
           ],
         ),
       ),

@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 import 'package:drift/drift.dart' hide JsonKey;
+import 'package:intl/intl.dart';
 import '../../database/app_database.dart';
 
 class ReportRoutes {
@@ -22,24 +23,24 @@ class ReportRoutes {
     router.get('/top-products', _getTopProductsHandler);
     router.get('/top-customers', _getTopCustomersHandler);
     router.get('/sales-by-payment', _getSalesByPaymentHandler);
-    router.get('/sales-by-category', _getSalesByCategoryHandler);   // 🆕
-    router.get('/sales-by-period', _getSalesByPeriodHandler);       // 🆕
+    router.get('/sales-by-category', _getSalesByCategoryHandler); // 🆕
+    router.get('/sales-by-period', _getSalesByPeriodHandler); // 🆕
 
     // ── Purchase Reports ─────────────────────────────────────────
-    router.get('/purchase-summary', _getPurchaseSummaryHandler);    // 🆕
+    router.get('/purchase-summary', _getPurchaseSummaryHandler); // 🆕
     router.get('/purchase-by-supplier', _getPurchaseBySupplierHandler); // 🆕
     router.get('/purchase-by-category', _getPurchaseByCategoryHandler); // 🆕
 
     // ── Inventory Reports ────────────────────────────────────────
-    router.get('/stock-movement', _getStockMovementHandler);        // 🆕
-    router.get('/low-stock', _getLowStockHandler);                  // 🆕
-    router.get('/stock-aging', _getStockAgingHandler);              // 🆕
+    router.get('/stock-movement', _getStockMovementHandler); // 🆕
+    router.get('/low-stock', _getLowStockHandler); // 🆕
+    router.get('/stock-aging', _getStockAgingHandler); // 🆕
 
     // ── Financial Reports ────────────────────────────────────────
-    router.get('/profit-loss', _getProfitLossHandler);              // 🆕
-    router.get('/ar-aging', _getArAgingHandler);                    // 🆕
-    router.get('/ap-aging', _getApAgingHandler);                    // 🆕
-    router.get('/cash-flow', _getCashFlowHandler);                  // 🆕
+    router.get('/profit-loss', _getProfitLossHandler); // 🆕
+    router.get('/ar-aging', _getArAgingHandler); // 🆕
+    router.get('/ap-aging', _getApAgingHandler); // 🆕
+    router.get('/cash-flow', _getCashFlowHandler); // 🆕
 
     return router;
   }
@@ -83,27 +84,53 @@ class ReportRoutes {
 
   Future<Response> _getSalesDailyHandler(Request request) async {
     try {
-      final days = int.tryParse(
-              request.url.queryParameters['days'] ?? '30') ??
-          30;
-      final results = await db.customSelect('''
-        SELECT
-          DATE(order_date) as date,
-          COUNT(*) as orders,
-          COALESCE(SUM(total_amount), 0) as sales,
-          COALESCE(SUM(discount_amount), 0) as discount
-        FROM sales_orders
-        WHERE order_date >= DATE('now', '-$days days')
-        GROUP BY DATE(order_date)
-        ORDER BY date DESC
-      ''').get();
+      final p = request.url.queryParameters;
+      final startDateParam = p['start_date'];
+      final endDateParam = p['end_date'];
+      final days = int.tryParse(p['days'] ?? '30') ?? 30;
 
-      return _okList(results.map((r) => {
-            'date': r.read<String>('date'),
-            'orders': r.read<int>('orders'),
-            'sales': r.read<double>('sales'),
-            'discount': r.read<double>('discount'),
-          }));
+      final now = DateTime.now();
+      final startDate = startDateParam != null
+          ? DateTime.parse(startDateParam)
+          : DateTime(
+              now.year,
+              now.month,
+              now.day,
+            ).subtract(Duration(days: days - 1));
+      final endDate = endDateParam != null
+          ? DateTime.parse(endDateParam)
+          : DateTime(now.year, now.month, now.day);
+      final endExclusive = DateTime(
+        endDate.year,
+        endDate.month,
+        endDate.day + 1,
+      );
+
+      final orders =
+          await (db.select(db.salesOrders)..where(
+                (t) =>
+                    t.orderDate.isBiggerOrEqualValue(startDate) &
+                    t.orderDate.isSmallerThanValue(endExclusive),
+              ))
+              .get();
+
+      final grouped = <String, Map<String, dynamic>>{};
+      for (final order in orders) {
+        final key = DateFormat('yyyy-MM-dd').format(order.orderDate);
+        final bucket = grouped.putIfAbsent(
+          key,
+          () => {'date': key, 'orders': 0, 'sales': 0.0, 'discount': 0.0},
+        );
+        bucket['orders'] = (bucket['orders'] as int) + 1;
+        bucket['sales'] = (bucket['sales'] as double) + order.totalAmount;
+        bucket['discount'] =
+            (bucket['discount'] as double) + order.discountAmount;
+      }
+
+      final results = grouped.values.toList()
+        ..sort((a, b) => (b['date'] as String).compareTo(a['date'] as String));
+
+      return _okList(results.cast<Map<String, dynamic>>());
     } catch (e) {
       return _err(e);
     }
@@ -139,14 +166,18 @@ class ReportRoutes {
         LIMIT $limit
       ''', variables: vars).get();
 
-      return _okList(results.map((r) => {
+      return _okList(
+        results.map(
+          (r) => {
             'product_id': r.read<String>('product_id'),
             'product_code': r.read<String>('product_code'),
             'product_name': r.read<String>('product_name'),
             'total_quantity': r.read<double>('total_quantity'),
             'total_sales': r.read<double>('total_sales'),
             'order_count': r.read<int>('order_count'),
-          }));
+          },
+        ),
+      );
     } catch (e) {
       return _err(e);
     }
@@ -169,12 +200,16 @@ class ReportRoutes {
         LIMIT $limit
       ''').get();
 
-      return _okList(results.map((r) => {
+      return _okList(
+        results.map(
+          (r) => {
             'customer_id': r.read<String>('customer_id'),
             'customer_name': r.read<String>('customer_name'),
             'order_count': r.read<int>('order_count'),
             'total_sales': r.read<double>('total_sales'),
-          }));
+          },
+        ),
+      );
     } catch (e) {
       return _err(e);
     }
@@ -192,11 +227,15 @@ class ReportRoutes {
         ORDER BY total DESC
       ''').get();
 
-      return _okList(results.map((r) => {
+      return _okList(
+        results.map(
+          (r) => {
             'payment_type': r.read<String>('payment_type'),
             'count': r.read<int>('count'),
             'total': r.read<double>('total'),
-          }));
+          },
+        ),
+      );
     } catch (e) {
       return _err(e);
     }
@@ -230,12 +269,16 @@ class ReportRoutes {
         ORDER BY total_sales DESC
       ''', variables: vars).get();
 
-      return _okList(results.map((r) => {
+      return _okList(
+        results.map(
+          (r) => {
             'category': r.read<String>('category'),
             'order_count': r.read<int>('order_count'),
             'total_qty': r.read<double>('total_qty'),
             'total_sales': r.read<double>('total_sales'),
-          }));
+          },
+        ),
+      );
     } catch (e) {
       return _err(e);
     }
@@ -277,12 +320,16 @@ class ReportRoutes {
         ORDER BY period ASC
       ''').get();
 
-      return _okList(results.map((r) => {
+      return _okList(
+        results.map(
+          (r) => {
             'period': r.read<String>('period'),
             'orders': r.read<int>('orders'),
             'sales': r.read<double>('sales'),
             'discount': r.read<double>('discount'),
-          }));
+          },
+        ),
+      );
     } catch (e) {
       return _err(e);
     }
@@ -347,12 +394,16 @@ class ReportRoutes {
         LIMIT $limit
       ''').get();
 
-      return _okList(results.map((r) => {
+      return _okList(
+        results.map(
+          (r) => {
             'supplier_id': r.read<String>('supplier_id'),
             'supplier_name': r.read<String>('supplier_name'),
             'po_count': r.read<int>('po_count'),
             'total_amount': r.read<double>('total_amount'),
-          }));
+          },
+        ),
+      );
     } catch (e) {
       return _err(e);
     }
@@ -372,11 +423,15 @@ class ReportRoutes {
         ORDER BY total_amount DESC
       ''').get();
 
-      return _okList(results.map((r) => {
+      return _okList(
+        results.map(
+          (r) => {
             'category': r.read<String>('category'),
             'total_qty': r.read<double>('total_qty'),
             'total_amount': r.read<double>('total_amount'),
-          }));
+          },
+        ),
+      );
     } catch (e) {
       return _err(e);
     }
@@ -417,7 +472,9 @@ class ReportRoutes {
         LIMIT 200
       ''', variables: vars).get();
 
-      return _okList(results.map((r) => {
+      return _okList(
+        results.map(
+          (r) => {
             'product_id': r.read<String>('product_id'),
             'product_name': r.read<String>('product_name'),
             'movement_type': r.read<String>('movement_type'),
@@ -427,7 +484,9 @@ class ReportRoutes {
             'reference_id': r.readNullable<String>('reference_id'),
             'remark': r.readNullable<String>('remark'),
             'created_at': r.read<DateTime>('created_at').toIso8601String(),
-          }));
+          },
+        ),
+      );
     } catch (e) {
       return _err(e);
     }
@@ -438,32 +497,37 @@ class ReportRoutes {
     try {
       final threshold =
           double.tryParse(request.url.queryParameters['threshold'] ?? '10') ??
-              10;
+          10;
 
       final results = await db.customSelect('''
         SELECT
-          sb.product_id,
+          pr.product_id,
           pr.product_code,
           pr.product_name,
           pr.base_unit,
-          sb.quantity as current_stock,
+          COALESCE(SUM(sm.quantity), 0) as current_stock,
           COALESCE(pr.price_level1, 0) as unit_price
-        FROM stock_balances sb
-        JOIN products pr ON sb.product_id = pr.product_id
-        WHERE sb.quantity <= $threshold
-          AND pr.is_stock_control = 1
+        FROM products pr
+        LEFT JOIN stock_movements sm ON sm.product_id = pr.product_id
+        WHERE pr.is_stock_control = 1
           AND pr.is_active = 1
-        ORDER BY sb.quantity ASC
+        GROUP BY pr.product_id
+        HAVING current_stock <= $threshold
+        ORDER BY current_stock ASC
       ''').get();
 
-      return _okList(results.map((r) => {
+      return _okList(
+        results.map(
+          (r) => {
             'product_id': r.read<String>('product_id'),
             'product_code': r.read<String>('product_code'),
             'product_name': r.read<String>('product_name'),
             'base_unit': r.read<String>('base_unit'),
             'current_stock': r.read<double>('current_stock'),
             'unit_price': r.read<double>('unit_price'),
-          }));
+          },
+        ),
+      );
     } catch (e) {
       return _err(e);
     }
@@ -494,17 +558,22 @@ class ReportRoutes {
         ORDER BY days_since_last_movement DESC
       ''').get();
 
-      return _okList(results.map((r) => {
+      return _okList(
+        results.map(
+          (r) => {
             'product_id': r.read<String>('product_id'),
             'product_code': r.read<String>('product_code'),
             'product_name': r.read<String>('product_name'),
             'base_unit': r.read<String>('base_unit'),
             'quantity': r.read<double>('quantity'),
-            'last_movement': r.readNullable<DateTime>('last_movement')
+            'last_movement': r
+                .readNullable<DateTime>('last_movement')
                 ?.toIso8601String(),
             'days_no_movement':
                 r.readNullable<int>('days_since_last_movement') ?? 999,
-          }));
+          },
+        ),
+      );
     } catch (e) {
       return _err(e);
     }
@@ -518,49 +587,56 @@ class ReportRoutes {
   Future<Response> _getProfitLossHandler(Request request) async {
     try {
       final p = request.url.queryParameters;
-      final startDate = p['start_date'] ??
-          '${DateTime.now().year}-01-01';
-      final endDate = p['end_date'] ??
-          DateTime.now().toIso8601String().substring(0, 10);
+      final startDate = p['start_date'];
+      final endDate = p['end_date'];
+      final salesDateFilter = _dateBetweenClause(
+        column: 'order_date',
+        startDate: startDate,
+        endDate: endDate,
+      );
+      final apDateFilter = _dateBetweenClause(
+        column: 'payment_date',
+        startDate: startDate,
+        endDate: endDate,
+      );
 
       // Revenue (ยอดขาย)
       final revenueResult = await db.customSelect('''
         SELECT COALESCE(SUM(total_amount), 0) as revenue,
                COALESCE(SUM(discount_amount), 0) as discount
         FROM sales_orders
-        WHERE DATE(order_date) BETWEEN ? AND ?
-      ''', variables: [
-        Variable.withString(startDate),
-        Variable.withString(endDate),
-      ]).getSingle();
+        ${salesDateFilter.clause}
+      ''', variables: salesDateFilter.variables).getSingle();
 
       // COGS (ต้นทุนขาย = ปริมาณขาย × standard_cost)
-      final cogsResult = await db.customSelect('''
+      final cogsResult = await db.customSelect(
+        '''
         SELECT COALESCE(SUM(soi.quantity * pr.standard_cost), 0) as cogs
         FROM sales_order_items soi
         JOIN sales_orders so ON soi.order_id = so.order_id
         JOIN products pr ON soi.product_id = pr.product_id
-        WHERE DATE(so.order_date) BETWEEN ? AND ?
-      ''', variables: [
-        Variable.withString(startDate),
-        Variable.withString(endDate),
-      ]).getSingle();
+        ${_dateBetweenClause(column: 'so.order_date', startDate: startDate, endDate: endDate).clause}
+      ''',
+        variables: _dateBetweenClause(
+          column: 'so.order_date',
+          startDate: startDate,
+          endDate: endDate,
+        ).variables,
+      ).getSingle();
 
       // AP (ค่าใช้จ่าย — จากการจ่ายเงิน AP)
       final apResult = await db.customSelect('''
         SELECT COALESCE(SUM(total_amount), 0) as total_ap
         FROM ap_payments
-        WHERE DATE(payment_date) BETWEEN ? AND ?
-      ''', variables: [
-        Variable.withString(startDate),
-        Variable.withString(endDate),
-      ]).getSingle();
+        ${apDateFilter.clause}
+      ''', variables: apDateFilter.variables).getSingle();
 
       final revenue = revenueResult.read<double>('revenue');
       final discount = revenueResult.read<double>('discount');
       final cogs = cogsResult.read<double>('cogs');
-      final grossProfit = revenue - cogs;
       final netRevenue = revenue - discount;
+      final grossProfit = netRevenue - cogs;
+      final totalApPaid = apResult.read<double>('total_ap');
 
       return _ok({
         'period': {'start': startDate, 'end': endDate},
@@ -569,10 +645,11 @@ class ReportRoutes {
         'net_revenue': netRevenue,
         'cogs': cogs,
         'gross_profit': grossProfit,
-        'gross_margin_pct':
-            revenue > 0 ? (grossProfit / revenue * 100) : 0,
-        'total_ap_paid': apResult.read<double>('total_ap'),
-        'net_profit': grossProfit - apResult.read<double>('total_ap'),
+        'gross_margin_pct': netRevenue > 0
+            ? (grossProfit / netRevenue * 100)
+            : 0,
+        'total_ap_paid': totalApPaid,
+        'net_profit': grossProfit - totalApPaid,
       });
     } catch (e) {
       return _err(e);
@@ -582,6 +659,12 @@ class ReportRoutes {
   // 🆕 AR Aging (ลูกหนี้คงค้าง)
   Future<Response> _getArAgingHandler(Request request) async {
     try {
+      final p = request.url.queryParameters;
+      final invoiceDateFilter = _dateBetweenClause(
+        column: 'ai.invoice_date',
+        startDate: p['start_date'],
+        endDate: p['end_date'],
+      );
       final results = await db.customSelect('''
         SELECT
           ai.invoice_id,
@@ -591,13 +674,18 @@ class ReportRoutes {
           ai.invoice_date,
           ai.due_date,
           ai.total_amount,
-          ai.paid_amount,
-          (ai.total_amount - ai.paid_amount) as outstanding,
-          CAST(julianday('now') - julianday(ai.due_date) AS INTEGER) as overdue_days
+          COALESCE(ai.paid_amount, 0) as paid_amount,
+          (COALESCE(ai.total_amount, 0) - COALESCE(ai.paid_amount, 0)) as outstanding,
+          CAST(
+            julianday('now') - julianday(COALESCE(ai.due_date, ai.invoice_date))
+            AS INTEGER
+          ) as overdue_days
         FROM ar_invoices ai
-        WHERE ai.status != 'PAID' AND ai.status != 'CANCELLED'
+        ${invoiceDateFilter.clause.isEmpty ? 'WHERE' : '${invoiceDateFilter.clause} AND'}
+          ai.status != 'CANCELLED'
+          AND (COALESCE(ai.total_amount, 0) - COALESCE(ai.paid_amount, 0)) > 0.009
         ORDER BY overdue_days DESC
-      ''').get();
+      ''', variables: invoiceDateFilter.variables).get();
 
       // จัดกลุ่ม Aging
       final data = results.map((r) {
@@ -620,10 +708,8 @@ class ReportRoutes {
           'invoice_no': r.read<String>('invoice_no'),
           'customer_id': r.read<String>('customer_id'),
           'customer_name': r.read<String>('customer_name'),
-          'invoice_date':
-              r.read<DateTime>('invoice_date').toIso8601String(),
-          'due_date':
-              r.readNullable<DateTime>('due_date')?.toIso8601String(),
+          'invoice_date': r.read<DateTime>('invoice_date').toIso8601String(),
+          'due_date': r.readNullable<DateTime>('due_date')?.toIso8601String(),
           'total_amount': r.read<double>('total_amount'),
           'paid_amount': r.read<double>('paid_amount'),
           'outstanding': r.read<double>('outstanding'),
@@ -641,6 +727,12 @@ class ReportRoutes {
   // 🆕 AP Aging (เจ้าหนี้คงค้าง)
   Future<Response> _getApAgingHandler(Request request) async {
     try {
+      final p = request.url.queryParameters;
+      final invoiceDateFilter = _dateBetweenClause(
+        column: 'ai.invoice_date',
+        startDate: p['start_date'],
+        endDate: p['end_date'],
+      );
       final results = await db.customSelect('''
         SELECT
           ai.invoice_id,
@@ -650,13 +742,18 @@ class ReportRoutes {
           ai.invoice_date,
           ai.due_date,
           ai.total_amount,
-          ai.paid_amount,
-          (ai.total_amount - ai.paid_amount) as outstanding,
-          CAST(julianday('now') - julianday(ai.due_date) AS INTEGER) as overdue_days
+          COALESCE(ai.paid_amount, 0) as paid_amount,
+          (COALESCE(ai.total_amount, 0) - COALESCE(ai.paid_amount, 0)) as outstanding,
+          CAST(
+            julianday('now') - julianday(COALESCE(ai.due_date, ai.invoice_date))
+            AS INTEGER
+          ) as overdue_days
         FROM ap_invoices ai
-        WHERE ai.status != 'PAID' AND ai.status != 'CANCELLED'
+        ${invoiceDateFilter.clause.isEmpty ? 'WHERE' : '${invoiceDateFilter.clause} AND'}
+          ai.status != 'CANCELLED'
+          AND (COALESCE(ai.total_amount, 0) - COALESCE(ai.paid_amount, 0)) > 0.009
         ORDER BY overdue_days DESC
-      ''').get();
+      ''', variables: invoiceDateFilter.variables).get();
 
       final data = results.map((r) {
         final overdueDays = r.readNullable<int>('overdue_days') ?? 0;
@@ -678,10 +775,8 @@ class ReportRoutes {
           'invoice_no': r.read<String>('invoice_no'),
           'supplier_id': r.read<String>('supplier_id'),
           'supplier_name': r.read<String>('supplier_name'),
-          'invoice_date':
-              r.read<DateTime>('invoice_date').toIso8601String(),
-          'due_date':
-              r.readNullable<DateTime>('due_date')?.toIso8601String(),
+          'invoice_date': r.read<DateTime>('invoice_date').toIso8601String(),
+          'due_date': r.readNullable<DateTime>('due_date')?.toIso8601String(),
           'total_amount': r.read<double>('total_amount'),
           'paid_amount': r.read<double>('paid_amount'),
           'outstanding': r.read<double>('outstanding'),
@@ -700,42 +795,46 @@ class ReportRoutes {
   Future<Response> _getCashFlowHandler(Request request) async {
     try {
       final p = request.url.queryParameters;
-      final startDate = p['start_date'] ??
-          '${DateTime.now().year}-01-01';
-      final endDate = p['end_date'] ??
-          DateTime.now().toIso8601String().substring(0, 10);
+      final startDate = p['start_date'];
+      final endDate = p['end_date'];
+      final receiptDateFilter = _dateBetweenClause(
+        column: 'receipt_date',
+        startDate: startDate,
+        endDate: endDate,
+      );
+      final salesDateFilter = _dateBetweenClause(
+        column: 'order_date',
+        startDate: startDate,
+        endDate: endDate,
+      );
+      final paymentDateFilter = _dateBetweenClause(
+        column: 'payment_date',
+        startDate: startDate,
+        endDate: endDate,
+      );
 
       // Inflow: AR Receipts + POS Sales (cash)
       final arResult = await db.customSelect('''
         SELECT COALESCE(SUM(total_amount), 0) as total
         FROM ar_receipts
-        WHERE DATE(receipt_date) BETWEEN ? AND ?
-      ''', variables: [
-        Variable.withString(startDate),
-        Variable.withString(endDate),
-      ]).getSingle();
+        ${receiptDateFilter.clause}
+      ''', variables: receiptDateFilter.variables).getSingle();
 
       final posResult = await db.customSelect('''
         SELECT COALESCE(SUM(total_amount), 0) as total
         FROM sales_orders
-        WHERE DATE(order_date) BETWEEN ? AND ?
-      ''', variables: [
-        Variable.withString(startDate),
-        Variable.withString(endDate),
-      ]).getSingle();
+        ${salesDateFilter.clause}
+      ''', variables: salesDateFilter.variables).getSingle();
 
       // Outflow: AP Payments
       final apResult = await db.customSelect('''
         SELECT COALESCE(SUM(total_amount), 0) as total
         FROM ap_payments
-        WHERE DATE(payment_date) BETWEEN ? AND ?
-      ''', variables: [
-        Variable.withString(startDate),
-        Variable.withString(endDate),
-      ]).getSingle();
+        ${paymentDateFilter.clause}
+      ''', variables: paymentDateFilter.variables).getSingle();
 
-      final inflow = posResult.read<double>('total') +
-          arResult.read<double>('total');
+      final inflow =
+          posResult.read<double>('total') + arResult.read<double>('total');
       final outflow = apResult.read<double>('total');
 
       return _ok({
@@ -745,10 +844,7 @@ class ReportRoutes {
           'ar_receipts': arResult.read<double>('total'),
           'total': inflow,
         },
-        'outflow': {
-          'ap_payments': outflow,
-          'total': outflow,
-        },
+        'outflow': {'ap_payments': outflow, 'total': outflow},
         'net_cash_flow': inflow - outflow,
       });
     } catch (e) {
@@ -761,17 +857,75 @@ class ReportRoutes {
   // ═══════════════════════════════════════════════════════════════
 
   Response _ok(Map<String, dynamic> data) => Response.ok(
-        jsonEncode({'success': true, 'data': data}),
-        headers: {'Content-Type': 'application/json'},
-      );
+    jsonEncode({'success': true, 'data': data}),
+    headers: {'Content-Type': 'application/json'},
+  );
 
   Response _okList(Iterable<Map<String, dynamic>> data) => Response.ok(
-        jsonEncode({'success': true, 'data': data.toList()}),
-        headers: {'Content-Type': 'application/json'},
+    jsonEncode({'success': true, 'data': data.toList()}),
+    headers: {'Content-Type': 'application/json'},
+  );
+
+  ({String clause, List<Variable> variables}) _dateBetweenClause({
+    required String column,
+    required String? startDate,
+    required String? endDate,
+  }) {
+    DateTime? parseStart(String? value) {
+      if (value == null || value.isEmpty) {
+        return null;
+      }
+      final date = DateTime.tryParse(value);
+      if (date == null) {
+        return null;
+      }
+      return DateTime(date.year, date.month, date.day);
+    }
+
+    DateTime? parseEndExclusive(String? value) {
+      if (value == null || value.isEmpty) {
+        return null;
+      }
+      final date = DateTime.tryParse(value);
+      if (date == null) {
+        return null;
+      }
+      return DateTime(
+        date.year,
+        date.month,
+        date.day,
+      ).add(const Duration(days: 1));
+    }
+
+    final start = parseStart(startDate);
+    final endExclusive = parseEndExclusive(endDate);
+
+    if (start != null && endExclusive != null) {
+      return (
+        clause: 'WHERE $column >= ? AND $column < ?',
+        variables: [
+          Variable.withDateTime(start),
+          Variable.withDateTime(endExclusive),
+        ],
       );
+    }
+    if (start != null) {
+      return (
+        clause: 'WHERE $column >= ?',
+        variables: [Variable.withDateTime(start)],
+      );
+    }
+    if (endExclusive != null) {
+      return (
+        clause: 'WHERE $column < ?',
+        variables: [Variable.withDateTime(endExclusive)],
+      );
+    }
+    return (clause: '', variables: <Variable>[]);
+  }
 
   Response _err(Object e) => Response.internalServerError(
-        body: jsonEncode({'success': false, 'message': '$e'}),
-        headers: {'Content-Type': 'application/json'},
-      );
+    body: jsonEncode({'success': false, 'message': '$e'}),
+    headers: {'Content-Type': 'application/json'},
+  );
 }

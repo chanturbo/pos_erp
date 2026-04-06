@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
 import 'package:pos_erp/shared/widgets/pagination_bar.dart';
 import 'package:pos_erp/shared/pdf/pdf_report_button.dart';
+import '../../../settings/presentation/pages/settings_page.dart';
 import '../providers/purchase_provider.dart';
 import '../../data/models/purchase_order_model.dart';
 import 'purchase_order_form_page.dart';
@@ -17,14 +18,12 @@ class PurchaseOrderListPage extends ConsumerStatefulWidget {
       _PurchaseOrderListPageState();
 }
 
-class _PurchaseOrderListPageState
-    extends ConsumerState<PurchaseOrderListPage> {
+class _PurchaseOrderListPageState extends ConsumerState<PurchaseOrderListPage> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   String _statusFilter = 'ALL';
   bool _isCardView = false;
   int _currentPage = 1;
-  static const int _pageSize = 20;
 
   @override
   void dispose() {
@@ -36,8 +35,7 @@ class _PurchaseOrderListPageState
     return src.where((order) {
       final matchesSearch =
           order.poNo.toLowerCase().contains(_searchQuery) ||
-              (order.supplierName?.toLowerCase().contains(_searchQuery) ??
-                  false);
+          (order.supplierName?.toLowerCase().contains(_searchQuery) ?? false);
       final matchesStatus =
           _statusFilter == 'ALL' || order.status == _statusFilter;
       return matchesSearch && matchesStatus;
@@ -50,6 +48,7 @@ class _PurchaseOrderListPageState
   @override
   Widget build(BuildContext context) {
     final purchaseOrdersAsync = ref.watch(purchaseListProvider);
+    final pageSize = ref.watch(settingsProvider).listPageSize;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
@@ -67,14 +66,11 @@ class _PurchaseOrderListPageState
               _searchController.clear();
               setState(() => _searchQuery = '');
             },
-            onToggleView: () =>
-                setState(() => _isCardView = !_isCardView),
-            onRefresh: () =>
-                ref.read(purchaseListProvider.notifier).refresh(),
+            onToggleView: () => setState(() => _isCardView = !_isCardView),
+            onRefresh: () => ref.read(purchaseListProvider.notifier).refresh(),
             onAdd: () => Navigator.push(
               context,
-              MaterialPageRoute(
-                  builder: (_) => const PurchaseOrderFormPage()),
+              MaterialPageRoute(builder: (_) => const PurchaseOrderFormPage()),
             ),
           ),
 
@@ -84,18 +80,18 @@ class _PurchaseOrderListPageState
           // ── Content ─────────────────────────────────────────
           Expanded(
             child: purchaseOrdersAsync.when(
-              loading: () =>
-                  const Center(child: CircularProgressIndicator()),
+              loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => _buildError(e),
               data: (orders) {
                 final filtered = _filter(orders);
                 if (filtered.isEmpty) return _buildEmpty();
-                final totalPages =
-                    (filtered.length / _pageSize).ceil().clamp(1, 9999);
+                final totalPages = (filtered.length / pageSize).ceil().clamp(
+                  1,
+                  9999,
+                );
                 final safePage = _currentPage.clamp(1, totalPages);
-                final start = (safePage - 1) * _pageSize;
-                final end =
-                    (start + _pageSize).clamp(0, filtered.length);
+                final start = (safePage - 1) * pageSize;
+                final end = (start + pageSize).clamp(0, filtered.length);
                 final pageItems = filtered.sublist(start, end);
                 return Column(
                   children: [
@@ -107,16 +103,14 @@ class _PurchaseOrderListPageState
                     PaginationBar(
                       currentPage: safePage,
                       totalItems: filtered.length,
-                      pageSize: _pageSize,
-                      onPageChanged: (p) =>
-                          setState(() => _currentPage = p),
+                      pageSize: pageSize,
+                      onPageChanged: (p) => setState(() => _currentPage = p),
                       trailing: PdfReportButton(
                         emptyMessage: 'ไม่มีข้อมูลใบสั่งซื้อ',
                         title: 'รายงานใบสั่งซื้อ',
                         filename: () =>
                             PdfFilename.generate('purchase_order_report'),
-                        buildPdf: () =>
-                            PurchaseOrderPdfBuilder.build(filtered),
+                        buildPdf: () => PurchaseOrderPdfBuilder.build(filtered),
                         hasData: filtered.isNotEmpty,
                       ),
                     ),
@@ -134,19 +128,18 @@ class _PurchaseOrderListPageState
   // Summary Bar + Status Filter
   // ─────────────────────────────────────────────────────────────
   Widget _buildSummaryBar(
-      AsyncValue<List<PurchaseOrderModel>> purchaseOrdersAsync) {
+    AsyncValue<List<PurchaseOrderModel>> purchaseOrdersAsync,
+  ) {
     return purchaseOrdersAsync.maybeWhen(
       data: (all) {
         final filtered = _filter(all);
-        final total =
-            filtered.fold<double>(0, (s, o) => s + o.totalAmount);
+        final total = filtered.fold<double>(0, (s, o) => s + o.totalAmount);
         final fmt = NumberFormat('#,##0.00', 'th_TH');
 
         int countByStatus(String status) =>
             all.where((o) => o.status == status).length;
 
-        final isDark =
-            Theme.of(context).brightness == Brightness.dark;
+        final isDark = Theme.of(context).brightness == Brightness.dark;
 
         return Container(
           color: isDark ? AppTheme.darkCard : Colors.white,
@@ -164,8 +157,7 @@ class _PurchaseOrderListPageState
                       count: all.length,
                       color: AppTheme.navy,
                       selected: _statusFilter == 'ALL',
-                      onTap: () =>
-                          setState(() => _statusFilter = 'ALL'),
+                      onTap: () => setState(() => _statusFilter = 'ALL'),
                     ),
                     const SizedBox(width: 6),
                     _POFilterChip(
@@ -173,8 +165,7 @@ class _PurchaseOrderListPageState
                       count: countByStatus('DRAFT'),
                       color: AppTheme.textSub,
                       selected: _statusFilter == 'DRAFT',
-                      onTap: () =>
-                          setState(() => _statusFilter = 'DRAFT'),
+                      onTap: () => setState(() => _statusFilter = 'DRAFT'),
                     ),
                     const SizedBox(width: 6),
                     _POFilterChip(
@@ -182,8 +173,7 @@ class _PurchaseOrderListPageState
                       count: countByStatus('APPROVED'),
                       color: AppTheme.info,
                       selected: _statusFilter == 'APPROVED',
-                      onTap: () =>
-                          setState(() => _statusFilter = 'APPROVED'),
+                      onTap: () => setState(() => _statusFilter = 'APPROVED'),
                     ),
                     const SizedBox(width: 6),
                     _POFilterChip(
@@ -191,8 +181,7 @@ class _PurchaseOrderListPageState
                       count: countByStatus('PARTIAL'),
                       color: AppTheme.warning,
                       selected: _statusFilter == 'PARTIAL',
-                      onTap: () =>
-                          setState(() => _statusFilter = 'PARTIAL'),
+                      onTap: () => setState(() => _statusFilter = 'PARTIAL'),
                     ),
                     const SizedBox(width: 6),
                     _POFilterChip(
@@ -200,8 +189,7 @@ class _PurchaseOrderListPageState
                       count: countByStatus('COMPLETED'),
                       color: AppTheme.success,
                       selected: _statusFilter == 'COMPLETED',
-                      onTap: () =>
-                          setState(() => _statusFilter = 'COMPLETED'),
+                      onTap: () => setState(() => _statusFilter = 'COMPLETED'),
                     ),
                   ],
                 ),
@@ -244,8 +232,8 @@ class _PurchaseOrderListPageState
         onTap: () => Navigator.push(
           context,
           MaterialPageRoute(
-              builder: (_) =>
-                  PurchaseOrderFormPage(order: orders[i])),
+            builder: (_) => PurchaseOrderFormPage(order: orders[i]),
+          ),
         ),
         onDelete: () => _deletePurchaseOrder(orders[i]),
         onApprove: () => _approvePurchaseOrder(orders[i]),
@@ -262,54 +250,57 @@ class _PurchaseOrderListPageState
       children: [
         // Header row
         Container(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           color: isDark ? AppTheme.darkElement : AppTheme.headerBg,
           child: Row(
             children: [
               const SizedBox(width: 14), // status bar
               Expanded(
                 flex: 3,
-                child: Text('เลขที่ PO / ซัพพลายเออร์',
-                    style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: isDark
-                            ? const Color(0xFFAAAAAA)
-                            : AppTheme.textSub)),
+                child: Text(
+                  'เลขที่ PO / ซัพพลายเออร์',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? const Color(0xFFAAAAAA) : AppTheme.textSub,
+                  ),
+                ),
               ),
               SizedBox(
                 width: 72,
-                child: Text('วันที่',
-                    style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: isDark
-                            ? const Color(0xFFAAAAAA)
-                            : AppTheme.textSub),
-                    textAlign: TextAlign.center),
+                child: Text(
+                  'วันที่',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? const Color(0xFFAAAAAA) : AppTheme.textSub,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
               ),
               SizedBox(
                 width: 76,
-                child: Text('สถานะ',
-                    style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: isDark
-                            ? const Color(0xFFAAAAAA)
-                            : AppTheme.textSub),
-                    textAlign: TextAlign.center),
+                child: Text(
+                  'สถานะ',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? const Color(0xFFAAAAAA) : AppTheme.textSub,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
               ),
               SizedBox(
                 width: 90,
-                child: Text('ยอดรวม',
-                    style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: isDark
-                            ? const Color(0xFFAAAAAA)
-                            : AppTheme.textSub),
-                    textAlign: TextAlign.right),
+                child: Text(
+                  'ยอดรวม',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? const Color(0xFFAAAAAA) : AppTheme.textSub,
+                  ),
+                  textAlign: TextAlign.right,
+                ),
               ),
             ],
           ),
@@ -325,20 +316,20 @@ class _PurchaseOrderListPageState
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                      builder: (_) =>
-                          PurchaseOrderFormPage(order: order)),
+                    builder: (_) => PurchaseOrderFormPage(order: order),
+                  ),
                 ),
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 10),
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
                     color: isEven
-                        ? (isDark
-                            ? AppTheme.darkCard
-                            : Colors.white)
+                        ? (isDark ? AppTheme.darkCard : Colors.white)
                         : (isDark
-                            ? AppTheme.darkElement
-                            : const Color(0xFFF9F9F9)),
+                              ? AppTheme.darkElement
+                              : const Color(0xFFF9F9F9)),
                     border: Border(
                       bottom: BorderSide(
                         color: isDark
@@ -411,7 +402,8 @@ class _PurchaseOrderListPageState
                           SizedBox(
                             width: 76,
                             child: Center(
-                                child: _buildStatusBadge(order.status)),
+                              child: _buildStatusBadge(order.status),
+                            ),
                           ),
                           // Amount
                           SizedBox(
@@ -443,15 +435,16 @@ class _PurchaseOrderListPageState
                                     _deletePurchaseOrder(orders[i]),
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: AppTheme.error,
-                                  side: const BorderSide(
-                                      color: AppTheme.error),
+                                  side: const BorderSide(color: AppTheme.error),
                                   padding: EdgeInsets.zero,
                                   shape: RoundedRectangleBorder(
-                                      borderRadius:
-                                          BorderRadius.circular(8)),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
                                 ),
                                 child: const Icon(
-                                    Icons.delete_outline, size: 18),
+                                  Icons.delete_outline,
+                                  size: 18,
+                                ),
                               ),
                             ),
                             const SizedBox(width: 8),
@@ -462,17 +455,20 @@ class _PurchaseOrderListPageState
                                 onPressed: () =>
                                     _approvePurchaseOrder(orders[i]),
                                 icon: const Icon(Icons.check, size: 14),
-                                label: const Text('อนุมัติ',
-                                    style: TextStyle(fontSize: 12)),
+                                label: const Text(
+                                  'อนุมัติ',
+                                  style: TextStyle(fontSize: 12),
+                                ),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: AppTheme.success,
                                   foregroundColor: Colors.white,
                                   elevation: 0,
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 8),
+                                    horizontal: 8,
+                                  ),
                                   shape: RoundedRectangleBorder(
-                                      borderRadius:
-                                          BorderRadius.circular(8)),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
                                 ),
                               ),
                             ),
@@ -563,19 +559,17 @@ class _PurchaseOrderListPageState
                 ? 'ยังไม่มีใบสั่งซื้อ'
                 : 'ไม่พบใบสั่งซื้อ "$_searchQuery"',
             style: TextStyle(
-                color: isDark
-                    ? const Color(0xFF888888)
-                    : Colors.grey[500]),
+              color: isDark ? const Color(0xFF888888) : Colors.grey[500],
+            ),
           ),
           if (_searchQuery.isEmpty) ...[
             const SizedBox(height: 4),
             Text(
               'กดปุ่ม + เพื่อสร้างใบสั่งซื้อใหม่',
               style: TextStyle(
-                  fontSize: 12,
-                  color: isDark
-                      ? const Color(0xFF666666)
-                      : Colors.grey[400]),
+                fontSize: 12,
+                color: isDark ? const Color(0xFF666666) : Colors.grey[400],
+              ),
             ),
           ],
         ],
@@ -584,21 +578,20 @@ class _PurchaseOrderListPageState
   }
 
   Widget _buildError(Object e) => Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline, size: 72, color: AppTheme.error),
-            const SizedBox(height: 12),
-            Text('เกิดข้อผิดพลาด: $e'),
-            const SizedBox(height: 12),
-            ElevatedButton(
-              onPressed: () =>
-                  ref.read(purchaseListProvider.notifier).refresh(),
-              child: const Text('ลองใหม่'),
-            ),
-          ],
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Icon(Icons.error_outline, size: 72, color: AppTheme.error),
+        const SizedBox(height: 12),
+        Text('เกิดข้อผิดพลาด: $e'),
+        const SizedBox(height: 12),
+        ElevatedButton(
+          onPressed: () => ref.read(purchaseListProvider.notifier).refresh(),
+          child: const Text('ลองใหม่'),
         ),
-      );
+      ],
+    ),
+  );
 
   // ─────────────────────────────────────────────────────────────
   // Actions
@@ -607,13 +600,14 @@ class _PurchaseOrderListPageState
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Row(children: [
-          const Icon(Icons.delete_outline, color: AppTheme.error, size: 20),
-          const SizedBox(width: 8),
-          const Text('ยืนยันการลบ'),
-        ]),
-        content:
-            Text('ต้องการลบใบสั่งซื้อ ${order.poNo} ออกจากระบบ?'),
+        title: Row(
+          children: [
+            const Icon(Icons.delete_outline, color: AppTheme.error, size: 20),
+            const SizedBox(width: 8),
+            const Text('ยืนยันการลบ'),
+          ],
+        ),
+        content: Text('ต้องการลบใบสั่งซื้อ ${order.poNo} ออกจากระบบ?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -639,25 +633,31 @@ class _PurchaseOrderListPageState
         .deletePurchaseOrder(order.poId);
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(success ? 'ลบใบสั่งซื้อสำเร็จ' : 'ลบใบสั่งซื้อไม่สำเร็จ'),
-      backgroundColor: success ? AppTheme.success : AppTheme.error,
-      behavior: SnackBarBehavior.floating,
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(success ? 'ลบใบสั่งซื้อสำเร็จ' : 'ลบใบสั่งซื้อไม่สำเร็จ'),
+        backgroundColor: success ? AppTheme.success : AppTheme.error,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   Future<void> _approvePurchaseOrder(PurchaseOrderModel order) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Row(children: [
-          const Icon(Icons.check_circle_outline,
-              color: AppTheme.success, size: 20),
-          const SizedBox(width: 8),
-          const Text('ยืนยันการอนุมัติ'),
-        ]),
-        content:
-            Text('อนุมัติใบสั่งซื้อ ${order.poNo} ใช่หรือไม่?'),
+        title: Row(
+          children: [
+            const Icon(
+              Icons.check_circle_outline,
+              color: AppTheme.success,
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            const Text('ยืนยันการอนุมัติ'),
+          ],
+        ),
+        content: Text('อนุมัติใบสั่งซื้อ ${order.poNo} ใช่หรือไม่?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -683,12 +683,15 @@ class _PurchaseOrderListPageState
         .approvePurchaseOrder(order.poId);
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(
-          success ? 'อนุมัติใบสั่งซื้อสำเร็จ' : 'อนุมัติใบสั่งซื้อไม่สำเร็จ'),
-      backgroundColor: success ? AppTheme.success : AppTheme.error,
-      behavior: SnackBarBehavior.floating,
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          success ? 'อนุมัติใบสั่งซื้อสำเร็จ' : 'อนุมัติใบสั่งซื้อไม่สำเร็จ',
+        ),
+        backgroundColor: success ? AppTheme.success : AppTheme.error,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 }
 
@@ -779,17 +782,18 @@ class _POCard extends StatelessWidget {
       AppTheme.tealColor,
     ];
     final supplierName = order.supplierName ?? 'S';
-    final avatarColor =
-        colors[supplierName.codeUnitAt(0) % colors.length];
-    final initial =
-        supplierName.isNotEmpty ? supplierName[0].toUpperCase() : 'S';
+    final avatarColor = colors[supplierName.codeUnitAt(0) % colors.length];
+    final initial = supplierName.isNotEmpty
+        ? supplierName[0].toUpperCase()
+        : 'S';
 
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
         side: BorderSide(
-            color: isDark ? const Color(0xFF333333) : AppTheme.border),
+          color: isDark ? const Color(0xFF333333) : AppTheme.border,
+        ),
       ),
       color: isDark ? AppTheme.darkCard : Colors.white,
       child: InkWell(
@@ -853,12 +857,9 @@ class _POCard extends StatelessWidget {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      _StatusBadge(
-                          label: _statusLabel, color: _statusColor),
+                      _StatusBadge(label: _statusLabel, color: _statusColor),
                       const SizedBox(height: 4),
-                      _StatusBadge(
-                          label: _paymentLabel,
-                          color: _paymentColor),
+                      _StatusBadge(label: _paymentLabel, color: _paymentColor),
                     ],
                   ),
                 ],
@@ -866,10 +867,9 @@ class _POCard extends StatelessWidget {
 
               const SizedBox(height: 10),
               Divider(
-                  height: 1,
-                  color: isDark
-                      ? const Color(0xFF2C2C2C)
-                      : AppTheme.border),
+                height: 1,
+                color: isDark ? const Color(0xFF2C2C2C) : AppTheme.border,
+              ),
               const SizedBox(height: 10),
 
               // ── Row 2: Meta info ────────────────────────────────
@@ -878,8 +878,7 @@ class _POCard extends StatelessWidget {
                   Expanded(
                     child: _InfoChip(
                       icon: Icons.calendar_today_outlined,
-                      text: DateFormat('dd/MM/yyyy')
-                          .format(order.poDate),
+                      text: DateFormat('dd/MM/yyyy').format(order.poDate),
                       isDark: isDark,
                     ),
                   ),
@@ -935,7 +934,8 @@ class _POCard extends StatelessWidget {
                           side: const BorderSide(color: AppTheme.error),
                           padding: EdgeInsets.zero,
                           shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8)),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
                         child: const Icon(Icons.delete_outline, size: 18),
                       ),
@@ -947,16 +947,18 @@ class _POCard extends StatelessWidget {
                       child: ElevatedButton.icon(
                         onPressed: onApprove,
                         icon: const Icon(Icons.check, size: 14),
-                        label: const Text('อนุมัติ',
-                            style: TextStyle(fontSize: 12)),
+                        label: const Text(
+                          'อนุมัติ',
+                          style: TextStyle(fontSize: 12),
+                        ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppTheme.success,
                           foregroundColor: Colors.white,
                           elevation: 0,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
                           shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8)),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
                       ),
                     ),
@@ -1012,14 +1014,10 @@ class _POListTopBar extends StatelessWidget {
     );
   }
 
-  Widget _buildSingleRow(
-      BuildContext context, bool canPop, bool isDark) {
+  Widget _buildSingleRow(BuildContext context, bool canPop, bool isDark) {
     return Row(
       children: [
-        if (canPop) ...[
-          _POBackBtn(isDark: isDark),
-          const SizedBox(width: 10),
-        ],
+        if (canPop) ...[_POBackBtn(isDark: isDark), const SizedBox(width: 10)],
         _POPageIcon(),
         const SizedBox(width: 10),
         Text(
@@ -1058,8 +1056,7 @@ class _POListTopBar extends StatelessWidget {
     );
   }
 
-  Widget _buildDoubleRow(
-      BuildContext context, bool canPop, bool isDark) {
+  Widget _buildDoubleRow(BuildContext context, bool canPop, bool isDark) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1116,40 +1113,40 @@ class _POBackBtn extends StatelessWidget {
   const _POBackBtn({required this.isDark});
   @override
   Widget build(BuildContext context) => InkWell(
-        onTap: () => Navigator.of(context).pop(),
+    onTap: () => Navigator.of(context).pop(),
+    borderRadius: BorderRadius.circular(8),
+    child: Container(
+      padding: const EdgeInsets.all(7),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkElement : const Color(0xFFF5F5F5),
         borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.all(7),
-          decoration: BoxDecoration(
-            color: isDark
-                ? AppTheme.darkElement
-                : const Color(0xFFF5F5F5),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-                color: isDark
-                    ? const Color(0xFF333333)
-                    : AppTheme.border),
-          ),
-          child: Icon(Icons.arrow_back_ios_new,
-              size: 15,
-              color: isDark
-                  ? const Color(0xFFAAAAAA)
-                  : const Color(0xFF8A8A8A)),
+        border: Border.all(
+          color: isDark ? const Color(0xFF333333) : AppTheme.border,
         ),
-      );
+      ),
+      child: Icon(
+        Icons.arrow_back_ios_new,
+        size: 15,
+        color: isDark ? const Color(0xFFAAAAAA) : const Color(0xFF8A8A8A),
+      ),
+    ),
+  );
 }
 
 class _POPageIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(7),
-        decoration: BoxDecoration(
-          color: AppTheme.primaryContainer,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: const Icon(Icons.receipt_long_outlined,
-            color: AppTheme.primaryDark, size: 18),
-      );
+    padding: const EdgeInsets.all(7),
+    decoration: BoxDecoration(
+      color: AppTheme.primaryContainer,
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child: const Icon(
+      Icons.receipt_long_outlined,
+      color: AppTheme.primaryDark,
+      size: 18,
+    ),
+  );
 }
 
 class _POSearchField extends StatelessWidget {
@@ -1169,55 +1166,53 @@ class _POSearchField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SizedBox(
-        height: 38,
-        child: TextField(
-          controller: controller,
-          style: TextStyle(
-              fontSize: 13,
-              color: isDark ? Colors.white : const Color(0xFF1A1A1A)),
-          decoration: InputDecoration(
-            hintText: 'ค้นหาเลขที่ PO, ซัพพลายเออร์...',
-            hintStyle: TextStyle(
-                fontSize: 13,
-                color: isDark
-                    ? const Color(0xFF666666)
-                    : const Color(0xFF8A8A8A)),
-            prefixIcon: Icon(Icons.search,
-                size: 17,
-                color: isDark
-                    ? const Color(0xFF666666)
-                    : const Color(0xFF8A8A8A)),
-            suffixIcon: query.isNotEmpty
-                ? IconButton(
-                    icon: const Icon(Icons.clear, size: 15),
-                    onPressed: onCleared,
-                  )
-                : null,
-            contentPadding: EdgeInsets.zero,
-            border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(
-                    color: isDark
-                        ? const Color(0xFF333333)
-                        : const Color(0xFFE0E0E0))),
-            enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(
-                    color: isDark
-                        ? const Color(0xFF333333)
-                        : const Color(0xFFE0E0E0))),
-            focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(
-                    color: AppTheme.primary, width: 1.5)),
-            filled: true,
-            fillColor: isDark
-                ? AppTheme.darkElement
-                : Colors.white,
-          ),
-          onChanged: onChanged,
+    height: 38,
+    child: TextField(
+      controller: controller,
+      style: TextStyle(
+        fontSize: 13,
+        color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+      ),
+      decoration: InputDecoration(
+        hintText: 'ค้นหาเลขที่ PO, ซัพพลายเออร์...',
+        hintStyle: TextStyle(
+          fontSize: 13,
+          color: isDark ? const Color(0xFF666666) : const Color(0xFF8A8A8A),
         ),
-      );
+        prefixIcon: Icon(
+          Icons.search,
+          size: 17,
+          color: isDark ? const Color(0xFF666666) : const Color(0xFF8A8A8A),
+        ),
+        suffixIcon: query.isNotEmpty
+            ? IconButton(
+                icon: const Icon(Icons.clear, size: 15),
+                onPressed: onCleared,
+              )
+            : null,
+        contentPadding: EdgeInsets.zero,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(
+            color: isDark ? const Color(0xFF333333) : const Color(0xFFE0E0E0),
+          ),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(
+            color: isDark ? const Color(0xFF333333) : const Color(0xFFE0E0E0),
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
+        ),
+        filled: true,
+        fillColor: isDark ? AppTheme.darkElement : Colors.white,
+      ),
+      onChanged: onChanged,
+    ),
+  );
 }
 
 class _POToggleBtn extends StatelessWidget {
@@ -1235,30 +1230,27 @@ class _POToggleBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Tooltip(
-        message: tooltip,
-        child: InkWell(
-          onTap: onTap,
+    message: tooltip,
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.all(7),
+        decoration: BoxDecoration(
+          color: isDark ? AppTheme.darkElement : const Color(0xFFF5F5F5),
           borderRadius: BorderRadius.circular(8),
-          child: Container(
-            padding: const EdgeInsets.all(7),
-            decoration: BoxDecoration(
-              color: isDark
-                  ? AppTheme.darkElement
-                  : const Color(0xFFF5F5F5),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                  color: isDark
-                      ? const Color(0xFF333333)
-                      : AppTheme.border),
-            ),
-            child: Icon(icon,
-                size: 17,
-                color: isDark
-                    ? const Color(0xFFAAAAAA)
-                    : const Color(0xFF8A8A8A)),
+          border: Border.all(
+            color: isDark ? const Color(0xFF333333) : AppTheme.border,
           ),
         ),
-      );
+        child: Icon(
+          icon,
+          size: 17,
+          color: isDark ? const Color(0xFFAAAAAA) : const Color(0xFF8A8A8A),
+        ),
+      ),
+    ),
+  );
 }
 
 class _PORefreshBtn extends StatelessWidget {
@@ -1267,30 +1259,27 @@ class _PORefreshBtn extends StatelessWidget {
   const _PORefreshBtn({required this.isDark, required this.onTap});
   @override
   Widget build(BuildContext context) => Tooltip(
-        message: 'รีเฟรช',
-        child: InkWell(
-          onTap: onTap,
+    message: 'รีเฟรช',
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.all(7),
+        decoration: BoxDecoration(
+          color: isDark ? AppTheme.darkElement : const Color(0xFFF5F5F5),
           borderRadius: BorderRadius.circular(8),
-          child: Container(
-            padding: const EdgeInsets.all(7),
-            decoration: BoxDecoration(
-              color: isDark
-                  ? AppTheme.darkElement
-                  : const Color(0xFFF5F5F5),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                  color: isDark
-                      ? const Color(0xFF333333)
-                      : AppTheme.border),
-            ),
-            child: Icon(Icons.refresh,
-                size: 17,
-                color: isDark
-                    ? const Color(0xFFAAAAAA)
-                    : const Color(0xFF8A8A8A)),
+          border: Border.all(
+            color: isDark ? const Color(0xFF333333) : AppTheme.border,
           ),
         ),
-      );
+        child: Icon(
+          Icons.refresh,
+          size: 17,
+          color: isDark ? const Color(0xFFAAAAAA) : const Color(0xFF8A8A8A),
+        ),
+      ),
+    ),
+  );
 }
 
 class _POAddBtn extends StatelessWidget {
@@ -1299,25 +1288,27 @@ class _POAddBtn extends StatelessWidget {
   const _POAddBtn({required this.onTap, this.compact = false});
   @override
   Widget build(BuildContext context) => ElevatedButton.icon(
-        onPressed: onTap,
-        icon: const Icon(Icons.add, size: 18),
-        label: compact
-            ? const SizedBox.shrink()
-            : const Text('สร้างใบสั่งซื้อ',
-                style: TextStyle(
-                    fontSize: 13, fontWeight: FontWeight.w600)),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppTheme.primary,
-          foregroundColor: Colors.white,
-          padding: EdgeInsets.symmetric(
-              horizontal: compact ? 12 : 16, vertical: 13),
-          minimumSize: Size.zero,
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8)),
-          elevation: 0,
-        ),
-      );
+    onPressed: onTap,
+    icon: const Icon(Icons.add, size: 18),
+    label: compact
+        ? const SizedBox.shrink()
+        : const Text(
+            'สร้างใบสั่งซื้อ',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          ),
+    style: ElevatedButton.styleFrom(
+      backgroundColor: AppTheme.primary,
+      foregroundColor: Colors.white,
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 12 : 16,
+        vertical: 13,
+      ),
+      minimumSize: Size.zero,
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      elevation: 0,
+    ),
+  );
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -1330,64 +1321,63 @@ class _StatusBadge extends StatelessWidget {
   const _StatusBadge({required this.label, required this.color});
   @override
   Widget build(BuildContext context) => Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(10),
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(10),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 5,
+          height: 5,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 5,
-              height: 5,
-              decoration: BoxDecoration(
-                  color: color, shape: BoxShape.circle),
-            ),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                color: color,
-              ),
-            ),
-          ],
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            color: color,
+          ),
         ),
-      );
+      ],
+    ),
+  );
 }
 
 class _InfoChip extends StatelessWidget {
   final IconData icon;
   final String text;
   final bool isDark;
-  const _InfoChip(
-      {required this.icon, required this.text, required this.isDark});
+  const _InfoChip({
+    required this.icon,
+    required this.text,
+    required this.isDark,
+  });
   @override
   Widget build(BuildContext context) => Row(
-        children: [
-          Icon(icon,
-              size: 13,
-              color: isDark
-                  ? const Color(0xFF888888)
-                  : AppTheme.textSub),
-          const SizedBox(width: 4),
-          Expanded(
-            child: Text(
-              text,
-              style: TextStyle(
-                fontSize: 11,
-                color: isDark
-                    ? const Color(0xFFAAAAAA)
-                    : AppTheme.textSub,
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
+    children: [
+      Icon(
+        icon,
+        size: 13,
+        color: isDark ? const Color(0xFF888888) : AppTheme.textSub,
+      ),
+      const SizedBox(width: 4),
+      Expanded(
+        child: Text(
+          text,
+          style: TextStyle(
+            fontSize: 11,
+            color: isDark ? const Color(0xFFAAAAAA) : AppTheme.textSub,
           ),
-        ],
-      );
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+    ],
+  );
 }
 
 class _POFilterChip extends StatelessWidget {
@@ -1434,31 +1424,34 @@ class _POFilterChip extends StatelessWidget {
             color: isDark ? AppTheme.darkElement : const Color(0xFFF5F5F5),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-                color: isDark ? const Color(0xFF4A4A4A) : AppTheme.border),
+              color: isDark ? const Color(0xFF4A4A4A) : AppTheme.border,
+            ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(label,
-                  style: TextStyle(
-                      fontSize: 12,
-                      color: isDark
-                          ? Colors.white70
-                          : AppTheme.textSub)),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isDark ? Colors.white70 : AppTheme.textSub,
+                ),
+              ),
               const SizedBox(width: 5),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                 decoration: BoxDecoration(
-                  color: isDark
-                      ? const Color(0xFF5A5A5A)
-                      : AppTheme.textSub,
+                  color: isDark ? const Color(0xFF5A5A5A) : AppTheme.textSub,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Text('$count',
-                    style: const TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white)),
+                child: Text(
+                  '$count',
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
               ),
             ],
           ),
@@ -1480,21 +1473,29 @@ class _POFilterChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(label,
-                style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: vc)),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: vc,
+              ),
+            ),
             const SizedBox(width: 5),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
               decoration: BoxDecoration(
-                  color: vc, borderRadius: BorderRadius.circular(10)),
-              child: Text('$count',
-                  style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white)),
+                color: vc,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '$count',
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
             ),
           ],
         ),

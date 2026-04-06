@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
 import 'package:pos_erp/shared/widgets/pagination_bar.dart';
 import 'package:pos_erp/shared/pdf/pdf_report_button.dart';
+import '../../../settings/presentation/pages/settings_page.dart';
 import '../providers/ap_invoice_provider.dart';
 import '../../data/models/ap_invoice_model.dart';
 import 'ap_invoice_form_page.dart';
@@ -22,7 +23,6 @@ class _ApInvoiceListPageState extends ConsumerState<ApInvoiceListPage> {
   String _statusFilter = 'ALL';
   bool _isCardView = false;
   int _currentPage = 1;
-  static const int _pageSize = 20;
 
   @override
   void dispose() {
@@ -34,14 +34,14 @@ class _ApInvoiceListPageState extends ConsumerState<ApInvoiceListPage> {
     return src.where((inv) {
       final matchesSearch =
           inv.invoiceNo.toLowerCase().contains(_searchQuery) ||
-              inv.supplierName.toLowerCase().contains(_searchQuery);
-      final matchesStatus = _statusFilter == 'ALL' ||
+          inv.supplierName.toLowerCase().contains(_searchQuery);
+      final matchesStatus =
+          _statusFilter == 'ALL' ||
           (_statusFilter == 'OVERDUE'
               ? inv.isOverdue
               : inv.status == _statusFilter);
       return matchesSearch && matchesStatus;
-    }).toList()
-      ..sort((a, b) => b.invoiceDate.compareTo(a.invoiceDate));
+    }).toList()..sort((a, b) => b.invoiceDate.compareTo(a.invoiceDate));
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -50,6 +50,7 @@ class _ApInvoiceListPageState extends ConsumerState<ApInvoiceListPage> {
   @override
   Widget build(BuildContext context) {
     final invoicesAsync = ref.watch(apInvoiceListProvider);
+    final pageSize = ref.watch(settingsProvider).listPageSize;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
@@ -61,22 +62,23 @@ class _ApInvoiceListPageState extends ConsumerState<ApInvoiceListPage> {
             searchController: _searchController,
             searchQuery: _searchQuery,
             isCardView: _isCardView,
-            onSearchChanged: (v) => setState(
-                () { _searchQuery = v.toLowerCase(); _currentPage = 1; }),
+            onSearchChanged: (v) => setState(() {
+              _searchQuery = v.toLowerCase();
+              _currentPage = 1;
+            }),
             onSearchCleared: () {
               _searchController.clear();
-              setState(() { _searchQuery = ''; _currentPage = 1; });
+              setState(() {
+                _searchQuery = '';
+                _currentPage = 1;
+              });
             },
-            onToggleView: () =>
-                setState(() => _isCardView = !_isCardView),
-            onRefresh: () =>
-                ref.read(apInvoiceListProvider.notifier).refresh(),
+            onToggleView: () => setState(() => _isCardView = !_isCardView),
+            onRefresh: () => ref.read(apInvoiceListProvider.notifier).refresh(),
             onAdd: () => Navigator.push(
               context,
-              MaterialPageRoute(
-                  builder: (_) => const ApInvoiceFormPage()),
-            ).then((_) =>
-                ref.read(apInvoiceListProvider.notifier).refresh()),
+              MaterialPageRoute(builder: (_) => const ApInvoiceFormPage()),
+            ).then((_) => ref.read(apInvoiceListProvider.notifier).refresh()),
           ),
 
           // ── Summary + Status Filter Bar ──────────────────────
@@ -85,18 +87,18 @@ class _ApInvoiceListPageState extends ConsumerState<ApInvoiceListPage> {
           // ── Content ─────────────────────────────────────────
           Expanded(
             child: invoicesAsync.when(
-              loading: () =>
-                  const Center(child: CircularProgressIndicator()),
+              loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => _buildError(e),
               data: (invoices) {
                 final filtered = _filter(invoices);
                 if (filtered.isEmpty) return _buildEmpty();
-                final totalPages =
-                    (filtered.length / _pageSize).ceil().clamp(1, 9999);
+                final totalPages = (filtered.length / pageSize).ceil().clamp(
+                  1,
+                  9999,
+                );
                 final safePage = _currentPage.clamp(1, totalPages);
-                final start = (safePage - 1) * _pageSize;
-                final end =
-                    (start + _pageSize).clamp(0, filtered.length);
+                final start = (safePage - 1) * pageSize;
+                final end = (start + pageSize).clamp(0, filtered.length);
                 final pageItems = filtered.sublist(start, end);
                 return Column(
                   children: [
@@ -108,16 +110,14 @@ class _ApInvoiceListPageState extends ConsumerState<ApInvoiceListPage> {
                     PaginationBar(
                       currentPage: safePage,
                       totalItems: filtered.length,
-                      pageSize: _pageSize,
-                      onPageChanged: (p) =>
-                          setState(() => _currentPage = p),
+                      pageSize: pageSize,
+                      onPageChanged: (p) => setState(() => _currentPage = p),
                       trailing: PdfReportButton(
                         emptyMessage: 'ไม่มีข้อมูลใบแจ้งหนี้',
                         title: 'รายงานใบแจ้งหนี้ค้างชำระ',
                         filename: () =>
                             PdfFilename.generate('ap_invoice_report'),
-                        buildPdf: () =>
-                            ApInvoicePdfBuilder.build(filtered),
+                        buildPdf: () => ApInvoicePdfBuilder.build(filtered),
                         hasData: filtered.isNotEmpty,
                       ),
                     ),
@@ -134,18 +134,18 @@ class _ApInvoiceListPageState extends ConsumerState<ApInvoiceListPage> {
   // ─────────────────────────────────────────────────────────────
   // Summary Bar + Status Filter
   // ─────────────────────────────────────────────────────────────
-  Widget _buildSummaryBar(
-      AsyncValue<List<ApInvoiceModel>> invoicesAsync) {
+  Widget _buildSummaryBar(AsyncValue<List<ApInvoiceModel>> invoicesAsync) {
     return invoicesAsync.maybeWhen(
       data: (all) {
         final filtered = _filter(all);
         final isDark = Theme.of(context).brightness == Brightness.dark;
         final fmt = NumberFormat('#,##0.00', 'th_TH');
-        final totalRemaining =
-            filtered.fold<double>(0, (s, i) => s + i.remainingAmount);
+        final totalRemaining = filtered.fold<double>(
+          0,
+          (s, i) => s + i.remainingAmount,
+        );
 
-        int countByStatus(String s) =>
-            all.where((i) => i.status == s).length;
+        int countByStatus(String s) => all.where((i) => i.status == s).length;
         final overdueCount = all.where((i) => i.isOverdue).length;
 
         return Container(
@@ -268,54 +268,57 @@ class _ApInvoiceListPageState extends ConsumerState<ApInvoiceListPage> {
       children: [
         // Header row
         Container(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           color: isDark ? AppTheme.darkElement : AppTheme.headerBg,
           child: Row(
             children: [
               const SizedBox(width: 14),
               Expanded(
                 flex: 3,
-                child: Text('เลขที่ / ซัพพลายเออร์',
-                    style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: isDark
-                            ? const Color(0xFFAAAAAA)
-                            : AppTheme.textSub)),
+                child: Text(
+                  'เลขที่ / ซัพพลายเออร์',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? const Color(0xFFAAAAAA) : AppTheme.textSub,
+                  ),
+                ),
               ),
               SizedBox(
                 width: 68,
-                child: Text('ครบกำหนด',
-                    style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: isDark
-                            ? const Color(0xFFAAAAAA)
-                            : AppTheme.textSub),
-                    textAlign: TextAlign.center),
+                child: Text(
+                  'ครบกำหนด',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? const Color(0xFFAAAAAA) : AppTheme.textSub,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
               ),
               SizedBox(
                 width: 76,
-                child: Text('สถานะ',
-                    style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: isDark
-                            ? const Color(0xFFAAAAAA)
-                            : AppTheme.textSub),
-                    textAlign: TextAlign.center),
+                child: Text(
+                  'สถานะ',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? const Color(0xFFAAAAAA) : AppTheme.textSub,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
               ),
               SizedBox(
                 width: 90,
-                child: Text('ค้างชำระ',
-                    style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: isDark
-                            ? const Color(0xFFAAAAAA)
-                            : AppTheme.textSub),
-                    textAlign: TextAlign.right),
+                child: Text(
+                  'ค้างชำระ',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? const Color(0xFFAAAAAA) : AppTheme.textSub,
+                  ),
+                  textAlign: TextAlign.right,
+                ),
               ),
             ],
           ),
@@ -331,13 +334,15 @@ class _ApInvoiceListPageState extends ConsumerState<ApInvoiceListPage> {
                 onTap: () => _openForm(inv),
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 10),
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
                     color: isEven
                         ? (isDark ? AppTheme.darkCard : Colors.white)
                         : (isDark
-                            ? AppTheme.darkElement
-                            : const Color(0xFFF9F9F9)),
+                              ? AppTheme.darkElement
+                              : const Color(0xFFF9F9F9)),
                     border: Border(
                       bottom: BorderSide(
                         color: isDark
@@ -386,19 +391,24 @@ class _ApInvoiceListPageState extends ConsumerState<ApInvoiceListPage> {
                                       const SizedBox(width: 4),
                                       Container(
                                         padding: const EdgeInsets.symmetric(
-                                            horizontal: 5, vertical: 1),
+                                          horizontal: 5,
+                                          vertical: 1,
+                                        ),
                                         decoration: BoxDecoration(
-                                          color: AppTheme.error
-                                              .withValues(alpha: 0.12),
-                                          borderRadius:
-                                              BorderRadius.circular(4),
+                                          color: AppTheme.error.withValues(
+                                            alpha: 0.12,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            4,
+                                          ),
                                         ),
                                         child: const Text(
                                           'เลยกำหนด',
                                           style: TextStyle(
-                                              fontSize: 9,
-                                              fontWeight: FontWeight.w600,
-                                              color: AppTheme.error),
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.w600,
+                                            color: AppTheme.error,
+                                          ),
                                         ),
                                       ),
                                     ],
@@ -421,24 +431,22 @@ class _ApInvoiceListPageState extends ConsumerState<ApInvoiceListPage> {
                             width: 68,
                             child: Text(
                               inv.dueDate != null
-                                  ? DateFormat('dd/MM/yy')
-                                      .format(inv.dueDate!)
+                                  ? DateFormat('dd/MM/yy').format(inv.dueDate!)
                                   : '-',
                               style: TextStyle(
                                 fontSize: 11,
                                 color: inv.isOverdue
                                     ? AppTheme.error
                                     : (isDark
-                                        ? const Color(0xFFAAAAAA)
-                                        : AppTheme.textSub),
+                                          ? const Color(0xFFAAAAAA)
+                                          : AppTheme.textSub),
                               ),
                               textAlign: TextAlign.center,
                             ),
                           ),
                           SizedBox(
                             width: 76,
-                            child: Center(
-                                child: _buildStatusBadge(inv.status)),
+                            child: Center(child: _buildStatusBadge(inv.status)),
                           ),
                           SizedBox(
                             width: 90,
@@ -472,15 +480,17 @@ class _ApInvoiceListPageState extends ConsumerState<ApInvoiceListPage> {
                                   style: OutlinedButton.styleFrom(
                                     foregroundColor: AppTheme.error,
                                     side: const BorderSide(
-                                        color: AppTheme.error),
+                                      color: AppTheme.error,
+                                    ),
                                     padding: EdgeInsets.zero,
                                     shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(8)),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
                                   ),
                                   child: const Icon(
-                                      Icons.delete_outline,
-                                      size: 18),
+                                    Icons.delete_outline,
+                                    size: 18,
+                                  ),
                                 ),
                               ),
                               const SizedBox(width: 8),
@@ -491,17 +501,20 @@ class _ApInvoiceListPageState extends ConsumerState<ApInvoiceListPage> {
                               child: ElevatedButton.icon(
                                 onPressed: () => _openForm(inv),
                                 icon: const Icon(Icons.payment, size: 14),
-                                label: const Text('บันทึกชำระ',
-                                    style: TextStyle(fontSize: 12)),
+                                label: const Text(
+                                  'บันทึกชำระ',
+                                  style: TextStyle(fontSize: 12),
+                                ),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: AppTheme.info,
                                   foregroundColor: Colors.white,
                                   elevation: 0,
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 8),
+                                    horizontal: 8,
+                                  ),
                                   shape: RoundedRectangleBorder(
-                                      borderRadius:
-                                          BorderRadius.circular(8)),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
                                 ),
                               ),
                             ),
@@ -524,10 +537,14 @@ class _ApInvoiceListPageState extends ConsumerState<ApInvoiceListPage> {
   // ─────────────────────────────────────────────────────────────
   Color _getStatusColor(String status) {
     switch (status) {
-      case 'UNPAID':  return AppTheme.error;
-      case 'PARTIAL': return AppTheme.warning;
-      case 'PAID':    return AppTheme.success;
-      default:        return AppTheme.textSub;
+      case 'UNPAID':
+        return AppTheme.error;
+      case 'PARTIAL':
+        return AppTheme.warning;
+      case 'PAID':
+        return AppTheme.success;
+      default:
+        return AppTheme.textSub;
     }
   }
 
@@ -535,10 +552,17 @@ class _ApInvoiceListPageState extends ConsumerState<ApInvoiceListPage> {
     final color = _getStatusColor(status);
     String label;
     switch (status) {
-      case 'UNPAID':  label = 'ยังไม่จ่าย'; break;
-      case 'PARTIAL': label = 'บางส่วน'; break;
-      case 'PAID':    label = 'จ่ายแล้ว'; break;
-      default:        label = status;
+      case 'UNPAID':
+        label = 'ยังไม่จ่าย';
+        break;
+      case 'PARTIAL':
+        label = 'บางส่วน';
+        break;
+      case 'PAID':
+        label = 'จ่ายแล้ว';
+        break;
+      default:
+        label = status;
     }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
@@ -549,7 +573,10 @@ class _ApInvoiceListPageState extends ConsumerState<ApInvoiceListPage> {
       child: Text(
         label,
         style: TextStyle(
-            fontSize: 10, fontWeight: FontWeight.w600, color: color),
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
       ),
     );
   }
@@ -573,19 +600,17 @@ class _ApInvoiceListPageState extends ConsumerState<ApInvoiceListPage> {
                 ? 'ยังไม่มีใบแจ้งหนี้'
                 : 'ไม่พบใบแจ้งหนี้ "$_searchQuery"',
             style: TextStyle(
-                color: isDark
-                    ? const Color(0xFF888888)
-                    : Colors.grey[500]),
+              color: isDark ? const Color(0xFF888888) : Colors.grey[500],
+            ),
           ),
           if (_searchQuery.isEmpty) ...[
             const SizedBox(height: 4),
             Text(
               'กดปุ่ม + เพื่อสร้างใบแจ้งหนี้ใหม่',
               style: TextStyle(
-                  fontSize: 12,
-                  color: isDark
-                      ? const Color(0xFF666666)
-                      : Colors.grey[400]),
+                fontSize: 12,
+                color: isDark ? const Color(0xFF666666) : Colors.grey[400],
+              ),
             ),
           ],
         ],
@@ -594,22 +619,20 @@ class _ApInvoiceListPageState extends ConsumerState<ApInvoiceListPage> {
   }
 
   Widget _buildError(Object e) => Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline,
-                size: 72, color: AppTheme.error),
-            const SizedBox(height: 12),
-            Text('เกิดข้อผิดพลาด: $e'),
-            const SizedBox(height: 12),
-            ElevatedButton(
-              onPressed: () =>
-                  ref.read(apInvoiceListProvider.notifier).refresh(),
-              child: const Text('ลองใหม่'),
-            ),
-          ],
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Icon(Icons.error_outline, size: 72, color: AppTheme.error),
+        const SizedBox(height: 12),
+        Text('เกิดข้อผิดพลาด: $e'),
+        const SizedBox(height: 12),
+        ElevatedButton(
+          onPressed: () => ref.read(apInvoiceListProvider.notifier).refresh(),
+          child: const Text('ลองใหม่'),
         ),
-      );
+      ],
+    ),
+  );
 
   // ─────────────────────────────────────────────────────────────
   // Actions
@@ -617,8 +640,7 @@ class _ApInvoiceListPageState extends ConsumerState<ApInvoiceListPage> {
   void _openForm(ApInvoiceModel invoice) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-          builder: (_) => ApInvoiceFormPage(invoice: invoice)),
+      MaterialPageRoute(builder: (_) => ApInvoiceFormPage(invoice: invoice)),
     ).then((_) => ref.read(apInvoiceListProvider.notifier).refresh());
   }
 
@@ -628,8 +650,7 @@ class _ApInvoiceListPageState extends ConsumerState<ApInvoiceListPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         title: Row(
           children: [
             Container(
@@ -638,31 +659,36 @@ class _ApInvoiceListPageState extends ConsumerState<ApInvoiceListPage> {
                 color: AppTheme.error.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(Icons.delete_outline,
-                  size: 18, color: AppTheme.error),
+              child: const Icon(
+                Icons.delete_outline,
+                size: 18,
+                color: AppTheme.error,
+              ),
             ),
             const SizedBox(width: 10),
-            Text('ยืนยันการลบ',
-                style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: isDark
-                        ? Colors.white
-                        : const Color(0xFF1A1A1A))),
+            Text(
+              'ยืนยันการลบ',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+              ),
+            ),
           ],
         ),
         content: Text(
-            'ต้องการลบใบแจ้งหนี้ ${invoice.invoiceNo} ออกจากระบบ?',
-            style: TextStyle(
-                color: isDark ? Colors.white70 : Colors.black87)),
+          'ต้องการลบใบแจ้งหนี้ ${invoice.invoiceNo} ออกจากระบบ?',
+          style: TextStyle(color: isDark ? Colors.white70 : Colors.black87),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: Text('ยกเลิก',
-                style: TextStyle(
-                    color: isDark
-                        ? Colors.white60
-                        : AppTheme.textSub)),
+            child: Text(
+              'ยกเลิก',
+              style: TextStyle(
+                color: isDark ? Colors.white60 : AppTheme.textSub,
+              ),
+            ),
           ),
           ElevatedButton.icon(
             icon: const Icon(Icons.delete_forever, size: 16),
@@ -671,7 +697,8 @@ class _ApInvoiceListPageState extends ConsumerState<ApInvoiceListPage> {
               backgroundColor: AppTheme.error,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
+                borderRadius: BorderRadius.circular(8),
+              ),
               elevation: 0,
             ),
             onPressed: () => Navigator.pop(ctx, true),
@@ -687,13 +714,13 @@ class _ApInvoiceListPageState extends ConsumerState<ApInvoiceListPage> {
         .deleteInvoice(invoice.invoiceId);
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(success
-          ? 'ลบใบแจ้งหนี้สำเร็จ'
-          : 'ลบใบแจ้งหนี้ไม่สำเร็จ'),
-      backgroundColor: success ? AppTheme.success : AppTheme.error,
-      behavior: SnackBarBehavior.floating,
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(success ? 'ลบใบแจ้งหนี้สำเร็จ' : 'ลบใบแจ้งหนี้ไม่สำเร็จ'),
+        backgroundColor: success ? AppTheme.success : AppTheme.error,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 }
 
@@ -713,19 +740,27 @@ class _APCard extends StatelessWidget {
 
   Color get _statusColor {
     switch (invoice.status) {
-      case 'UNPAID':  return AppTheme.error;
-      case 'PARTIAL': return AppTheme.warning;
-      case 'PAID':    return AppTheme.success;
-      default:        return AppTheme.textSub;
+      case 'UNPAID':
+        return AppTheme.error;
+      case 'PARTIAL':
+        return AppTheme.warning;
+      case 'PAID':
+        return AppTheme.success;
+      default:
+        return AppTheme.textSub;
     }
   }
 
   String get _statusLabel {
     switch (invoice.status) {
-      case 'UNPAID':  return 'ยังไม่จ่าย';
-      case 'PARTIAL': return 'จ่ายบางส่วน';
-      case 'PAID':    return 'จ่ายครบแล้ว';
-      default:        return invoice.status;
+      case 'UNPAID':
+        return 'ยังไม่จ่าย';
+      case 'PARTIAL':
+        return 'จ่ายบางส่วน';
+      case 'PAID':
+        return 'จ่ายครบแล้ว';
+      default:
+        return invoice.status;
     }
   }
 
@@ -735,8 +770,12 @@ class _APCard extends StatelessWidget {
     final fmt = NumberFormat('#,##0.00', 'th_TH');
 
     final colors = [
-      AppTheme.error, AppTheme.warning, AppTheme.info,
-      AppTheme.primary, AppTheme.purpleColor, AppTheme.tealColor,
+      AppTheme.error,
+      AppTheme.warning,
+      AppTheme.info,
+      AppTheme.primary,
+      AppTheme.purpleColor,
+      AppTheme.tealColor,
     ];
     final name = invoice.supplierName;
     final avatarColor = colors[name.codeUnitAt(0) % colors.length];
@@ -747,11 +786,10 @@ class _APCard extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
         side: BorderSide(
-            color: invoice.isOverdue
-                ? AppTheme.error.withValues(alpha: 0.35)
-                : (isDark
-                    ? const Color(0xFF333333)
-                    : AppTheme.border)),
+          color: invoice.isOverdue
+              ? AppTheme.error.withValues(alpha: 0.35)
+              : (isDark ? const Color(0xFF333333) : AppTheme.border),
+        ),
       ),
       color: isDark ? AppTheme.darkCard : Colors.white,
       child: InkWell(
@@ -769,11 +807,14 @@ class _APCard extends StatelessWidget {
                   CircleAvatar(
                     radius: 20,
                     backgroundColor: avatarColor,
-                    child: Text(initial,
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold)),
+                    child: Text(
+                      initial,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -783,20 +824,22 @@ class _APCard extends StatelessWidget {
                         Text(
                           invoice.invoiceNo,
                           style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: isDark
-                                  ? Colors.white
-                                  : const Color(0xFF1A1A1A)),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: isDark
+                                ? Colors.white
+                                : const Color(0xFF1A1A1A),
+                          ),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           invoice.supplierName,
                           style: TextStyle(
-                              fontSize: 12,
-                              color: isDark
-                                  ? const Color(0xFFAAAAAA)
-                                  : AppTheme.textSub),
+                            fontSize: 12,
+                            color: isDark
+                                ? const Color(0xFFAAAAAA)
+                                : AppTheme.textSub,
+                          ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ],
@@ -805,12 +848,10 @@ class _APCard extends StatelessWidget {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      _StatusBadge(
-                          label: _statusLabel, color: _statusColor),
+                      _StatusBadge(label: _statusLabel, color: _statusColor),
                       if (invoice.isOverdue) ...[
                         const SizedBox(height: 4),
-                        _StatusBadge(
-                            label: 'เลยกำหนด', color: AppTheme.error),
+                        _StatusBadge(label: 'เลยกำหนด', color: AppTheme.error),
                       ],
                     ],
                   ),
@@ -819,10 +860,9 @@ class _APCard extends StatelessWidget {
 
               const SizedBox(height: 10),
               Divider(
-                  height: 1,
-                  color: isDark
-                      ? const Color(0xFF2C2C2C)
-                      : AppTheme.border),
+                height: 1,
+                color: isDark ? const Color(0xFF2C2C2C) : AppTheme.border,
+              ),
               const SizedBox(height: 10),
 
               // ── Row 2: Dates ────────────────────────────────────
@@ -831,8 +871,9 @@ class _APCard extends StatelessWidget {
                   Expanded(
                     child: _InfoChip(
                       icon: Icons.calendar_today_outlined,
-                      text: DateFormat('dd/MM/yyyy')
-                          .format(invoice.invoiceDate),
+                      text: DateFormat(
+                        'dd/MM/yyyy',
+                      ).format(invoice.invoiceDate),
                       isDark: isDark,
                     ),
                   ),
@@ -905,15 +946,13 @@ class _APCard extends StatelessWidget {
                           onPressed: onDelete,
                           style: OutlinedButton.styleFrom(
                             foregroundColor: AppTheme.error,
-                            side:
-                                const BorderSide(color: AppTheme.error),
+                            side: const BorderSide(color: AppTheme.error),
                             padding: EdgeInsets.zero,
                             shape: RoundedRectangleBorder(
-                                borderRadius:
-                                    BorderRadius.circular(8)),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
                           ),
-                          child: const Icon(Icons.delete_outline,
-                              size: 18),
+                          child: const Icon(Icons.delete_outline, size: 18),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -924,16 +963,18 @@ class _APCard extends StatelessWidget {
                       child: ElevatedButton.icon(
                         onPressed: onTap,
                         icon: const Icon(Icons.payment, size: 14),
-                        label: const Text('บันทึกชำระ',
-                            style: TextStyle(fontSize: 12)),
+                        label: const Text(
+                          'บันทึกชำระ',
+                          style: TextStyle(fontSize: 12),
+                        ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppTheme.info,
                           foregroundColor: Colors.white,
                           elevation: 0,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
                           shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8)),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
                       ),
                     ),
@@ -989,22 +1030,19 @@ class _APListTopBar extends StatelessWidget {
     );
   }
 
-  Widget _buildSingleRow(
-      BuildContext context, bool canPop, bool isDark) {
+  Widget _buildSingleRow(BuildContext context, bool canPop, bool isDark) {
     return Row(
       children: [
-        if (canPop) ...[
-          _APBackBtn(isDark: isDark),
-          const SizedBox(width: 10),
-        ],
+        if (canPop) ...[_APBackBtn(isDark: isDark), const SizedBox(width: 10)],
         _APPageIcon(),
         const SizedBox(width: 10),
         Text(
           'ใบแจ้งหนี้ค้างชำระ',
           style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: isDark ? Colors.white : const Color(0xFF1A1A1A)),
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+          ),
         ),
         const Spacer(),
         ConstrainedBox(
@@ -1039,8 +1077,7 @@ class _APListTopBar extends StatelessWidget {
     );
   }
 
-  Widget _buildDoubleRow(
-      BuildContext context, bool canPop, bool isDark) {
+  Widget _buildDoubleRow(BuildContext context, bool canPop, bool isDark) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1056,11 +1093,10 @@ class _APListTopBar extends StatelessWidget {
               child: Text(
                 'ใบแจ้งหนี้ค้างชำระ',
                 style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: isDark
-                        ? Colors.white
-                        : const Color(0xFF1A1A1A)),
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+                ),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -1103,39 +1139,40 @@ class _APBackBtn extends StatelessWidget {
   const _APBackBtn({required this.isDark});
   @override
   Widget build(BuildContext context) => InkWell(
-        onTap: () => Navigator.of(context).pop(),
+    onTap: () => Navigator.of(context).pop(),
+    borderRadius: BorderRadius.circular(8),
+    child: Container(
+      padding: const EdgeInsets.all(7),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkElement : const Color(0xFFF5F5F5),
         borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.all(7),
-          decoration: BoxDecoration(
-            color:
-                isDark ? AppTheme.darkElement : const Color(0xFFF5F5F5),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-                color: isDark
-                    ? const Color(0xFF333333)
-                    : AppTheme.border),
-          ),
-          child: Icon(Icons.arrow_back_ios_new,
-              size: 15,
-              color: isDark
-                  ? const Color(0xFFAAAAAA)
-                  : const Color(0xFF8A8A8A)),
+        border: Border.all(
+          color: isDark ? const Color(0xFF333333) : AppTheme.border,
         ),
-      );
+      ),
+      child: Icon(
+        Icons.arrow_back_ios_new,
+        size: 15,
+        color: isDark ? const Color(0xFFAAAAAA) : const Color(0xFF8A8A8A),
+      ),
+    ),
+  );
 }
 
 class _APPageIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(7),
-        decoration: BoxDecoration(
-          color: AppTheme.error.withValues(alpha: 0.10),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: const Icon(Icons.receipt_long_outlined,
-            color: AppTheme.error, size: 18),
-      );
+    padding: const EdgeInsets.all(7),
+    decoration: BoxDecoration(
+      color: AppTheme.error.withValues(alpha: 0.10),
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child: const Icon(
+      Icons.receipt_long_outlined,
+      color: AppTheme.error,
+      size: 18,
+    ),
+  );
 }
 
 class _APSearchField extends StatelessWidget {
@@ -1155,53 +1192,53 @@ class _APSearchField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SizedBox(
-        height: 38,
-        child: TextField(
-          controller: controller,
-          style: TextStyle(
-              fontSize: 13,
-              color: isDark ? Colors.white : const Color(0xFF1A1A1A)),
-          decoration: InputDecoration(
-            hintText: 'ค้นหาเลขที่ใบแจ้งหนี้, ซัพพลายเออร์...',
-            hintStyle: TextStyle(
-                fontSize: 13,
-                color: isDark
-                    ? const Color(0xFF666666)
-                    : const Color(0xFF8A8A8A)),
-            prefixIcon: Icon(Icons.search,
-                size: 17,
-                color: isDark
-                    ? const Color(0xFF666666)
-                    : const Color(0xFF8A8A8A)),
-            suffixIcon: query.isNotEmpty
-                ? IconButton(
-                    icon: const Icon(Icons.clear, size: 15),
-                    onPressed: onCleared,
-                  )
-                : null,
-            contentPadding: EdgeInsets.zero,
-            border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(
-                    color: isDark
-                        ? const Color(0xFF333333)
-                        : const Color(0xFFE0E0E0))),
-            enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(
-                    color: isDark
-                        ? const Color(0xFF333333)
-                        : const Color(0xFFE0E0E0))),
-            focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(
-                    color: AppTheme.error, width: 1.5)),
-            filled: true,
-            fillColor: isDark ? AppTheme.darkElement : Colors.white,
-          ),
-          onChanged: onChanged,
+    height: 38,
+    child: TextField(
+      controller: controller,
+      style: TextStyle(
+        fontSize: 13,
+        color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+      ),
+      decoration: InputDecoration(
+        hintText: 'ค้นหาเลขที่ใบแจ้งหนี้, ซัพพลายเออร์...',
+        hintStyle: TextStyle(
+          fontSize: 13,
+          color: isDark ? const Color(0xFF666666) : const Color(0xFF8A8A8A),
         ),
-      );
+        prefixIcon: Icon(
+          Icons.search,
+          size: 17,
+          color: isDark ? const Color(0xFF666666) : const Color(0xFF8A8A8A),
+        ),
+        suffixIcon: query.isNotEmpty
+            ? IconButton(
+                icon: const Icon(Icons.clear, size: 15),
+                onPressed: onCleared,
+              )
+            : null,
+        contentPadding: EdgeInsets.zero,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(
+            color: isDark ? const Color(0xFF333333) : const Color(0xFFE0E0E0),
+          ),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(
+            color: isDark ? const Color(0xFF333333) : const Color(0xFFE0E0E0),
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: AppTheme.error, width: 1.5),
+        ),
+        filled: true,
+        fillColor: isDark ? AppTheme.darkElement : Colors.white,
+      ),
+      onChanged: onChanged,
+    ),
+  );
 }
 
 class _APIconBtn extends StatelessWidget {
@@ -1219,30 +1256,27 @@ class _APIconBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Tooltip(
-        message: tooltip,
-        child: InkWell(
-          onTap: onTap,
+    message: tooltip,
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.all(7),
+        decoration: BoxDecoration(
+          color: isDark ? AppTheme.darkElement : const Color(0xFFF5F5F5),
           borderRadius: BorderRadius.circular(8),
-          child: Container(
-            padding: const EdgeInsets.all(7),
-            decoration: BoxDecoration(
-              color: isDark
-                  ? AppTheme.darkElement
-                  : const Color(0xFFF5F5F5),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                  color: isDark
-                      ? const Color(0xFF333333)
-                      : AppTheme.border),
-            ),
-            child: Icon(icon,
-                size: 17,
-                color: isDark
-                    ? const Color(0xFFAAAAAA)
-                    : const Color(0xFF8A8A8A)),
+          border: Border.all(
+            color: isDark ? const Color(0xFF333333) : AppTheme.border,
           ),
         ),
-      );
+        child: Icon(
+          icon,
+          size: 17,
+          color: isDark ? const Color(0xFFAAAAAA) : const Color(0xFF8A8A8A),
+        ),
+      ),
+    ),
+  );
 }
 
 class _APAddBtn extends StatelessWidget {
@@ -1251,25 +1285,27 @@ class _APAddBtn extends StatelessWidget {
   const _APAddBtn({required this.onTap, this.compact = false});
   @override
   Widget build(BuildContext context) => ElevatedButton.icon(
-        onPressed: onTap,
-        icon: const Icon(Icons.add, size: 18),
-        label: compact
-            ? const SizedBox.shrink()
-            : const Text('สร้างใบแจ้งหนี้',
-                style: TextStyle(
-                    fontSize: 13, fontWeight: FontWeight.w600)),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppTheme.error,
-          foregroundColor: Colors.white,
-          padding: EdgeInsets.symmetric(
-              horizontal: compact ? 12 : 16, vertical: 13),
-          minimumSize: Size.zero,
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8)),
-          elevation: 0,
-        ),
-      );
+    onPressed: onTap,
+    icon: const Icon(Icons.add, size: 18),
+    label: compact
+        ? const SizedBox.shrink()
+        : const Text(
+            'สร้างใบแจ้งหนี้',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          ),
+    style: ElevatedButton.styleFrom(
+      backgroundColor: AppTheme.error,
+      foregroundColor: Colors.white,
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 12 : 16,
+        vertical: 13,
+      ),
+      minimumSize: Size.zero,
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      elevation: 0,
+    ),
+  );
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -1282,30 +1318,31 @@ class _StatusBadge extends StatelessWidget {
   const _StatusBadge({required this.label, required this.color});
   @override
   Widget build(BuildContext context) => Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(10),
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(10),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 5,
+          height: 5,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 5,
-              height: 5,
-              decoration: BoxDecoration(
-                  color: color, shape: BoxShape.circle),
-            ),
-            const SizedBox(width: 4),
-            Text(label,
-                style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: color)),
-          ],
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            color: color,
+          ),
         ),
-      );
+      ],
+    ),
+  );
 }
 
 class _InfoChip extends StatelessWidget {
@@ -1313,23 +1350,25 @@ class _InfoChip extends StatelessWidget {
   final String text;
   final bool isDark;
   final Color? color;
-  const _InfoChip(
-      {required this.icon,
-      required this.text,
-      required this.isDark,
-      this.color});
+  const _InfoChip({
+    required this.icon,
+    required this.text,
+    required this.isDark,
+    this.color,
+  });
   @override
   Widget build(BuildContext context) {
-    final c =
-        color ?? (isDark ? const Color(0xFFAAAAAA) : AppTheme.textSub);
+    final c = color ?? (isDark ? const Color(0xFFAAAAAA) : AppTheme.textSub);
     return Row(
       children: [
         Icon(icon, size: 13, color: c),
         const SizedBox(width: 4),
         Expanded(
-          child: Text(text,
-              style: TextStyle(fontSize: 11, color: c),
-              overflow: TextOverflow.ellipsis),
+          child: Text(
+            text,
+            style: TextStyle(fontSize: 11, color: c),
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
       ],
     );
@@ -1349,17 +1388,19 @@ class _AmountTile extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label,
-              style: TextStyle(fontSize: 10, color: labelColor)),
-          Text(value,
-              style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: valueColor)),
-        ],
-      );
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(label, style: TextStyle(fontSize: 10, color: labelColor)),
+      Text(
+        value,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          color: valueColor,
+        ),
+      ),
+    ],
+  );
 }
 
 class _APFilterChip extends StatelessWidget {
@@ -1398,41 +1439,39 @@ class _APFilterChip extends StatelessWidget {
       return GestureDetector(
         onTap: onTap,
         child: Container(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(
-            color:
-                isDark ? AppTheme.darkElement : const Color(0xFFF5F5F5),
+            color: isDark ? AppTheme.darkElement : const Color(0xFFF5F5F5),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-                color: isDark
-                    ? const Color(0xFF4A4A4A)
-                    : AppTheme.border),
+              color: isDark ? const Color(0xFF4A4A4A) : AppTheme.border,
+            ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(label,
-                  style: TextStyle(
-                      fontSize: 12,
-                      color: isDark
-                          ? Colors.white70
-                          : AppTheme.textSub)),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isDark ? Colors.white70 : AppTheme.textSub,
+                ),
+              ),
               const SizedBox(width: 5),
               Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 5, vertical: 1),
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                 decoration: BoxDecoration(
-                  color: isDark
-                      ? const Color(0xFF5A5A5A)
-                      : AppTheme.textSub,
+                  color: isDark ? const Color(0xFF5A5A5A) : AppTheme.textSub,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Text('$count',
-                    style: const TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white)),
+                child: Text(
+                  '$count',
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
               ),
             ],
           ),
@@ -1444,8 +1483,7 @@ class _APFilterChip extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        padding:
-            const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
           color: vc.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(20),
@@ -1454,23 +1492,29 @@ class _APFilterChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(label,
-                style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: vc)),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: vc,
+              ),
+            ),
             const SizedBox(width: 5),
             Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 5, vertical: 1),
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
               decoration: BoxDecoration(
-                  color: vc,
-                  borderRadius: BorderRadius.circular(10)),
-              child: Text('$count',
-                  style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white)),
+                color: vc,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '$count',
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
             ),
           ],
         ),
@@ -1494,8 +1538,7 @@ class _APValueStat extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      padding:
-          const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(8),
@@ -1504,17 +1547,21 @@ class _APValueStat extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label,
-              style: TextStyle(
-                  fontSize: 10,
-                  color: isDark
-                      ? const Color(0xFFAAAAAA)
-                      : AppTheme.textSub)),
-          Text(value,
-              style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: color)),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              color: isDark ? const Color(0xFFAAAAAA) : AppTheme.textSub,
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
         ],
       ),
     );

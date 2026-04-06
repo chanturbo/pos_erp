@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
 import 'package:pos_erp/shared/widgets/pagination_bar.dart';
 import 'package:pos_erp/shared/pdf/pdf_report_button.dart';
+import '../../../settings/presentation/pages/settings_page.dart';
 import '../providers/ap_payment_provider.dart';
 import '../../data/models/ap_payment_model.dart';
 import 'ap_payment_form_page.dart';
@@ -22,7 +23,6 @@ class _ApPaymentListPageState extends ConsumerState<ApPaymentListPage> {
   String _methodFilter = 'ALL';
   bool _isCardView = false;
   int _currentPage = 1;
-  static const int _pageSize = 20;
 
   @override
   void dispose() {
@@ -34,18 +34,18 @@ class _ApPaymentListPageState extends ConsumerState<ApPaymentListPage> {
     return src.where((p) {
       final matchSearch =
           p.paymentNo.toLowerCase().contains(_searchQuery) ||
-              p.supplierName.toLowerCase().contains(_searchQuery);
+          p.supplierName.toLowerCase().contains(_searchQuery);
       final matchMethod =
           _methodFilter == 'ALL' || p.paymentMethod == _methodFilter;
       return matchSearch && matchMethod;
-    }).toList()
-      ..sort((a, b) => b.paymentDate.compareTo(a.paymentDate));
+    }).toList()..sort((a, b) => b.paymentDate.compareTo(a.paymentDate));
   }
 
   // ─────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     final paymentsAsync = ref.watch(apPaymentListProvider);
+    final pageSize = ref.watch(settingsProvider).listPageSize;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
@@ -56,39 +56,41 @@ class _ApPaymentListPageState extends ConsumerState<ApPaymentListPage> {
             searchController: _searchController,
             searchQuery: _searchQuery,
             isCardView: _isCardView,
-            onSearchChanged: (v) => setState(
-                () { _searchQuery = v.toLowerCase(); _currentPage = 1; }),
+            onSearchChanged: (v) => setState(() {
+              _searchQuery = v.toLowerCase();
+              _currentPage = 1;
+            }),
             onSearchCleared: () {
               _searchController.clear();
-              setState(() { _searchQuery = ''; _currentPage = 1; });
+              setState(() {
+                _searchQuery = '';
+                _currentPage = 1;
+              });
             },
             onToggleView: () => setState(() => _isCardView = !_isCardView),
-            onRefresh: () =>
-                ref.read(apPaymentListProvider.notifier).refresh(),
+            onRefresh: () => ref.read(apPaymentListProvider.notifier).refresh(),
             onAdd: () => Navigator.push(
               context,
-              MaterialPageRoute(
-                  builder: (_) => const ApPaymentFormPage()),
-            ).then((_) =>
-                ref.read(apPaymentListProvider.notifier).refresh()),
+              MaterialPageRoute(builder: (_) => const ApPaymentFormPage()),
+            ).then((_) => ref.read(apPaymentListProvider.notifier).refresh()),
           ),
 
           _buildSummaryBar(paymentsAsync),
 
           Expanded(
             child: paymentsAsync.when(
-              loading: () =>
-                  const Center(child: CircularProgressIndicator()),
+              loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => _buildError(e),
               data: (payments) {
                 final filtered = _filter(payments);
                 if (filtered.isEmpty) return _buildEmpty();
-                final totalPages =
-                    (filtered.length / _pageSize).ceil().clamp(1, 9999);
+                final totalPages = (filtered.length / pageSize).ceil().clamp(
+                  1,
+                  9999,
+                );
                 final safePage = _currentPage.clamp(1, totalPages);
-                final start = (safePage - 1) * _pageSize;
-                final end =
-                    (start + _pageSize).clamp(0, filtered.length);
+                final start = (safePage - 1) * pageSize;
+                final end = (start + pageSize).clamp(0, filtered.length);
                 final pageItems = filtered.sublist(start, end);
                 return Column(
                   children: [
@@ -100,16 +102,14 @@ class _ApPaymentListPageState extends ConsumerState<ApPaymentListPage> {
                     PaginationBar(
                       currentPage: safePage,
                       totalItems: filtered.length,
-                      pageSize: _pageSize,
-                      onPageChanged: (p) =>
-                          setState(() => _currentPage = p),
+                      pageSize: pageSize,
+                      onPageChanged: (p) => setState(() => _currentPage = p),
                       trailing: PdfReportButton(
                         emptyMessage: 'ไม่มีข้อมูลการจ่ายเงิน',
                         title: 'รายงานการจ่ายเงิน',
                         filename: () =>
                             PdfFilename.generate('ap_payment_report'),
-                        buildPdf: () =>
-                            ApPaymentPdfBuilder.build(filtered),
+                        buildPdf: () => ApPaymentPdfBuilder.build(filtered),
                         hasData: filtered.isNotEmpty,
                       ),
                     ),
@@ -130,8 +130,7 @@ class _ApPaymentListPageState extends ConsumerState<ApPaymentListPage> {
         final filtered = _filter(all);
         final isDark = Theme.of(context).brightness == Brightness.dark;
         final fmt = NumberFormat('#,##0.00', 'th_TH');
-        final totalAmt =
-            filtered.fold<double>(0, (s, p) => s + p.totalAmount);
+        final totalAmt = filtered.fold<double>(0, (s, p) => s + p.totalAmount);
 
         int countMethod(String m) =>
             all.where((p) => p.paymentMethod == m).length;
@@ -152,7 +151,8 @@ class _ApPaymentListPageState extends ConsumerState<ApPaymentListPage> {
                       color: AppTheme.tealColor,
                       selected: _methodFilter == 'ALL',
                       onTap: () => setState(() {
-                        _methodFilter = 'ALL'; _currentPage = 1;
+                        _methodFilter = 'ALL';
+                        _currentPage = 1;
                       }),
                     ),
                     const SizedBox(width: 6),
@@ -162,7 +162,8 @@ class _ApPaymentListPageState extends ConsumerState<ApPaymentListPage> {
                       color: AppTheme.success,
                       selected: _methodFilter == 'CASH',
                       onTap: () => setState(() {
-                        _methodFilter = 'CASH'; _currentPage = 1;
+                        _methodFilter = 'CASH';
+                        _currentPage = 1;
                       }),
                     ),
                     const SizedBox(width: 6),
@@ -172,7 +173,8 @@ class _ApPaymentListPageState extends ConsumerState<ApPaymentListPage> {
                       color: AppTheme.info,
                       selected: _methodFilter == 'TRANSFER',
                       onTap: () => setState(() {
-                        _methodFilter = 'TRANSFER'; _currentPage = 1;
+                        _methodFilter = 'TRANSFER';
+                        _currentPage = 1;
                       }),
                     ),
                     const SizedBox(width: 6),
@@ -182,7 +184,8 @@ class _ApPaymentListPageState extends ConsumerState<ApPaymentListPage> {
                       color: AppTheme.warning,
                       selected: _methodFilter == 'CHEQUE',
                       onTap: () => setState(() {
-                        _methodFilter = 'CHEQUE'; _currentPage = 1;
+                        _methodFilter = 'CHEQUE';
+                        _currentPage = 1;
                       }),
                     ),
                   ],
@@ -239,46 +242,50 @@ class _ApPaymentListPageState extends ConsumerState<ApPaymentListPage> {
               const SizedBox(width: 14),
               Expanded(
                 flex: 3,
-                child: Text('เลขที่ / ซัพพลายเออร์',
-                    style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: isDark
-                            ? const Color(0xFFAAAAAA)
-                            : AppTheme.textSub)),
+                child: Text(
+                  'เลขที่ / ซัพพลายเออร์',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? const Color(0xFFAAAAAA) : AppTheme.textSub,
+                  ),
+                ),
               ),
               SizedBox(
                 width: 68,
-                child: Text('วันที่',
-                    style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: isDark
-                            ? const Color(0xFFAAAAAA)
-                            : AppTheme.textSub),
-                    textAlign: TextAlign.center),
+                child: Text(
+                  'วันที่',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? const Color(0xFFAAAAAA) : AppTheme.textSub,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
               ),
               SizedBox(
                 width: 76,
-                child: Text('วิธีจ่าย',
-                    style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: isDark
-                            ? const Color(0xFFAAAAAA)
-                            : AppTheme.textSub),
-                    textAlign: TextAlign.center),
+                child: Text(
+                  'วิธีจ่าย',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? const Color(0xFFAAAAAA) : AppTheme.textSub,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
               ),
               SizedBox(
                 width: 90,
-                child: Text('ยอดจ่าย',
-                    style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: isDark
-                            ? const Color(0xFFAAAAAA)
-                            : AppTheme.textSub),
-                    textAlign: TextAlign.right),
+                child: Text(
+                  'ยอดจ่าย',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? const Color(0xFFAAAAAA) : AppTheme.textSub,
+                  ),
+                  textAlign: TextAlign.right,
+                ),
               ),
             ],
           ),
@@ -294,13 +301,15 @@ class _ApPaymentListPageState extends ConsumerState<ApPaymentListPage> {
                 onTap: () => _viewDetails(p),
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 10),
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
                     color: isEven
                         ? (isDark ? AppTheme.darkCard : Colors.white)
                         : (isDark
-                            ? AppTheme.darkElement
-                            : const Color(0xFFF9F9F9)),
+                              ? AppTheme.darkElement
+                              : const Color(0xFFF9F9F9)),
                     border: Border(
                       bottom: BorderSide(
                         color: isDark
@@ -366,8 +375,8 @@ class _ApPaymentListPageState extends ConsumerState<ApPaymentListPage> {
                       SizedBox(
                         width: 76,
                         child: Center(
-                            child: _buildMethodBadge(
-                                p.paymentMethod, isDark)),
+                          child: _buildMethodBadge(p.paymentMethod, isDark),
+                        ),
                       ),
                       SizedBox(
                         width: 90,
@@ -396,10 +405,14 @@ class _ApPaymentListPageState extends ConsumerState<ApPaymentListPage> {
   // ─── Helpers ─────────────────────────────────────────────────
   Color _getMethodColor(String m) {
     switch (m) {
-      case 'CASH':     return AppTheme.success;
-      case 'TRANSFER': return AppTheme.info;
-      case 'CHEQUE':   return AppTheme.warning;
-      default:         return AppTheme.tealColor;
+      case 'CASH':
+        return AppTheme.success;
+      case 'TRANSFER':
+        return AppTheme.info;
+      case 'CHEQUE':
+        return AppTheme.warning;
+      default:
+        return AppTheme.tealColor;
     }
   }
 
@@ -407,10 +420,17 @@ class _ApPaymentListPageState extends ConsumerState<ApPaymentListPage> {
     final color = _getMethodColor(m);
     String label;
     switch (m) {
-      case 'CASH':     label = 'เงินสด'; break;
-      case 'TRANSFER': label = 'โอนเงิน'; break;
-      case 'CHEQUE':   label = 'เช็ค'; break;
-      default:         label = m;
+      case 'CASH':
+        label = 'เงินสด';
+        break;
+      case 'TRANSFER':
+        label = 'โอนเงิน';
+        break;
+      case 'CHEQUE':
+        label = 'เช็ค';
+        break;
+      default:
+        label = m;
     }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
@@ -421,7 +441,10 @@ class _ApPaymentListPageState extends ConsumerState<ApPaymentListPage> {
       child: Text(
         label,
         style: TextStyle(
-            fontSize: 10, fontWeight: FontWeight.w600, color: color),
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
       ),
     );
   }
@@ -445,19 +468,17 @@ class _ApPaymentListPageState extends ConsumerState<ApPaymentListPage> {
                 ? 'ยังไม่มีประวัติการจ่ายเงิน'
                 : 'ไม่พบรายการ "$_searchQuery"',
             style: TextStyle(
-                color: isDark
-                    ? const Color(0xFF888888)
-                    : Colors.grey[500]),
+              color: isDark ? const Color(0xFF888888) : Colors.grey[500],
+            ),
           ),
           if (_searchQuery.isEmpty) ...[
             const SizedBox(height: 4),
             Text(
               'กดปุ่ม + เพื่อบันทึกการจ่ายเงินใหม่',
               style: TextStyle(
-                  fontSize: 12,
-                  color: isDark
-                      ? const Color(0xFF666666)
-                      : Colors.grey[400]),
+                fontSize: 12,
+                color: isDark ? const Color(0xFF666666) : Colors.grey[400],
+              ),
             ),
           ],
         ],
@@ -466,22 +487,20 @@ class _ApPaymentListPageState extends ConsumerState<ApPaymentListPage> {
   }
 
   Widget _buildError(Object e) => Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline,
-                size: 72, color: AppTheme.error),
-            const SizedBox(height: 12),
-            Text('เกิดข้อผิดพลาด: $e'),
-            const SizedBox(height: 12),
-            ElevatedButton(
-              onPressed: () =>
-                  ref.read(apPaymentListProvider.notifier).refresh(),
-              child: const Text('ลองใหม่'),
-            ),
-          ],
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Icon(Icons.error_outline, size: 72, color: AppTheme.error),
+        const SizedBox(height: 12),
+        Text('เกิดข้อผิดพลาด: $e'),
+        const SizedBox(height: 12),
+        ElevatedButton(
+          onPressed: () => ref.read(apPaymentListProvider.notifier).refresh(),
+          child: const Text('ลองใหม่'),
         ),
-      );
+      ],
+    ),
+  );
 
   // ─── Actions ─────────────────────────────────────────────────
   Future<void> _viewDetails(ApPaymentModel payment) async {
@@ -497,18 +516,24 @@ class _ApPaymentListPageState extends ConsumerState<ApPaymentListPage> {
     final methodColor = _getMethodColor(payment.paymentMethod);
     String methodLabel;
     switch (payment.paymentMethod) {
-      case 'CASH':     methodLabel = 'เงินสด'; break;
-      case 'TRANSFER': methodLabel = 'โอนเงิน'; break;
-      case 'CHEQUE':   methodLabel = 'เช็ค'; break;
-      default:         methodLabel = payment.paymentMethod;
+      case 'CASH':
+        methodLabel = 'เงินสด';
+        break;
+      case 'TRANSFER':
+        methodLabel = 'โอนเงิน';
+        break;
+      case 'CHEQUE':
+        methodLabel = 'เช็ค';
+        break;
+      default:
+        methodLabel = payment.paymentMethod;
     }
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         titlePadding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
         title: Row(
           children: [
@@ -518,8 +543,11 @@ class _ApPaymentListPageState extends ConsumerState<ApPaymentListPage> {
                 color: AppTheme.tealColor.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(Icons.payments_outlined,
-                  size: 18, color: AppTheme.tealColor),
+              child: const Icon(
+                Icons.payments_outlined,
+                size: 18,
+                color: AppTheme.tealColor,
+              ),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -529,35 +557,37 @@ class _ApPaymentListPageState extends ConsumerState<ApPaymentListPage> {
                   Text(
                     payment.paymentNo,
                     style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: isDark
-                            ? Colors.white
-                            : const Color(0xFF1A1A1A)),
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+                    ),
                   ),
                   Text(
                     payment.supplierName,
                     style: TextStyle(
-                        fontSize: 12,
-                        color: isDark
-                            ? const Color(0xFFAAAAAA)
-                            : AppTheme.textSub),
+                      fontSize: 12,
+                      color: isDark
+                          ? const Color(0xFFAAAAAA)
+                          : AppTheme.textSub,
+                    ),
                   ),
                 ],
               ),
             ),
             Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 8, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 color: methodColor.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Text(methodLabel,
-                  style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: methodColor)),
+              child: Text(
+                methodLabel,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: methodColor,
+                ),
+              ),
             ),
           ],
         ),
@@ -569,44 +599,62 @@ class _ApPaymentListPageState extends ConsumerState<ApPaymentListPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 12),
-                _DetailRow(label: 'วันที่จ่าย',
-                    value: fmtDate.format(payment.paymentDate),
-                    isDark: isDark),
+                _DetailRow(
+                  label: 'วันที่จ่าย',
+                  value: fmtDate.format(payment.paymentDate),
+                  isDark: isDark,
+                ),
                 if (payment.bankName != null)
-                  _DetailRow(label: 'ธนาคาร',
-                      value: payment.bankName!, isDark: isDark),
+                  _DetailRow(
+                    label: 'ธนาคาร',
+                    value: payment.bankName!,
+                    isDark: isDark,
+                  ),
                 if (payment.transferRef != null)
-                  _DetailRow(label: 'เลขที่อ้างอิง',
-                      value: payment.transferRef!, isDark: isDark),
+                  _DetailRow(
+                    label: 'เลขที่อ้างอิง',
+                    value: payment.transferRef!,
+                    isDark: isDark,
+                  ),
                 if (payment.chequeNo != null)
-                  _DetailRow(label: 'เลขที่เช็ค',
-                      value: payment.chequeNo!, isDark: isDark),
-                if (payment.remark != null &&
-                    payment.remark!.isNotEmpty)
-                  _DetailRow(label: 'หมายเหตุ',
-                      value: payment.remark!, isDark: isDark),
+                  _DetailRow(
+                    label: 'เลขที่เช็ค',
+                    value: payment.chequeNo!,
+                    isDark: isDark,
+                  ),
+                if (payment.remark != null && payment.remark!.isNotEmpty)
+                  _DetailRow(
+                    label: 'หมายเหตุ',
+                    value: payment.remark!,
+                    isDark: isDark,
+                  ),
                 const SizedBox(height: 8),
                 // Amount highlight
                 Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 10),
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
                     color: AppTheme.tealColor.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                        color: AppTheme.tealColor.withValues(alpha: 0.2)),
+                      color: AppTheme.tealColor.withValues(alpha: 0.2),
+                    ),
                   ),
                   child: Row(
-                    mainAxisAlignment:
-                        MainAxisAlignment.spaceBetween,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('ยอดจ่ายทั้งหมด',
-                          style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: isDark
-                                  ? Colors.white70
-                                  : const Color(0xFF1A1A1A))),
+                      Text(
+                        'ยอดจ่ายทั้งหมด',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: isDark
+                              ? Colors.white70
+                              : const Color(0xFF1A1A1A),
+                        ),
+                      ),
                       Text(
                         '฿${fmt.format(payment.totalAmount)}',
                         style: const TextStyle(
@@ -622,51 +670,57 @@ class _ApPaymentListPageState extends ConsumerState<ApPaymentListPage> {
                 if (paymentDetails?.allocations != null &&
                     paymentDetails!.allocations!.isNotEmpty) ...[
                   const SizedBox(height: 12),
-                  Text('การจัดสรรเงิน',
-                      style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: isDark
-                              ? Colors.white70
-                              : const Color(0xFF1A1A1A))),
+                  Text(
+                    'การจัดสรรเงิน',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white70 : const Color(0xFF1A1A1A),
+                    ),
+                  ),
                   const SizedBox(height: 6),
-                  ...paymentDetails.allocations!.map((alloc) =>
-                      Container(
-                        margin: const EdgeInsets.only(bottom: 6),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
+                  ...paymentDetails.allocations!.map(
+                    (alloc) => Container(
+                      margin: const EdgeInsets.only(bottom: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? AppTheme.darkElement
+                            : const Color(0xFFF9F9F9),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
                           color: isDark
-                              ? AppTheme.darkElement
-                              : const Color(0xFFF9F9F9),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
+                              ? const Color(0xFF333333)
+                              : AppTheme.border,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Invoice: ${alloc.invoiceId}',
+                            style: TextStyle(
+                              fontSize: 11,
                               color: isDark
-                                  ? const Color(0xFF333333)
-                                  : AppTheme.border),
-                        ),
-                        child: Row(
-                          mainAxisAlignment:
-                              MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Invoice: ${alloc.invoiceId}',
-                              style: TextStyle(
-                                  fontSize: 11,
-                                  color: isDark
-                                      ? const Color(0xFFAAAAAA)
-                                      : AppTheme.textSub),
+                                  ? const Color(0xFFAAAAAA)
+                                  : AppTheme.textSub,
                             ),
-                            Text(
-                              '฿${fmt.format(alloc.allocatedAmount)}',
-                              style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppTheme.tealColor),
+                          ),
+                          Text(
+                            '฿${fmt.format(alloc.allocatedAmount)}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.tealColor,
                             ),
-                          ],
-                        ),
-                      )),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
               ],
             ),
@@ -675,11 +729,12 @@ class _ApPaymentListPageState extends ConsumerState<ApPaymentListPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text('ปิด',
-                style: TextStyle(
-                    color: isDark
-                        ? Colors.white60
-                        : AppTheme.textSub)),
+            child: Text(
+              'ปิด',
+              style: TextStyle(
+                color: isDark ? Colors.white60 : AppTheme.textSub,
+              ),
+            ),
           ),
           if (paymentDetails != null)
             ElevatedButton.icon(
@@ -689,7 +744,8 @@ class _ApPaymentListPageState extends ConsumerState<ApPaymentListPage> {
                 backgroundColor: AppTheme.error,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8)),
+                  borderRadius: BorderRadius.circular(8),
+                ),
                 elevation: 0,
               ),
               onPressed: () async {
@@ -708,8 +764,7 @@ class _ApPaymentListPageState extends ConsumerState<ApPaymentListPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         title: Row(
           children: [
             Container(
@@ -718,31 +773,36 @@ class _ApPaymentListPageState extends ConsumerState<ApPaymentListPage> {
                 color: AppTheme.error.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(Icons.delete_outline,
-                  size: 18, color: AppTheme.error),
+              child: const Icon(
+                Icons.delete_outline,
+                size: 18,
+                color: AppTheme.error,
+              ),
             ),
             const SizedBox(width: 10),
-            Text('ยืนยันการลบ',
-                style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: isDark
-                        ? Colors.white
-                        : const Color(0xFF1A1A1A))),
+            Text(
+              'ยืนยันการลบ',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+              ),
+            ),
           ],
         ),
         content: Text(
-            'ต้องการลบ ${payment.paymentNo} ออกจากระบบ?',
-            style: TextStyle(
-                color: isDark ? Colors.white70 : Colors.black87)),
+          'ต้องการลบ ${payment.paymentNo} ออกจากระบบ?',
+          style: TextStyle(color: isDark ? Colors.white70 : Colors.black87),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: Text('ยกเลิก',
-                style: TextStyle(
-                    color: isDark
-                        ? Colors.white60
-                        : AppTheme.textSub)),
+            child: Text(
+              'ยกเลิก',
+              style: TextStyle(
+                color: isDark ? Colors.white60 : AppTheme.textSub,
+              ),
+            ),
           ),
           ElevatedButton.icon(
             icon: const Icon(Icons.delete_forever, size: 16),
@@ -751,7 +811,8 @@ class _ApPaymentListPageState extends ConsumerState<ApPaymentListPage> {
               backgroundColor: AppTheme.error,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
+                borderRadius: BorderRadius.circular(8),
+              ),
               elevation: 0,
             ),
             onPressed: () => Navigator.pop(ctx, true),
@@ -767,11 +828,13 @@ class _ApPaymentListPageState extends ConsumerState<ApPaymentListPage> {
         .deletePayment(payment.paymentId);
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(success ? 'ลบรายการสำเร็จ' : 'ลบไม่สำเร็จ'),
-      backgroundColor: success ? AppTheme.success : AppTheme.error,
-      behavior: SnackBarBehavior.floating,
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(success ? 'ลบรายการสำเร็จ' : 'ลบไม่สำเร็จ'),
+        backgroundColor: success ? AppTheme.success : AppTheme.error,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 }
 
@@ -791,19 +854,27 @@ class _PayCard extends StatelessWidget {
 
   Color get _methodColor {
     switch (payment.paymentMethod) {
-      case 'CASH':     return AppTheme.success;
-      case 'TRANSFER': return AppTheme.info;
-      case 'CHEQUE':   return AppTheme.warning;
-      default:         return AppTheme.tealColor;
+      case 'CASH':
+        return AppTheme.success;
+      case 'TRANSFER':
+        return AppTheme.info;
+      case 'CHEQUE':
+        return AppTheme.warning;
+      default:
+        return AppTheme.tealColor;
     }
   }
 
   String get _methodLabel {
     switch (payment.paymentMethod) {
-      case 'CASH':     return 'เงินสด';
-      case 'TRANSFER': return 'โอนเงิน';
-      case 'CHEQUE':   return 'เช็ค';
-      default:         return payment.paymentMethod;
+      case 'CASH':
+        return 'เงินสด';
+      case 'TRANSFER':
+        return 'โอนเงิน';
+      case 'CHEQUE':
+        return 'เช็ค';
+      default:
+        return payment.paymentMethod;
     }
   }
 
@@ -813,8 +884,12 @@ class _PayCard extends StatelessWidget {
     final fmt = NumberFormat('#,##0.00', 'th_TH');
 
     final colors = [
-      AppTheme.tealColor, AppTheme.info, AppTheme.success,
-      AppTheme.primary, AppTheme.purpleColor, AppTheme.warning,
+      AppTheme.tealColor,
+      AppTheme.info,
+      AppTheme.success,
+      AppTheme.primary,
+      AppTheme.purpleColor,
+      AppTheme.warning,
     ];
     final name = payment.supplierName;
     final avatarColor = colors[name.codeUnitAt(0) % colors.length];
@@ -825,9 +900,8 @@ class _PayCard extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
         side: BorderSide(
-            color: isDark
-                ? const Color(0xFF333333)
-                : AppTheme.border),
+          color: isDark ? const Color(0xFF333333) : AppTheme.border,
+        ),
       ),
       color: isDark ? AppTheme.darkCard : Colors.white,
       child: InkWell(
@@ -845,11 +919,14 @@ class _PayCard extends StatelessWidget {
                   CircleAvatar(
                     radius: 20,
                     backgroundColor: avatarColor,
-                    child: Text(initial,
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold)),
+                    child: Text(
+                      initial,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -859,36 +936,36 @@ class _PayCard extends StatelessWidget {
                         Text(
                           payment.paymentNo,
                           style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: isDark
-                                  ? Colors.white
-                                  : const Color(0xFF1A1A1A)),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: isDark
+                                ? Colors.white
+                                : const Color(0xFF1A1A1A),
+                          ),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           payment.supplierName,
                           style: TextStyle(
-                              fontSize: 12,
-                              color: isDark
-                                  ? const Color(0xFFAAAAAA)
-                                  : AppTheme.textSub),
+                            fontSize: 12,
+                            color: isDark
+                                ? const Color(0xFFAAAAAA)
+                                : AppTheme.textSub,
+                          ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
                   ),
-                  _MethodBadge(
-                      label: _methodLabel, color: _methodColor),
+                  _MethodBadge(label: _methodLabel, color: _methodColor),
                 ],
               ),
 
               const SizedBox(height: 10),
               Divider(
-                  height: 1,
-                  color: isDark
-                      ? const Color(0xFF2C2C2C)
-                      : AppTheme.border),
+                height: 1,
+                color: isDark ? const Color(0xFF2C2C2C) : AppTheme.border,
+              ),
               const SizedBox(height: 10),
 
               // Row 2: Dates
@@ -897,24 +974,23 @@ class _PayCard extends StatelessWidget {
                   Expanded(
                     child: _InfoChip(
                       icon: Icons.calendar_today_outlined,
-                      text: DateFormat('dd/MM/yyyy')
-                          .format(payment.paymentDate),
+                      text: DateFormat(
+                        'dd/MM/yyyy',
+                      ).format(payment.paymentDate),
                       isDark: isDark,
                     ),
                   ),
                   Expanded(
                     child: _InfoChip(
                       icon: Icons.access_time_outlined,
-                      text: DateFormat('HH:mm')
-                          .format(payment.createdAt),
+                      text: DateFormat('HH:mm').format(payment.createdAt),
                       isDark: isDark,
                     ),
                   ),
                 ],
               ),
 
-              if (payment.remark != null &&
-                  payment.remark!.isNotEmpty) ...[
+              if (payment.remark != null && payment.remark!.isNotEmpty) ...[
                 const SizedBox(height: 6),
                 _InfoChip(
                   icon: Icons.note_outlined,
@@ -932,18 +1008,22 @@ class _PayCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('ยอดจ่าย',
-                            style: TextStyle(
-                                fontSize: 10,
-                                color: isDark
-                                    ? const Color(0xFFAAAAAA)
-                                    : AppTheme.textSub)),
+                        Text(
+                          'ยอดจ่าย',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: isDark
+                                ? const Color(0xFFAAAAAA)
+                                : AppTheme.textSub,
+                          ),
+                        ),
                         Text(
                           '฿${fmt.format(payment.totalAmount)}',
                           style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              color: AppTheme.tealColor),
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.tealColor,
+                          ),
                         ),
                       ],
                     ),
@@ -959,7 +1039,8 @@ class _PayCard extends StatelessWidget {
                         side: const BorderSide(color: AppTheme.error),
                         padding: EdgeInsets.zero,
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                       child: const Icon(Icons.delete_outline, size: 18),
                     ),
@@ -1015,23 +1096,20 @@ class _PayListTopBar extends StatelessWidget {
     );
   }
 
-  Widget _buildSingleRow(
-      BuildContext context, bool canPop, bool isDark) {
+  Widget _buildSingleRow(BuildContext context, bool canPop, bool isDark) {
     return Row(
       children: [
-        if (canPop) ...[
-          _BackBtn(isDark: isDark),
-          const SizedBox(width: 10),
-        ],
+        if (canPop) ...[_BackBtn(isDark: isDark), const SizedBox(width: 10)],
         _PageIcon(),
         const SizedBox(width: 10),
-        Text('ประวัติการจ่ายเงิน',
-            style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: isDark
-                    ? Colors.white
-                    : const Color(0xFF1A1A1A))),
+        Text(
+          'ประวัติการจ่ายเงิน',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+          ),
+        ),
         const Spacer(),
         ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 280),
@@ -1065,28 +1143,25 @@ class _PayListTopBar extends StatelessWidget {
     );
   }
 
-  Widget _buildDoubleRow(
-      BuildContext context, bool canPop, bool isDark) {
+  Widget _buildDoubleRow(BuildContext context, bool canPop, bool isDark) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            if (canPop) ...[
-              _BackBtn(isDark: isDark),
-              const SizedBox(width: 8),
-            ],
+            if (canPop) ...[_BackBtn(isDark: isDark), const SizedBox(width: 8)],
             _PageIcon(),
             const SizedBox(width: 8),
             Expanded(
-              child: Text('ประวัติการจ่ายเงิน',
-                  style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: isDark
-                          ? Colors.white
-                          : const Color(0xFF1A1A1A)),
-                  overflow: TextOverflow.ellipsis),
+              child: Text(
+                'ประวัติการจ่ายเงิน',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
             _IconBtn(
               icon: isCardView
@@ -1127,38 +1202,40 @@ class _BackBtn extends StatelessWidget {
   const _BackBtn({required this.isDark});
   @override
   Widget build(BuildContext context) => InkWell(
-        onTap: () => Navigator.of(context).pop(),
+    onTap: () => Navigator.of(context).pop(),
+    borderRadius: BorderRadius.circular(8),
+    child: Container(
+      padding: const EdgeInsets.all(7),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkElement : const Color(0xFFF5F5F5),
         borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.all(7),
-          decoration: BoxDecoration(
-            color: isDark ? AppTheme.darkElement : const Color(0xFFF5F5F5),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-                color: isDark
-                    ? const Color(0xFF333333)
-                    : AppTheme.border),
-          ),
-          child: Icon(Icons.arrow_back_ios_new,
-              size: 15,
-              color: isDark
-                  ? const Color(0xFFAAAAAA)
-                  : const Color(0xFF8A8A8A)),
+        border: Border.all(
+          color: isDark ? const Color(0xFF333333) : AppTheme.border,
         ),
-      );
+      ),
+      child: Icon(
+        Icons.arrow_back_ios_new,
+        size: 15,
+        color: isDark ? const Color(0xFFAAAAAA) : const Color(0xFF8A8A8A),
+      ),
+    ),
+  );
 }
 
 class _PageIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(7),
-        decoration: BoxDecoration(
-          color: AppTheme.tealColor.withValues(alpha: 0.10),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: const Icon(Icons.payments_outlined,
-            color: AppTheme.tealColor, size: 18),
-      );
+    padding: const EdgeInsets.all(7),
+    decoration: BoxDecoration(
+      color: AppTheme.tealColor.withValues(alpha: 0.10),
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child: const Icon(
+      Icons.payments_outlined,
+      color: AppTheme.tealColor,
+      size: 18,
+    ),
+  );
 }
 
 class _SearchField extends StatelessWidget {
@@ -1178,53 +1255,53 @@ class _SearchField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SizedBox(
-        height: 38,
-        child: TextField(
-          controller: controller,
-          style: TextStyle(
-              fontSize: 13,
-              color: isDark ? Colors.white : const Color(0xFF1A1A1A)),
-          decoration: InputDecoration(
-            hintText: 'ค้นหาเลขที่ใบจ่ายเงิน, ซัพพลายเออร์...',
-            hintStyle: TextStyle(
-                fontSize: 13,
-                color: isDark
-                    ? const Color(0xFF666666)
-                    : const Color(0xFF8A8A8A)),
-            prefixIcon: Icon(Icons.search,
-                size: 17,
-                color: isDark
-                    ? const Color(0xFF666666)
-                    : const Color(0xFF8A8A8A)),
-            suffixIcon: query.isNotEmpty
-                ? IconButton(
-                    icon: const Icon(Icons.clear, size: 15),
-                    onPressed: onCleared,
-                  )
-                : null,
-            contentPadding: EdgeInsets.zero,
-            border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(
-                    color: isDark
-                        ? const Color(0xFF333333)
-                        : const Color(0xFFE0E0E0))),
-            enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(
-                    color: isDark
-                        ? const Color(0xFF333333)
-                        : const Color(0xFFE0E0E0))),
-            focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(
-                    color: AppTheme.tealColor, width: 1.5)),
-            filled: true,
-            fillColor: isDark ? AppTheme.darkElement : Colors.white,
-          ),
-          onChanged: onChanged,
+    height: 38,
+    child: TextField(
+      controller: controller,
+      style: TextStyle(
+        fontSize: 13,
+        color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+      ),
+      decoration: InputDecoration(
+        hintText: 'ค้นหาเลขที่ใบจ่ายเงิน, ซัพพลายเออร์...',
+        hintStyle: TextStyle(
+          fontSize: 13,
+          color: isDark ? const Color(0xFF666666) : const Color(0xFF8A8A8A),
         ),
-      );
+        prefixIcon: Icon(
+          Icons.search,
+          size: 17,
+          color: isDark ? const Color(0xFF666666) : const Color(0xFF8A8A8A),
+        ),
+        suffixIcon: query.isNotEmpty
+            ? IconButton(
+                icon: const Icon(Icons.clear, size: 15),
+                onPressed: onCleared,
+              )
+            : null,
+        contentPadding: EdgeInsets.zero,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(
+            color: isDark ? const Color(0xFF333333) : const Color(0xFFE0E0E0),
+          ),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(
+            color: isDark ? const Color(0xFF333333) : const Color(0xFFE0E0E0),
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: AppTheme.tealColor, width: 1.5),
+        ),
+        filled: true,
+        fillColor: isDark ? AppTheme.darkElement : Colors.white,
+      ),
+      onChanged: onChanged,
+    ),
+  );
 }
 
 class _IconBtn extends StatelessWidget {
@@ -1233,38 +1310,36 @@ class _IconBtn extends StatelessWidget {
   final bool isDark;
   final VoidCallback onTap;
 
-  const _IconBtn(
-      {required this.icon,
-      required this.tooltip,
-      required this.isDark,
-      required this.onTap});
+  const _IconBtn({
+    required this.icon,
+    required this.tooltip,
+    required this.isDark,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) => Tooltip(
-        message: tooltip,
-        child: InkWell(
-          onTap: onTap,
+    message: tooltip,
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.all(7),
+        decoration: BoxDecoration(
+          color: isDark ? AppTheme.darkElement : const Color(0xFFF5F5F5),
           borderRadius: BorderRadius.circular(8),
-          child: Container(
-            padding: const EdgeInsets.all(7),
-            decoration: BoxDecoration(
-              color: isDark
-                  ? AppTheme.darkElement
-                  : const Color(0xFFF5F5F5),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                  color: isDark
-                      ? const Color(0xFF333333)
-                      : AppTheme.border),
-            ),
-            child: Icon(icon,
-                size: 17,
-                color: isDark
-                    ? const Color(0xFFAAAAAA)
-                    : const Color(0xFF8A8A8A)),
+          border: Border.all(
+            color: isDark ? const Color(0xFF333333) : AppTheme.border,
           ),
         ),
-      );
+        child: Icon(
+          icon,
+          size: 17,
+          color: isDark ? const Color(0xFFAAAAAA) : const Color(0xFF8A8A8A),
+        ),
+      ),
+    ),
+  );
 }
 
 class _AddBtn extends StatelessWidget {
@@ -1273,25 +1348,27 @@ class _AddBtn extends StatelessWidget {
   const _AddBtn({required this.onTap, this.compact = false});
   @override
   Widget build(BuildContext context) => ElevatedButton.icon(
-        onPressed: onTap,
-        icon: const Icon(Icons.add, size: 18),
-        label: compact
-            ? const SizedBox.shrink()
-            : const Text('บันทึกจ่ายเงิน',
-                style: TextStyle(
-                    fontSize: 13, fontWeight: FontWeight.w600)),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppTheme.tealColor,
-          foregroundColor: Colors.white,
-          padding: EdgeInsets.symmetric(
-              horizontal: compact ? 12 : 16, vertical: 13),
-          minimumSize: Size.zero,
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8)),
-          elevation: 0,
-        ),
-      );
+    onPressed: onTap,
+    icon: const Icon(Icons.add, size: 18),
+    label: compact
+        ? const SizedBox.shrink()
+        : const Text(
+            'บันทึกจ่ายเงิน',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          ),
+    style: ElevatedButton.styleFrom(
+      backgroundColor: AppTheme.tealColor,
+      foregroundColor: Colors.white,
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 12 : 16,
+        vertical: 13,
+      ),
+      minimumSize: Size.zero,
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      elevation: 0,
+    ),
+  );
 }
 
 // ── Shared small widgets ───────────────────────────────────────
@@ -1302,40 +1379,42 @@ class _MethodBadge extends StatelessWidget {
   const _MethodBadge({required this.label, required this.color});
   @override
   Widget build(BuildContext context) => Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(10),
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(10),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 5,
+          height: 5,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 5,
-              height: 5,
-              decoration: BoxDecoration(
-                  color: color, shape: BoxShape.circle),
-            ),
-            const SizedBox(width: 4),
-            Text(label,
-                style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: color)),
-          ],
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            color: color,
+          ),
         ),
-      );
+      ],
+    ),
+  );
 }
 
 class _InfoChip extends StatelessWidget {
   final IconData icon;
   final String text;
   final bool isDark;
-  const _InfoChip(
-      {required this.icon,
-      required this.text,
-      required this.isDark});
+  const _InfoChip({
+    required this.icon,
+    required this.text,
+    required this.isDark,
+  });
   @override
   Widget build(BuildContext context) {
     final c = isDark ? const Color(0xFFAAAAAA) : AppTheme.textSub;
@@ -1344,9 +1423,11 @@ class _InfoChip extends StatelessWidget {
         Icon(icon, size: 13, color: c),
         const SizedBox(width: 4),
         Expanded(
-          child: Text(text,
-              style: TextStyle(fontSize: 11, color: c),
-              overflow: TextOverflow.ellipsis),
+          child: Text(
+            text,
+            style: TextStyle(fontSize: 11, color: c),
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
       ],
     );
@@ -1357,36 +1438,40 @@ class _DetailRow extends StatelessWidget {
   final String label;
   final String value;
   final bool isDark;
-  const _DetailRow(
-      {required this.label,
-      required this.value,
-      required this.isDark});
+  const _DetailRow({
+    required this.label,
+    required this.value,
+    required this.isDark,
+  });
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              width: 110,
-              child: Text('$label:',
-                  style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: isDark
-                          ? Colors.white60
-                          : AppTheme.textSub)),
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 110,
+          child: Text(
+            '$label:',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: isDark ? Colors.white60 : AppTheme.textSub,
             ),
-            Expanded(
-              child: Text(value,
-                  style: TextStyle(
-                      fontSize: 12,
-                      color:
-                          isDark ? Colors.white70 : Colors.black87)),
-            ),
-          ],
+          ),
         ),
-      );
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(
+              fontSize: 12,
+              color: isDark ? Colors.white70 : Colors.black87,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _PayFilterChip extends StatelessWidget {
@@ -1425,38 +1510,39 @@ class _PayFilterChip extends StatelessWidget {
       return GestureDetector(
         onTap: onTap,
         child: Container(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(
             color: isDark ? AppTheme.darkElement : const Color(0xFFF5F5F5),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-                color: isDark
-                    ? const Color(0xFF4A4A4A)
-                    : AppTheme.border),
+              color: isDark ? const Color(0xFF4A4A4A) : AppTheme.border,
+            ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(label,
-                  style: TextStyle(
-                      fontSize: 12,
-                      color: isDark ? Colors.white70 : AppTheme.textSub)),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isDark ? Colors.white70 : AppTheme.textSub,
+                ),
+              ),
               const SizedBox(width: 5),
               Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 5, vertical: 1),
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                 decoration: BoxDecoration(
-                  color: isDark
-                      ? const Color(0xFF5A5A5A)
-                      : AppTheme.textSub,
+                  color: isDark ? const Color(0xFF5A5A5A) : AppTheme.textSub,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Text('$count',
-                    style: const TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white)),
+                child: Text(
+                  '$count',
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
               ),
             ],
           ),
@@ -1468,8 +1554,7 @@ class _PayFilterChip extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        padding:
-            const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
           color: vc.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(20),
@@ -1478,23 +1563,29 @@ class _PayFilterChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(label,
-                style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: vc)),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: vc,
+              ),
+            ),
             const SizedBox(width: 5),
             Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 5, vertical: 1),
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
               decoration: BoxDecoration(
-                  color: vc,
-                  borderRadius: BorderRadius.circular(10)),
-              child: Text('$count',
-                  style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white)),
+                color: vc,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '$count',
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
             ),
           ],
         ),
@@ -1508,10 +1599,11 @@ class _PayValueStat extends StatelessWidget {
   final String value;
   final Color color;
 
-  const _PayValueStat(
-      {required this.label,
-      required this.value,
-      required this.color});
+  const _PayValueStat({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1526,17 +1618,21 @@ class _PayValueStat extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label,
-              style: TextStyle(
-                  fontSize: 10,
-                  color: isDark
-                      ? const Color(0xFFAAAAAA)
-                      : AppTheme.textSub)),
-          Text(value,
-              style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: color)),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              color: isDark ? const Color(0xFFAAAAAA) : AppTheme.textSub,
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
         ],
       ),
     );

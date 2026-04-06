@@ -5,8 +5,8 @@
 
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:printing/printing.dart';
 
 // ─────────────────────────────────────────────────────────────────
@@ -32,8 +32,8 @@ class _PdfPreviewDialogState extends State<PdfPreviewDialog> {
   final TransformationController _transform = TransformationController();
   double _scale = 1.0;
 
-  static const double _minScale  = 0.5;
-  static const double _maxScale  = 4.0;
+  static const double _minScale = 0.5;
+  static const double _maxScale = 4.0;
   static const double _scaleStep = 0.25;
 
   @override
@@ -42,18 +42,22 @@ class _PdfPreviewDialogState extends State<PdfPreviewDialog> {
     super.dispose();
   }
 
-  void _zoomIn()    => _applyScale((_scale + _scaleStep).clamp(_minScale, _maxScale));
-  void _zoomOut()   => _applyScale((_scale - _scaleStep).clamp(_minScale, _maxScale));
+  void _zoomIn() =>
+      _applyScale((_scale + _scaleStep).clamp(_minScale, _maxScale));
+  void _zoomOut() =>
+      _applyScale((_scale - _scaleStep).clamp(_minScale, _maxScale));
   void _resetZoom() => _applyScale(1.0);
 
   Future<void> _savePdf() async {
-    Directory dir;
-    try {
-      dir = await getApplicationDocumentsDirectory();
-    } catch (_) {
-      dir = await getTemporaryDirectory();
-    }
-    final file = File('${dir.path}/${widget.filename}');
+    var filepath = await FilePicker.platform.saveFile(
+      dialogTitle: 'เลือกตำแหน่งบันทึก PDF',
+      fileName: widget.filename,
+      type: FileType.custom,
+      allowedExtensions: ['pdf'],
+    );
+    if (filepath == null || filepath.isEmpty) return;
+
+    final file = File(filepath);
     await file.writeAsBytes(widget.bytes);
 
     // เปิดไฟล์อัตโนมัติทันที
@@ -100,30 +104,31 @@ class _PdfPreviewDialogState extends State<PdfPreviewDialog> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxWidth:  screenW * 0.92,
+          maxWidth: screenW * 0.92,
           maxHeight: screenH * 0.92,
         ),
         child: Column(
           children: [
             // ── Dialog Header ─────────────────────────────────────
             _DialogHeader(
-              title:    widget.title,
-              scale:    _scale,
+              title: widget.title,
+              scale: _scale,
               minScale: _minScale,
               maxScale: _maxScale,
-              onZoomIn:    _zoomIn,
-              onZoomOut:   _zoomOut,
+              onZoomIn: _zoomIn,
+              onZoomOut: _zoomOut,
               onResetZoom: _resetZoom,
-                onSavePdf:   _savePdf,
-              onPrint:     _print,
+              onSavePdf: _savePdf,
+              onPrint: _print,
               onClose: () => Navigator.pop(context),
             ),
 
             // ── PDF Content with zoom ──────────────────────────────
             Expanded(
               child: ClipRRect(
-                borderRadius:
-                    const BorderRadius.vertical(bottom: Radius.circular(12)),
+                borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(12),
+                ),
                 child: InteractiveViewer(
                   transformationController: _transform,
                   minScale: _minScale,
@@ -135,12 +140,17 @@ class _PdfPreviewDialogState extends State<PdfPreviewDialog> {
                   },
                   child: PdfPreview(
                     build: (_) async => widget.bytes,
-                    allowPrinting:        false,
-                    allowSharing:         false,
+                    allowPrinting: false,
+                    allowSharing: false,
                     canChangeOrientation: false,
-                    canChangePageFormat:  false,
-                    canDebug:             false,
-                    pdfFileName:          widget.filename,
+                    canChangePageFormat: false,
+                    canDebug: false,
+                    pdfFileName: widget.filename,
+                    onError: (context, error) => _PreviewErrorState(
+                      filename: widget.filename,
+                      error: error,
+                      onSavePdf: _savePdf,
+                    ),
                     scrollViewDecoration: const BoxDecoration(
                       color: Color(0xFFF0F0F0),
                     ),
@@ -199,9 +209,10 @@ class _DialogHeader extends StatelessWidget {
             child: Text(
               title,
               style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14),
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
             ),
           ),
           // Zoom out
@@ -223,9 +234,10 @@ class _DialogHeader extends StatelessWidget {
               child: Text(
                 '${(scale * 100).round()}%',
                 style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600),
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ),
@@ -286,18 +298,70 @@ class PdfZoomButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Tooltip(
-        message: tooltip,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(6),
-          child: Padding(
-            padding: const EdgeInsets.all(6),
-            child: Icon(
-              icon,
-              size: 18,
-              color: onTap == null ? Colors.white30 : color,
-            ),
-          ),
+    message: tooltip,
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Padding(
+        padding: const EdgeInsets.all(6),
+        child: Icon(
+          icon,
+          size: 18,
+          color: onTap == null ? Colors.white30 : color,
         ),
-      );
+      ),
+    ),
+  );
+}
+
+class _PreviewErrorState extends StatelessWidget {
+  final String filename;
+  final Object error;
+  final Future<void> Function() onSavePdf;
+
+  const _PreviewErrorState({
+    required this.filename,
+    required this.error,
+    required this.onSavePdf,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: const Color(0xFFF6F6F6),
+      alignment: Alignment.center,
+      padding: const EdgeInsets.all(24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 440),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.picture_as_pdf_outlined,
+              size: 72,
+              color: Color(0xFFE8622A),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'ไม่สามารถแสดงตัวอย่าง PDF ในหน้านี้ได้',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'ไฟล์ $filename ยังสามารถบันทึกหรือเปิดภายนอกได้ตามปกติ\n$error',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 13, color: Colors.black54),
+            ),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: onSavePdf,
+              icon: const Icon(Icons.save_alt),
+              label: const Text('บันทึก PDF'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

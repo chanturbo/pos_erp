@@ -3,13 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pos_erp/features/customers/data/models/customer_model.dart';
 import '../../../../shared/pdf/pdf_report_button.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
+import 'package:pos_erp/shared/utils/responsive_utils.dart';
 import 'package:pos_erp/shared/widgets/pagination_bar.dart';
 import 'package:pos_erp/features/settings/presentation/pages/settings_page.dart';
 import '../providers/customer_provider.dart';
 import 'customer_detail_page.dart'; // ✅
 import 'customer_form_page.dart';
 import 'customer_pdf_report.dart';
-
 
 class CustomerListPage extends ConsumerStatefulWidget {
   const CustomerListPage({super.key});
@@ -28,7 +28,7 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
   // ── Sort ───────────────────────────────────────────────────────
   // column keys: 'name','code','phone','memberNo','points','creditLimit','status'
   String _sortColumn = 'name';
-  bool   _sortAsc    = true;
+  bool _sortAsc = true;
 
   // ── Pagination ──────────────────────────────────────────────────
   int _currentPage = 1;
@@ -70,264 +70,326 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
     final pageSize = ref.watch(settingsProvider).listPageSize;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
-      body: Column(
-        children: [
-          // ── Top Bar (Responsive) ───────────────────────────────
-          _CustomerListTopBar(
-            searchController: _searchController,
-            searchQuery: _searchQuery,
-            showMembersOnly: _showMembersOnly,
-            isTableView: _isTableView,
-            onSearchChanged: (v) => setState(() { _searchQuery = v; _currentPage = 1; }),
-            onSearchCleared: () {
-              _searchController.clear();
-              setState(() { _searchQuery = ''; _currentPage = 1; });
-            },
-            onToggleMember: () =>
-                setState(() { _showMembersOnly = !_showMembersOnly; _currentPage = 1; }),
-            onToggleView: () => setState(() => _isTableView = !_isTableView),
-            onRefresh: () => ref.read(customerListProvider.notifier).refresh(),
-            onAdd: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const CustomerFormPage()),
-              );
-              // ✅ refresh หลังเพิ่มลูกค้าใหม่
-              if (context.mounted) {
-                ref.read(customerListProvider.notifier).refresh();
-              }
-            },
-          ),
-
-          // ── Table ──────────────────────────────────────────────
-          Expanded(
-            child: customerAsync.when(
-              loading: () => const Center(
-                child: CircularProgressIndicator(color: AppTheme.primary),
+      backgroundColor: AppTheme.surfaceColorOf(context),
+      appBar: AppBar(
+        automaticallyImplyLeading: !context.hasPermanentSidebar,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('รายการลูกค้า'),
+            Text(
+              'ค้นหา จัดการ และติดตามข้อมูลลูกค้าในระบบ',
+              style: TextStyle(
+                fontSize: 11,
+                color: Colors.white.withValues(alpha: 0.65),
+                fontWeight: FontWeight.normal,
               ),
-              error: (e, _) => _buildError(e),
-              data: (customers) {
-                final filtered = customers.where((c) {
-                  if (_showMembersOnly &&
-                      (c.memberNo == null || c.memberNo!.isEmpty)) {
-                    return false;
-                  }
-                  if (_searchQuery.isEmpty) return true;
-                  final q = _searchQuery.toLowerCase();
-                  return c.customerName.toLowerCase().contains(q) ||
-                      c.customerCode.toLowerCase().contains(q) ||
-                      (c.phone?.toLowerCase().contains(q) ?? false) ||
-                      (c.memberNo?.toLowerCase().contains(q) ?? false);
-                }).toList();
-
-                // ── Sort ────────────────────────────────────────
-                filtered.sort((a, b) {
-                  int cmp;
-                  switch (_sortColumn) {
-                    case 'name':
-                      cmp = a.customerName.compareTo(b.customerName);
-                    case 'code':
-                      cmp = a.customerCode.compareTo(b.customerCode);
-                    case 'phone':
-                      cmp = (a.phone ?? '').compareTo(b.phone ?? '');
-                    case 'memberNo':
-                      cmp = (a.memberNo ?? '').compareTo(b.memberNo ?? '');
-                    case 'points':
-                      cmp = a.points.compareTo(b.points);
-                    case 'creditLimit':
-                      cmp = a.creditLimit.compareTo(b.creditLimit);
-                    case 'status':
-                      cmp = (b.isActive ? 1 : 0).compareTo(a.isActive ? 1 : 0);
-                    default:
-                      cmp = 0;
-                  }
-                  return _sortAsc ? cmp : -cmp;
-                });
-
-                if (filtered.isEmpty) return _buildEmpty();
-
-                // Pagination
-                final totalPages = (filtered.length / pageSize).ceil();
-                final safePage = _currentPage.clamp(1, totalPages);
-                final pageStart = (safePage - 1) * pageSize;
-                final pageEnd = (pageStart + pageSize).clamp(0, filtered.length);
-                final pageItems = filtered.sublist(pageStart, pageEnd);
-
-                // ✅ Card View เมื่อ user เลือก
-                if (!_isTableView) {
-                  return Column(
-                    children: [
-                      Expanded(child: _buildCustomerCardView(context, pageItems)),
-                      PaginationBar(
-                        currentPage: safePage,
-                        totalItems: filtered.length,
-                        pageSize: pageSize,
-                        onPageChanged: (p) => setState(() => _currentPage = p),
-                      ),
-                    ],
+            ),
+          ],
+        ),
+      ),
+      body: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: context.contentMaxWidth),
+          child: Column(
+            children: [
+              // ── Top Bar (Responsive) ───────────────────────────────
+              _CustomerListTopBar(
+                searchController: _searchController,
+                searchQuery: _searchQuery,
+                showMembersOnly: _showMembersOnly,
+                isTableView: _isTableView,
+                onSearchChanged: (v) => setState(() {
+                  _searchQuery = v;
+                  _currentPage = 1;
+                }),
+                onSearchCleared: () {
+                  _searchController.clear();
+                  setState(() {
+                    _searchQuery = '';
+                    _currentPage = 1;
+                  });
+                },
+                onToggleMember: () => setState(() {
+                  _showMembersOnly = !_showMembersOnly;
+                  _currentPage = 1;
+                }),
+                onToggleView: () =>
+                    setState(() => _isTableView = !_isTableView),
+                onRefresh: () =>
+                    ref.read(customerListProvider.notifier).refresh(),
+                onAdd: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const CustomerFormPage()),
                   );
-                }
+                  // ✅ refresh หลังเพิ่มลูกค้าใหม่
+                  if (context.mounted) {
+                    ref.read(customerListProvider.notifier).refresh();
+                  }
+                },
+              ),
 
-                // ✅ Auto-fit colWidths ตามเนื้อหา (เฉพาะครั้งแรก / ยังไม่ resize)
-                final screenW = MediaQuery.of(context).size.width - 32;
-                if (!_userResized) _autoFitColWidths(filtered, screenW);
-
-                final totalW =
-                    40.0 +
-                    16.0 +
-                    _colWidths.fold(0.0, (s, w) => s + w) +
-                    28.0 +
-                    32.0;
-                final tableW = totalW > screenW ? totalW : screenW;
-
-                return Stack(
-                  children: [
-                    Container(
-                      margin: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppTheme.border),
+              // ── Table ──────────────────────────────────────────────
+              Expanded(
+                child: customerAsync.when(
+                  loading: () => Center(
+                    child: Padding(
+                      padding: context.pagePadding,
+                      child: const CircularProgressIndicator(
+                        color: AppTheme.primary,
                       ),
-                      // ✅ แนวตั้ง scroll ด้านนอก, แนวนอน scroll ด้านใน
-                      child: Column(
+                    ),
+                  ),
+                  error: (e, _) => _buildError(e),
+                  data: (customers) {
+                    final filtered = customers.where((c) {
+                      if (_showMembersOnly &&
+                          (c.memberNo == null || c.memberNo!.isEmpty)) {
+                        return false;
+                      }
+                      if (_searchQuery.isEmpty) return true;
+                      final q = _searchQuery.toLowerCase();
+                      return c.customerName.toLowerCase().contains(q) ||
+                          c.customerCode.toLowerCase().contains(q) ||
+                          (c.phone?.toLowerCase().contains(q) ?? false) ||
+                          (c.memberNo?.toLowerCase().contains(q) ?? false);
+                    }).toList();
+
+                    // ── Sort ────────────────────────────────────────
+                    filtered.sort((a, b) {
+                      int cmp;
+                      switch (_sortColumn) {
+                        case 'name':
+                          cmp = a.customerName.compareTo(b.customerName);
+                        case 'code':
+                          cmp = a.customerCode.compareTo(b.customerCode);
+                        case 'phone':
+                          cmp = (a.phone ?? '').compareTo(b.phone ?? '');
+                        case 'memberNo':
+                          cmp = (a.memberNo ?? '').compareTo(b.memberNo ?? '');
+                        case 'points':
+                          cmp = a.points.compareTo(b.points);
+                        case 'creditLimit':
+                          cmp = a.creditLimit.compareTo(b.creditLimit);
+                        case 'status':
+                          cmp = (b.isActive ? 1 : 0).compareTo(
+                            a.isActive ? 1 : 0,
+                          );
+                        default:
+                          cmp = 0;
+                      }
+                      return _sortAsc ? cmp : -cmp;
+                    });
+
+                    if (filtered.isEmpty) return _buildEmpty();
+
+                    // Pagination
+                    final totalPages = (filtered.length / pageSize).ceil();
+                    final safePage = _currentPage.clamp(1, totalPages);
+                    final pageStart = (safePage - 1) * pageSize;
+                    final pageEnd = (pageStart + pageSize).clamp(
+                      0,
+                      filtered.length,
+                    );
+                    final pageItems = filtered.sublist(pageStart, pageEnd);
+
+                    // ✅ Card View เมื่อ user เลือก
+                    if (!_isTableView) {
+                      return Column(
                         children: [
-                          // ── Header + Rows scroll แนวนอนพร้อมกัน ──────
                           Expanded(
-                            child: Scrollbar(
-                              controller: _hScroll,
-                              thumbVisibility: true,
-                              trackVisibility: true,
-                              child: SingleChildScrollView(
-                                controller: _hScroll,
-                                scrollDirection: Axis.horizontal,
-                                child: SizedBox(
-                                  width: tableW,
-                                  child: Column(
-                                    children: [
-                                      // Header (resizable + sortable)
-                                      _ResizableTableHeader(
-                                        colWidths: _colWidths,
-                                        colMinW: _colMinW,
-                                        colMaxW: _colMaxW,
-                                        sortColumn: _sortColumn,
-                                        sortAsc: _sortAsc,
-                                        onSort: (col) => setState(() {
-                                          if (_sortColumn == col) {
-                                            _sortAsc = !_sortAsc;
-                                          } else {
-                                            _sortColumn = col;
-                                            _sortAsc = true;
-                                          }
-                                          _currentPage = 1;
-                                        }),
-                                        onResize: (i, w) => setState(() {
-                                          _colWidths[i] = w;
-                                          _userResized = true;
-                                        }),
-                                        onReset: () => setState(() {
-                                          _colWidths.setAll(0, [
-                                            200, 110, 120, 120, 80, 110, 80, 100,
-                                          ]);
-                                          _userResized = false;
-                                        }),
-                                      ),
-                                      const Divider(
-                                        height: 1,
-                                        color: AppTheme.border,
-                                      ),
-                                      // Rows — ใช้ shrinkWrap ภายใน Column ที่รู้ขนาดแล้ว
-                                      Expanded(
-                                        child: ListView.separated(
-                                          itemCount: pageItems.length,
-                                          separatorBuilder: (_, _) =>
-                                              const Divider(
-                                                height: 1,
-                                                color: AppTheme.border,
-                                              ),
-                                          itemBuilder: (context, i) {
-                                            final c = pageItems[i];
-                                            final isMember =
-                                                c.memberNo != null &&
-                                                c.memberNo!.isNotEmpty;
-                                            final isSystem =
-                                                c.customerId == 'WALK_IN';
-                                            return _CustomerRow(
-                                              customer: c,
-                                              isMember: isMember,
-                                              isSystem: isSystem,
-                                              colWidths: _colWidths,
-                                              avatarColor: isSystem
-                                                  ? const Color(0xFF546E7A)
-                                                  : _avatarColor(
-                                                      c.customerName,
-                                                    ),
-                                              // ✅ กดเพื่อดูรายละเอียด
-                                              onTap: () => Navigator.push(
-                                                context,
-                                                MaterialPageRoute(
-                                                  builder: (_) =>
-                                                      CustomerDetailPage(
-                                                          customer: c),
-                                                ),
-                                              ),
-                                              onEdit: isSystem
-                                                  ? null
-                                                  : () async {
-                                                      await Navigator.push(
-                                                        context,
-                                                        MaterialPageRoute(
-                                                          builder: (_) =>
-                                                              CustomerFormPage(
-                                                                customer: c,
-                                                              ),
-                                                        ),
-                                                      );
-                                                      // ✅ refresh หลังแก้ไข
-                                                      if (context.mounted) {
-                                                        ref.read(customerListProvider.notifier).refresh();
-                                                      }
-                                                    },
-                                              onDelete: isSystem
-                                                  ? null
-                                                  : () => _confirmDelete(
-                                                      c.customerId,
-                                                      c.customerName,
-                                                    ),
-                                            );
-                                          },
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
+                            child: _buildCustomerCardView(context, pageItems),
                           ),
-                          // ── Footer / Pagination ───────────────────
                           PaginationBar(
                             currentPage: safePage,
                             totalItems: filtered.length,
                             pageSize: pageSize,
-                            onPageChanged: (p) => setState(() => _currentPage = p),
-                            trailing: PdfReportButton(
-                              emptyMessage: 'ไม่มีข้อมูลลูกค้า',
-                              title: 'รายงานลูกค้า',
-                              filename: () => PdfFilename.generate('customer_report'),
-                              buildPdf: () => CustomerPdfBuilder.build(filtered),
-                              hasData: filtered.isNotEmpty,
-                            ),
+                            onPageChanged: (p) =>
+                                setState(() => _currentPage = p),
                           ),
                         ],
-                      ),
-                    ), // Container
-                  ],
-                ); // Stack
-              },
-            ),
+                      );
+                    }
+
+                    // ✅ Auto-fit colWidths ตามเนื้อหา (เฉพาะครั้งแรก / ยังไม่ resize)
+                    final screenW = MediaQuery.of(context).size.width - 32;
+                    if (!_userResized) _autoFitColWidths(filtered, screenW);
+
+                    final totalW =
+                        40.0 +
+                        16.0 +
+                        _colWidths.fold(0.0, (s, w) => s + w) +
+                        28.0 +
+                        32.0;
+                    final tableW = totalW > screenW ? totalW : screenW;
+
+                    return Stack(
+                      children: [
+                        Container(
+                          margin: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppTheme.border),
+                          ),
+                          // ✅ แนวตั้ง scroll ด้านนอก, แนวนอน scroll ด้านใน
+                          child: Column(
+                            children: [
+                              // ── Header + Rows scroll แนวนอนพร้อมกัน ──────
+                              Expanded(
+                                child: Scrollbar(
+                                  controller: _hScroll,
+                                  thumbVisibility: true,
+                                  trackVisibility: true,
+                                  child: SingleChildScrollView(
+                                    controller: _hScroll,
+                                    scrollDirection: Axis.horizontal,
+                                    child: SizedBox(
+                                      width: tableW,
+                                      child: Column(
+                                        children: [
+                                          // Header (resizable + sortable)
+                                          _ResizableTableHeader(
+                                            colWidths: _colWidths,
+                                            colMinW: _colMinW,
+                                            colMaxW: _colMaxW,
+                                            sortColumn: _sortColumn,
+                                            sortAsc: _sortAsc,
+                                            onSort: (col) => setState(() {
+                                              if (_sortColumn == col) {
+                                                _sortAsc = !_sortAsc;
+                                              } else {
+                                                _sortColumn = col;
+                                                _sortAsc = true;
+                                              }
+                                              _currentPage = 1;
+                                            }),
+                                            onResize: (i, w) => setState(() {
+                                              _colWidths[i] = w;
+                                              _userResized = true;
+                                            }),
+                                            onReset: () => setState(() {
+                                              _colWidths.setAll(0, [
+                                                200,
+                                                110,
+                                                120,
+                                                120,
+                                                80,
+                                                110,
+                                                80,
+                                                100,
+                                              ]);
+                                              _userResized = false;
+                                            }),
+                                          ),
+                                          const Divider(
+                                            height: 1,
+                                            color: AppTheme.border,
+                                          ),
+                                          // Rows — ใช้ shrinkWrap ภายใน Column ที่รู้ขนาดแล้ว
+                                          Expanded(
+                                            child: ListView.separated(
+                                              itemCount: pageItems.length,
+                                              separatorBuilder: (_, _) =>
+                                                  const Divider(
+                                                    height: 1,
+                                                    color: AppTheme.border,
+                                                  ),
+                                              itemBuilder: (context, i) {
+                                                final c = pageItems[i];
+                                                final isMember =
+                                                    c.memberNo != null &&
+                                                    c.memberNo!.isNotEmpty;
+                                                final isSystem =
+                                                    c.customerId == 'WALK_IN';
+                                                return _CustomerRow(
+                                                  customer: c,
+                                                  isMember: isMember,
+                                                  isSystem: isSystem,
+                                                  colWidths: _colWidths,
+                                                  avatarColor: isSystem
+                                                      ? const Color(0xFF546E7A)
+                                                      : _avatarColor(
+                                                          c.customerName,
+                                                        ),
+                                                  // ✅ กดเพื่อดูรายละเอียด
+                                                  onTap: () => Navigator.push(
+                                                    context,
+                                                    MaterialPageRoute(
+                                                      builder: (_) =>
+                                                          CustomerDetailPage(
+                                                            customer: c,
+                                                          ),
+                                                    ),
+                                                  ),
+                                                  onEdit: isSystem
+                                                      ? null
+                                                      : () async {
+                                                          await Navigator.push(
+                                                            context,
+                                                            MaterialPageRoute(
+                                                              builder: (_) =>
+                                                                  CustomerFormPage(
+                                                                    customer: c,
+                                                                  ),
+                                                            ),
+                                                          );
+                                                          // ✅ refresh หลังแก้ไข
+                                                          if (context.mounted) {
+                                                            ref
+                                                                .read(
+                                                                  customerListProvider
+                                                                      .notifier,
+                                                                )
+                                                                .refresh();
+                                                          }
+                                                        },
+                                                  onDelete: isSystem
+                                                      ? null
+                                                      : () => _confirmDelete(
+                                                          c.customerId,
+                                                          c.customerName,
+                                                        ),
+                                                );
+                                              },
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              // ── Footer / Pagination ───────────────────
+                              PaginationBar(
+                                currentPage: safePage,
+                                totalItems: filtered.length,
+                                pageSize: pageSize,
+                                onPageChanged: (p) =>
+                                    setState(() => _currentPage = p),
+                                trailing: PdfReportButton(
+                                  emptyMessage: 'ไม่มีข้อมูลลูกค้า',
+                                  title: 'รายงานลูกค้า',
+                                  filename: () =>
+                                      PdfFilename.generate('customer_report'),
+                                  buildPdf: () =>
+                                      CustomerPdfBuilder.build(filtered),
+                                  hasData: filtered.isNotEmpty,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ), // Container
+                      ],
+                    ); // Stack
+                  },
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -574,13 +636,21 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
     // ── Header label widths (fontSize 12, w600 ~7.5px/char Thai)
     // คอลัมน์ที่ sort ได้ บวก sort icon (13px) + gap (3px) = +16
     // คอลัมน์ที่ไม่ sort บวกแค่ padding (16px)
-    const hPad     = 16.0;
+    const hPad = 16.0;
     const sortIcon = 16.0;
-    const hCharW   = 7.5;
+    const hCharW = 7.5;
 
     // [ชื่อ-นามสกุล, รหัสลูกค้า, โทรศัพท์, เลขสมาชิก, คะแนน, วงเงินเครดิต, สถานะ, จัดการ]
-    final labels  = ['ชื่อ-นามสกุล', 'รหัสลูกค้า', 'โทรศัพท์', 'เลขสมาชิก',
-                     'คะแนน',        'วงเงินเครดิต', 'สถานะ',    'จัดการ'];
+    final labels = [
+      'ชื่อ-นามสกุล',
+      'รหัสลูกค้า',
+      'โทรศัพท์',
+      'เลขสมาชิก',
+      'คะแนน',
+      'วงเงินเครดิต',
+      'สถานะ',
+      'จัดการ',
+    ];
     final hasSort = [true, true, true, true, true, true, true, false];
 
     final headerMinW = List<double>.generate(labels.length, (i) {
@@ -592,9 +662,9 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
     final maxW = List<double>.from(headerMinW);
 
     // ── Content character widths ──────────────────────────────
-    const charW   = 7.2;  // regular fontSize 13
+    const charW = 7.2; // regular fontSize 13
     const numCharW = 7.4; // ตัวเลข
-    const cPad    = 24.0; // horizontal padding ต่อ cell content
+    const cPad = 24.0; // horizontal padding ต่อ cell content
 
     for (final c in rows) {
       // 0: ชื่อ + avatar(36) + gap(10)
@@ -636,11 +706,13 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
 
     // กระจาย space ที่เหลือให้คอลัมน์ชื่อ (index 0)
     const totalFixed = 116.0; // ลำดับ(40+16) + reset(28) + padding(32)
-    final totalCols  = maxW.fold(0.0, (s, w) => s + w);
-    final available  = screenW - totalFixed;
+    final totalCols = maxW.fold(0.0, (s, w) => s + w);
+    final available = screenW - totalFixed;
     if (totalCols < available) {
-      maxW[0] = (maxW[0] + (available - totalCols))
-          .clamp(_colMinW[0], _colMaxW[0]);
+      maxW[0] = (maxW[0] + (available - totalCols)).clamp(
+        _colMinW[0],
+        _colMaxW[0],
+      );
     }
 
     for (int i = 0; i < _colWidths.length; i++) {
@@ -667,15 +739,17 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: Row(children: [
-          Icon(
-            hasHistory ? Icons.archive_outlined : Icons.delete_outline,
-            color: hasHistory ? AppTheme.warningColor : AppTheme.error,
-            size: 20,
-          ),
-          const SizedBox(width: 8),
-          Text(hasHistory ? 'ปิดการใช้งานลูกค้า' : 'ลบลูกค้าถาวร'),
-        ]),
+        title: Row(
+          children: [
+            Icon(
+              hasHistory ? Icons.archive_outlined : Icons.delete_outline,
+              color: hasHistory ? AppTheme.warningColor : AppTheme.error,
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Text(hasHistory ? 'ปิดการใช้งานลูกค้า' : 'ลบลูกค้าถาวร'),
+          ],
+        ),
         content: hasHistory
             ? Text(
                 'ลูกค้า "$name" มี$details\n\n'
@@ -697,8 +771,9 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
             ),
             label: Text(hasHistory ? 'ปิดการใช้งาน' : 'ลบถาวร'),
             style: ElevatedButton.styleFrom(
-              backgroundColor:
-                  hasHistory ? AppTheme.warningColor : AppTheme.error,
+              backgroundColor: hasHistory
+                  ? AppTheme.warningColor
+                  : AppTheme.error,
               foregroundColor: Colors.white,
             ),
             onPressed: () => Navigator.pop(context, true),
@@ -713,68 +788,112 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
         .deleteCustomer(id);
     if (!mounted) return;
     final success = message != null;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(success ? message : 'ดำเนินการไม่สำเร็จ'),
-      backgroundColor: success ? AppTheme.success : AppTheme.error,
-      behavior: SnackBarBehavior.floating,
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(success ? message : 'ดำเนินการไม่สำเร็จ'),
+        backgroundColor: success ? AppTheme.success : AppTheme.error,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   Widget _buildEmpty() {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            _showMembersOnly ? Icons.card_membership : Icons.people_outline,
-            size: 72,
-            color: Colors.grey[300],
+      child: Padding(
+        padding: context.pagePadding,
+        child: Card(
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: AppTheme.borderColorOf(context)),
           ),
-          const SizedBox(height: 16),
-          Text(
-            _searchQuery.isEmpty
-                ? (_showMembersOnly ? 'ยังไม่มีสมาชิก' : 'ยังไม่มีลูกค้า')
-                : 'ไม่พบลูกค้าที่ค้นหา',
-            style: TextStyle(color: Colors.grey[500], fontSize: 15),
-          ),
-          const SizedBox(height: 20),
-          ElevatedButton.icon(
-            onPressed: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const CustomerFormPage()),
-              );
-              // ✅ refresh หลังเพิ่มลูกค้าใหม่
-              if (context.mounted) {
-                ref.read(customerListProvider.notifier).refresh();
-              }
-            },
-            icon: const Icon(Icons.add),
-            label: const Text('เพิ่มลูกค้า'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primary,
-              foregroundColor: Colors.white,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 36),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  _showMembersOnly
+                      ? Icons.card_membership
+                      : Icons.people_outline,
+                  size: 72,
+                  color: Colors.grey[300],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  _searchQuery.isEmpty
+                      ? (_showMembersOnly ? 'ยังไม่มีสมาชิก' : 'ยังไม่มีลูกค้า')
+                      : 'ไม่พบลูกค้าที่ค้นหา',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'ลองเปลี่ยนคำค้นหา หรือลูกค้าใหม่เพื่อเริ่มต้นใช้งาน',
+                  style: TextStyle(
+                    color: AppTheme.subtextColorOf(context),
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                ElevatedButton.icon(
+                  onPressed: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const CustomerFormPage(),
+                      ),
+                    );
+                    if (context.mounted) {
+                      ref.read(customerListProvider.notifier).refresh();
+                    }
+                  },
+                  icon: const Icon(Icons.add),
+                  label: const Text('เพิ่มลูกค้า'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primary,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
 
   Widget _buildError(Object e) {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.error_outline, size: 72, color: Colors.red),
-          const SizedBox(height: 16),
-          Text('เกิดข้อผิดพลาด: $e'),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: () => ref.read(customerListProvider.notifier).refresh(),
-            child: const Text('ลองใหม่'),
+      child: Padding(
+        padding: context.pagePadding,
+        child: Card(
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: AppTheme.borderColorOf(context)),
           ),
-        ],
+          child: Padding(
+            padding: context.cardPadding,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                const SizedBox(height: 16),
+                Text('เกิดข้อผิดพลาด: $e', textAlign: TextAlign.center),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () =>
+                      ref.read(customerListProvider.notifier).refresh(),
+                  child: const Text('ลองใหม่'),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -795,14 +914,14 @@ class _ResizableTableHeader extends StatelessWidget {
 
   // label, sortKey ('' = ไม่ sort ได้)
   static const _cols = [
-    ('ชื่อ-นามสกุล',   'name'),
-    ('รหัสลูกค้า',     'code'),
-    ('โทรศัพท์',       'phone'),
-    ('เลขสมาชิก',     'memberNo'),
-    ('คะแนน',         'points'),
-    ('วงเงินเครดิต',  'creditLimit'),
-    ('สถานะ',         'status'),
-    ('จัดการ',        ''),
+    ('ชื่อ-นามสกุล', 'name'),
+    ('รหัสลูกค้า', 'code'),
+    ('โทรศัพท์', 'phone'),
+    ('เลขสมาชิก', 'memberNo'),
+    ('คะแนน', 'points'),
+    ('วงเงินเครดิต', 'creditLimit'),
+    ('สถานะ', 'status'),
+    ('จัดการ', ''),
   ];
 
   const _ResizableTableHeader({
@@ -828,11 +947,14 @@ class _ResizableTableHeader extends StatelessWidget {
             width: 40,
             height: 40,
             child: Center(
-              child: Text('รหัส',
-                  style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white70)),
+              child: Text(
+                'รหัส',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white70,
+                ),
+              ),
             ),
           ),
           const SizedBox(width: 16),
@@ -852,8 +974,10 @@ class _ResizableTableHeader extends StatelessWidget {
               isLast: i == _cols.length - 1,
               onSort: sortKey.isNotEmpty ? () => onSort(sortKey) : null,
               onResize: (delta) {
-                final newW = (colWidths[i] + delta)
-                    .clamp(colMinW[i], colMaxW[i]);
+                final newW = (colWidths[i] + delta).clamp(
+                  colMinW[i],
+                  colMaxW[i],
+                );
                 onResize(i, newW);
               },
             );
@@ -867,8 +991,11 @@ class _ResizableTableHeader extends StatelessWidget {
               borderRadius: BorderRadius.circular(4),
               child: const Padding(
                 padding: EdgeInsets.all(4),
-                child: Icon(Icons.settings_backup_restore,
-                    size: 14, color: Colors.white54),
+                child: Icon(
+                  Icons.settings_backup_restore,
+                  size: 14,
+                  color: Colors.white54,
+                ),
               ),
             ),
           ),
@@ -915,9 +1042,9 @@ class _ResizableCellState extends State<_ResizableCell> {
 
   @override
   Widget build(BuildContext context) {
-    final canSort    = widget.onSort != null;
+    final canSort = widget.onSort != null;
     // active = ส้ม, inactive = white70 (บน navy background)
-    const activeColor   = Color(0xFFFF9D45); // เหมือน product
+    const activeColor = Color(0xFFFF9D45); // เหมือน product
     const inactiveColor = Colors.white70;
     final labelColor = widget.isActive ? activeColor : inactiveColor;
 
@@ -934,7 +1061,9 @@ class _ResizableCellState extends State<_ResizableCell> {
                     borderRadius: BorderRadius.circular(4),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
-                          vertical: 4, horizontal: 2),
+                        vertical: 4,
+                        horizontal: 2,
+                      ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -954,8 +1083,8 @@ class _ResizableCellState extends State<_ResizableCell> {
                           Icon(
                             widget.isActive
                                 ? (widget.sortAsc
-                                    ? Icons.arrow_upward_rounded
-                                    : Icons.arrow_downward_rounded)
+                                      ? Icons.arrow_upward_rounded
+                                      : Icons.arrow_downward_rounded)
                                 : Icons.unfold_more_rounded,
                             size: 13,
                             color: widget.isActive
@@ -988,8 +1117,7 @@ class _ResizableCellState extends State<_ResizableCell> {
               onExit: (_) => setState(() => _hovering = false),
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                onHorizontalDragUpdate: (d) =>
-                    widget.onResize(d.delta.dx),
+                onHorizontalDragUpdate: (d) => widget.onResize(d.delta.dx),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 120),
                   width: 8,
@@ -1000,8 +1128,8 @@ class _ResizableCellState extends State<_ResizableCell> {
                     height: _hovering ? 22 : 12,
                     decoration: BoxDecoration(
                       color: _hovering
-                          ? const Color(0xFFFF9D45)  // active = ส้ม
-                          : Colors.white24,           // inactive = white บน navy
+                          ? const Color(0xFFFF9D45) // active = ส้ม
+                          : Colors.white24, // inactive = white บน navy
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -1023,7 +1151,7 @@ class _CustomerRow extends StatefulWidget {
   final bool isSystem;
   final List<double> colWidths; // ✅ รับความกว้างจาก parent
   final Color avatarColor;
-  final VoidCallback? onTap;   // ✅ เปิดหน้า detail
+  final VoidCallback? onTap; // ✅ เปิดหน้า detail
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
 
@@ -1065,282 +1193,282 @@ class _CustomerRowState extends State<_CustomerRow> {
           color: _hovered ? AppTheme.primaryLight : Colors.white,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Row(
-          children: [
-            // ลำดับ (fixed)
-            SizedBox(
-              width: 40,
-              child: Text(
-                c.customerCode.length > 6
-                    ? c.customerCode.substring(c.customerCode.length - 4)
-                    : c.customerCode,
-                style: const TextStyle(fontSize: 11, color: AppTheme.textSub),
+            children: [
+              // ลำดับ (fixed)
+              SizedBox(
+                width: 40,
+                child: Text(
+                  c.customerCode.length > 6
+                      ? c.customerCode.substring(c.customerCode.length - 4)
+                      : c.customerCode,
+                  style: const TextStyle(fontSize: 11, color: AppTheme.textSub),
+                ),
               ),
-            ),
-            const SizedBox(width: 16),
+              const SizedBox(width: 16),
 
-            // ชื่อ + Avatar — w[0]
-            SizedBox(
-              width: w[0],
-              child: Row(
-                children: [
-                  Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      CircleAvatar(
-                        radius: 18,
-                        backgroundColor: widget.avatarColor,
-                        child: Text(
-                          initial,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
+              // ชื่อ + Avatar — w[0]
+              SizedBox(
+                width: w[0],
+                child: Row(
+                  children: [
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        CircleAvatar(
+                          radius: 18,
+                          backgroundColor: widget.avatarColor,
+                          child: Text(
+                            initial,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
-                      ),
-                      if (widget.isMember)
-                        Positioned(
-                          right: -2,
-                          bottom: -2,
-                          child: Container(
-                            width: 14,
-                            height: 14,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFFB300),
-                              shape: BoxShape.circle,
-                              border: Border.all(
+                        if (widget.isMember)
+                          Positioned(
+                            right: -2,
+                            bottom: -2,
+                            child: Container(
+                              width: 14,
+                              height: 14,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFB300),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.white,
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: const Icon(
+                                Icons.star,
+                                size: 8,
                                 color: Colors.white,
-                                width: 1.5,
                               ),
                             ),
-                            child: const Icon(
-                              Icons.star,
-                              size: 8,
-                              color: Colors.white,
-                            ),
                           ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      c.customerName,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.black87,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // รหัส — w[1]
-            SizedBox(
-              width: w[1],
-              child: Text(
-                c.customerCode,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 13, color: AppTheme.textSub),
-              ),
-            ),
-
-            // โทร — w[2]
-            SizedBox(
-              width: w[2],
-              child: Text(
-                c.phone ?? '-',
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 13, color: AppTheme.textSub),
-              ),
-            ),
-
-            // เลขสมาชิก — w[3]
-            SizedBox(
-              width: w[3],
-              child: widget.isMember
-                  ? Row(
-                      children: [
-                        const Icon(
-                          Icons.card_membership,
-                          size: 13,
-                          color: Color(0xFFFFB300),
-                        ),
-                        const SizedBox(width: 4),
-                        Flexible(
-                          child: Text(
-                            c.memberNo ?? '',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFFFFB300),
-                              fontWeight: FontWeight.w500,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
                       ],
-                    )
-                  : const Text(
-                      '-',
-                      style: TextStyle(fontSize: 13, color: AppTheme.textSub),
                     ),
-            ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        c.customerName,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.black87,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
 
-            // คะแนน — w[4]
-            SizedBox(
-              width: w[4],
-              child: widget.isMember
-                  ? Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFF8E1),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFFFFE082)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
+              // รหัส — w[1]
+              SizedBox(
+                width: w[1],
+                child: Text(
+                  c.customerCode,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 13, color: AppTheme.textSub),
+                ),
+              ),
+
+              // โทร — w[2]
+              SizedBox(
+                width: w[2],
+                child: Text(
+                  c.phone ?? '-',
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 13, color: AppTheme.textSub),
+                ),
+              ),
+
+              // เลขสมาชิก — w[3]
+              SizedBox(
+                width: w[3],
+                child: widget.isMember
+                    ? Row(
                         children: [
                           const Icon(
-                            Icons.stars,
-                            size: 12,
+                            Icons.card_membership,
+                            size: 13,
                             color: Color(0xFFFFB300),
                           ),
-                          const SizedBox(width: 3),
-                          Text(
-                            '${c.points} pt',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFFE65100),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              c.memberNo ?? '',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFFFFB300),
+                                fontWeight: FontWeight.w500,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],
+                      )
+                    : const Text(
+                        '-',
+                        style: TextStyle(fontSize: 13, color: AppTheme.textSub),
                       ),
-                    )
-                  : const Text(
-                      '-',
-                      style: TextStyle(fontSize: 13, color: AppTheme.textSub),
-                    ),
-            ),
-
-            // วงเงินเครดิต — w[5]
-            SizedBox(
-              width: w[5],
-              child: c.creditLimit > 0
-                  ? Text(
-                      '฿${c.creditLimit.toStringAsFixed(0)}',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFF1565C0),
-                      ),
-                    )
-                  : const Text(
-                      '-',
-                      style: TextStyle(fontSize: 13, color: AppTheme.textSub),
-                    ),
-            ),
-
-            // สถานะ — w[6]
-            SizedBox(
-              width: w[6],
-              child: Center(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: c.isActive
-                        ? const Color(0xFFE8F5E9)
-                        : const Color(0xFFFFEBEE),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 6,
-                        height: 6,
-                        decoration: BoxDecoration(
-                          color: c.isActive
-                              ? const Color(0xFF4CAF50)
-                              : const Color(0xFFF44336),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 5),
-                      Text(
-                        c.isActive ? 'ใช้งาน' : 'ปิดใช้',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: c.isActive
-                              ? const Color(0xFF2E7D32)
-                              : const Color(0xFFC62828),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
               ),
-            ),
 
-            // จัดการ — w[7]
-            SizedBox(
-              width: w[7],
-              child: widget.isSystem
-                  // ✅ ลูกค้าระบบ — แสดง badge แทนปุ่ม
-                  ? Center(
-                      child: Container(
+              // คะแนน — w[4]
+              SizedBox(
+                width: w[4],
+                child: widget.isMember
+                    ? Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 8,
-                          vertical: 4,
+                          vertical: 3,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFECEFF1),
+                          color: const Color(0xFFFFF8E1),
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: const Color(0xFFB0BEC5)),
+                          border: Border.all(color: const Color(0xFFFFE082)),
                         ),
-                        child: const Text(
-                          'ระบบ',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF546E7A),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.stars,
+                              size: 12,
+                              color: Color(0xFFFFB300),
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              '${c.points} pt',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFFE65100),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : const Text(
+                        '-',
+                        style: TextStyle(fontSize: 13, color: AppTheme.textSub),
+                      ),
+              ),
+
+              // วงเงินเครดิต — w[5]
+              SizedBox(
+                width: w[5],
+                child: c.creditLimit > 0
+                    ? Text(
+                        '฿${c.creditLimit.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF1565C0),
+                        ),
+                      )
+                    : const Text(
+                        '-',
+                        style: TextStyle(fontSize: 13, color: AppTheme.textSub),
+                      ),
+              ),
+
+              // สถานะ — w[6]
+              SizedBox(
+                width: w[6],
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: c.isActive
+                          ? const Color(0xFFE8F5E9)
+                          : const Color(0xFFFFEBEE),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: c.isActive
+                                ? const Color(0xFF4CAF50)
+                                : const Color(0xFFF44336),
+                            shape: BoxShape.circle,
                           ),
                         ),
-                      ),
-                    )
-                  : Row(
-                      mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _ActionIcon(
-                          icon: Icons.edit_outlined,
-                          color: const Color(0xFF1565C0),
-                          tooltip: 'แก้ไข',
-                          onTap: widget.onEdit!,
-                        ),
-                        const SizedBox(width: 6),
-                        _ActionIcon(
-                          icon: Icons.delete_outline,
-                          color: const Color(0xFFC62828),
-                          tooltip: 'ลบ',
-                          onTap: widget.onDelete!,
+                        const SizedBox(width: 5),
+                        Text(
+                          c.isActive ? 'ใช้งาน' : 'ปิดใช้',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: c.isActive
+                                ? const Color(0xFF2E7D32)
+                                : const Color(0xFFC62828),
+                          ),
                         ),
                       ],
                     ),
-            ),
-          ],
-        ),
-        ),  // AnimatedContainer
-      ),  // GestureDetector
+                  ),
+                ),
+              ),
+
+              // จัดการ — w[7]
+              SizedBox(
+                width: w[7],
+                child: widget.isSystem
+                    // ✅ ลูกค้าระบบ — แสดง badge แทนปุ่ม
+                    ? Center(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFECEFF1),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: const Color(0xFFB0BEC5)),
+                          ),
+                          child: const Text(
+                            'ระบบ',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF546E7A),
+                            ),
+                          ),
+                        ),
+                      )
+                    : Row(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _ActionIcon(
+                            icon: Icons.edit_outlined,
+                            color: const Color(0xFF1565C0),
+                            tooltip: 'แก้ไข',
+                            onTap: widget.onEdit!,
+                          ),
+                          const SizedBox(width: 6),
+                          _ActionIcon(
+                            icon: Icons.delete_outline,
+                            color: const Color(0xFFC62828),
+                            tooltip: 'ลบ',
+                            onTap: widget.onDelete!,
+                          ),
+                        ],
+                      ),
+              ),
+            ],
+          ),
+        ), // AnimatedContainer
+      ), // GestureDetector
     );
   }
 }
@@ -1381,39 +1509,64 @@ class _CustomerListTopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-    final isWide = width >= _kBreak;
-    final canPop = Navigator.of(context).canPop();
-
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: isWide
-          ? _buildSingleRow(context, canPop)
-          : _buildDoubleRow(context, canPop),
+    return Padding(
+      padding: context.pagePadding,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isWide = constraints.maxWidth >= _kBreak;
+          return Card(
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: AppTheme.borderColorOf(context)),
+            ),
+            child: Padding(
+              padding: context.cardPadding,
+              child: isWide
+                  ? _buildSingleRow(context)
+                  : _buildDoubleRow(context),
+            ),
+          );
+        },
+      ),
     );
   }
 
   // ── Desktop / Wide: ทุกอย่างอยู่แถวเดียว ──────────────────────
-  Widget _buildSingleRow(BuildContext context, bool canPop) {
+  Widget _buildSingleRow(BuildContext context) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (canPop) ...[
-          _BackBtn(onTap: () => Navigator.of(context).pop()),
-          const SizedBox(width: 10),
-        ],
-        _PageIcon(),
-        const SizedBox(width: 10),
-        const Text(
-          'รายการลูกค้า',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF1A1A1A),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  _PageIcon(),
+                  const SizedBox(width: 10),
+                  Text(
+                    'ค้นหาและตัวกรอง',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'ค้นหาลูกค้า ดูเฉพาะสมาชิก และสลับมุมมองรายการ',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppTheme.subtextColorOf(context),
+                ),
+              ),
+            ],
           ),
         ),
-        const Spacer(),
-        // Search — ยืดหยุ่นแต่มี max width
+        const SizedBox(width: 16),
         ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 280),
           child: _SearchField(
@@ -1458,32 +1611,41 @@ class _CustomerListTopBar extends StatelessWidget {
   }
 
   // ── Mobile / Tablet: แถว 1 = title+ปุ่ม, แถว 2 = search ──────
-  Widget _buildDoubleRow(BuildContext context, bool canPop) {
+  Widget _buildDoubleRow(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // แถวบน: back + title + action buttons
         Row(
           children: [
-            if (canPop) ...[
-              _BackBtn(onTap: () => Navigator.of(context).pop()),
-              const SizedBox(width: 8),
-            ],
             _PageIcon(),
             const SizedBox(width: 8),
-            const Expanded(
+            Expanded(
               child: Text(
-                'รายการลูกค้า',
+                'ค้นหาและตัวกรอง',
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF1A1A1A),
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Text(
+          'ค้นหาลูกค้า ดูเฉพาะสมาชิก และสลับมุมมองรายการ',
+          style: TextStyle(
+            fontSize: 12,
+            color: AppTheme.subtextColorOf(context),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [
             _MemberToggle(active: showMembersOnly, onTap: onToggleMember),
-            const SizedBox(width: 4),
             Tooltip(
               message: isTableView ? 'Card View' : 'Table View',
               child: InkWell(
@@ -1506,14 +1668,11 @@ class _CustomerListTopBar extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(width: 4),
             _RefreshBtn(onTap: onRefresh),
-            const SizedBox(width: 4),
             _AddBtn(onTap: onAdd, compact: true),
           ],
         ),
         const SizedBox(height: 10),
-        // แถวล่าง: search เต็มความกว้าง
         _SearchField(
           controller: searchController,
           query: searchQuery,
@@ -1526,30 +1685,6 @@ class _CustomerListTopBar extends StatelessWidget {
 }
 
 // ── Sub-widgets ───────────────────────────────────────────────────
-
-class _BackBtn extends StatelessWidget {
-  final VoidCallback onTap;
-  const _BackBtn({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) => InkWell(
-    onTap: onTap,
-    borderRadius: BorderRadius.circular(8),
-    child: Container(
-      padding: const EdgeInsets.all(7),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF5F5F5),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppTheme.border),
-      ),
-      child: const Icon(
-        Icons.arrow_back_ios_new,
-        size: 15,
-        color: AppTheme.textSub,
-      ),
-    ),
-  );
-}
 
 class _PageIcon extends StatelessWidget {
   @override
@@ -1585,11 +1720,7 @@ class _SearchField extends StatelessWidget {
       decoration: InputDecoration(
         hintText: 'ค้นหาลูกค้า...',
         hintStyle: const TextStyle(fontSize: 13, color: AppTheme.textSub),
-        prefixIcon: const Icon(
-          Icons.search,
-          size: 17,
-          color: AppTheme.textSub,
-        ),
+        prefixIcon: const Icon(Icons.search, size: 17, color: AppTheme.textSub),
         suffixIcon: query.isNotEmpty
             ? IconButton(
                 icon: const Icon(Icons.clear, size: 15),

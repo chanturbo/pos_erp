@@ -9,26 +9,27 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import '../../../settings/shared/settings_defaults.dart';
 import '../../data/models/sales_order_model.dart';
 
 // ─────────────────────────────────────────────────────────────────
 // Standard color palette
 // ─────────────────────────────────────────────────────────────────
-const _kBorder  = PdfColor.fromInt(0xFFBBBBBB);
-const _kHdrBg   = PdfColor.fromInt(0xFFDDDDDD);
-const _kAltRow  = PdfColor.fromInt(0xFFF5F5F5);
-const _kText    = PdfColors.black;
-const _kSub     = PdfColor.fromInt(0xFF555555);
+const _kBorder = PdfColor.fromInt(0xFFBBBBBB);
+const _kHdrBg = PdfColor.fromInt(0xFFDDDDDD);
+const _kAltRow = PdfColor.fromInt(0xFFF5F5F5);
+const _kText = PdfColors.black;
+const _kSub = PdfColor.fromInt(0xFF555555);
 const _kSuccess = PdfColor.fromInt(0xFF1B5E20);
-const _kError   = PdfColor.fromInt(0xFFB71C1C);
+const _kError = PdfColor.fromInt(0xFFB71C1C);
 const _kWarning = PdfColor.fromInt(0xFFBF360C);
 
 // ─────────────────────────────────────────────────────────────────
 // SalesHistoryPdfBuilder
 // ─────────────────────────────────────────────────────────────────
 class SalesHistoryPdfBuilder {
-  static final _fmt      = NumberFormat('#,##0.00', 'th');
-  static final _dateFmt  = DateFormat('dd/MM/yyyy HH:mm');
+  static final _fmt = NumberFormat('#,##0.00', 'th');
+  static final _dateFmt = DateFormat('dd/MM/yyyy HH:mm');
   static final _shortFmt = DateFormat('dd/MM/yyyy');
 
   /// สร้าง PDF — รับ list ที่ filter แล้ว + filter params สำหรับแสดงใน header
@@ -37,28 +38,31 @@ class SalesHistoryPdfBuilder {
     DateTime? dateFrom,
     DateTime? dateTo,
     String paymentFilter = 'ALL',
-    String statusFilter  = 'ALL',
-    String companyName   = 'DEE POS',
+    String statusFilter = 'ALL',
+    String? companyName,
   }) async {
+    final effectiveCompanyName =
+        companyName ?? await SettingsStorage.getCompanyName();
     final doc = pw.Document(
-      title:  'รายงานประวัติการขาย',
-      author: companyName,
+      title: 'รายงานประวัติการขาย',
+      author: effectiveCompanyName,
     );
 
-    final ttf        = await PdfGoogleFonts.notoSansThaiBold();
+    final ttf = await PdfGoogleFonts.notoSansThaiBold();
     final ttfRegular = await PdfGoogleFonts.notoSansThaiRegular();
-    final printedAt  = DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now());
+    final printedAt = DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now());
 
     // คำนวณ summary
-    final completed    = orders.where((o) => o.status == 'COMPLETED').toList();
-    final cancelled    = orders.where((o) => o.status == 'CANCELLED').toList();
-    final pending      = orders.where((o) => o.status == 'PENDING').toList();
+    final completed = orders.where((o) => o.status == 'COMPLETED').toList();
+    final cancelled = orders.where((o) => o.status == 'CANCELLED').toList();
+    final pending = orders.where((o) => o.status == 'PENDING').toList();
     final totalRevenue = completed.fold(0.0, (s, o) => s + o.totalAmount);
 
     // สร้าง subtitle (ช่วงเวลา + filter)
     String periodText = 'ทั้งหมด';
     if (dateFrom != null && dateTo != null) {
-      periodText = '${_shortFmt.format(dateFrom)} – ${_shortFmt.format(dateTo)}';
+      periodText =
+          '${_shortFmt.format(dateFrom)} – ${_shortFmt.format(dateTo)}';
     } else if (dateFrom != null) {
       periodText = 'ตั้งแต่ ${_shortFmt.format(dateFrom)}';
     } else if (dateTo != null) {
@@ -66,17 +70,23 @@ class SalesHistoryPdfBuilder {
     }
 
     var subtitle = 'ช่วงเวลา: $periodText';
-    if (paymentFilter != 'ALL') subtitle += '   ชำระ: ${_paymentLabel(paymentFilter)}';
-    if (statusFilter != 'ALL')  subtitle += '   สถานะ: ${_statusLabel(statusFilter)}';
+    if (paymentFilter != 'ALL') {
+      subtitle += '   ชำระ: ${_paymentLabel(paymentFilter)}';
+    }
+    if (statusFilter != 'ALL') {
+      subtitle += '   สถานะ: ${_statusLabel(statusFilter)}';
+    }
 
     final summaryLine =
         'ทั้งหมด ${orders.length} ใบ   สำเร็จ ${completed.length} ใบ   รอดำเนิน ${pending.length} ใบ   ยกเลิก ${cancelled.length} ใบ   ยอดรวม ฿${_fmt.format(totalRevenue)}';
 
     // แบ่งหน้า 38 rows / page (A4 แนวตั้ง)
-    const rowsPerPage = 38;
+    final rowsPerPage = await SettingsStorage.getReportRowsPerPage();
     final pages = <List<SalesOrderModel>>[];
     for (var i = 0; i < orders.length; i += rowsPerPage) {
-      final end = (i + rowsPerPage) > orders.length ? orders.length : i + rowsPerPage;
+      final end = (i + rowsPerPage) > orders.length
+          ? orders.length
+          : i + rowsPerPage;
       pages.add(orders.sublist(i, end));
     }
     if (pages.isEmpty) pages.add([]);
@@ -88,23 +98,26 @@ class SalesHistoryPdfBuilder {
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(24),
         header: (ctx) => _buildPageHeader(
-          companyName: companyName,
+          companyName: effectiveCompanyName,
           reportTitle: 'รายงานประวัติการขาย',
-          printedAt:   printedAt,
-          page:        ctx.pageNumber,
-          totalPages:  totalPages,
-          ttf:         ttf,
-          ttfRegular:  ttfRegular,
-          subtitle:    subtitle,
+          printedAt: printedAt,
+          page: ctx.pageNumber,
+          totalPages: totalPages,
+          ttf: ttf,
+          ttfRegular: ttfRegular,
+          subtitle: subtitle,
           summaryLine: summaryLine,
         ),
-        footer: (ctx) => _buildFooter(ttfRegular: ttfRegular),
+        footer: (ctx) => _buildFooter(
+          companyName: effectiveCompanyName,
+          ttfRegular: ttfRegular,
+        ),
         build: (ctx) => [
           for (var i = 0; i < pages.length; i++)
             _buildTable(
               pages[i],
-              startNo:    i * rowsPerPage + 1,
-              ttf:        ttf,
+              startNo: i * rowsPerPage + 1,
+              ttf: ttf,
               ttfRegular: ttfRegular,
             ),
         ],
@@ -116,15 +129,15 @@ class SalesHistoryPdfBuilder {
 
   // ── Page Header ────────────────────────────────────────────────
   static pw.Widget _buildPageHeader({
-    required String  companyName,
-    required String  reportTitle,
-    required String  printedAt,
-    required int     page,
-    required int     totalPages,
+    required String companyName,
+    required String reportTitle,
+    required String printedAt,
+    required int page,
+    required int totalPages,
     required pw.Font ttf,
     required pw.Font ttfRegular,
-    String?          subtitle,
-    String?          summaryLine,
+    String? subtitle,
+    String? summaryLine,
   }) {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.stretch,
@@ -132,34 +145,46 @@ class SalesHistoryPdfBuilder {
         pw.Row(
           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
           children: [
-            pw.Text('พิมพ์เมื่อ $printedAt',
-                style: pw.TextStyle(font: ttfRegular, fontSize: 8, color: _kSub)),
-            pw.Text('หน้าที่ $page / $totalPages',
-                style: pw.TextStyle(font: ttfRegular, fontSize: 8, color: _kSub)),
+            pw.Text(
+              'พิมพ์เมื่อ $printedAt',
+              style: pw.TextStyle(font: ttfRegular, fontSize: 8, color: _kSub),
+            ),
+            pw.Text(
+              'หน้าที่ $page / $totalPages',
+              style: pw.TextStyle(font: ttfRegular, fontSize: 8, color: _kSub),
+            ),
           ],
         ),
         pw.SizedBox(height: 3),
         pw.Center(
-          child: pw.Text(companyName,
-              style: pw.TextStyle(font: ttfRegular, fontSize: 9, color: _kSub)),
+          child: pw.Text(
+            companyName,
+            style: pw.TextStyle(font: ttfRegular, fontSize: 9, color: _kSub),
+          ),
         ),
         pw.SizedBox(height: 2),
         pw.Center(
-          child: pw.Text(reportTitle,
-              style: pw.TextStyle(font: ttf, fontSize: 14, color: _kText)),
+          child: pw.Text(
+            reportTitle,
+            style: pw.TextStyle(font: ttf, fontSize: 14, color: _kText),
+          ),
         ),
         if (subtitle != null) ...[
           pw.SizedBox(height: 3),
           pw.Center(
-            child: pw.Text(subtitle,
-                style: pw.TextStyle(font: ttfRegular, fontSize: 8, color: _kSub)),
+            child: pw.Text(
+              subtitle,
+              style: pw.TextStyle(font: ttfRegular, fontSize: 8, color: _kSub),
+            ),
           ),
         ],
         if (summaryLine != null) ...[
           pw.SizedBox(height: 2),
           pw.Center(
-            child: pw.Text(summaryLine,
-                style: pw.TextStyle(font: ttfRegular, fontSize: 8, color: _kSub)),
+            child: pw.Text(
+              summaryLine,
+              style: pw.TextStyle(font: ttfRegular, fontSize: 8, color: _kSub),
+            ),
           ),
         ],
         pw.SizedBox(height: 6),
@@ -172,28 +197,31 @@ class SalesHistoryPdfBuilder {
   // ── Table ─────────────────────────────────────────────────────────
   static pw.Widget _buildTable(
     List<SalesOrderModel> orders, {
-    required int     startNo,
+    required int startNo,
     required pw.Font ttf,
     required pw.Font ttfRegular,
   }) {
     // portrait A4 usable ≈ 547pt — fixed total 417pt → flex ≈ 130pt
     const colWidths = {
-      0: pw.FixedColumnWidth(24),   // #
-      1: pw.FixedColumnWidth(80),   // วันที่
-      2: pw.FixedColumnWidth(88),   // เลขที่
-      3: pw.FlexColumnWidth(1),     // ลูกค้า
-      4: pw.FixedColumnWidth(50),   // ชำระด้วย
-      5: pw.FixedColumnWidth(55),   // ส่วนลด
-      6: pw.FixedColumnWidth(70),   // ยอดรวม
-      7: pw.FixedColumnWidth(50),   // สถานะ
+      0: pw.FixedColumnWidth(24), // #
+      1: pw.FixedColumnWidth(80), // วันที่
+      2: pw.FixedColumnWidth(88), // เลขที่
+      3: pw.FlexColumnWidth(1), // ลูกค้า
+      4: pw.FixedColumnWidth(50), // ชำระด้วย
+      5: pw.FixedColumnWidth(55), // ส่วนลด
+      6: pw.FixedColumnWidth(70), // ยอดรวม
+      7: pw.FixedColumnWidth(50), // สถานะ
     };
 
-    pw.Widget cell(String text, pw.Font font,
-        {pw.Alignment align     = pw.Alignment.centerLeft,
-        PdfColor?    color,
-        PdfColor?    bgColor,
-        double       fontSize   = 8.5,
-        bool         strikethrough = false}) {
+    pw.Widget cell(
+      String text,
+      pw.Font font, {
+      pw.Alignment align = pw.Alignment.centerLeft,
+      PdfColor? color,
+      PdfColor? bgColor,
+      double fontSize = 8.5,
+      bool strikethrough = false,
+    }) {
       return pw.Container(
         color: bgColor,
         padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 5),
@@ -201,12 +229,10 @@ class SalesHistoryPdfBuilder {
         child: pw.Text(
           text,
           style: pw.TextStyle(
-            font:       font,
-            fontSize:   fontSize,
-            color:      color ?? _kText,
-            decoration: strikethrough
-                ? pw.TextDecoration.lineThrough
-                : null,
+            font: font,
+            fontSize: fontSize,
+            color: color ?? _kText,
+            decoration: strikethrough ? pw.TextDecoration.lineThrough : null,
           ),
         ),
       );
@@ -219,46 +245,77 @@ class SalesHistoryPdfBuilder {
         // Header row
         pw.TableRow(
           decoration: pw.BoxDecoration(color: _kHdrBg),
-          children: [
-            '#', 'วันที่-เวลา', 'เลขที่ใบขาย', 'ลูกค้า',
-            'ชำระด้วย', 'ส่วนลด', 'ยอดรวม', 'สถานะ',
-          ]
-              .map((h) => pw.Container(
-                    padding: const pw.EdgeInsets.symmetric(
-                        horizontal: 5, vertical: 6),
-                    child: pw.Text(h,
+          children:
+              [
+                    '#',
+                    'วันที่-เวลา',
+                    'เลขที่ใบขาย',
+                    'ลูกค้า',
+                    'ชำระด้วย',
+                    'ส่วนลด',
+                    'ยอดรวม',
+                    'สถานะ',
+                  ]
+                  .map(
+                    (h) => pw.Container(
+                      padding: const pw.EdgeInsets.symmetric(
+                        horizontal: 5,
+                        vertical: 6,
+                      ),
+                      child: pw.Text(
+                        h,
                         style: pw.TextStyle(
-                            font: ttf, fontSize: 8, color: _kText)),
-                  ))
-              .toList(),
+                          font: ttf,
+                          fontSize: 8,
+                          color: _kText,
+                        ),
+                      ),
+                    ),
+                  )
+                  .toList(),
         ),
 
         // Data rows
         ...orders.asMap().entries.map((entry) {
-          final i           = entry.key;
-          final o           = entry.value;
-          final rowBg       = i.isEven ? _kAltRow : null;
+          final i = entry.key;
+          final o = entry.value;
+          final rowBg = i.isEven ? _kAltRow : null;
           final isCancelled = o.status == 'CANCELLED';
 
           return pw.TableRow(
             children: [
               // #
-              cell('${startNo + i}', ttfRegular,
-                  align: pw.Alignment.center, bgColor: rowBg),
+              cell(
+                '${startNo + i}',
+                ttfRegular,
+                align: pw.Alignment.center,
+                bgColor: rowBg,
+              ),
               // วันที่
-              cell(_dateFmt.format(o.orderDate), ttfRegular,
-                  fontSize: 7.5, color: _kSub, bgColor: rowBg),
+              cell(
+                _dateFmt.format(o.orderDate),
+                ttfRegular,
+                fontSize: 7.5,
+                color: _kSub,
+                bgColor: rowBg,
+              ),
               // เลขที่ใบขาย
               cell(o.orderNo, ttf, bgColor: rowBg),
               // ลูกค้า
-              cell(o.customerName ?? 'Walk-in', ttfRegular,
-                  color: o.customerName == null ? _kSub : null,
-                  bgColor: rowBg),
+              cell(
+                o.customerName ?? 'Walk-in',
+                ttfRegular,
+                color: o.customerName == null ? _kSub : null,
+                bgColor: rowBg,
+              ),
               // ชำระด้วย
-              cell(_paymentLabel(o.paymentType), ttfRegular,
-                  align: pw.Alignment.center,
-                  color: _paymentColor(o.paymentType),
-                  bgColor: rowBg),
+              cell(
+                _paymentLabel(o.paymentType),
+                ttfRegular,
+                align: pw.Alignment.center,
+                color: _paymentColor(o.paymentType),
+                bgColor: rowBg,
+              ),
               // ส่วนลด
               cell(
                 o.discountAmount > 0
@@ -279,10 +336,13 @@ class SalesHistoryPdfBuilder {
                 bgColor: rowBg,
               ),
               // สถานะ
-              cell(_statusLabel(o.status), ttf,
-                  align: pw.Alignment.center,
-                  color: _statusColor(o.status),
-                  bgColor: rowBg),
+              cell(
+                _statusLabel(o.status),
+                ttf,
+                align: pw.Alignment.center,
+                color: _statusColor(o.status),
+                bgColor: rowBg,
+              ),
             ],
           );
         }),
@@ -291,15 +351,17 @@ class SalesHistoryPdfBuilder {
   }
 
   // ── Footer ────────────────────────────────────────────────────────
-  static pw.Widget _buildFooter({required pw.Font ttfRegular}) {
+  static pw.Widget _buildFooter({
+    required String companyName,
+    required pw.Font ttfRegular,
+  }) {
     return pw.Container(
       padding: const pw.EdgeInsets.only(top: 6),
       decoration: const pw.BoxDecoration(
-        border: pw.Border(
-            top: pw.BorderSide(color: _kBorder, width: 0.5)),
+        border: pw.Border(top: pw.BorderSide(color: _kBorder, width: 0.5)),
       ),
       child: pw.Text(
-        'DEE POS — รายงานประวัติการขาย',
+        '$companyName — รายงานประวัติการขาย',
         style: pw.TextStyle(font: ttfRegular, fontSize: 7, color: _kSub),
       ),
     );
@@ -307,30 +369,30 @@ class SalesHistoryPdfBuilder {
 
   // ── Label / Color helpers ─────────────────────────────────────────
   static String _paymentLabel(String type) => switch (type) {
-        'CASH'     => 'เงินสด',
-        'CARD'     => 'บัตร',
-        'TRANSFER' => 'โอน',
-        _          => type,
-      };
+    'CASH' => 'เงินสด',
+    'CARD' => 'บัตร',
+    'TRANSFER' => 'โอน',
+    _ => type,
+  };
 
   static PdfColor _paymentColor(String type) => switch (type) {
-        'CASH'     => _kSuccess,
-        'CARD'     => const PdfColor.fromInt(0xFF1565C0),
-        'TRANSFER' => const PdfColor.fromInt(0xFF6A1B9A),
-        _          => _kSub,
-      };
+    'CASH' => _kSuccess,
+    'CARD' => const PdfColor.fromInt(0xFF1565C0),
+    'TRANSFER' => const PdfColor.fromInt(0xFF6A1B9A),
+    _ => _kSub,
+  };
 
   static String _statusLabel(String status) => switch (status) {
-        'COMPLETED' => 'สำเร็จ',
-        'PENDING'   => 'รอดำเนิน',
-        'CANCELLED' => 'ยกเลิก',
-        _           => status,
-      };
+    'COMPLETED' => 'สำเร็จ',
+    'PENDING' => 'รอดำเนิน',
+    'CANCELLED' => 'ยกเลิก',
+    _ => status,
+  };
 
   static PdfColor _statusColor(String status) => switch (status) {
-        'COMPLETED' => _kSuccess,
-        'PENDING'   => const PdfColor.fromInt(0xFFE65100),
-        'CANCELLED' => _kError,
-        _           => _kSub,
-      };
+    'COMPLETED' => _kSuccess,
+    'PENDING' => const PdfColor.fromInt(0xFFE65100),
+    'CANCELLED' => _kError,
+    _ => _kSub,
+  };
 }
