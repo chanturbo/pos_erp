@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:pos_erp/shared/theme/app_theme.dart';
 import '../../data/models/ap_payment_model.dart';
 import '../../data/models/ap_payment_allocation_model.dart';
 import '../../data/models/ap_invoice_model.dart';
@@ -13,7 +14,8 @@ class ApPaymentFormPage extends ConsumerStatefulWidget {
   const ApPaymentFormPage({super.key});
 
   @override
-  ConsumerState<ApPaymentFormPage> createState() => _ApPaymentFormPageState();
+  ConsumerState<ApPaymentFormPage> createState() =>
+      _ApPaymentFormPageState();
 }
 
 class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
@@ -30,20 +32,19 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
   String _paymentMethod = 'CASH';
 
   List<ApInvoiceModel> _unpaidInvoices = [];
-  final Map<String, double> _allocations = {}; // invoiceId -> amount
+  final Map<String, double> _allocations = {};
   bool _isLoading = false;
   bool _isLoadingInvoices = false;
 
   @override
   void initState() {
     super.initState();
-    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final ts = DateTime.now().millisecondsSinceEpoch;
     _paymentNoController = TextEditingController(
-      text: 'APPAY${timestamp.toString().substring(8)}',
-    );
+        text: 'APPAY${ts.toString().substring(8)}');
     _referenceNoController = TextEditingController();
-    _bankNameController = TextEditingController();
-    _remarkController = TextEditingController();
+    _bankNameController    = TextEditingController();
+    _remarkController      = TextEditingController();
   }
 
   @override
@@ -55,337 +56,361 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
     super.dispose();
   }
 
+  // ─────────────────────────────────────────────────────────────
+  Color get _accentColor => AppTheme.tealColor;
+
+  double get _totalAmount =>
+      _allocations.values.fold(0, (s, v) => s + v);
+
+  // ─────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('จ่ายเงินซัพพลายเออร์'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.help_outline),
-            onPressed: _showHelp,
-          ),
-        ],
-      ),
-      body: Form(
-        key: _formKey,
-        child: Column(
-          children: [
-            Expanded(
+      backgroundColor:
+          isDark ? AppTheme.darkBg : const Color(0xFFF0F2F5),
+      body: Column(
+        children: [
+          _PayFormTitleBar(isDark: isDark),
+          Expanded(
+            child: Form(
+              key: _formKey,
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildPaymentInfoCard(),
-                    const SizedBox(height: 16),
-                    _buildInvoiceAllocationCard(),
-                    const SizedBox(height: 16),
-                    if (_allocations.isNotEmpty) _buildSummaryCard(),
+                    _buildInfoSection(isDark),
+                    const SizedBox(height: 14),
+                    _buildAllocationSection(isDark),
+                    if (_allocations.isNotEmpty) ...[
+                      const SizedBox(height: 14),
+                      _buildSummarySection(isDark),
+                    ],
+                    const SizedBox(height: 80),
                   ],
                 ),
               ),
             ),
-            _buildBottomActions(),
-          ],
-        ),
+          ),
+          _buildBottomBar(isDark),
+        ],
       ),
     );
   }
 
-  Widget _buildPaymentInfoCard() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
+  // ─── Section 1: ข้อมูลการจ่ายเงิน ──────────────────────────
+  Widget _buildInfoSection(bool isDark) {
+    return _SectionCard(
+      icon: Icons.payments_outlined,
+      title: 'ข้อมูลการจ่ายเงิน',
+      color: _accentColor,
+      isDark: isDark,
+      child: Column(
+        children: [
+          // เลขที่ใบจ่ายเงิน
+          _PayTextField(
+            controller: _paymentNoController,
+            hint: 'เลขที่ใบจ่ายเงิน',
+            icon: Icons.receipt_outlined,
+            isDark: isDark,
+            readOnly: true,
+          ),
+          const SizedBox(height: 12),
+
+          // วันที่จ่าย
+          _DatePickerField(
+            label: 'วันที่จ่าย',
+            date: _paymentDate,
+            isDark: isDark,
+            accentColor: _accentColor,
+            onPick: _selectPaymentDate,
+          ),
+          const SizedBox(height: 12),
+
+          // ซัพพลายเออร์
+          _SupplierPickerField(
+            supplierName: _supplierName,
+            isDark: isDark,
+            accentColor: _accentColor,
+            onPick: _selectSupplier,
+          ),
+          const SizedBox(height: 12),
+
+          // วิธีจ่าย
+          _PayMethodDropdown(
+            value: _paymentMethod,
+            isDark: isDark,
+            accentColor: _accentColor,
+            onChanged: (v) => setState(() {
+              _paymentMethod = v!;
+              _referenceNoController.clear();
+              _bankNameController.clear();
+            }),
+          ),
+
+          // ฟิลด์เพิ่มเติมตามวิธีจ่าย
+          if (_paymentMethod == 'TRANSFER' ||
+              _paymentMethod == 'CHEQUE') ...[
+            const SizedBox(height: 12),
+            _PayTextField(
+              controller: _bankNameController,
+              hint: 'ธนาคาร',
+              icon: Icons.account_balance_outlined,
+              isDark: isDark,
+            ),
+            const SizedBox(height: 12),
+            _PayTextField(
+              controller: _referenceNoController,
+              hint: _paymentMethod == 'CHEQUE'
+                  ? 'เลขที่เช็ค'
+                  : 'เลขที่อ้างอิง',
+              icon: Icons.confirmation_number_outlined,
+              isDark: isDark,
+            ),
+          ],
+
+          const SizedBox(height: 12),
+
+          // หมายเหตุ
+          _PayTextField(
+            controller: _remarkController,
+            hint: 'หมายเหตุ',
+            icon: Icons.notes_outlined,
+            isDark: isDark,
+            maxLines: 2,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── Section 2: จัดสรรเงินจ่าย ──────────────────────────────
+  Widget _buildAllocationSection(bool isDark) {
+    return _SectionCard(
+      icon: Icons.receipt_long_outlined,
+      title: 'จัดสรรเงินจ่าย',
+      color: _accentColor,
+      isDark: isDark,
+      trailing: _unpaidInvoices.isNotEmpty
+          ? GestureDetector(
+              onTap: _autoAllocate,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: _accentColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.auto_awesome,
+                        size: 14, color: _accentColor),
+                    const SizedBox(width: 4),
+                    Text('จัดสรรอัตโนมัติ',
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: _accentColor)),
+                  ],
+                ),
+              ),
+            )
+          : null,
+      child: _supplierId == null
+          ? _buildAllocationPlaceholder(
+              icon: Icons.business_outlined,
+              message: 'กรุณาเลือกซัพพลายเออร์ก่อน',
+              isDark: isDark,
+            )
+          : _isLoadingInvoices
+              ? const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 32),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              : _unpaidInvoices.isEmpty
+                  ? _buildAllocationPlaceholder(
+                      icon: Icons.check_circle_outline,
+                      message: 'ไม่มีใบแจ้งหนี้ค้างชำระ',
+                      color: AppTheme.success,
+                      isDark: isDark,
+                    )
+                  : Column(
+                      children: _unpaidInvoices
+                          .map((inv) =>
+                              _buildAllocationRow(inv, isDark))
+                          .toList(),
+                    ),
+    );
+  }
+
+  Widget _buildAllocationPlaceholder({
+    required IconData icon,
+    required String message,
+    Color? color,
+    required bool isDark,
+  }) {
+    final c = color ??
+        (isDark ? const Color(0xFF666666) : Colors.grey[400]!);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 32),
+      child: Center(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'ข้อมูลการจ่ายเงิน',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-
-            // เลขที่ใบจ่ายเงิน
-            TextFormField(
-              controller: _paymentNoController,
-              decoration: const InputDecoration(
-                labelText: 'เลขที่ใบจ่ายเงิน',
-                prefixIcon: Icon(Icons.receipt),
-              ),
-              readOnly: true,
-              style: TextStyle(color: Colors.grey[700]),
-            ),
-            const SizedBox(height: 16),
-
-            // วันที่จ่าย
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.calendar_today),
-              title: const Text('วันที่จ่าย'),
-              subtitle: Text(DateFormat('dd/MM/yyyy').format(_paymentDate)),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: _selectPaymentDate,
-            ),
-
-            const Divider(),
-
-            // ซัพพลายเออร์
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.business),
-              title: const Text('ซัพพลายเออร์'),
-              subtitle: Text(_supplierName ?? 'เลือกซัพพลายเออร์'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: _selectSupplier,
-            ),
-
-            const Divider(),
-
-            // วิธีจ่าย
-            DropdownButtonFormField<String>(
-              decoration: const InputDecoration(
-                labelText: 'วิธีจ่าย',
-                prefixIcon: Icon(Icons.payment),
-              ),
-              initialValue: _paymentMethod,
-              items: const [
-                DropdownMenuItem(value: 'CASH', child: Text('เงินสด')),
-                DropdownMenuItem(value: 'TRANSFER', child: Text('โอนเงิน')),
-                DropdownMenuItem(value: 'CHEQUE', child: Text('เช็ค')),
-              ],
-              onChanged: (value) {
-                setState(() {
-                  _paymentMethod = value!;
-                });
-              },
-            ),
-            const SizedBox(height: 16),
-
-            // ฟิลด์เพิ่มเติมตามวิธีจ่าย
-            if (_paymentMethod == 'TRANSFER') ...[
-              TextFormField(
-                controller: _bankNameController,
-                decoration: const InputDecoration(
-                  labelText: 'ธนาคาร',
-                  prefixIcon: Icon(Icons.account_balance),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _referenceNoController,
-                decoration: const InputDecoration(
-                  labelText: 'เลขที่อ้างอิง',
-                  prefixIcon: Icon(Icons.confirmation_number),
-                ),
-              ),
-            ] else if (_paymentMethod == 'CHEQUE') ...[
-              TextFormField(
-                controller: _bankNameController,
-                decoration: const InputDecoration(
-                  labelText: 'ธนาคาร',
-                  prefixIcon: Icon(Icons.account_balance),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _referenceNoController,
-                decoration: const InputDecoration(
-                  labelText: 'เลขที่เช็ค',
-                  prefixIcon: Icon(Icons.confirmation_number),
-                ),
-              ),
-            ],
-
-            const SizedBox(height: 16),
-
-            // หมายเหตุ
-            TextFormField(
-              controller: _remarkController,
-              decoration: const InputDecoration(
-                labelText: 'หมายเหตุ',
-                prefixIcon: Icon(Icons.note),
-              ),
-              maxLines: 2,
-            ),
+            Icon(icon, size: 48, color: c),
+            const SizedBox(height: 12),
+            Text(message,
+                style: TextStyle(
+                    fontSize: 14,
+                    color: isDark
+                        ? const Color(0xFF888888)
+                        : Colors.grey[500])),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildInvoiceAllocationCard() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'จัดสรรเงินจ่าย',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                if (_unpaidInvoices.isNotEmpty)
-                  TextButton.icon(
-                    onPressed: _autoAllocate,
-                    icon: const Icon(Icons.auto_awesome, size: 18),
-                    label: const Text('จัดสรรอัตโนมัติ'),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 8),
-
-            if (_supplierId == null)
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(32),
-                  child: Column(
-                    children: [
-                      Icon(
-                        Icons.info_outline,
-                        size: 64,
-                        color: Colors.grey[400],
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'กรุณาเลือกซัพพลายเออร์ก่อน',
-                        style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                      ),
-                    ],
-                  ),
-                ),
-              )
-            else if (_isLoadingInvoices)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(32),
-                  child: CircularProgressIndicator(),
-                ),
-              )
-            else if (_unpaidInvoices.isEmpty)
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(32),
-                  child: Column(
-                    children: [
-                      Icon(
-                        Icons.check_circle,
-                        size: 64,
-                        color: Colors.green[400],
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'ไม่มีใบแจ้งหนี้ค้างชำระ',
-                        style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                      ),
-                    ],
-                  ),
-                ),
-              )
-            else
-              ..._unpaidInvoices.map(
-                (invoice) => _buildInvoiceAllocationRow(invoice),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInvoiceAllocationRow(ApInvoiceModel invoice) {
-    final currentAllocation = _allocations[invoice.invoiceId] ?? 0;
+  Widget _buildAllocationRow(ApInvoiceModel invoice, bool isDark) {
+    final currentAlloc = _allocations[invoice.invoiceId] ?? 0;
     final controller = TextEditingController(
-      text: currentAllocation > 0 ? currentAllocation.toStringAsFixed(2) : '',
+      text: currentAlloc > 0
+          ? currentAlloc.toStringAsFixed(2)
+          : '',
     );
+    final fmt = NumberFormat('#,##0.00', 'th_TH');
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      color: Colors.grey[50],
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        invoice.invoiceNo,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      Text(
-                        'วันที่: ${DateFormat('dd/MM/yyyy').format(invoice.invoiceDate)}',
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                      ),
-                    ],
-                  ),
-                ),
-                if (invoice.isOverdue)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.red.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      'เลยกำหนด',
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark
+            ? AppTheme.darkElement
+            : const Color(0xFFF9FAFB),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: invoice.isOverdue
+              ? AppTheme.error.withValues(alpha: 0.3)
+              : (isDark
+                  ? const Color(0xFF333333)
+                  : AppTheme.border),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      invoice.invoiceNo,
                       style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.red.shade700,
-                      ),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: isDark
+                              ? Colors.white
+                              : const Color(0xFF1A1A1A)),
                     ),
-                  ),
-              ],
-            ),
-            const Divider(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  flex: 2,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'ยอดคงเหลือ',
-                        style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '฿${invoice.remainingAmount.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.orange,
-                        ),
-                      ),
-                    ],
-                  ),
+                    Text(
+                      'วันที่: ${DateFormat('dd/MM/yyyy').format(invoice.invoiceDate)}',
+                      style: TextStyle(
+                          fontSize: 11,
+                          color: isDark
+                              ? const Color(0xFFAAAAAA)
+                              : AppTheme.textSub),
+                    ),
+                  ],
                 ),
-                Expanded(
-                  flex: 3,
+              ),
+              if (invoice.isOverdue)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 7, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppTheme.error.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Text('เลยกำหนด',
+                      style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.error)),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                flex: 2,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('ยอดคงเหลือ',
+                        style: TextStyle(
+                            fontSize: 10,
+                            color: isDark
+                                ? const Color(0xFFAAAAAA)
+                                : AppTheme.textSub)),
+                    Text(
+                      '฿${fmt.format(invoice.remainingAmount)}',
+                      style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.warning),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                flex: 3,
+                child: SizedBox(
+                  height: 40,
                   child: TextField(
                     controller: controller,
-                    decoration: const InputDecoration(
-                      labelText: 'จำนวนเงินที่จ่าย',
-                      prefixText: '฿',
-                      border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                    ),
                     keyboardType: TextInputType.number,
-                    onChanged: (value) {
-                      final amount = double.tryParse(value) ?? 0;
+                    style: TextStyle(
+                        fontSize: 13,
+                        color:
+                            isDark ? Colors.white : Colors.black87),
+                    decoration: InputDecoration(
+                      hintText: '0.00',
+                      prefixText: '฿',
+                      hintStyle: TextStyle(
+                          color: isDark
+                              ? const Color(0xFF666666)
+                              : Colors.grey[400]),
+                      contentPadding:
+                          const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 0),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(
+                              color: isDark
+                                  ? const Color(0xFF444444)
+                                  : AppTheme.border)),
+                      enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(
+                              color: isDark
+                                  ? const Color(0xFF444444)
+                                  : AppTheme.border)),
+                      focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(
+                              color: _accentColor, width: 1.5)),
+                      filled: true,
+                      fillColor: isDark
+                          ? AppTheme.darkCard
+                          : Colors.white,
+                    ),
+                    onChanged: (v) {
+                      final amount = double.tryParse(v) ?? 0;
                       setState(() {
                         if (amount > 0) {
                           _allocations[invoice.invoiceId] = amount;
@@ -396,84 +421,94 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
                     },
                   ),
                 ),
-                const SizedBox(width: 8),
-                TextButton(
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                height: 40,
+                child: OutlinedButton(
                   onPressed: () {
-                    controller.text = invoice.remainingAmount.toStringAsFixed(
-                      2,
-                    );
+                    controller.text =
+                        invoice.remainingAmount.toStringAsFixed(2);
                     setState(() {
-                      _allocations[invoice.invoiceId] = invoice.remainingAmount;
+                      _allocations[invoice.invoiceId] =
+                          invoice.remainingAmount;
                     });
                   },
-                  child: const Text('จ่ายเต็ม'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: _accentColor,
+                    side: BorderSide(color: _accentColor),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                  ),
+                  child: const Text('เต็ม',
+                      style: TextStyle(fontSize: 12)),
                 ),
-              ],
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildSummaryCard() {
-    final totalAmount = _allocations.values.fold<double>(
-      0,
-      (sum, amount) => sum + amount,
-    );
-
-    return Card(
-      color: Colors.green.withValues(alpha: 0.1),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('จำนวนใบแจ้งหนี้', style: TextStyle(fontSize: 14)),
-                Text(
-                  '${_allocations.length} ใบ',
-                  style: const TextStyle(
-                    fontSize: 16,
+  // ─── Section 3: สรุปยอด ─────────────────────────────────────
+  Widget _buildSummarySection(bool isDark) {
+    final fmt = NumberFormat('#,##0.00', 'th_TH');
+    return _SectionCard(
+      icon: Icons.summarize_outlined,
+      title: 'สรุปยอด',
+      color: _accentColor,
+      isDark: isDark,
+      child: Column(
+        children: [
+          _SummaryRow(
+            label: 'จำนวนใบแจ้งหนี้',
+            value: '${_allocations.length} ใบ',
+            isDark: isDark,
+          ),
+          const SizedBox(height: 8),
+          Divider(
+              height: 1,
+              color: isDark
+                  ? const Color(0xFF333333)
+                  : AppTheme.border),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('ยอดรวมที่จ่าย',
+                  style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: isDark
+                          ? Colors.white
+                          : const Color(0xFF1A1A1A))),
+              Text(
+                '฿${fmt.format(_totalAmount)}',
+                style: const TextStyle(
+                    fontSize: 22,
                     fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-            const Divider(),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'ยอดรวมที่จ่าย',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                Text(
-                  '฿${totalAmount.toStringAsFixed(2)}',
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.green,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+                    color: AppTheme.tealColor),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildBottomActions() {
+  // ─── Bottom Bar ──────────────────────────────────────────────
+  Widget _buildBottomBar(bool isDark) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? AppTheme.darkCard : Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 4,
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 8,
             offset: const Offset(0, -2),
           ),
         ],
@@ -483,20 +518,49 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
           Expanded(
             child: OutlinedButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('ยกเลิก'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor:
+                    isDark ? Colors.white70 : AppTheme.textSub,
+                side: BorderSide(
+                    color: isDark
+                        ? const Color(0xFF444444)
+                        : AppTheme.border),
+                padding:
+                    const EdgeInsets.symmetric(vertical: 13),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+              child: const Text('ยกเลิก',
+                  style: TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w600)),
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
           Expanded(
+            flex: 2,
             child: ElevatedButton(
               onPressed: _isLoading ? null : _savePayment,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _accentColor,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding:
+                    const EdgeInsets.symmetric(vertical: 13),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
               child: _isLoading
                   ? const SizedBox(
-                      height: 20,
                       width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      height: 20,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white),
                     )
-                  : const Text('บันทึก'),
+                  : const Text('บันทึกการจ่ายเงิน',
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700)),
             ),
           ),
         ],
@@ -504,6 +568,7 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
     );
   }
 
+  // ─── Actions ─────────────────────────────────────────────────
   Future<void> _selectPaymentDate() async {
     final date = await showDatePicker(
       context: context,
@@ -511,53 +576,105 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
       firstDate: DateTime(2020),
       lastDate: DateTime.now(),
     );
-    if (date != null) {
-      setState(() {
-        _paymentDate = date;
-      });
-    }
+    if (date != null) setState(() => _paymentDate = date);
   }
 
   Future<void> _selectSupplier() async {
     final suppliersAsync = ref.read(supplierListProvider);
-
     await suppliersAsync.when(
       data: (suppliers) async {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
         final selected = await showDialog<Map<String, String>>(
           context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('เลือกซัพพลายเออร์'),
-            content: SizedBox(
-              width: 400,
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: suppliers.length,
-                itemBuilder: (context, index) {
-                  final supplier = suppliers[index];
-                  return ListTile(
-                    title: Text(supplier.supplierName),
-                    subtitle: supplier.currentBalance > 0
-                        ? Text(
-                            'ค้างชำระ: ฿${supplier.currentBalance.toStringAsFixed(2)}',
-                            style: const TextStyle(color: Colors.orange),
-                          )
-                        : null,
-                    onTap: () {
-                      Navigator.pop(context, {
-                        'id': supplier.supplierId,
-                        'name': supplier.supplierName,
-                      });
-                    },
-                  );
-                },
-              ),
-            ),
-          ),
+          builder: (ctx) {
+            String q = '';
+            return StatefulBuilder(builder: (ctx2, setS) {
+              final filtered = suppliers
+                  .where((s) =>
+                      s.supplierName.toLowerCase().contains(q))
+                  .toList();
+              return AlertDialog(
+                backgroundColor:
+                    isDark ? AppTheme.darkCard : Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+                title: Text('เลือกซัพพลายเออร์',
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: isDark
+                            ? Colors.white
+                            : const Color(0xFF1A1A1A))),
+                content: SizedBox(
+                  width: 420,
+                  height: 400,
+                  child: Column(
+                    children: [
+                      SizedBox(
+                        height: 38,
+                        child: TextField(
+                          autofocus: true,
+                          style: TextStyle(
+                              fontSize: 13,
+                              color: isDark
+                                  ? Colors.white
+                                  : Colors.black87),
+                          decoration: InputDecoration(
+                            hintText: 'ค้นหา...',
+                            prefixIcon: const Icon(
+                                Icons.search, size: 16),
+                            border: OutlineInputBorder(
+                                borderRadius:
+                                    BorderRadius.circular(8)),
+                            contentPadding: EdgeInsets.zero,
+                            filled: true,
+                            fillColor: isDark
+                                ? AppTheme.darkElement
+                                : const Color(0xFFF5F5F5),
+                          ),
+                          onChanged: (v) =>
+                              setS(() => q = v.toLowerCase()),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Expanded(
+                        child: ListView.builder(
+                          itemCount: filtered.length,
+                          itemBuilder: (_, i) {
+                            final s = filtered[i];
+                            return ListTile(
+                              dense: true,
+                              title: Text(s.supplierName,
+                                  style: TextStyle(
+                                      fontSize: 13,
+                                      color: isDark
+                                          ? Colors.white
+                                          : Colors.black87)),
+                              subtitle: s.currentBalance > 0
+                                  ? Text(
+                                      'ค้างชำระ: ฿${NumberFormat('#,##0.00', 'th_TH').format(s.currentBalance)}',
+                                      style: const TextStyle(
+                                          fontSize: 11,
+                                          color: AppTheme.warning))
+                                  : null,
+                              onTap: () => Navigator.pop(ctx, {
+                                'id': s.supplierId,
+                                'name': s.supplierName,
+                              }),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            });
+          },
         );
-
         if (selected != null) {
           setState(() {
-            _supplierId = selected['id'];
+            _supplierId   = selected['id'];
             _supplierName = selected['name'];
             _allocations.clear();
           });
@@ -565,122 +682,84 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
         }
       },
       loading: () {},
-      error: (error, stack) {},
+      error: (_, _) {},
     );
   }
 
   Future<void> _loadUnpaidInvoices() async {
     if (_supplierId == null) return;
-
-    setState(() {
-      _isLoadingInvoices = true;
-    });
-
+    setState(() => _isLoadingInvoices = true);
     final invoices = await ref
         .read(apInvoiceListProvider.notifier)
         .getUnpaidInvoices(_supplierId!);
-
     setState(() {
-      _unpaidInvoices = invoices;
-      _isLoadingInvoices = false;
+      _unpaidInvoices      = invoices;
+      _isLoadingInvoices   = false;
     });
   }
 
   void _autoAllocate() {
     setState(() {
       _allocations.clear();
-      for (var invoice in _unpaidInvoices) {
-        _allocations[invoice.invoiceId] = invoice.remainingAmount;
+      for (final inv in _unpaidInvoices) {
+        _allocations[inv.invoiceId] = inv.remainingAmount;
       }
     });
   }
 
   Future<void> _savePayment() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
+    if (!_formKey.currentState!.validate()) return;
 
     if (_allocations.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('กรุณาจัดสรรเงินให้กับใบแจ้งหนี้'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _snackbar('กรุณาจัดสรรเงินให้กับใบแจ้งหนี้', isError: true);
       return;
     }
-
     if (_supplierId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('กรุณาเลือกซัพพลายเออร์'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _snackbar('กรุณาเลือกซัพพลายเออร์', isError: true);
       return;
     }
 
-    // ตรวจสอบว่าจัดสรรเกินจำนวนที่ค้างหรือไม่
-    for (var entry in _allocations.entries) {
-      final invoice = _unpaidInvoices.firstWhere(
-        (inv) => inv.invoiceId == entry.key,
-      );
-      if (entry.value > invoice.remainingAmount) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('ใบแจ้งหนี้ ${invoice.invoiceNo} จ่ายเกินยอดคงเหลือ'),
-            backgroundColor: Colors.red,
-          ),
-        );
+    for (final entry in _allocations.entries) {
+      final inv = _unpaidInvoices
+          .firstWhere((i) => i.invoiceId == entry.key);
+      if (entry.value > inv.remainingAmount) {
+        _snackbar('ใบแจ้งหนี้ ${inv.invoiceNo} จ่ายเกินยอดคงเหลือ',
+            isError: true);
         return;
       }
     }
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
-    final authState = ref.read(authProvider);
-    final totalAmount = _allocations.values.fold<double>(
-      0,
-      (sum, amount) => sum + amount,
-    );
-
-    final allocations = _allocations.entries.map((entry) {
-      return ApPaymentAllocationModel(
-        allocationId: '',
-        paymentId: '',
-        invoiceId: entry.key,
-        allocatedAmount: entry.value,
-        createdAt: DateTime.now(),
-      );
-    }).toList();
+    final authState  = ref.read(authProvider);
+    final allocations = _allocations.entries.map((e) =>
+        ApPaymentAllocationModel(
+          allocationId:   '',
+          paymentId:      '',
+          invoiceId:      e.key,
+          allocatedAmount: e.value,
+          createdAt:      DateTime.now(),
+        )).toList();
 
     final payment = ApPaymentModel(
-      paymentId: '',
-      paymentNo: _paymentNoController.text.trim(),
-      paymentDate: _paymentDate,
-      supplierId: _supplierId!,
-      supplierName: _supplierName!,
-      totalAmount: totalAmount,
+      paymentId:     '',
+      paymentNo:     _paymentNoController.text.trim(),
+      paymentDate:   _paymentDate,
+      supplierId:    _supplierId!,
+      supplierName:  _supplierName!,
+      totalAmount:   _totalAmount,
       paymentMethod: _paymentMethod,
       bankName: _bankNameController.text.trim().isEmpty
-          ? null
-          : _bankNameController.text.trim(),
-      transferRef:
-          _paymentMethod == 'TRANSFER' &&
+          ? null : _bankNameController.text.trim(),
+      transferRef: _paymentMethod == 'TRANSFER' &&
               _referenceNoController.text.trim().isNotEmpty
-          ? _referenceNoController.text.trim()
-          : null,
-      chequeNo:
-          _paymentMethod == 'CHEQUE' &&
+          ? _referenceNoController.text.trim() : null,
+      chequeNo: _paymentMethod == 'CHEQUE' &&
               _referenceNoController.text.trim().isNotEmpty
-          ? _referenceNoController.text.trim()
-          : null,
-      userId: authState.user!.userId,
-      remark: _remarkController.text.trim().isEmpty
-          ? null
-          : _remarkController.text.trim(),
+          ? _referenceNoController.text.trim() : null,
+      userId:    authState.user!.userId,
+      remark:    _remarkController.text.trim().isEmpty
+          ? null : _remarkController.text.trim(),
       createdAt: DateTime.now(),
       allocations: allocations,
     );
@@ -689,79 +768,464 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
         .read(apPaymentListProvider.notifier)
         .createPayment(payment);
 
-    setState(() {
-      _isLoading = false;
-    });
+    setState(() => _isLoading = false);
 
-    if (mounted) {
-      if (success) {
-        // Refresh invoice list
-        ref.read(apInvoiceListProvider.notifier).refresh();
-        // Refresh supplier list
-        ref.read(supplierListProvider.notifier).refresh();
-
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('บันทึกการจ่ายเงินสำเร็จ'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('บันทึกไม่สำเร็จ'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+    if (!mounted) return;
+    if (success) {
+      ref.read(apInvoiceListProvider.notifier).refresh();
+      ref.read(supplierListProvider.notifier).refresh();
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: const Text('บันทึกการจ่ายเงินสำเร็จ'),
+        backgroundColor: AppTheme.success,
+        behavior: SnackBarBehavior.floating,
+      ));
+    } else {
+      _snackbar('บันทึกไม่สำเร็จ', isError: true);
     }
   }
 
-  void _showHelp() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('คำแนะนำ'),
-        content: const SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'การจ่ายเงินซัพพลายเออร์',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+  void _snackbar(String msg, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg),
+      backgroundColor: isError ? AppTheme.error : AppTheme.success,
+      behavior: SnackBarBehavior.floating,
+    ));
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// _PayFormTitleBar
+// ════════════════════════════════════════════════════════════════
+class _PayFormTitleBar extends StatelessWidget {
+  final bool isDark;
+  const _PayFormTitleBar({required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    final canPop = Navigator.of(context).canPop();
+    return Container(
+      color: isDark ? AppTheme.darkTopBar : Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Row(
+        children: [
+          if (canPop) ...[
+            InkWell(
+              onTap: () => Navigator.of(context).pop(),
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? AppTheme.darkElement
+                      : const Color(0xFFF5F5F5),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                      color: isDark
+                          ? const Color(0xFF333333)
+                          : AppTheme.border),
+                ),
+                child: Icon(Icons.arrow_back_ios_new,
+                    size: 15,
+                    color: isDark
+                        ? const Color(0xFFAAAAAA)
+                        : const Color(0xFF8A8A8A)),
               ),
-              SizedBox(height: 8),
-              Text(
-                'บันทึกการจ่ายเงินให้ซัพพลายเออร์และจัดสรรเงินให้กับใบแจ้งหนี้',
-              ),
-              SizedBox(height: 16),
-              Text(
-                'จัดสรรอัตโนมัติ',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-              SizedBox(height: 8),
-              Text('กดปุ่ม "จัดสรรอัตโนมัติ" เพื่อจ่ายเต็มจำนวนทุกใบแจ้งหนี้'),
-              SizedBox(height: 16),
-              Text(
-                'การอัพเดท',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-              SizedBox(height: 8),
-              Text(
-                'ระบบจะอัพเดทสถานะใบแจ้งหนี้และยอดค้างชำระของซัพพลายเออร์อัตโนมัติ',
-              ),
-            ],
+            ),
+            const SizedBox(width: 12),
+          ],
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppTheme.tealColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.payments_outlined,
+                size: 18, color: AppTheme.tealColor),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('ปิด'),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('จ่ายเงินซัพพลายเออร์',
+                  style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: isDark
+                          ? Colors.white
+                          : const Color(0xFF1A1A1A))),
+              Text('บันทึกการชำระเงินและจัดสรรใบแจ้งหนี้',
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: isDark
+                          ? const Color(0xFF888888)
+                          : AppTheme.textSub)),
+            ],
           ),
         ],
       ),
     );
   }
+}
+
+// ════════════════════════════════════════════════════════════════
+// _SectionCard
+// ════════════════════════════════════════════════════════════════
+class _SectionCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final Color color;
+  final bool isDark;
+  final Widget child;
+  final Widget? trailing;
+
+  const _SectionCard({
+    required this.icon,
+    required this.title,
+    required this.color,
+    required this.isDark,
+    required this.child,
+    this.trailing,
+  });
+
+  @override
+  Widget build(BuildContext context) => Container(
+        decoration: BoxDecoration(
+          color: isDark ? AppTheme.darkCard : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+              color: isDark
+                  ? const Color(0xFF2C2C2C)
+                  : AppTheme.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 14, vertical: 11),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.08),
+                borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(12)),
+                border: Border(
+                  bottom: BorderSide(
+                      color: isDark
+                          ? const Color(0xFF2C2C2C)
+                          : color.withValues(alpha: 0.15)),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(icon, size: 16, color: color),
+                  const SizedBox(width: 8),
+                  Text(title,
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: color)),
+                  if (trailing != null) ...[
+                    const Spacer(),
+                    trailing!,
+                  ],
+                ],
+              ),
+            ),
+            // Body
+            Padding(
+              padding: const EdgeInsets.all(14),
+              child: child,
+            ),
+          ],
+        ),
+      );
+}
+
+// ── Form Fields ────────────────────────────────────────────────
+
+class _PayTextField extends StatelessWidget {
+  final TextEditingController controller;
+  final String hint;
+  final IconData icon;
+  final bool isDark;
+  final int maxLines;
+  final bool readOnly;
+
+  const _PayTextField({
+    required this.controller,
+    required this.hint,
+    required this.icon,
+    required this.isDark,
+    this.maxLines = 1,
+    this.readOnly = false,
+  });
+
+  @override
+  Widget build(BuildContext context) => TextFormField(
+        controller: controller,
+        maxLines: maxLines,
+        readOnly: readOnly,
+        style: TextStyle(
+            fontSize: 13,
+            color: isDark
+                ? (readOnly ? Colors.white38 : Colors.white)
+                : (readOnly ? Colors.black38 : Colors.black87)),
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: TextStyle(
+              fontSize: 13,
+              color: isDark
+                  ? const Color(0xFF666666)
+                  : AppTheme.textSub),
+          prefixIcon: Icon(icon,
+              size: 17,
+              color: isDark
+                  ? const Color(0xFF666666)
+                  : AppTheme.textSub),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(
+                  color: isDark
+                      ? const Color(0xFF3A3A3A)
+                      : AppTheme.border)),
+          enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(
+                  color: isDark
+                      ? const Color(0xFF3A3A3A)
+                      : AppTheme.border)),
+          focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(
+                  color: AppTheme.tealColor, width: 1.5)),
+          filled: true,
+          fillColor: isDark
+              ? AppTheme.darkElement
+              : (readOnly
+                  ? const Color(0xFFF5F5F5)
+                  : Colors.white),
+        ),
+      );
+}
+
+class _DatePickerField extends StatelessWidget {
+  final String label;
+  final DateTime date;
+  final bool isDark;
+  final Color accentColor;
+  final VoidCallback onPick;
+
+  const _DatePickerField({
+    required this.label,
+    required this.date,
+    required this.isDark,
+    required this.accentColor,
+    required this.onPick,
+  });
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+        onTap: onPick,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+              horizontal: 12, vertical: 12),
+          decoration: BoxDecoration(
+            color: isDark ? AppTheme.darkElement : Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+                color: isDark
+                    ? const Color(0xFF3A3A3A)
+                    : AppTheme.border),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.calendar_today_outlined,
+                  size: 17,
+                  color: isDark
+                      ? const Color(0xFF666666)
+                      : AppTheme.textSub),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  '$label: ${DateFormat('dd/MM/yyyy').format(date)}',
+                  style: TextStyle(
+                      fontSize: 13,
+                      color: isDark ? Colors.white : Colors.black87),
+                ),
+              ),
+              Icon(Icons.chevron_right,
+                  size: 18,
+                  color: isDark
+                      ? const Color(0xFF666666)
+                      : AppTheme.textSub),
+            ],
+          ),
+        ),
+      );
+}
+
+class _SupplierPickerField extends StatelessWidget {
+  final String? supplierName;
+  final bool isDark;
+  final Color accentColor;
+  final VoidCallback onPick;
+
+  const _SupplierPickerField({
+    required this.supplierName,
+    required this.isDark,
+    required this.accentColor,
+    required this.onPick,
+  });
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+        onTap: onPick,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+              horizontal: 12, vertical: 12),
+          decoration: BoxDecoration(
+            color: isDark ? AppTheme.darkElement : Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+                color: supplierName == null
+                    ? (isDark
+                        ? const Color(0xFF3A3A3A)
+                        : AppTheme.border)
+                    : accentColor.withValues(alpha: 0.4)),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.business_outlined,
+                  size: 17,
+                  color: supplierName != null
+                      ? accentColor
+                      : (isDark
+                          ? const Color(0xFF666666)
+                          : AppTheme.textSub)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  supplierName ?? 'เลือกซัพพลายเออร์',
+                  style: TextStyle(
+                      fontSize: 13,
+                      color: supplierName != null
+                          ? (isDark
+                              ? Colors.white
+                              : Colors.black87)
+                          : (isDark
+                              ? const Color(0xFF666666)
+                              : AppTheme.textSub)),
+                ),
+              ),
+              Icon(Icons.chevron_right,
+                  size: 18,
+                  color: isDark
+                      ? const Color(0xFF666666)
+                      : AppTheme.textSub),
+            ],
+          ),
+        ),
+      );
+}
+
+class _PayMethodDropdown extends StatelessWidget {
+  final String value;
+  final bool isDark;
+  final Color accentColor;
+  final ValueChanged<String?> onChanged;
+
+  const _PayMethodDropdown({
+    required this.value,
+    required this.isDark,
+    required this.accentColor,
+    required this.onChanged,
+  });
+
+  Color get _methodColor {
+    switch (value) {
+      case 'CASH':     return AppTheme.success;
+      case 'TRANSFER': return AppTheme.info;
+      case 'CHEQUE':   return AppTheme.warning;
+      default:         return accentColor;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => DropdownButtonFormField<String>(
+        initialValue: value,
+        decoration: InputDecoration(
+          prefixIcon: Icon(Icons.payment_outlined,
+              size: 17, color: _methodColor),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(
+                  color: isDark
+                      ? const Color(0xFF3A3A3A)
+                      : AppTheme.border)),
+          enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(
+                  color: isDark
+                      ? const Color(0xFF3A3A3A)
+                      : AppTheme.border)),
+          focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(
+                  color: accentColor, width: 1.5)),
+          filled: true,
+          fillColor:
+              isDark ? AppTheme.darkElement : Colors.white,
+        ),
+        dropdownColor: isDark ? AppTheme.darkCard : Colors.white,
+        style: TextStyle(
+            fontSize: 13,
+            color: isDark ? Colors.white : Colors.black87),
+        items: const [
+          DropdownMenuItem(value: 'CASH',
+              child: Text('เงินสด')),
+          DropdownMenuItem(value: 'TRANSFER',
+              child: Text('โอนเงิน')),
+          DropdownMenuItem(value: 'CHEQUE',
+              child: Text('เช็ค')),
+        ],
+        onChanged: onChanged,
+      );
+}
+
+class _SummaryRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool isDark;
+
+  const _SummaryRow(
+      {required this.label,
+      required this.value,
+      required this.isDark});
+
+  @override
+  Widget build(BuildContext context) => Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label,
+              style: TextStyle(
+                  fontSize: 13,
+                  color: isDark
+                      ? const Color(0xFFAAAAAA)
+                      : AppTheme.textSub)),
+          Text(value,
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: isDark
+                      ? Colors.white
+                      : const Color(0xFF1A1A1A))),
+        ],
+      );
 }

@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:pos_erp/shared/theme/app_theme.dart';
+import 'package:pos_erp/shared/widgets/pagination_bar.dart';
+import 'package:pos_erp/shared/pdf/pdf_report_button.dart';
 import '../providers/ap_payment_provider.dart';
 import '../../data/models/ap_payment_model.dart';
 import 'ap_payment_form_page.dart';
+import 'ap_payment_pdf_report.dart';
 
 class ApPaymentListPage extends ConsumerStatefulWidget {
   const ApPaymentListPage({super.key});
@@ -13,383 +17,656 @@ class ApPaymentListPage extends ConsumerStatefulWidget {
 }
 
 class _ApPaymentListPageState extends ConsumerState<ApPaymentListPage> {
+  final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  String _methodFilter = 'ALL';
+  bool _isCardView = false;
+  int _currentPage = 1;
+  static const int _pageSize = 20;
 
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<ApPaymentModel> _filter(List<ApPaymentModel> src) {
+    return src.where((p) {
+      final matchSearch =
+          p.paymentNo.toLowerCase().contains(_searchQuery) ||
+              p.supplierName.toLowerCase().contains(_searchQuery);
+      final matchMethod =
+          _methodFilter == 'ALL' || p.paymentMethod == _methodFilter;
+      return matchSearch && matchMethod;
+    }).toList()
+      ..sort((a, b) => b.paymentDate.compareTo(a.paymentDate));
+  }
+
+  // ─────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     final paymentsAsync = ref.watch(apPaymentListProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('ประวัติการจ่ายเงิน'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              ref.read(apPaymentListProvider.notifier).refresh();
-            },
-          ),
-        ],
-      ),
+      backgroundColor: isDark ? AppTheme.darkBg : const Color(0xFFF5F5F5),
       body: Column(
         children: [
-          _buildSearchBar(),
+          _PayListTopBar(
+            searchController: _searchController,
+            searchQuery: _searchQuery,
+            isCardView: _isCardView,
+            onSearchChanged: (v) => setState(
+                () { _searchQuery = v.toLowerCase(); _currentPage = 1; }),
+            onSearchCleared: () {
+              _searchController.clear();
+              setState(() { _searchQuery = ''; _currentPage = 1; });
+            },
+            onToggleView: () => setState(() => _isCardView = !_isCardView),
+            onRefresh: () =>
+                ref.read(apPaymentListProvider.notifier).refresh(),
+            onAdd: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => const ApPaymentFormPage()),
+            ).then((_) =>
+                ref.read(apPaymentListProvider.notifier).refresh()),
+          ),
+
+          _buildSummaryBar(paymentsAsync),
+
           Expanded(
             child: paymentsAsync.when(
-              data: (payments) => _buildPaymentList(payments),
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, stack) => _buildError(error),
+              loading: () =>
+                  const Center(child: CircularProgressIndicator()),
+              error: (e, _) => _buildError(e),
+              data: (payments) {
+                final filtered = _filter(payments);
+                if (filtered.isEmpty) return _buildEmpty();
+                final totalPages =
+                    (filtered.length / _pageSize).ceil().clamp(1, 9999);
+                final safePage = _currentPage.clamp(1, totalPages);
+                final start = (safePage - 1) * _pageSize;
+                final end =
+                    (start + _pageSize).clamp(0, filtered.length);
+                final pageItems = filtered.sublist(start, end);
+                return Column(
+                  children: [
+                    Expanded(
+                      child: _isCardView
+                          ? _buildCardView(pageItems)
+                          : _buildListView(pageItems),
+                    ),
+                    PaginationBar(
+                      currentPage: safePage,
+                      totalItems: filtered.length,
+                      pageSize: _pageSize,
+                      onPageChanged: (p) =>
+                          setState(() => _currentPage = p),
+                      trailing: PdfReportButton(
+                        emptyMessage: 'ไม่มีข้อมูลการจ่ายเงิน',
+                        title: 'รายงานการจ่ายเงิน',
+                        filename: () =>
+                            PdfFilename.generate('ap_payment_report'),
+                        buildPdf: () =>
+                            ApPaymentPdfBuilder.build(filtered),
+                        hasData: filtered.isNotEmpty,
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _createNewPayment,
-        icon: const Icon(Icons.add),
-        label: const Text('จ่ายเงิน'),
-      ),
     );
   }
 
-  Widget _buildSearchBar() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      color: Colors.grey[100],
-      child: TextField(
-        decoration: InputDecoration(
-          hintText: 'ค้นหาเลขที่ใบจ่ายเงิน, ซัพพลายเออร์...',
-          prefixIcon: const Icon(Icons.search),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide.none,
-          ),
-          filled: true,
-          fillColor: Colors.white,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-        ),
-        onChanged: (value) {
-          setState(() {
-            _searchQuery = value.toLowerCase();
-          });
-        },
-      ),
-    );
-  }
+  // ─── Summary / Method Filter Bar ──────────────────────────────
+  Widget _buildSummaryBar(AsyncValue<List<ApPaymentModel>> async) {
+    return async.maybeWhen(
+      data: (all) {
+        final filtered = _filter(all);
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final fmt = NumberFormat('#,##0.00', 'th_TH');
+        final totalAmt =
+            filtered.fold<double>(0, (s, p) => s + p.totalAmount);
 
-  Widget _buildPaymentList(List<ApPaymentModel> payments) {
-    var filteredPayments = payments.where((payment) {
-      return payment.paymentNo.toLowerCase().contains(_searchQuery) ||
-          payment.supplierName.toLowerCase().contains(_searchQuery);
-    }).toList();
+        int countMethod(String m) =>
+            all.where((p) => p.paymentMethod == m).length;
 
-    // เรียงจากใหม่ไปเก่า
-    filteredPayments.sort((a, b) => b.paymentDate.compareTo(a.paymentDate));
-
-    if (filteredPayments.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.payment, size: 64, color: Colors.grey[400]),
-            const SizedBox(height: 16),
-            Text(
-              'ไม่มีประวัติการจ่ายเงิน',
-              style: TextStyle(fontSize: 18, color: Colors.grey[600]),
-            ),
-            const SizedBox(height: 8),
-            TextButton.icon(
-              onPressed: _createNewPayment,
-              icon: const Icon(Icons.add),
-              label: const Text('จ่ายเงินใหม่'),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: filteredPayments.length,
-      itemBuilder: (context, index) {
-        final payment = filteredPayments[index];
-        return _buildPaymentCard(payment);
-      },
-    );
-  }
-
-  Widget _buildPaymentCard(ApPaymentModel payment) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: InkWell(
-        onTap: () => _viewPaymentDetails(payment),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
+        return Container(
+          color: isDark ? AppTheme.darkCard : Colors.white,
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          payment.paymentNo,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          payment.supplierName,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _PayFilterChip(
+                      label: 'ทั้งหมด',
+                      count: all.length,
+                      color: AppTheme.tealColor,
+                      selected: _methodFilter == 'ALL',
+                      onTap: () => setState(() {
+                        _methodFilter = 'ALL'; _currentPage = 1;
+                      }),
                     ),
-                  ),
-                  _buildPaymentMethodChip(payment.paymentMethod),
-                ],
-              ),
-              const Divider(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildInfoRow(
-                      Icons.calendar_today,
-                      DateFormat('dd/MM/yyyy').format(payment.paymentDate),
+                    const SizedBox(width: 6),
+                    _PayFilterChip(
+                      label: 'เงินสด',
+                      count: countMethod('CASH'),
+                      color: AppTheme.success,
+                      selected: _methodFilter == 'CASH',
+                      onTap: () => setState(() {
+                        _methodFilter = 'CASH'; _currentPage = 1;
+                      }),
                     ),
-                  ),
-                  Expanded(
-                    child: _buildInfoRow(
-                      Icons.access_time,
-                      DateFormat('HH:mm').format(payment.createdAt),
+                    const SizedBox(width: 6),
+                    _PayFilterChip(
+                      label: 'โอนเงิน',
+                      count: countMethod('TRANSFER'),
+                      color: AppTheme.info,
+                      selected: _methodFilter == 'TRANSFER',
+                      onTap: () => setState(() {
+                        _methodFilter = 'TRANSFER'; _currentPage = 1;
+                      }),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 6),
+                    _PayFilterChip(
+                      label: 'เช็ค',
+                      count: countMethod('CHEQUE'),
+                      color: AppTheme.warning,
+                      selected: _methodFilter == 'CHEQUE',
+                      onTap: () => setState(() {
+                        _methodFilter = 'CHEQUE'; _currentPage = 1;
+                      }),
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 8),
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'ยอดจ่าย',
-                    style: TextStyle(fontSize: 14, color: Colors.grey),
+                  _PayValueStat(
+                    label: 'กรองแล้ว',
+                    value: '${filtered.length} รายการ',
+                    color: AppTheme.tealColor,
                   ),
-                  Text(
-                    '฿${payment.totalAmount.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.green,
-                    ),
+                  const SizedBox(width: 8),
+                  _PayValueStat(
+                    label: 'ยอดจ่ายรวม',
+                    value: '฿${fmt.format(totalAmt)}',
+                    color: AppTheme.success,
                   ),
                 ],
               ),
-              if (payment.remark != null && payment.remark!.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.all(8),
+            ],
+          ),
+        );
+      },
+      orElse: () => const SizedBox.shrink(),
+    );
+  }
+
+  // ─── Card View ────────────────────────────────────────────────
+  Widget _buildCardView(List<ApPaymentModel> items) {
+    return ListView.separated(
+      padding: const EdgeInsets.all(12),
+      itemCount: items.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 8),
+      itemBuilder: (context, i) => _PayCard(
+        payment: items[i],
+        onTap: () => _viewDetails(items[i]),
+        onDelete: () => _deletePayment(items[i]),
+      ),
+    );
+  }
+
+  // ─── List View ────────────────────────────────────────────────
+  Widget _buildListView(List<ApPaymentModel> items) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          color: isDark ? AppTheme.darkElement : AppTheme.headerBg,
+          child: Row(
+            children: [
+              const SizedBox(width: 14),
+              Expanded(
+                flex: 3,
+                child: Text('เลขที่ / ซัพพลายเออร์',
+                    style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: isDark
+                            ? const Color(0xFFAAAAAA)
+                            : AppTheme.textSub)),
+              ),
+              SizedBox(
+                width: 68,
+                child: Text('วันที่',
+                    style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: isDark
+                            ? const Color(0xFFAAAAAA)
+                            : AppTheme.textSub),
+                    textAlign: TextAlign.center),
+              ),
+              SizedBox(
+                width: 76,
+                child: Text('วิธีจ่าย',
+                    style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: isDark
+                            ? const Color(0xFFAAAAAA)
+                            : AppTheme.textSub),
+                    textAlign: TextAlign.center),
+              ),
+              SizedBox(
+                width: 90,
+                child: Text('ยอดจ่าย',
+                    style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: isDark
+                            ? const Color(0xFFAAAAAA)
+                            : AppTheme.textSub),
+                    textAlign: TextAlign.right),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: ListView.builder(
+            itemCount: items.length,
+            itemBuilder: (context, i) {
+              final p = items[i];
+              final isEven = i.isEven;
+              final methodColor = _getMethodColor(p.paymentMethod);
+              return InkWell(
+                onTap: () => _viewDetails(p),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 10),
                   decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    borderRadius: BorderRadius.circular(4),
+                    color: isEven
+                        ? (isDark ? AppTheme.darkCard : Colors.white)
+                        : (isDark
+                            ? AppTheme.darkElement
+                            : const Color(0xFFF9F9F9)),
+                    border: Border(
+                      bottom: BorderSide(
+                        color: isDark
+                            ? const Color(0xFF2C2C2C)
+                            : AppTheme.border,
+                        width: 0.5,
+                      ),
+                    ),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.note, size: 16, color: Colors.grey[600]),
-                      const SizedBox(width: 8),
+                      Container(
+                        width: 4,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: methodColor,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
                       Expanded(
+                        flex: 3,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              p.paymentNo,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: isDark
+                                    ? Colors.white
+                                    : const Color(0xFF1A1A1A),
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              p.supplierName,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isDark
+                                    ? const Color(0xFFAAAAAA)
+                                    : AppTheme.textSub,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(
+                        width: 68,
                         child: Text(
-                          payment.remark!,
+                          DateFormat('dd/MM/yy').format(p.paymentDate),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isDark
+                                ? const Color(0xFFAAAAAA)
+                                : AppTheme.textSub,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      SizedBox(
+                        width: 76,
+                        child: Center(
+                            child: _buildMethodBadge(
+                                p.paymentMethod, isDark)),
+                      ),
+                      SizedBox(
+                        width: 90,
+                        child: Text(
+                          '฿${NumberFormat('#,##0.00', 'th_TH').format(p.totalAmount)}',
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.grey[700],
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.tealColor,
                           ),
+                          textAlign: TextAlign.right,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
                   ),
                 ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPaymentMethodChip(String method) {
-    Color color;
-    String label;
-    IconData icon;
-
-    switch (method) {
-      case 'CASH':
-        color = Colors.green;
-        label = 'เงินสด';
-        icon = Icons.money;
-        break;
-      case 'TRANSFER':
-        color = Colors.blue;
-        label = 'โอนเงิน';
-        icon = Icons.account_balance;
-        break;
-      case 'CHEQUE':
-        color = Colors.orange;
-        label = 'เช็ค';
-        icon = Icons.receipt;
-        break;
-      default:
-        color = Colors.grey;
-        label = method;
-        icon = Icons.payment;
-    }
-
-    return Chip(
-      avatar: Icon(
-        icon,
-        size: 16,
-        color: HSLColor.fromColor(color).withLightness(0.3).toColor(),
-      ),
-      label: Text(label, style: const TextStyle(fontSize: 12)),
-      backgroundColor: color.withValues(alpha: 0.2),
-      labelStyle: TextStyle(
-        color: HSLColor.fromColor(color).withLightness(0.3).toColor(),
-      ),
-      padding: EdgeInsets.zero,
-      visualDensity: VisualDensity.compact,
-    );
-  }
-
-  Widget _buildInfoRow(IconData icon, String text) {
-    return Row(
-      children: [
-        Icon(icon, size: 16, color: Colors.grey[600]),
-        const SizedBox(width: 4),
-        Expanded(
-          child: Text(
-            text,
-            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-            overflow: TextOverflow.ellipsis,
+              );
+            },
           ),
         ),
       ],
     );
   }
 
-  Widget _buildError(Object error) {
+  // ─── Helpers ─────────────────────────────────────────────────
+  Color _getMethodColor(String m) {
+    switch (m) {
+      case 'CASH':     return AppTheme.success;
+      case 'TRANSFER': return AppTheme.info;
+      case 'CHEQUE':   return AppTheme.warning;
+      default:         return AppTheme.tealColor;
+    }
+  }
+
+  Widget _buildMethodBadge(String m, bool isDark) {
+    final color = _getMethodColor(m);
+    String label;
+    switch (m) {
+      case 'CASH':     label = 'เงินสด'; break;
+      case 'TRANSFER': label = 'โอนเงิน'; break;
+      case 'CHEQUE':   label = 'เช็ค'; break;
+      default:         label = m;
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+            fontSize: 10, fontWeight: FontWeight.w600, color: color),
+      ),
+    );
+  }
+
+  Widget _buildEmpty() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.error_outline, size: 64, color: Colors.red),
-          const SizedBox(height: 16),
-          Text('เกิดข้อผิดพลาด: $error'),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: () {
-              ref.read(apPaymentListProvider.notifier).refresh();
-            },
-            child: const Text('ลองใหม่'),
+          Icon(
+            _searchQuery.isEmpty
+                ? Icons.payments_outlined
+                : Icons.search_off_outlined,
+            size: 72,
+            color: isDark ? const Color(0xFF444444) : Colors.grey[300],
           ),
+          const SizedBox(height: 12),
+          Text(
+            _searchQuery.isEmpty
+                ? 'ยังไม่มีประวัติการจ่ายเงิน'
+                : 'ไม่พบรายการ "$_searchQuery"',
+            style: TextStyle(
+                color: isDark
+                    ? const Color(0xFF888888)
+                    : Colors.grey[500]),
+          ),
+          if (_searchQuery.isEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              'กดปุ่ม + เพื่อบันทึกการจ่ายเงินใหม่',
+              style: TextStyle(
+                  fontSize: 12,
+                  color: isDark
+                      ? const Color(0xFF666666)
+                      : Colors.grey[400]),
+            ),
+          ],
         ],
       ),
     );
   }
 
-  Future<void> _createNewPayment() async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const ApPaymentFormPage()),
-    );
-    ref.read(apPaymentListProvider.notifier).refresh();
-  }
+  Widget _buildError(Object e) => Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline,
+                size: 72, color: AppTheme.error),
+            const SizedBox(height: 12),
+            Text('เกิดข้อผิดพลาด: $e'),
+            const SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: () =>
+                  ref.read(apPaymentListProvider.notifier).refresh(),
+              child: const Text('ลองใหม่'),
+            ),
+          ],
+        ),
+      );
 
-  Future<void> _viewPaymentDetails(ApPaymentModel payment) async {
-    // โหลดรายละเอียดพร้อม allocations
+  // ─── Actions ─────────────────────────────────────────────────
+  Future<void> _viewDetails(ApPaymentModel payment) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final paymentDetails = await ref
         .read(apPaymentListProvider.notifier)
         .getPaymentDetails(payment.paymentId);
 
     if (!mounted) return;
 
+    final fmt = NumberFormat('#,##0.00', 'th_TH');
+    final fmtDate = DateFormat('dd/MM/yyyy');
+    final methodColor = _getMethodColor(payment.paymentMethod);
+    String methodLabel;
+    switch (payment.paymentMethod) {
+      case 'CASH':     methodLabel = 'เงินสด'; break;
+      case 'TRANSFER': methodLabel = 'โอนเงิน'; break;
+      case 'CHEQUE':   methodLabel = 'เช็ค'; break;
+      default:         methodLabel = payment.paymentMethod;
+    }
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(payment.paymentNo),
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12)),
+        titlePadding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppTheme.tealColor.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.payments_outlined,
+                  size: 18, color: AppTheme.tealColor),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    payment.paymentNo,
+                    style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: isDark
+                            ? Colors.white
+                            : const Color(0xFF1A1A1A)),
+                  ),
+                  Text(
+                    payment.supplierName,
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: isDark
+                            ? const Color(0xFFAAAAAA)
+                            : AppTheme.textSub),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: methodColor.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(methodLabel,
+                  style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: methodColor)),
+            ),
+          ],
+        ),
         content: SingleChildScrollView(
           child: SizedBox(
-            width: 500,
+            width: 480,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildDetailRow('ซัพพลายเออร์', payment.supplierName),
-                _buildDetailRow(
-                  'วันที่จ่าย',
-                  DateFormat('dd/MM/yyyy').format(payment.paymentDate),
-                ),
-                _buildDetailRow(
-                  'วิธีจ่าย',
-                  _getPaymentMethodLabel(payment.paymentMethod),
-                ),
+                const SizedBox(height: 12),
+                _DetailRow(label: 'วันที่จ่าย',
+                    value: fmtDate.format(payment.paymentDate),
+                    isDark: isDark),
                 if (payment.bankName != null)
-                  _buildDetailRow('ธนาคาร', payment.bankName!),
+                  _DetailRow(label: 'ธนาคาร',
+                      value: payment.bankName!, isDark: isDark),
                 if (payment.transferRef != null)
-                  _buildDetailRow('เลขที่อ้างอิง', payment.transferRef!),
+                  _DetailRow(label: 'เลขที่อ้างอิง',
+                      value: payment.transferRef!, isDark: isDark),
                 if (payment.chequeNo != null)
-                  _buildDetailRow('เลขที่เช็ค', payment.chequeNo!),
-                _buildDetailRow(
-                  'ยอดจ่าย',
-                  '฿${payment.totalAmount.toStringAsFixed(2)}',
+                  _DetailRow(label: 'เลขที่เช็ค',
+                      value: payment.chequeNo!, isDark: isDark),
+                if (payment.remark != null &&
+                    payment.remark!.isNotEmpty)
+                  _DetailRow(label: 'หมายเหตุ',
+                      value: payment.remark!, isDark: isDark),
+                const SizedBox(height: 8),
+                // Amount highlight
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppTheme.tealColor.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                        color: AppTheme.tealColor.withValues(alpha: 0.2)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment:
+                        MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('ยอดจ่ายทั้งหมด',
+                          style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: isDark
+                                  ? Colors.white70
+                                  : const Color(0xFF1A1A1A))),
+                      Text(
+                        '฿${fmt.format(payment.totalAmount)}',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.tealColor,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                if (payment.remark != null)
-                  _buildDetailRow('หมายเหตุ', payment.remark!),
 
                 if (paymentDetails?.allocations != null &&
                     paymentDetails!.allocations!.isNotEmpty) ...[
-                  const Divider(height: 24),
-                  const Text(
-                    'การจัดสรรเงิน',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  ...paymentDetails.allocations!.map((alloc) {
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      color: Colors.grey[50],
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
+                  const SizedBox(height: 12),
+                  Text('การจัดสรรเงิน',
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: isDark
+                              ? Colors.white70
+                              : const Color(0xFF1A1A1A))),
+                  const SizedBox(height: 6),
+                  ...paymentDetails.allocations!.map((alloc) =>
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 6),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? AppTheme.darkElement
+                              : const Color(0xFFF9F9F9),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                              color: isDark
+                                  ? const Color(0xFF333333)
+                                  : AppTheme.border),
+                        ),
                         child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          mainAxisAlignment:
+                              MainAxisAlignment.spaceBetween,
                           children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Invoice ID: ${alloc.invoiceId}',
-                                    style: const TextStyle(fontSize: 12),
-                                  ),
-                                ],
-                              ),
+                            Text(
+                              'Invoice: ${alloc.invoiceId}',
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  color: isDark
+                                      ? const Color(0xFFAAAAAA)
+                                      : AppTheme.textSub),
                             ),
                             Text(
-                              '฿${alloc.allocatedAmount.toStringAsFixed(2)}',
+                              '฿${fmt.format(alloc.allocatedAmount)}',
                               style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.green,
-                              ),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppTheme.tealColor),
                             ),
                           ],
                         ),
-                      ),
-                    );
-                  }),
+                      )),
                 ],
               ],
             ),
@@ -397,89 +674,871 @@ class _ApPaymentListPageState extends ConsumerState<ApPaymentListPage> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('ปิด'),
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('ปิด',
+                style: TextStyle(
+                    color: isDark
+                        ? Colors.white60
+                        : AppTheme.textSub)),
           ),
           if (paymentDetails != null)
-            ElevatedButton(
+            ElevatedButton.icon(
+              icon: const Icon(Icons.delete_forever, size: 16),
+              label: const Text('ลบ'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.error,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+                elevation: 0,
+              ),
               onPressed: () async {
-                final confirm = await showDialog<bool>(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('ยืนยันการลบ'),
-                    content: Text('ต้องการลบ ${payment.paymentNo} ใช่หรือไม่?'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, false),
-                        child: const Text('ยกเลิก'),
-                      ),
-                      ElevatedButton(
-                        onPressed: () => Navigator.pop(context, true),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red,
-                        ),
-                        child: const Text('ลบ'),
-                      ),
-                    ],
-                  ),
-                );
-
-                if (confirm == true && mounted) {
-                  final success = await ref
-                      .read(apPaymentListProvider.notifier)
-                      .deletePayment(payment.paymentId);
-
-                  if (!context.mounted) return;
-
-                  Navigator.pop(context);
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        success ? 'ลบการจ่ายเงินสำเร็จ' : 'ลบไม่สำเร็จ',
-                      ),
-                      backgroundColor: success ? Colors.green : Colors.red,
-                    ),
-                  );
-                }
+                Navigator.pop(ctx);
+                await _deletePayment(payment);
               },
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-              child: const Text('ลบ'),
             ),
         ],
       ),
     );
   }
 
-  Widget _buildDetailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
+  Future<void> _deletePayment(ApPaymentModel payment) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                color: AppTheme.error.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.delete_outline,
+                  size: 18, color: AppTheme.error),
+            ),
+            const SizedBox(width: 10),
+            Text('ยืนยันการลบ',
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: isDark
+                        ? Colors.white
+                        : const Color(0xFF1A1A1A))),
+          ],
+        ),
+        content: Text(
+            'ต้องการลบ ${payment.paymentNo} ออกจากระบบ?',
+            style: TextStyle(
+                color: isDark ? Colors.white70 : Colors.black87)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('ยกเลิก',
+                style: TextStyle(
+                    color: isDark
+                        ? Colors.white60
+                        : AppTheme.textSub)),
+          ),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.delete_forever, size: 16),
+            label: const Text('ลบ'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.error,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+              elevation: 0,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true || !mounted) return;
+
+    final success = await ref
+        .read(apPaymentListProvider.notifier)
+        .deletePayment(payment.paymentId);
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(success ? 'ลบรายการสำเร็จ' : 'ลบไม่สำเร็จ'),
+      backgroundColor: success ? AppTheme.success : AppTheme.error,
+      behavior: SnackBarBehavior.floating,
+    ));
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// _PayCard
+// ════════════════════════════════════════════════════════════════
+class _PayCard extends StatelessWidget {
+  final ApPaymentModel payment;
+  final VoidCallback onTap;
+  final VoidCallback onDelete;
+
+  const _PayCard({
+    required this.payment,
+    required this.onTap,
+    required this.onDelete,
+  });
+
+  Color get _methodColor {
+    switch (payment.paymentMethod) {
+      case 'CASH':     return AppTheme.success;
+      case 'TRANSFER': return AppTheme.info;
+      case 'CHEQUE':   return AppTheme.warning;
+      default:         return AppTheme.tealColor;
+    }
+  }
+
+  String get _methodLabel {
+    switch (payment.paymentMethod) {
+      case 'CASH':     return 'เงินสด';
+      case 'TRANSFER': return 'โอนเงิน';
+      case 'CHEQUE':   return 'เช็ค';
+      default:         return payment.paymentMethod;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final fmt = NumberFormat('#,##0.00', 'th_TH');
+
+    final colors = [
+      AppTheme.tealColor, AppTheme.info, AppTheme.success,
+      AppTheme.primary, AppTheme.purpleColor, AppTheme.warning,
+    ];
+    final name = payment.supplierName;
+    final avatarColor = colors[name.codeUnitAt(0) % colors.length];
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : 'S';
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: BorderSide(
+            color: isDark
+                ? const Color(0xFF333333)
+                : AppTheme.border),
+      ),
+      color: isDark ? AppTheme.darkCard : Colors.white,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Row 1: Avatar + Info + Method Badge
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundColor: avatarColor,
+                    child: Text(initial,
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold)),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          payment.paymentNo,
+                          style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: isDark
+                                  ? Colors.white
+                                  : const Color(0xFF1A1A1A)),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          payment.supplierName,
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: isDark
+                                  ? const Color(0xFFAAAAAA)
+                                  : AppTheme.textSub),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  _MethodBadge(
+                      label: _methodLabel, color: _methodColor),
+                ],
+              ),
+
+              const SizedBox(height: 10),
+              Divider(
+                  height: 1,
+                  color: isDark
+                      ? const Color(0xFF2C2C2C)
+                      : AppTheme.border),
+              const SizedBox(height: 10),
+
+              // Row 2: Dates
+              Row(
+                children: [
+                  Expanded(
+                    child: _InfoChip(
+                      icon: Icons.calendar_today_outlined,
+                      text: DateFormat('dd/MM/yyyy')
+                          .format(payment.paymentDate),
+                      isDark: isDark,
+                    ),
+                  ),
+                  Expanded(
+                    child: _InfoChip(
+                      icon: Icons.access_time_outlined,
+                      text: DateFormat('HH:mm')
+                          .format(payment.createdAt),
+                      isDark: isDark,
+                    ),
+                  ),
+                ],
+              ),
+
+              if (payment.remark != null &&
+                  payment.remark!.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                _InfoChip(
+                  icon: Icons.note_outlined,
+                  text: payment.remark!,
+                  isDark: isDark,
+                ),
+              ],
+
+              const SizedBox(height: 10),
+
+              // Row 3: Amount
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('ยอดจ่าย',
+                            style: TextStyle(
+                                fontSize: 10,
+                                color: isDark
+                                    ? const Color(0xFFAAAAAA)
+                                    : AppTheme.textSub)),
+                        Text(
+                          '฿${fmt.format(payment.totalAmount)}',
+                          style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.tealColor),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Delete button
+                  SizedBox(
+                    width: 52,
+                    height: 34,
+                    child: OutlinedButton(
+                      onPressed: onDelete,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.error,
+                        side: const BorderSide(color: AppTheme.error),
+                        padding: EdgeInsets.zero,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
+                      ),
+                      child: const Icon(Icons.delete_outline, size: 18),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// _PayListTopBar
+// ════════════════════════════════════════════════════════════════
+class _PayListTopBar extends StatelessWidget {
+  final TextEditingController searchController;
+  final String searchQuery;
+  final bool isCardView;
+  final ValueChanged<String> onSearchChanged;
+  final VoidCallback onSearchCleared;
+  final VoidCallback onToggleView;
+  final VoidCallback onRefresh;
+  final VoidCallback onAdd;
+
+  const _PayListTopBar({
+    required this.searchController,
+    required this.searchQuery,
+    required this.isCardView,
+    required this.onSearchChanged,
+    required this.onSearchCleared,
+    required this.onToggleView,
+    required this.onRefresh,
+    required this.onAdd,
+  });
+
+  static const _kBreak = 640.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isWide = MediaQuery.of(context).size.width >= _kBreak;
+    final canPop = Navigator.of(context).canPop();
+
+    return Container(
+      color: isDark ? AppTheme.darkTopBar : Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: isWide
+          ? _buildSingleRow(context, canPop, isDark)
+          : _buildDoubleRow(context, canPop, isDark),
+    );
+  }
+
+  Widget _buildSingleRow(
+      BuildContext context, bool canPop, bool isDark) {
+    return Row(
+      children: [
+        if (canPop) ...[
+          _BackBtn(isDark: isDark),
+          const SizedBox(width: 10),
+        ],
+        _PageIcon(),
+        const SizedBox(width: 10),
+        Text('ประวัติการจ่ายเงิน',
+            style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: isDark
+                    ? Colors.white
+                    : const Color(0xFF1A1A1A))),
+        const Spacer(),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 280),
+          child: _SearchField(
+            controller: searchController,
+            query: searchQuery,
+            onChanged: onSearchChanged,
+            onCleared: onSearchCleared,
+            isDark: isDark,
+          ),
+        ),
+        const SizedBox(width: 8),
+        _IconBtn(
+          icon: isCardView
+              ? Icons.view_list_outlined
+              : Icons.grid_view_outlined,
+          tooltip: isCardView ? 'List View' : 'Card View',
+          isDark: isDark,
+          onTap: onToggleView,
+        ),
+        const SizedBox(width: 6),
+        _IconBtn(
+          icon: Icons.refresh,
+          tooltip: 'รีเฟรช',
+          isDark: isDark,
+          onTap: onRefresh,
+        ),
+        const SizedBox(width: 6),
+        _AddBtn(onTap: onAdd),
+      ],
+    );
+  }
+
+  Widget _buildDoubleRow(
+      BuildContext context, bool canPop, bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            if (canPop) ...[
+              _BackBtn(isDark: isDark),
+              const SizedBox(width: 8),
+            ],
+            _PageIcon(),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text('ประวัติการจ่ายเงิน',
+                  style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: isDark
+                          ? Colors.white
+                          : const Color(0xFF1A1A1A)),
+                  overflow: TextOverflow.ellipsis),
+            ),
+            _IconBtn(
+              icon: isCardView
+                  ? Icons.view_list_outlined
+                  : Icons.grid_view_outlined,
+              tooltip: isCardView ? 'List View' : 'Card View',
+              isDark: isDark,
+              onTap: onToggleView,
+            ),
+            const SizedBox(width: 4),
+            _IconBtn(
+              icon: Icons.refresh,
+              tooltip: 'รีเฟรช',
+              isDark: isDark,
+              onTap: onRefresh,
+            ),
+            const SizedBox(width: 4),
+            _AddBtn(onTap: onAdd, compact: true),
+          ],
+        ),
+        const SizedBox(height: 10),
+        _SearchField(
+          controller: searchController,
+          query: searchQuery,
+          onChanged: onSearchChanged,
+          onCleared: onSearchCleared,
+          isDark: isDark,
+        ),
+      ],
+    );
+  }
+}
+
+// ── TopBar helpers ─────────────────────────────────────────────
+
+class _BackBtn extends StatelessWidget {
+  final bool isDark;
+  const _BackBtn({required this.isDark});
+  @override
+  Widget build(BuildContext context) => InkWell(
+        onTap: () => Navigator.of(context).pop(),
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.all(7),
+          decoration: BoxDecoration(
+            color: isDark ? AppTheme.darkElement : const Color(0xFFF5F5F5),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+                color: isDark
+                    ? const Color(0xFF333333)
+                    : AppTheme.border),
+          ),
+          child: Icon(Icons.arrow_back_ios_new,
+              size: 15,
+              color: isDark
+                  ? const Color(0xFFAAAAAA)
+                  : const Color(0xFF8A8A8A)),
+        ),
+      );
+}
+
+class _PageIcon extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(7),
+        decoration: BoxDecoration(
+          color: AppTheme.tealColor.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Icon(Icons.payments_outlined,
+            color: AppTheme.tealColor, size: 18),
+      );
+}
+
+class _SearchField extends StatelessWidget {
+  final TextEditingController controller;
+  final String query;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onCleared;
+  final bool isDark;
+
+  const _SearchField({
+    required this.controller,
+    required this.query,
+    required this.onChanged,
+    required this.onCleared,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        height: 38,
+        child: TextField(
+          controller: controller,
+          style: TextStyle(
+              fontSize: 13,
+              color: isDark ? Colors.white : const Color(0xFF1A1A1A)),
+          decoration: InputDecoration(
+            hintText: 'ค้นหาเลขที่ใบจ่ายเงิน, ซัพพลายเออร์...',
+            hintStyle: TextStyle(
+                fontSize: 13,
+                color: isDark
+                    ? const Color(0xFF666666)
+                    : const Color(0xFF8A8A8A)),
+            prefixIcon: Icon(Icons.search,
+                size: 17,
+                color: isDark
+                    ? const Color(0xFF666666)
+                    : const Color(0xFF8A8A8A)),
+            suffixIcon: query.isNotEmpty
+                ? IconButton(
+                    icon: const Icon(Icons.clear, size: 15),
+                    onPressed: onCleared,
+                  )
+                : null,
+            contentPadding: EdgeInsets.zero,
+            border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(
+                    color: isDark
+                        ? const Color(0xFF333333)
+                        : const Color(0xFFE0E0E0))),
+            enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(
+                    color: isDark
+                        ? const Color(0xFF333333)
+                        : const Color(0xFFE0E0E0))),
+            focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(
+                    color: AppTheme.tealColor, width: 1.5)),
+            filled: true,
+            fillColor: isDark ? AppTheme.darkElement : Colors.white,
+          ),
+          onChanged: onChanged,
+        ),
+      );
+}
+
+class _IconBtn extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  const _IconBtn(
+      {required this.icon,
+      required this.tooltip,
+      required this.isDark,
+      required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+        message: tooltip,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+              color: isDark
+                  ? AppTheme.darkElement
+                  : const Color(0xFFF5F5F5),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                  color: isDark
+                      ? const Color(0xFF333333)
+                      : AppTheme.border),
+            ),
+            child: Icon(icon,
+                size: 17,
+                color: isDark
+                    ? const Color(0xFFAAAAAA)
+                    : const Color(0xFF8A8A8A)),
+          ),
+        ),
+      );
+}
+
+class _AddBtn extends StatelessWidget {
+  final VoidCallback onTap;
+  final bool compact;
+  const _AddBtn({required this.onTap, this.compact = false});
+  @override
+  Widget build(BuildContext context) => ElevatedButton.icon(
+        onPressed: onTap,
+        icon: const Icon(Icons.add, size: 18),
+        label: compact
+            ? const SizedBox.shrink()
+            : const Text('บันทึกจ่ายเงิน',
+                style: TextStyle(
+                    fontSize: 13, fontWeight: FontWeight.w600)),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppTheme.tealColor,
+          foregroundColor: Colors.white,
+          padding: EdgeInsets.symmetric(
+              horizontal: compact ? 12 : 16, vertical: 13),
+          minimumSize: Size.zero,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8)),
+          elevation: 0,
+        ),
+      );
+}
+
+// ── Shared small widgets ───────────────────────────────────────
+
+class _MethodBadge extends StatelessWidget {
+  final String label;
+  final Color color;
+  const _MethodBadge({required this.label, required this.color});
+  @override
+  Widget build(BuildContext context) => Container(
+        padding:
+            const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 5,
+              height: 5,
+              decoration: BoxDecoration(
+                  color: color, shape: BoxShape.circle),
+            ),
+            const SizedBox(width: 4),
+            Text(label,
+                style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: color)),
+          ],
+        ),
+      );
+}
+
+class _InfoChip extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final bool isDark;
+  const _InfoChip(
+      {required this.icon,
+      required this.text,
+      required this.isDark});
+  @override
+  Widget build(BuildContext context) {
+    final c = isDark ? const Color(0xFFAAAAAA) : AppTheme.textSub;
+    return Row(
+      children: [
+        Icon(icon, size: 13, color: c),
+        const SizedBox(width: 4),
+        Expanded(
+          child: Text(text,
+              style: TextStyle(fontSize: 11, color: c),
+              overflow: TextOverflow.ellipsis),
+        ),
+      ],
+    );
+  }
+}
+
+class _DetailRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool isDark;
+  const _DetailRow(
+      {required this.label,
+      required this.value,
+      required this.isDark});
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 110,
+              child: Text('$label:',
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: isDark
+                          ? Colors.white60
+                          : AppTheme.textSub)),
+            ),
+            Expanded(
+              child: Text(value,
+                  style: TextStyle(
+                      fontSize: 12,
+                      color:
+                          isDark ? Colors.white70 : Colors.black87)),
+            ),
+          ],
+        ),
+      );
+}
+
+class _PayFilterChip extends StatelessWidget {
+  final String label;
+  final int count;
+  final Color color;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _PayFilterChip({
+    required this.label,
+    required this.count,
+    required this.color,
+    required this.selected,
+    required this.onTap,
+  });
+
+  static Color _visible(Color c, bool isDark) {
+    if (!isDark) return c;
+    final hsl = HSLColor.fromColor(c);
+    if (hsl.lightness < 0.50) {
+      return hsl
+          .withLightness(0.68)
+          .withSaturation((hsl.saturation * 0.75).clamp(0.0, 1.0))
+          .toColor();
+    }
+    return c;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final vc = _visible(color, isDark);
+
+    if (!selected) {
+      return GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding:
+              const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: isDark ? AppTheme.darkElement : const Color(0xFFF5F5F5),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+                color: isDark
+                    ? const Color(0xFF4A4A4A)
+                    : AppTheme.border),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(label,
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: isDark ? Colors.white70 : AppTheme.textSub)),
+              const SizedBox(width: 5),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 5, vertical: 1),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? const Color(0xFF5A5A5A)
+                      : AppTheme.textSub,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text('$count',
+                    style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white)),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: vc.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: vc, width: 1.5),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(label,
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: vc)),
+            const SizedBox(width: 5),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 5, vertical: 1),
+              decoration: BoxDecoration(
+                  color: vc,
+                  borderRadius: BorderRadius.circular(10)),
+              child: Text('$count',
+                  style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PayValueStat extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+
+  const _PayValueStat(
+      {required this.label,
+      required this.value,
+      required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 120,
-            child: Text(
-              '$label:',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ),
-          Expanded(child: Text(value)),
+          Text(label,
+              style: TextStyle(
+                  fontSize: 10,
+                  color: isDark
+                      ? const Color(0xFFAAAAAA)
+                      : AppTheme.textSub)),
+          Text(value,
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: color)),
         ],
       ),
     );
-  }
-
-  String _getPaymentMethodLabel(String method) {
-    switch (method) {
-      case 'CASH':
-        return 'เงินสด';
-      case 'TRANSFER':
-        return 'โอนเงิน';
-      case 'CHEQUE':
-        return 'เช็ค';
-      default:
-        return method;
-    }
   }
 }
