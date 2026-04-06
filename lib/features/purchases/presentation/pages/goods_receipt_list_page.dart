@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
+import 'package:pos_erp/shared/widgets/pagination_bar.dart';
+import 'package:pos_erp/shared/pdf/pdf_report_button.dart';
 import '../providers/goods_receipt_provider.dart';
 import '../../data/models/goods_receipt_model.dart';
 import 'goods_receipt_form_page.dart';
+import 'goods_receipt_pdf_report.dart';
 
 class GoodsReceiptListPage extends ConsumerStatefulWidget {
   const GoodsReceiptListPage({super.key});
@@ -20,6 +23,8 @@ class _GoodsReceiptListPageState
   String _searchQuery = '';
   String _statusFilter = 'ALL';
   bool _isCardView = false;
+  int _currentPage = 1;
+  static const int _pageSize = 20;
 
   @override
   void dispose() {
@@ -55,10 +60,10 @@ class _GoodsReceiptListPageState
             searchQuery: _searchQuery,
             isCardView: _isCardView,
             onSearchChanged: (v) =>
-                setState(() => _searchQuery = v.toLowerCase()),
+                setState(() { _searchQuery = v.toLowerCase(); _currentPage = 1; }),
             onSearchCleared: () {
               _searchController.clear();
-              setState(() => _searchQuery = '');
+              setState(() { _searchQuery = ''; _currentPage = 1; });
             },
             onToggleView: () =>
                 setState(() => _isCardView = !_isCardView),
@@ -83,9 +88,37 @@ class _GoodsReceiptListPageState
               data: (receipts) {
                 final filtered = _filter(receipts);
                 if (filtered.isEmpty) return _buildEmpty();
-                return _isCardView
-                    ? _buildCardView(filtered)
-                    : _buildListView(filtered);
+                final totalPages =
+                    (filtered.length / _pageSize).ceil().clamp(1, 9999);
+                final safePage = _currentPage.clamp(1, totalPages);
+                final start = (safePage - 1) * _pageSize;
+                final end = (start + _pageSize).clamp(0, filtered.length);
+                final pageItems = filtered.sublist(start, end);
+                return Column(
+                  children: [
+                    Expanded(
+                      child: _isCardView
+                          ? _buildCardView(pageItems)
+                          : _buildListView(pageItems),
+                    ),
+                    PaginationBar(
+                      currentPage: safePage,
+                      totalItems: filtered.length,
+                      pageSize: _pageSize,
+                      onPageChanged: (p) =>
+                          setState(() => _currentPage = p),
+                      trailing: PdfReportButton(
+                        emptyMessage: 'ไม่มีข้อมูลการรับสินค้า',
+                        title: 'รายงานการรับสินค้า',
+                        filename: () =>
+                            PdfFilename.generate('goods_receipt_report'),
+                        buildPdf: () =>
+                            GoodsReceiptPdfBuilder.build(filtered),
+                        hasData: filtered.isNotEmpty,
+                      ),
+                    ),
+                  ],
+                );
               },
             ),
           ),
@@ -125,7 +158,7 @@ class _GoodsReceiptListPageState
                       color: AppTheme.navy,
                       selected: _statusFilter == 'ALL',
                       onTap: () =>
-                          setState(() => _statusFilter = 'ALL'),
+                          setState(() { _statusFilter = 'ALL'; _currentPage = 1; }),
                     ),
                     const SizedBox(width: 6),
                     _GRFilterChip(
@@ -134,7 +167,7 @@ class _GoodsReceiptListPageState
                       color: AppTheme.warning,
                       selected: _statusFilter == 'DRAFT',
                       onTap: () =>
-                          setState(() => _statusFilter = 'DRAFT'),
+                          setState(() { _statusFilter = 'DRAFT'; _currentPage = 1; }),
                     ),
                     const SizedBox(width: 6),
                     _GRFilterChip(
@@ -143,7 +176,7 @@ class _GoodsReceiptListPageState
                       color: AppTheme.success,
                       selected: _statusFilter == 'CONFIRMED',
                       onTap: () =>
-                          setState(() => _statusFilter = 'CONFIRMED'),
+                          setState(() { _statusFilter = 'CONFIRMED'; _currentPage = 1; }),
                     ),
                   ],
                 ),
