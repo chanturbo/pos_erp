@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/config/app_mode.dart';
 import '../features/auth/presentation/pages/login_page.dart';
 import '../features/auth/presentation/providers/auth_provider.dart'; // ✅ เพิ่ม สำหรับ _RootRedirect
 import '../features/home/presentation/pages/home_page.dart';
+import '../features/sales/presentation/pages/mobile_order_page.dart';
 import '../features/sales/presentation/pages/pos_page.dart';
 import '../shared/utils/app_transitions.dart'; // ✅ Phase 4
 
@@ -16,10 +18,11 @@ import '../shared/utils/app_transitions.dart'; // ✅ Phase 4
 class AppRouter {
   AppRouter._();
 
-  static const String root  = '/';       // ✅ เพิ่ม — แก้ back จาก PosPage
+  static const String root = '/'; // ✅ เพิ่ม — แก้ back จาก PosPage
   static const String login = '/login';
-  static const String home  = '/home';
-  static const String pos   = '/pos';
+  static const String home = '/home';
+  static const String pos = '/pos';
+  static const String mobileOrder = '/mobile-order';
 
   /// Cashier role IDs — ตรงกับ roleId ใน database
   static const _cashierRoles = {'CASHIER', 'SALE', 'POS'};
@@ -35,34 +38,44 @@ class AppRouter {
       // MaterialApp จะ push '/' เข้า stack โดยอัตโนมัติเมื่อ
       // initialRoute ไม่ใช่ '/' ทำให้เกิด error เมื่อ back
       case root:
-        return FadeSlideRoute(
-          settings: settings,
-          page: const _RootRedirect(),
-        );
+        return FadeSlideRoute(settings: settings, page: const _RootRedirect());
 
       // ── Login ─────────────────────────────────────────────
       case login:
-        return FadeSlideRoute(
-          settings: settings,
-          page: const LoginPage(),
-        );
+        return FadeSlideRoute(settings: settings, page: const LoginPage());
 
       // ── Home ──────────────────────────────────────────────
       case home:
-        return FadeSlideRoute(
-          settings: settings,
-          page: const HomePage(),
-        );
+        if (AppModeConfig.mode == AppMode.clientMobile) {
+          return SlideRightRoute(
+            settings: settings,
+            page: const MobileOrderPage(),
+          );
+        }
+        return FadeSlideRoute(settings: settings, page: const HomePage());
 
       // ── POS ───────────────────────────────────────────────
       // รับ arguments: true = isCashierMode (ส่งมาจาก login_page)
       // เมื่อ navigate มาจาก HomePage ปกติ arguments จะเป็น null → false
       case pos:
-        final isCashierMode =
-            settings.arguments is bool ? settings.arguments as bool : false;
+        if (AppModeConfig.mode == AppMode.clientMobile) {
+          return SlideRightRoute(
+            settings: settings,
+            page: const MobileOrderPage(),
+          );
+        }
+        final isCashierMode = settings.arguments is bool
+            ? settings.arguments as bool
+            : false;
         return SlideRightRoute(
           settings: settings,
           page: PosPage(isCashierMode: isCashierMode),
+        );
+
+      case mobileOrder:
+        return SlideRightRoute(
+          settings: settings,
+          page: const MobileOrderPage(),
         );
 
       // ── Default ───────────────────────────────────────────
@@ -70,9 +83,7 @@ class AppRouter {
         return FadeSlideRoute(
           settings: settings,
           page: Scaffold(
-            body: Center(
-              child: Text('No route defined for ${settings.name}'),
-            ),
+            body: Center(child: Text('No route defined for ${settings.name}')),
           ),
         );
     }
@@ -107,6 +118,11 @@ class _RootRedirect extends ConsumerWidget {
       if (!context.mounted) return;
 
       if (authState.isAuthenticated) {
+        if (AppModeConfig.mode == AppMode.clientMobile) {
+          Navigator.of(context).pushReplacementNamed(AppRouter.mobileOrder);
+          return;
+        }
+
         final roleId = authState.user?.roleId?.toUpperCase() ?? '';
         if (AppRouter.isCashierRole(roleId)) {
           Navigator.of(context).pushReplacementNamed(

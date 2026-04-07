@@ -4,16 +4,26 @@
 class ProductUnitOption {
   final String unit;
   final double factor;
+  final String? barcode;
 
-  const ProductUnitOption({required this.unit, required this.factor});
+  const ProductUnitOption({
+    required this.unit,
+    required this.factor,
+    this.barcode,
+  });
 
   factory ProductUnitOption.fromJson(Map<String, dynamic> json) =>
       ProductUnitOption(
         unit: json['unit'] as String,
         factor: (json['factor'] as num).toDouble(),
+        barcode: json['barcode'] as String?,
       );
 
-  Map<String, dynamic> toJson() => {'unit': unit, 'factor': factor};
+  Map<String, dynamic> toJson() => {
+    'unit': unit,
+    'factor': factor,
+    'barcode': barcode,
+  };
 
   @override
   String toString() => unit;
@@ -26,6 +36,7 @@ class ProductModel {
   final String? barcode;
   final String? groupId;
   final String baseUnit;
+
   /// หน่วยแปลง เช่น [{"unit":"ลัง","factor":24},{"unit":"แพ็ค","factor":6}]
   final List<ProductUnitOption> unitConversions;
   final double priceLevel1;
@@ -61,9 +72,9 @@ class ProductModel {
 
   /// ตัวเลือกหน่วยทั้งหมด: base unit (factor=1) + หน่วยแปลง
   List<ProductUnitOption> get allUnits => [
-        ProductUnitOption(unit: baseUnit, factor: 1),
-        ...unitConversions,
-      ];
+    ProductUnitOption(unit: baseUnit, factor: 1),
+    ...unitConversions,
+  ];
 
   factory ProductModel.fromJson(Map<String, dynamic> json) {
     // parse unitConversion JSON array

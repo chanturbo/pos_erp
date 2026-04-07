@@ -55,8 +55,8 @@ class ProductListState {
 // ─────────────────────────────────────────────────────────────
 final productListProvider =
     AsyncNotifierProvider<ProductListNotifier, List<ProductModel>>(
-  ProductListNotifier.new,
-);
+      ProductListNotifier.new,
+    );
 
 class ProductListNotifier extends AsyncNotifier<List<ProductModel>> {
   // เก็บ pagination state แยกต่างหาก
@@ -87,7 +87,9 @@ class ProductListNotifier extends AsyncNotifier<List<ProductModel>> {
     bool activeOnly = false,
   }) async {
     try {
-      print('📡 Loading products (limit=$limit offset=$offset search="$search")...');
+      print(
+        '📡 Loading products (limit=$limit offset=$offset search="$search")...',
+      );
 
       final apiClient = ref.read(apiClientProvider);
 
@@ -103,15 +105,17 @@ class ProductListNotifier extends AsyncNotifier<List<ProductModel>> {
       final queryString = queryParams.entries
           .map((e) => '${e.key}=${Uri.encodeComponent(e.value.toString())}')
           .join('&');
-      final path =
-          queryString.isEmpty ? '/api/products' : '/api/products?$queryString';
+      final path = queryString.isEmpty
+          ? '/api/products'
+          : '/api/products?$queryString';
 
       final response = await apiClient.get(path);
 
       if (response.statusCode == 200) {
         final data = response.data['data'] as List;
-        final products =
-            data.map((json) => ProductModel.fromJson(json)).toList();
+        final products = data
+            .map((json) => ProductModel.fromJson(json))
+            .toList();
 
         // บันทึก pagination info
         final pagination =
@@ -162,8 +166,7 @@ class ProductListNotifier extends AsyncNotifier<List<ProductModel>> {
   Future<bool> addProduct(Map<String, dynamic> productData) async {
     try {
       final apiClient = ref.read(apiClientProvider);
-      final response =
-          await apiClient.post('/api/products', data: productData);
+      final response = await apiClient.post('/api/products', data: productData);
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         await refresh();
@@ -179,7 +182,9 @@ class ProductListNotifier extends AsyncNotifier<List<ProductModel>> {
 
   /// แก้ไขสินค้า
   Future<bool> updateProduct(
-      String productId, Map<String, dynamic> productData) async {
+    String productId,
+    Map<String, dynamic> productData,
+  ) async {
     try {
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.put(
@@ -240,11 +245,19 @@ class ProductGroupModel {
   final String groupId;
   final String groupCode;
   final String groupName;
+  final String? groupType;
+  final String? imageUrl;
+  final String? mobileColor;
+  final String? mobileIcon;
 
   const ProductGroupModel({
     required this.groupId,
     required this.groupCode,
     required this.groupName,
+    this.groupType,
+    this.imageUrl,
+    this.mobileColor,
+    this.mobileIcon,
   });
 
   factory ProductGroupModel.fromJson(Map<String, dynamic> json) =>
@@ -252,14 +265,19 @@ class ProductGroupModel {
         groupId: json['group_id'] as String,
         groupCode: json['group_code'] as String,
         groupName: json['group_name'] as String,
+        groupType: json['group_type'] as String?,
+        imageUrl: json['image_url'] as String?,
+        mobileColor: json['mobile_color'] as String?,
+        mobileIcon: json['mobile_icon'] as String?,
       );
 }
 
 // ─────────────────────────────────────────────────────────────
 // productGroupsProvider — ดึง product groups ทั้งหมด
 // ─────────────────────────────────────────────────────────────
-final productGroupsProvider =
-    FutureProvider<List<ProductGroupModel>>((ref) async {
+final productGroupsProvider = FutureProvider<List<ProductGroupModel>>((
+  ref,
+) async {
   try {
     final authState = ref.watch(authProvider);
     if (authState.isRestoring || !authState.isAuthenticated) return [];
@@ -268,8 +286,7 @@ final productGroupsProvider =
     if (res.statusCode == 200 && res.data != null) {
       final list = res.data['data'] as List;
       return list
-          .map((j) =>
-              ProductGroupModel.fromJson(j as Map<String, dynamic>))
+          .map((j) => ProductGroupModel.fromJson(j as Map<String, dynamic>))
           .toList();
     }
     return [];
@@ -278,3 +295,73 @@ final productGroupsProvider =
     return [];
   }
 });
+
+final productGroupRepositoryProvider = Provider<ProductGroupRepository>((ref) {
+  return ProductGroupRepository(ref);
+});
+
+class ProductGroupRepository {
+  final Ref ref;
+
+  ProductGroupRepository(this.ref);
+
+  Future<bool> createGroup(Map<String, dynamic> payload) async {
+    try {
+      final api = ref.read(apiClientProvider);
+      final res = await api.post('/api/products/groups', data: payload);
+      if (res.statusCode == 200 || res.statusCode == 201) {
+        ref.invalidate(productGroupsProvider);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      print('❌ Error creating product group: $e');
+      return false;
+    }
+  }
+
+  Future<bool> updateGroup(String groupId, Map<String, dynamic> payload) async {
+    try {
+      final api = ref.read(apiClientProvider);
+      final res = await api.put('/api/products/groups/$groupId', data: payload);
+      if (res.statusCode == 200) {
+        ref.invalidate(productGroupsProvider);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      print('❌ Error updating product group: $e');
+      return false;
+    }
+  }
+
+  Future<Map<String, dynamic>> checkDeleteGroup(String groupId) async {
+    try {
+      final api = ref.read(apiClientProvider);
+      final res = await api.get('/api/products/groups/$groupId/check-delete');
+      if (res.statusCode == 200) {
+        return Map<String, dynamic>.from(res.data as Map);
+      }
+      return {'success': false};
+    } catch (e) {
+      print('❌ Error checking product group delete: $e');
+      return {'success': false, 'message': '$e'};
+    }
+  }
+
+  Future<String?> deleteGroup(String groupId) async {
+    try {
+      final api = ref.read(apiClientProvider);
+      final res = await api.delete('/api/products/groups/$groupId');
+      if (res.statusCode == 200) {
+        ref.invalidate(productGroupsProvider);
+        return (res.data as Map?)?['message'] as String? ??
+            'ลบหมวดสินค้าสำเร็จ';
+      }
+      return null;
+    } catch (e) {
+      print('❌ Error deleting product group: $e');
+      return null;
+    }
+  }
+}

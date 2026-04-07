@@ -6,16 +6,14 @@ import '../config/app_config.dart';
 
 class ApiClient {
   final Dio _dio;
-  final String baseUrl;
   String? _token;
 
   /// ✅ Callback เมื่อ server ตอบ 401 — ใช้ redirect ไป login page
   void Function()? onUnauthorized;
   
   ApiClient({String? baseUrl}) 
-      : baseUrl = baseUrl ?? AppConfig.apiBaseUrl,
-        _dio = Dio(BaseOptions(
-    baseUrl: baseUrl ?? AppConfig.apiBaseUrl,
+      : _dio = Dio(BaseOptions(
+    baseUrl: baseUrl ?? AppConfig.resolveApiBaseUrl(),
     connectTimeout: AppConfig.connectTimeout,
     receiveTimeout: AppConfig.receiveTimeout,
     headers: {
@@ -56,6 +54,16 @@ class ApiClient {
       ),
     );
   }
+
+  String get baseUrl => _dio.options.baseUrl;
+
+  void refreshBaseUrl() {
+    final resolved = AppConfig.resolveApiBaseUrl();
+    if (_dio.options.baseUrl != resolved) {
+      _dio.options.baseUrl = resolved;
+      print('🌐 API Base URL switched to $resolved');
+    }
+  }
   
   /// Set authentication token
   void setToken(String? token) {
@@ -76,6 +84,7 @@ class ApiClient {
   Future<Response> get(String path,
       {Map<String, dynamic>? queryParameters}) async {
     try {
+      refreshBaseUrl();
       final response =
           await _dio.get(path, queryParameters: queryParameters);
       return response;
@@ -88,6 +97,7 @@ class ApiClient {
   /// Post with auth
   Future<Response> post(String path, {dynamic data}) async {
     try {
+      refreshBaseUrl();
       final response = await _dio.post(path, data: data);
       return response;
     } on DioException catch (e) {
@@ -99,6 +109,7 @@ class ApiClient {
   /// Put with auth
   Future<Response> put(String path, {dynamic data}) async {
     try {
+      refreshBaseUrl();
       final response = await _dio.put(path, data: data);
       return response;
     } on DioException catch (e) {
@@ -111,6 +122,7 @@ class ApiClient {
   Future<Response> delete(String path,
       {Map<String, dynamic>? queryParameters}) async {
     try {
+      refreshBaseUrl();
       final response =
           await _dio.delete(path, queryParameters: queryParameters);
       return response;

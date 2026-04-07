@@ -3,13 +3,75 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../providers/cart_provider.dart';
 
-class HoldOrdersDialog extends ConsumerWidget {
+class HoldOrdersDialog extends ConsumerStatefulWidget {
   const HoldOrdersDialog({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HoldOrdersDialog> createState() => _HoldOrdersDialogState();
+}
+
+class _HoldOrdersDialogState extends ConsumerState<HoldOrdersDialog> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _renameOrder(int index, HoldOrder order) async {
+    final controller = TextEditingController(text: order.name);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('แก้ชื่อบิลที่พัก'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'ชื่อบิล',
+            hintText: 'เช่น โต๊ะ 5 / ลูกค้ารับกลับ',
+          ),
+          onSubmitted: (value) => Navigator.pop(context, value.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('ยกเลิก'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('บันทึก'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+
+    if (result == null || result.trim().isEmpty) return;
+
+    ref.read(holdOrdersProvider.notifier).renameOrder(index, result.trim());
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('เปลี่ยนชื่อบิลเป็น "$result" แล้ว')),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final holdOrdersState = ref.watch(holdOrdersProvider);
-    final orders = holdOrdersState.orders;
+    final filteredEntries = holdOrdersState.orders.asMap().entries.where((
+      entry,
+    ) {
+      final order = entry.value;
+      if (_searchQuery.trim().isEmpty) return true;
+      final query = _searchQuery.trim().toLowerCase();
+      return order.name.toLowerCase().contains(query) ||
+          (order.cartState.customerName?.toLowerCase().contains(query) ??
+              false);
+    }).toList();
+    final orders = filteredEntries.map((entry) => entry.value).toList();
 
     return Dialog(
       child: Container(
@@ -36,6 +98,26 @@ class HoldOrdersDialog extends ConsumerWidget {
               ],
             ),
             const Divider(),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(0, 0, 0, 12),
+              child: TextField(
+                controller: _searchController,
+                onChanged: (value) => setState(() => _searchQuery = value),
+                decoration: InputDecoration(
+                  hintText: 'ค้นหาชื่อบิล, โต๊ะ, หรือลูกค้า',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: _searchQuery.isEmpty
+                      ? null
+                      : IconButton(
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() => _searchQuery = '');
+                          },
+                          icon: const Icon(Icons.clear),
+                        ),
+                ),
+              ),
+            ),
 
             // Hold Orders List
             Expanded(
@@ -53,7 +135,9 @@ class HoldOrdersDialog extends ConsumerWidget {
                   : ListView.builder(
                       itemCount: orders.length,
                       itemBuilder: (context, index) {
-                        final order = orders[index];
+                        final entry = filteredEntries[index];
+                        final originalIndex = entry.key;
+                        final order = entry.value;
                         final cart = order.cartState; // ✅ ดึง cartState
 
                         return Card(
@@ -72,15 +156,11 @@ class HoldOrdersDialog extends ConsumerWidget {
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  '${cart.items.length} รายการ',
-                                ), // ✅ ใช้ cart.items
+                                Text('${cart.items.length} รายการ'),
                                 if (cart.customerName != null)
-                                  Text(
-                                    'ลูกค้า: ${cart.customerName}',
-                                  ), // ✅ ใช้ cart.customerName
+                                  Text('ลูกค้า: ${cart.customerName}'),
                                 Text(
-                                  'เวลา: ${DateFormat('HH:mm').format(order.timestamp)}', // ✅ ใช้ timestamp
+                                  'เวลา: ${DateFormat('HH:mm').format(order.timestamp)}',
                                   style: TextStyle(
                                     fontSize: 12,
                                     color: Colors.grey[600],
@@ -106,6 +186,15 @@ class HoldOrdersDialog extends ConsumerWidget {
                                   ],
                                 ),
                                 const SizedBox(width: 8),
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.edit_outlined,
+                                    size: 20,
+                                  ),
+                                  tooltip: 'แก้ชื่อบิล',
+                                  onPressed: () =>
+                                      _renameOrder(originalIndex, order),
+                                ),
                                 // ปุ่มลบ
                                 IconButton(
                                   icon: const Icon(
@@ -142,7 +231,7 @@ class HoldOrdersDialog extends ConsumerWidget {
                                     if (confirm == true) {
                                       ref
                                           .read(holdOrdersProvider.notifier)
-                                          .removeOrder(index);
+                                          .removeOrder(originalIndex);
 
                                       if (context.mounted) {
                                         ScaffoldMessenger.of(
@@ -161,16 +250,21 @@ class HoldOrdersDialog extends ConsumerWidget {
                               ],
                             ),
                             onTap: () {
-                              // ✅ เรียกกลับบิล - ใช้ recallOrder
+                              final hasCurrentItems = ref
+                                  .read(cartProvider)
+                                  .items
+                                  .isNotEmpty;
                               ref
                                   .read(holdOrdersProvider.notifier)
-                                  .recallOrder(index);
+                                  .recallOrder(originalIndex);
                               Navigator.pop(context);
 
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text(
-                                    'เรียก ${order.name} กลับมาแล้ว',
+                                    hasCurrentItems
+                                        ? 'เรียก ${order.name} กลับมาและรวมกับบิลปัจจุบันแล้ว'
+                                        : 'เรียก ${order.name} กลับมาแล้ว',
                                   ),
                                 ),
                               );

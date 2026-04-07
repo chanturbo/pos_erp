@@ -129,7 +129,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         _MenuSection('ระบบ', [
           _MenuItem(icon: Icons.assessment, title: 'รายงาน',      page: const ReportsPage()),
           _MenuItem(icon: Icons.store,      title: 'จัดการสาขา',  page: const BranchListPage()),
-          _MenuItem(icon: Icons.sync_alt,   title: 'Sync สถานะ',  page: const SyncStatusPage()),
+          _MenuItem(icon: Icons.sync_alt,   title: 'การเชื่อมต่อ/ซิงก์',  page: const SyncStatusPage()),
           _MenuItem(icon: Icons.settings,   title: 'ตั้งค่า',      page: const SettingsPage()),
         ]),
       ];
@@ -205,8 +205,10 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(posContextBootstrapProvider);
     final user      = ref.watch(authProvider).user;
     final syncAsync = ref.watch(syncStatusProvider);
+    final connectionAsync = ref.watch(connectionStatusProvider);
 
     // ── Sidebar Widget ─────────────────────────────────────────
     Widget sidebarWidget = _SidebarContent(
@@ -215,6 +217,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       selectedIndex: _selectedIndex,
       user: user,
       syncAsync: syncAsync,
+      connectionAsync: connectionAsync,
       onItemSelected: _selectItem,
       onSyncTap: () => _push(context, const SyncStatusPage()),
       onTestTap: () => _push(context, const TestPage()),
@@ -245,7 +248,12 @@ class _HomePageState extends ConsumerState<HomePage> {
             )
           // ── Tablet/Mobile: Drawer + AppBar ─────────────────
           : Scaffold(
-              appBar: _buildMobileAppBar(context, user, syncAsync),
+              appBar: _buildMobileAppBar(
+                context,
+                user,
+                syncAsync,
+                connectionAsync,
+              ),
               drawer: Drawer(
                 width: context.sidebarWidth,
                 backgroundColor: AppTheme.navyColor,
@@ -261,7 +269,12 @@ class _HomePageState extends ConsumerState<HomePage> {
     BuildContext context,
     dynamic user,
     AsyncValue syncAsync,
+    AsyncValue connectionAsync,
   ) {
+    final syncValue = syncAsync.maybeWhen(
+      data: (value) => value,
+      orElse: () => null,
+    );
     final sectionTitle =
         _sections.expand((s) => s.items).toList()[_selectedIndex].title;
 
@@ -289,15 +302,16 @@ class _HomePageState extends ConsumerState<HomePage> {
       ),
       actions: [
         // Sync badge
-        syncAsync.when(
-          data: (sync) => IconButton(
+        connectionAsync.when(
+          data: (connection) => IconButton(
             icon: Stack(
               children: [
                 Icon(
-                  sync.isOnline ? Icons.sync : Icons.sync_disabled,
-                  color: sync.isOnline ? Colors.white70 : AppTheme.errorLight,
+                  connection.isConnected ? Icons.wifi : Icons.wifi_off,
+                  color:
+                      connection.isConnected ? Colors.white70 : AppTheme.errorLight,
                 ),
-                if (sync.hasPending)
+                if (syncValue?.hasPending == true)
                   Positioned(
                     right: 0,
                     top: 0,
@@ -312,9 +326,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                   ),
               ],
             ),
-            tooltip: sync.pendingCount > 0
-                ? 'รอ Sync ${sync.pendingCount} รายการ'
-                : 'Sync',
+            tooltip: connection.detail,
             onPressed: () => _push(context, const SyncStatusPage()),
           ),
           loading: () => const SizedBox(width: 48),
@@ -350,6 +362,7 @@ class _SidebarContent extends StatelessWidget {
   final int selectedIndex;
   final dynamic user;
   final AsyncValue syncAsync;
+  final AsyncValue connectionAsync;
   final void Function(int) onItemSelected;
   final VoidCallback onSyncTap;
   final VoidCallback onTestTap;
@@ -361,6 +374,7 @@ class _SidebarContent extends StatelessWidget {
     required this.selectedIndex,
     required this.user,
     required this.syncAsync,
+    required this.connectionAsync,
     required this.onItemSelected,
     required this.onSyncTap,
     required this.onTestTap,
@@ -394,6 +408,7 @@ class _SidebarContent extends StatelessWidget {
           // Bottom
           _SidebarBottom(
             syncAsync: syncAsync,
+            connectionAsync: connectionAsync,
             onSyncTap: onSyncTap,
             onTestTap: onTestTap,
             onLogout: onLogout,
@@ -627,12 +642,14 @@ class _SidebarItem extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────
 class _SidebarBottom extends StatelessWidget {
   final AsyncValue syncAsync;
+  final AsyncValue connectionAsync;
   final VoidCallback onSyncTap;
   final VoidCallback onTestTap;
   final VoidCallback onLogout;
 
   const _SidebarBottom({
     required this.syncAsync,
+    required this.connectionAsync,
     required this.onSyncTap,
     required this.onTestTap,
     required this.onLogout,
@@ -640,6 +657,11 @@ class _SidebarBottom extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final syncValue = syncAsync.maybeWhen(
+      data: (value) => value,
+      orElse: () => null,
+    );
+
     return Container(
       decoration: const BoxDecoration(
         border: Border(top: BorderSide(color: AppTheme.navyBorder)),
@@ -648,16 +670,17 @@ class _SidebarBottom extends StatelessWidget {
           8, 6, 8, MediaQuery.of(context).padding.bottom + 6),
       child: Column(
         children: [
-          syncAsync.when(
-            data: (sync) => _BottomAction(
-              icon: sync.isOnline ? Icons.sync : Icons.sync_disabled,
-              label: sync.pendingCount > 0
-                  ? 'รอ Sync ${sync.pendingCount} รายการ'
-                  : 'ออนไลน์',
-              iconColor: sync.isOnline
+          connectionAsync.when(
+            data: (connection) => _BottomAction(
+              icon: connection.isConnected ? Icons.wifi : Icons.wifi_off,
+              label: syncValue?.pendingCount != null &&
+                      syncValue!.pendingCount > 0
+                  ? '${connection.title} • รอส่ง ${syncValue.pendingCount} รายการ'
+                  : connection.title,
+              iconColor: connection.isConnected
                   ? AppTheme.successColor
                   : AppTheme.errorColor,
-              badge: sync.hasPending,
+              badge: syncValue?.hasPending ?? false,
               onTap: onSyncTap,
             ),
             loading: () => const SizedBox(height: 32),

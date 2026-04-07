@@ -1,5 +1,6 @@
 // ignore_for_file: avoid_print
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -15,6 +16,9 @@ import '../providers/sales_provider.dart';
 import '../../../dashboard/presentation/providers/dashboard_provider.dart';
 import '../../../inventory/presentation/providers/stock_provider.dart';
 import '../../../products/presentation/providers/product_provider.dart';
+import '../../../branches/presentation/providers/branch_provider.dart';
+import '../../../../core/config/app_mode.dart';
+import '../../../../core/services/pending_sales_queue_service.dart';
 import '../../../../shared/services/mobile_scanner_service.dart';
 import '../../../../shared/widgets/thermal_receipt.dart';
 
@@ -38,8 +42,8 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
   String? _couponError;
 
   // ── Points redemption ────────────────────────────────────────────
-  int _customerPoints = 0;    // แต้มคงเหลือของลูกค้า (โหลดจาก API)
-  int _pointsUsed = 0;        // แต้มที่เลือกจะใช้ในบิลนี้
+  int _customerPoints = 0; // แต้มคงเหลือของลูกค้า (โหลดจาก API)
+  int _pointsUsed = 0; // แต้มที่เลือกจะใช้ในบิลนี้
   bool _isLoadingPoints = false;
 
   @override
@@ -64,11 +68,20 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
   Future<void> _loadCustomerPoints() async {
     final cartState = ref.read(cartProvider);
     final customerId = cartState.customerId;
-    if (customerId == null || customerId == 'WALK_IN' || customerId.isEmpty) return;
+    if (customerId == null || customerId == 'WALK_IN' || customerId.isEmpty) {
+      return;
+    }
 
     setState(() => _isLoadingPoints = true);
-    final pts = await ref.read(salesHistoryProvider.notifier).getCustomerPoints(customerId);
-    if (mounted) setState(() { _customerPoints = pts; _isLoadingPoints = false; });
+    final pts = await ref
+        .read(salesHistoryProvider.notifier)
+        .getCustomerPoints(customerId);
+    if (mounted) {
+      setState(() {
+        _customerPoints = pts;
+        _isLoadingPoints = false;
+      });
+    }
   }
 
   /// คำนวณยอดหลังหักแต้ม
@@ -109,8 +122,9 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
     });
 
     try {
-      final result =
-          await ref.read(couponListProvider.notifier).validateCoupon(code);
+      final result = await ref
+          .read(couponListProvider.notifier)
+          .validateCoupon(code);
 
       if (!mounted) return;
 
@@ -138,11 +152,16 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
       // ── ตรวจสอบ Exclusive ─────────────────────────────────────
       final isExclusive = result['is_exclusive'] as bool? ?? false;
       if (existing.isNotEmpty && isExclusive) {
-        setState(() => _couponError = 'คูปองนี้ไม่สามารถใช้ร่วมกับคูปองอื่นได้');
+        setState(
+          () => _couponError = 'คูปองนี้ไม่สามารถใช้ร่วมกับคูปองอื่นได้',
+        );
         return;
       }
       if (existing.any((c) => c.isExclusive)) {
-        setState(() => _couponError = 'มีคูปอง Exclusive อยู่แล้ว ไม่สามารถเพิ่มคูปองอื่นได้');
+        setState(
+          () => _couponError =
+              'มีคูปอง Exclusive อยู่แล้ว ไม่สามารถเพิ่มคูปองอื่นได้',
+        );
         return;
       }
 
@@ -162,13 +181,17 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
       }
       couponDiscount = couponDiscount.clamp(0, cartState.subtotal);
 
-      ref.read(cartProvider.notifier).applyCoupon(AppliedCoupon(
-            code: code,
-            discount: couponDiscount,
-            promotionId: promoId,
-            promotionName: result['promotion_name'] as String?,
-            isExclusive: isExclusive,
-          ));
+      ref
+          .read(cartProvider.notifier)
+          .applyCoupon(
+            AppliedCoupon(
+              code: code,
+              discount: couponDiscount,
+              promotionId: promoId,
+              promotionName: result['promotion_name'] as String?,
+              isExclusive: isExclusive,
+            ),
+          );
 
       _couponController.clear();
       setState(() => _couponError = null);
@@ -211,8 +234,9 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
 
   @override
   Widget build(BuildContext context) {
-    final cartState   = ref.watch(cartProvider);
-    final settings    = ref.watch(settingsProvider);
+    ref.watch(posContextBootstrapProvider);
+    final cartState = ref.watch(cartProvider);
+    final settings = ref.watch(settingsProvider);
     final promptPayId = settings.promptPayId.trim();
     final hasPromptPay = PromptPayUtils.isValidPromptPayId(promptPayId);
 
@@ -228,79 +252,96 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // ยอดที่ต้องชำระ
-                  Builder(builder: (context) {
-                    final isDark = Theme.of(context).brightness == Brightness.dark;
-                    return Container(
-                      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: isDark
-                              ? [const Color(0xFF0D2137), const Color(0xFF0D3354)]
-                              : [const Color(0xFF1565C0), const Color(0xFF1976D2)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
+                  Builder(
+                    builder: (context) {
+                      final isDark =
+                          Theme.of(context).brightness == Brightness.dark;
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 20,
+                          horizontal: 24,
                         ),
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF1565C0).withValues(alpha: 0.3),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: isDark
+                                ? [
+                                    const Color(0xFF0D2137),
+                                    const Color(0xFF0D3354),
+                                  ]
+                                : [
+                                    const Color(0xFF1565C0),
+                                    const Color(0xFF1976D2),
+                                  ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
                           ),
-                        ],
-                      ),
-                      child: Column(
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(Icons.receipt_long,
-                                  color: Colors.white70, size: 16),
-                              const SizedBox(width: 6),
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(
+                                0xFF1565C0,
+                              ).withValues(alpha: 0.3),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(
+                                  Icons.receipt_long,
+                                  color: Colors.white70,
+                                  size: 16,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'ยอดที่ต้องชำระ',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    color: Colors.white.withValues(alpha: 0.85),
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              '฿${_netTotal.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontSize: 52,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                letterSpacing: 1,
+                              ),
+                            ),
+                            if (cartState.totalDiscount > 0) ...[
+                              const SizedBox(height: 4),
                               Text(
-                                'ยอดที่ต้องชำระ',
+                                'ส่วนลด ฿${cartState.totalDiscount.toStringAsFixed(2)}',
                                 style: TextStyle(
-                                  fontSize: 15,
-                                  color: Colors.white.withValues(alpha: 0.85),
-                                  letterSpacing: 0.5,
+                                  fontSize: 12,
+                                  color: Colors.white.withValues(alpha: 0.7),
                                 ),
                               ),
                             ],
-                          ),
-                          const SizedBox(height: 10),
-                          Text(
-                            '฿${_netTotal.toStringAsFixed(2)}',
-                            style: const TextStyle(
-                              fontSize: 52,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                              letterSpacing: 1,
-                            ),
-                          ),
-                          if (cartState.totalDiscount > 0) ...[
-                            const SizedBox(height: 4),
-                            Text(
-                              'ส่วนลด ฿${cartState.totalDiscount.toStringAsFixed(2)}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.white.withValues(alpha: 0.7),
+                            if (_pointsUsed > 0) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                'แลกแต้ม $_pointsUsed pt = -฿${_pointsUsed.toStringAsFixed(2)}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.orange[200],
+                                ),
                               ),
-                            ),
+                            ],
                           ],
-                          if (_pointsUsed > 0) ...[
-                            const SizedBox(height: 2),
-                            Text(
-                              'แลกแต้ม $_pointsUsed pt = -฿${_pointsUsed.toStringAsFixed(2)}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.orange[200],
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    );
-                  }),
+                        ),
+                      );
+                    },
+                  ),
                   const SizedBox(height: 16),
 
                   // ── คูปองส่วนลด ────────────────────────────────
@@ -320,12 +361,12 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                       cartState.customerId != 'WALK_IN' &&
                       cartState.customerId!.isNotEmpty)
                     _PointsSection(
-                      customerPoints:  _customerPoints,
-                      pointsUsed:      _pointsUsed,
-                      cartTotal:       cartState.total,
-                      isLoading:       _isLoadingPoints,
-                      onApply:         _applyPoints,
-                      onClear:         () => _applyPoints(0),
+                      customerPoints: _customerPoints,
+                      pointsUsed: _pointsUsed,
+                      cartTotal: cartState.total,
+                      isLoading: _isLoadingPoints,
+                      onApply: _applyPoints,
+                      onClear: () => _applyPoints(0),
                     ),
                   if (cartState.customerId != null &&
                       cartState.customerId != 'WALK_IN' &&
@@ -396,168 +437,188 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                     const SizedBox(height: 16),
 
                     // ปุ่มจำนวนเงินด่วน — คำนวณอัตโนมัติจากยอดขาย
-                    Builder(builder: (context) {
-                      final isDark = Theme.of(context).brightness == Brightness.dark;
-                      // สร้าง list จากยอดจริง: พอดียอด → กลมขึ้นไปเรื่อย ๆ
-                      final total = cartState.total;
-                      final amounts = _buildQuickAmounts(total);
-                      return Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: amounts.map((amount) {
-                          final isExact = amount == total;
-                          final isSelected = _receivedAmount == amount;
-                          return InkWell(
-                            onTap: () => setState(() {
-                              _receivedAmount = amount;
-                              _receivedController.text =
-                                  amount.toStringAsFixed(2);
-                            }),
-                            borderRadius: BorderRadius.circular(8),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 150),
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 14, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? const Color(0xFF1565C0)
-                                    : isExact
-                                        ? (isDark
-                                            ? const Color(0xFF0D3354)
-                                            : const Color(0xFFE3F2FD))
-                                        : (isDark
-                                            ? const Color(0xFF2A2A2A)
-                                            : const Color(0xFFF5F5F5)),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
+                    Builder(
+                      builder: (context) {
+                        final isDark =
+                            Theme.of(context).brightness == Brightness.dark;
+                        // สร้าง list จากยอดจริง: พอดียอด → กลมขึ้นไปเรื่อย ๆ
+                        final total = cartState.total;
+                        final amounts = _buildQuickAmounts(total);
+                        return Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: amounts.map((amount) {
+                            final isExact = amount == total;
+                            final isSelected = _receivedAmount == amount;
+                            return InkWell(
+                              onTap: () => setState(() {
+                                _receivedAmount = amount;
+                                _receivedController.text = amount
+                                    .toStringAsFixed(2);
+                              }),
+                              borderRadius: BorderRadius.circular(8),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 150),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
                                   color: isSelected
                                       ? const Color(0xFF1565C0)
                                       : isExact
-                                          ? const Color(0xFF90CAF9)
-                                          : (isDark
+                                      ? (isDark
+                                            ? const Color(0xFF0D3354)
+                                            : const Color(0xFFE3F2FD))
+                                      : (isDark
+                                            ? const Color(0xFF2A2A2A)
+                                            : const Color(0xFFF5F5F5)),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? const Color(0xFF1565C0)
+                                        : isExact
+                                        ? const Color(0xFF90CAF9)
+                                        : (isDark
                                               ? const Color(0xFF444444)
                                               : const Color(0xFFE0E0E0)),
+                                  ),
                                 ),
-                              ),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    '฿${amount.toStringAsFixed(0)}',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w700,
-                                      color: isSelected
-                                          ? Colors.white
-                                          : isExact
-                                              ? const Color(0xFF1565C0)
-                                              : (isDark
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      '฿${amount.toStringAsFixed(0)}',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                        color: isSelected
+                                            ? Colors.white
+                                            : isExact
+                                            ? const Color(0xFF1565C0)
+                                            : (isDark
                                                   ? Colors.white
                                                   : const Color(0xFF1A1A1A)),
-                                    ),
-                                  ),
-                                  if (isExact)
-                                    Text(
-                                      'พอดี',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        color: isSelected
-                                            ? Colors.white70
-                                            : const Color(0xFF1565C0),
                                       ),
                                     ),
-                                  if (!isExact && amount > total)
-                                    Text(
-                                      'ทอน ฿${(amount - total).toStringAsFixed(0)}',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        color: isSelected
-                                            ? Colors.white70
-                                            : (isDark
-                                                ? Colors.white54
-                                                : Colors.grey[600]),
+                                    if (isExact)
+                                      Text(
+                                        'พอดี',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: isSelected
+                                              ? Colors.white70
+                                              : const Color(0xFF1565C0),
+                                        ),
                                       ),
-                                    ),
-                                ],
+                                    if (!isExact && amount > total)
+                                      Text(
+                                        'ทอน ฿${(amount - total).toStringAsFixed(0)}',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: isSelected
+                                              ? Colors.white70
+                                              : (isDark
+                                                    ? Colors.white54
+                                                    : Colors.grey[600]),
+                                        ),
+                                      ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          );
-                        }).toList(),
-                      );
-                    }),
+                            );
+                          }).toList(),
+                        );
+                      },
+                    ),
                     const SizedBox(height: 24),
 
                     // เงินทอน
-                    Builder(builder: (context) {
-                      final isDark = Theme.of(context).brightness == Brightness.dark;
-                      final isOk = _change >= 0;
-                      return Container(
-                        padding: const EdgeInsets.symmetric(
-                            vertical: 16, horizontal: 24),
-                        decoration: BoxDecoration(
-                          // dark: bg มืดตาม isOk, border บาง
-                          // light: เขียวอ่อน/แดงอ่อน ตาม isOk
-                          color: isDark
-                              ? (isOk
-                                  ? const Color(0xFF1A2E1A)  // เขียวมืด
-                                  : const Color(0xFF2A1A1A)) // แดงมืด (อ่อนกว่าเดิม)
-                              : (isOk
-                                  ? const Color(0xFFE8F5E9)
-                                  : const Color(0xFFFFEBEE)),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
+                    Builder(
+                      builder: (context) {
+                        final isDark =
+                            Theme.of(context).brightness == Brightness.dark;
+                        final isOk = _change >= 0;
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 16,
+                            horizontal: 24,
+                          ),
+                          decoration: BoxDecoration(
+                            // dark: bg มืดตาม isOk, border บาง
+                            // light: เขียวอ่อน/แดงอ่อน ตาม isOk
                             color: isDark
                                 ? (isOk
-                                    ? const Color(0xFF4CAF50).withValues(alpha: 0.25)
-                                    : const Color(0xFFF44336).withValues(alpha: 0.25))
+                                      ? const Color(0xFF1A2E1A) // เขียวมืด
+                                      : const Color(
+                                          0xFF2A1A1A,
+                                        )) // แดงมืด (อ่อนกว่าเดิม)
                                 : (isOk
-                                    ? const Color(0xFF4CAF50).withValues(alpha: 0.3)
-                                    : const Color(0xFFF44336).withValues(alpha: 0.3)),
+                                      ? const Color(0xFFE8F5E9)
+                                      : const Color(0xFFFFEBEE)),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isDark
+                                  ? (isOk
+                                        ? const Color(
+                                            0xFF4CAF50,
+                                          ).withValues(alpha: 0.25)
+                                        : const Color(
+                                            0xFFF44336,
+                                          ).withValues(alpha: 0.25))
+                                  : (isOk
+                                        ? const Color(
+                                            0xFF4CAF50,
+                                          ).withValues(alpha: 0.3)
+                                        : const Color(
+                                            0xFFF44336,
+                                          ).withValues(alpha: 0.3)),
+                            ),
                           ),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  isOk
-                                      ? Icons.check_circle_outline
-                                      : Icons.remove_circle_outline,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    isOk
+                                        ? Icons.check_circle_outline
+                                        : Icons.remove_circle_outline,
+                                    color: isOk
+                                        ? const Color(0xFF4CAF50)
+                                        : const Color(0xFFEF5350),
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    isOk ? 'เงินทอน' : 'ยอดขาด',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      color: isDark
+                                          ? Colors.white70
+                                          : (isOk
+                                                ? const Color(0xFF2E7D32)
+                                                : const Color(0xFFC62828)),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Text(
+                                '฿${_change.abs().toStringAsFixed(2)}',
+                                style: TextStyle(
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.bold,
                                   color: isOk
                                       ? const Color(0xFF4CAF50)
                                       : const Color(0xFFEF5350),
-                                  size: 20,
                                 ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  isOk ? 'เงินทอน' : 'ยอดขาด',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                    color: isDark
-                                        ? Colors.white70
-                                        : (isOk
-                                            ? const Color(0xFF2E7D32)
-                                            : const Color(0xFFC62828)),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            Text(
-                              '฿${_change.abs().toStringAsFixed(2)}',
-                              style: TextStyle(
-                                fontSize: 32,
-                                fontWeight: FontWeight.bold,
-                                color: isOk
-                                    ? const Color(0xFF4CAF50)
-                                    : const Color(0xFFEF5350),
                               ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
                   ],
 
                   // ── โอน: QR PromptPay ──────────────────────────
@@ -578,22 +639,30 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                         ),
                         child: Row(
                           children: [
-                            Icon(Icons.warning_amber_rounded,
-                                color: Colors.orange[700], size: 24),
+                            Icon(
+                              Icons.warning_amber_rounded,
+                              color: Colors.orange[700],
+                              size: 24,
+                            ),
                             const SizedBox(width: 12),
                             const Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('ยังไม่ได้ตั้งค่าเลข PromptPay',
-                                      style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 13)),
+                                  Text(
+                                    'ยังไม่ได้ตั้งค่าเลข PromptPay',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                    ),
+                                  ),
                                   SizedBox(height: 4),
                                   Text(
                                     'ไปที่ ตั้งค่า → ข้อมูลบริษัท → เลข PromptPay',
                                     style: TextStyle(
-                                        fontSize: 11, color: Colors.black54),
+                                      fontSize: 11,
+                                      color: Colors.black54,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -618,8 +687,10 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                         children: [
                           Icon(Icons.credit_card, color: Colors.blue, size: 24),
                           SizedBox(width: 12),
-                          Text('รูดบัตรที่เครื่อง EDC แล้วกดยืนยัน',
-                              style: TextStyle(fontSize: 13)),
+                          Text(
+                            'รูดบัตรที่เครื่อง EDC แล้วกดยืนยัน',
+                            style: TextStyle(fontSize: 13),
+                          ),
                         ],
                       ),
                     ),
@@ -629,93 +700,92 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                   const SizedBox(height: 32),
 
                   // ── ปุ่มชำระเงิน ──────────────────────────────────
-                  Builder(builder: (context) {
-                    final isDisabled =
-                        (_paymentType == 'CASH' && _change < 0) ||
-                            _isProcessing;
-                    final cartState = ref.watch(cartProvider);
+                  Builder(
+                    builder: (context) {
+                      final isDisabled =
+                          (_paymentType == 'CASH' && _change < 0) ||
+                          _isProcessing;
+                      final cartState = ref.watch(cartProvider);
 
-                    final isDark =
-                        Theme.of(context).brightness == Brightness.dark;
+                      final isDark =
+                          Theme.of(context).brightness == Brightness.dark;
 
-                    return SizedBox(
-                      height: 64,
-                      child: ElevatedButton(
-                        onPressed: isDisabled ? null : _handlePayment,
-                        style: ElevatedButton.styleFrom(
-                          // dark: ส้มเข้ม #E57200 ชัดบน dark bg
-                          // light: ใช้สีจาก AppTheme (default)
-                          backgroundColor: isDisabled
-                              ? null
-                              : (isDark
-                                  ? const Color(0xFFE57200)
-                                  : null),
-                          foregroundColor: Colors.white,
-                          disabledBackgroundColor: isDark
-                              ? const Color(0xFF2A2A2A)
-                              : Colors.grey[300],
-                          disabledForegroundColor: isDark
-                              ? Colors.white30
-                              : Colors.grey[500],
-                          elevation: isDisabled ? 0 : 3,
-                          shadowColor: isDark
-                              ? const Color(0xFFE57200).withValues(alpha: 0.5)
-                              : null,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                      return SizedBox(
+                        height: 64,
+                        child: ElevatedButton(
+                          onPressed: isDisabled ? null : _handlePayment,
+                          style: ElevatedButton.styleFrom(
+                            // dark: ส้มเข้ม #E57200 ชัดบน dark bg
+                            // light: ใช้สีจาก AppTheme (default)
+                            backgroundColor: isDisabled
+                                ? null
+                                : (isDark ? const Color(0xFFE57200) : null),
+                            foregroundColor: Colors.white,
+                            disabledBackgroundColor: isDark
+                                ? const Color(0xFF2A2A2A)
+                                : Colors.grey[300],
+                            disabledForegroundColor: isDark
+                                ? Colors.white30
+                                : Colors.grey[500],
+                            elevation: isDisabled ? 0 : 3,
+                            shadowColor: isDark
+                                ? const Color(0xFFE57200).withValues(alpha: 0.5)
+                                : null,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
-                        ),
-                        child: _isProcessing
-                            ? const SizedBox(
-                                height: 26,
-                                width: 26,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2.5,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    _paymentType == 'TRANSFER'
-                                        ? Icons.check_circle_outline
-                                        : Icons.payments_outlined,
-                                    size: 22,
+                          child: _isProcessing
+                              ? const SizedBox(
+                                  height: 26,
+                                  width: 26,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    color: Colors.white,
                                   ),
-                                  const SizedBox(width: 10),
-                                  Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        _paymentType == 'TRANSFER'
-                                            ? 'ยืนยันรับเงินโอนแล้ว'
-                                            : 'ชำระเงิน',
-                                        style: const TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                          letterSpacing: 0.5,
-                                        ),
-                                      ),
-                                      if (_paymentType == 'CASH' &&
-                                          !isDisabled)
+                                )
+                              : Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      _paymentType == 'TRANSFER'
+                                          ? Icons.check_circle_outline
+                                          : Icons.payments_outlined,
+                                      size: 22,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
                                         Text(
-                                          '฿${cartState.total.toStringAsFixed(2)}',
+                                          _paymentType == 'TRANSFER'
+                                              ? 'ยืนยันรับเงินโอนแล้ว'
+                                              : 'ชำระเงิน',
                                           style: const TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.white70,
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                            letterSpacing: 0.5,
                                           ),
                                         ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                      ),
-                    );
-                  }),
+                                        if (_paymentType == 'CASH' &&
+                                            !isDisabled)
+                                          Text(
+                                            '฿${cartState.total.toStringAsFixed(2)}',
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.white70,
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                        ),
+                      );
+                    },
+                  ),
                 ],
               ),
             ),
@@ -759,52 +829,70 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
       final cartState = ref.read(cartProvider);
       final authState = ref.read(authProvider);
       final apiClient = ref.read(apiClientProvider);
+      final selectedBranch = ref.read(selectedBranchProvider);
+      final selectedWarehouse = ref.read(selectedWarehouseProvider);
       // ✅ เก็บ netTotal ก่อน clear cart — getter _netTotal อ่านจาก cart
       final netTotal = _netTotal;
+
+      if (selectedBranch == null || selectedWarehouse == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('กรุณาเลือกสาขาและคลังของเครื่องนี้ก่อนชำระเงิน'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        setState(() => _isProcessing = false);
+        return;
+      }
 
       final orderData = {
         'customer_id': cartState.customerId,
         'customer_name': cartState.customerName,
         'user_id': authState.user?.userId ?? 'USR001',
-        'branch_id': 'BR001',
-        'warehouse_id': 'WH001',
+        'branch_id': selectedBranch.branchId,
+        'warehouse_id': selectedWarehouse.warehouseId,
         'subtotal': cartState.subtotal,
-        'discount_amount': cartState.totalDiscount + cartState.totalCouponDiscount,
+        'discount_amount':
+            cartState.totalDiscount + cartState.totalCouponDiscount,
         'coupon_discount': cartState.totalCouponDiscount,
         'points_used': _pointsUsed,
         'amount_before_vat': _netTotal,
         'vat_amount': 0.0,
         'total_amount': _netTotal,
         'payment_type': _paymentType,
-        'paid_amount':
-            _paymentType == 'CASH' ? _receivedAmount : _netTotal,
+        'paid_amount': _paymentType == 'CASH' ? _receivedAmount : _netTotal,
         'change_amount': _paymentType == 'CASH' ? _change : 0.0,
         if (cartState.appliedCoupons.isNotEmpty)
-          'coupon_codes':
-              cartState.appliedCoupons.map((c) => c.code).toList(),
+          'coupon_codes': cartState.appliedCoupons.map((c) => c.code).toList(),
         'items': cartState.items
-            .map((item) => {
+            .map(
+              (item) => {
+                'product_id': item.productId,
+                'product_code': item.productCode,
+                'product_name': item.productName,
+                'unit': item.unit,
+                'quantity': item.quantity,
+                'unit_price': item.unitPrice,
+                'discount_percent': 0.0,
+                'discount_amount': 0.0,
+                'amount': item.amount,
+              },
+            )
+            .toList(),
+        if (cartState.freeItems.isNotEmpty) ...{
+          'free_items': cartState.freeItems
+              .map(
+                (item) => {
                   'product_id': item.productId,
                   'product_code': item.productCode,
                   'product_name': item.productName,
                   'unit': item.unit,
                   'quantity': item.quantity,
-                  'unit_price': item.unitPrice,
-                  'discount_percent': 0.0,
-                  'discount_amount': 0.0,
-                  'amount': item.amount,
-                })
-            .toList(),
-        if (cartState.freeItems.isNotEmpty) ...{
-          'free_items': cartState.freeItems
-              .map((item) => {
-                    'product_id': item.productId,
-                    'product_code': item.productCode,
-                    'product_name': item.productName,
-                    'unit': item.unit,
-                    'quantity': item.quantity,
-                    'promotion_id': item.promotionId,
-                  })
+                  'promotion_id': item.promotionId,
+                },
+              )
               .toList(),
           'promotion_ids': cartState.freeItems
               .map((i) => i.promotionId)
@@ -822,11 +910,11 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
 
       if (response.statusCode == 200) {
         // ✅ อ่านค่าจาก response ก่อน — ต้องใช้ orderNo ใน coupon use call
-        final responseData =
-            response.data is Map ? response.data as Map : {};
-        final dataMap =
-            responseData['data'] is Map ? responseData['data'] as Map : {};
-        final orderNo      = dataMap['order_no'] as String? ?? '-';
+        final responseData = response.data is Map ? response.data as Map : {};
+        final dataMap = responseData['data'] is Map
+            ? responseData['data'] as Map
+            : {};
+        final orderNo = dataMap['order_no'] as String? ?? '-';
         final earnedPoints = dataMap['earned_points'] as int? ?? 0;
 
         // ── Mark all coupons as used ──────────────────────────────
@@ -834,10 +922,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
           try {
             await apiClient.put(
               '/api/promotions/coupons/${coupon.code.toUpperCase()}/use',
-              data: {
-                'customer_id': cartState.customerId,
-                'order_no':    orderNo,
-              },
+              data: {'customer_id': cartState.customerId, 'order_no': orderNo},
             );
           } catch (e) {
             print('⚠️ Could not mark coupon ${coupon.code} as used: $e');
@@ -860,8 +945,10 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
         ref.read(customerListProvider.notifier).refresh();
 
         // ✅ คำนวณค่าทั้งหมดก่อน navigate — ป้องกัน ref ถูกเรียกหลัง unmount
-        final paidAmount   = _paymentType == 'CASH' ? _receivedAmount : netTotal;
-        final changeAmount = _paymentType == 'CASH' ? _receivedAmount - netTotal : 0.0;
+        final paidAmount = _paymentType == 'CASH' ? _receivedAmount : netTotal;
+        final changeAmount = _paymentType == 'CASH'
+            ? _receivedAmount - netTotal
+            : 0.0;
 
         if (mounted) {
           // ✅ ไปหน้าใบเสร็จแทน dialog
@@ -869,21 +956,22 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
             context,
             MaterialPageRoute(
               builder: (_) => ReceiptPage(
-                orderNo:        orderNo,
-                orderDate:      DateTime.now(),
-                customerName:   cartState.customerName,
-                items:          cartState.items,
-                freeItems:      cartState.freeItems,
-                subtotal:       cartState.subtotal,
-                discount:       cartState.totalDiscount,
+                orderNo: orderNo,
+                orderDate: DateTime.now(),
+                customerName: cartState.customerName,
+                items: cartState.items,
+                freeItems: cartState.freeItems,
+                subtotal: cartState.subtotal,
+                discount: cartState.totalDiscount,
                 appliedCoupons: cartState.appliedCoupons,
-                total:          netTotal,
-                paymentType:    _paymentType,
-                paidAmount:     paidAmount,
-                changeAmount:   changeAmount,
-                earnedPoints:   earnedPoints,
-                pointsUsed:     _pointsUsed,
-                pointsBalance:  (cartState.customerId != null &&
+                total: netTotal,
+                paymentType: _paymentType,
+                paidAmount: paidAmount,
+                changeAmount: changeAmount,
+                earnedPoints: earnedPoints,
+                pointsUsed: _pointsUsed,
+                pointsBalance:
+                    (cartState.customerId != null &&
                         cartState.customerId != 'WALK_IN' &&
                         cartState.customerId!.isNotEmpty)
                     ? _customerPoints - _pointsUsed + earnedPoints
@@ -894,23 +982,121 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
         }
       } else {
         // ✅ อ่าน error message จาก API แต่ไม่ expose raw exception
-        final responseData =
-            response.data is Map ? response.data as Map : {};
+        final responseData = response.data is Map ? response.data as Map : {};
         final serverMsg =
             responseData['message'] as String? ?? 'ไม่สามารถบันทึกออเดอร์ได้';
         throw Exception(serverMsg);
       }
-    } catch (e) {
+    } on DioException catch (e) {
       print('❌ Payment error: $e');
+
+      final shouldQueue =
+          AppModeConfig.isClient &&
+          (e.response == null ||
+              e.type == DioExceptionType.connectionError ||
+              e.type == DioExceptionType.connectionTimeout ||
+              e.type == DioExceptionType.receiveTimeout ||
+              e.type == DioExceptionType.unknown);
+
+      if (shouldQueue) {
+        final cartState = ref.read(cartProvider);
+        final authState = ref.read(authProvider);
+        final selectedBranch = ref.read(selectedBranchProvider);
+        final selectedWarehouse = ref.read(selectedWarehouseProvider);
+
+        if (selectedBranch != null && selectedWarehouse != null) {
+          final fallbackOrderData = {
+            'customer_id': cartState.customerId,
+            'customer_name': cartState.customerName,
+            'user_id': authState.user?.userId ?? 'USR001',
+            'branch_id': selectedBranch.branchId,
+            'warehouse_id': selectedWarehouse.warehouseId,
+            'subtotal': cartState.subtotal,
+            'discount_amount':
+                cartState.totalDiscount + cartState.totalCouponDiscount,
+            'coupon_discount': cartState.totalCouponDiscount,
+            'points_used': _pointsUsed,
+            'amount_before_vat': _netTotal,
+            'vat_amount': 0.0,
+            'total_amount': _netTotal,
+            'payment_type': _paymentType,
+            'paid_amount': _paymentType == 'CASH' ? _receivedAmount : _netTotal,
+            'change_amount': _paymentType == 'CASH' ? _change : 0.0,
+            if (cartState.appliedCoupons.isNotEmpty)
+              'coupon_codes': cartState.appliedCoupons
+                  .map((c) => c.code)
+                  .toList(),
+            'items': cartState.items
+                .map(
+                  (item) => {
+                    'product_id': item.productId,
+                    'product_code': item.productCode,
+                    'product_name': item.productName,
+                    'unit': item.unit,
+                    'quantity': item.quantity,
+                    'unit_price': item.unitPrice,
+                    'discount_percent': 0.0,
+                    'discount_amount': 0.0,
+                    'amount': item.amount,
+                  },
+                )
+                .toList(),
+            if (cartState.freeItems.isNotEmpty) ...{
+              'free_items': cartState.freeItems
+                  .map(
+                    (item) => {
+                      'product_id': item.productId,
+                      'product_code': item.productCode,
+                      'product_name': item.productName,
+                      'unit': item.unit,
+                      'quantity': item.quantity,
+                      'promotion_id': item.promotionId,
+                    },
+                  )
+                  .toList(),
+              'promotion_ids': cartState.freeItems
+                  .map((i) => i.promotionId)
+                  .whereType<String>()
+                  .toSet()
+                  .toList(),
+            },
+          };
+
+          await ref
+              .read(pendingSalesQueueServiceProvider)
+              .enqueueOrder(fallbackOrderData);
+          ref.read(cartProvider.notifier).clear();
+          ref.invalidate(syncStatusProvider);
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'เชื่อมต่อ Master ไม่ได้ บิลถูกเก็บเข้าคิวในเครื่องนี้แล้ว และจะส่งอัตโนมัติเมื่อ Wi‑Fi กลับมา',
+                ),
+                backgroundColor: Colors.orange,
+              ),
+            );
+            Navigator.of(context).pop();
+          }
+          return;
+        }
+      }
 
       if (mounted) {
         // ✅ แสดงข้อความที่เป็นมิตรกับผู้ใช้ ไม่หลุด stack trace หรือ schema
         final userMessage = _toUserMessage(e);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(userMessage),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text(userMessage), backgroundColor: Colors.red),
+        );
+      }
+    } catch (e) {
+      print('❌ Payment error: $e');
+
+      if (mounted) {
+        final userMessage = _toUserMessage(e);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(userMessage), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -973,8 +1159,7 @@ class _CouponSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final fmt = NumberFormat('#,##0.00', 'th_TH');
     final hasApplied = appliedCoupons.isNotEmpty;
-    final totalDiscount =
-        appliedCoupons.fold(0.0, (s, c) => s + c.discount);
+    final totalDiscount = appliedCoupons.fold(0.0, (s, c) => s + c.discount);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
@@ -988,8 +1173,8 @@ class _CouponSection extends StatelessWidget {
           color: hasApplied
               ? const Color(0xFF4CAF50)
               : errorText != null
-                  ? const Color(0xFFEF5350)
-                  : Colors.grey.shade300,
+              ? const Color(0xFFEF5350)
+              : Colors.grey.shade300,
         ),
       ),
       child: Column(
@@ -998,21 +1183,27 @@ class _CouponSection extends StatelessWidget {
           // ── Header ──────────────────────────────────────────
           Row(
             children: [
-              const Icon(Icons.confirmation_number_outlined,
-                  size: 18, color: Color(0xFF1565C0)),
+              const Icon(
+                Icons.confirmation_number_outlined,
+                size: 18,
+                color: Color(0xFF1565C0),
+              ),
               const SizedBox(width: 8),
               const Text(
                 'คูปองส่วนลด',
                 style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF1565C0)),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF1565C0),
+                ),
               ),
               if (hasApplied) ...[
                 const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 2),
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFF4CAF50),
                     borderRadius: BorderRadius.circular(10),
@@ -1020,18 +1211,20 @@ class _CouponSection extends StatelessWidget {
                   child: Text(
                     '${appliedCoupons.length} ใบ',
                     style: const TextStyle(
-                        fontSize: 11,
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600),
+                      fontSize: 11,
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
                 const Spacer(),
                 Text(
                   'ส่วนลดรวม ฿${fmt.format(totalDiscount)}',
                   style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF2E7D32)),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF2E7D32),
+                  ),
                 ),
               ],
             ],
@@ -1046,18 +1239,24 @@ class _CouponSection extends StatelessWidget {
               children: appliedCoupons.map((c) {
                 return Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 6),
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFF4CAF50).withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                        color: const Color(0xFF4CAF50).withValues(alpha: 0.4)),
+                      color: const Color(0xFF4CAF50).withValues(alpha: 0.4),
+                    ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.check_circle,
-                          size: 13, color: Color(0xFF2E7D32)),
+                      const Icon(
+                        Icons.check_circle,
+                        size: 13,
+                        color: Color(0xFF2E7D32),
+                      ),
                       const SizedBox(width: 5),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1076,15 +1275,17 @@ class _CouponSection extends StatelessWidget {
                             Text(
                               c.promotionName!,
                               style: const TextStyle(
-                                  fontSize: 10,
-                                  color: Color(0xFF388E3C)),
+                                fontSize: 10,
+                                color: Color(0xFF388E3C),
+                              ),
                             ),
                           Text(
                             'ลด ฿${fmt.format(c.discount)}',
                             style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF2E7D32)),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF2E7D32),
+                            ),
                           ),
                         ],
                       ),
@@ -1094,8 +1295,11 @@ class _CouponSection extends StatelessWidget {
                         borderRadius: BorderRadius.circular(4),
                         child: const Padding(
                           padding: EdgeInsets.all(2),
-                          child: Icon(Icons.close,
-                              size: 14, color: Color(0xFFEF5350)),
+                          child: Icon(
+                            Icons.close,
+                            size: 14,
+                            color: Color(0xFFEF5350),
+                          ),
                         ),
                       ),
                     ],
@@ -1114,23 +1318,28 @@ class _CouponSection extends StatelessWidget {
                   controller: controller,
                   textCapitalization: TextCapitalization.characters,
                   style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 1.5),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 1.5,
+                  ),
                   decoration: InputDecoration(
                     hintText: hasApplied
                         ? 'เพิ่มคูปองอีกใบ...'
                         : 'กรอกรหัสคูปอง',
                     hintStyle: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.normal,
-                        letterSpacing: 0,
-                        color: Colors.grey.shade500),
+                      fontSize: 12,
+                      fontWeight: FontWeight.normal,
+                      letterSpacing: 0,
+                      color: Colors.grey.shade500,
+                    ),
                     errorText: errorText,
                     contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 10),
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
                     border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8)),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                       borderSide: BorderSide(
@@ -1142,7 +1351,9 @@ class _CouponSection extends StatelessWidget {
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                       borderSide: const BorderSide(
-                          color: Color(0xFF1565C0), width: 1.5),
+                        color: Color(0xFF1565C0),
+                        width: 1.5,
+                      ),
                     ),
                     isDense: true,
                   ),
@@ -1162,7 +1373,8 @@ class _CouponSection extends StatelessWidget {
                       foregroundColor: const Color(0xFF1565C0),
                       side: const BorderSide(color: Color(0xFF1565C0)),
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8)),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                       padding: EdgeInsets.zero,
                     ),
                     child: const Icon(Icons.qr_code_scanner, size: 20),
@@ -1178,19 +1390,20 @@ class _CouponSection extends StatelessWidget {
                     backgroundColor: const Color(0xFF1565C0),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8)),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
                   ),
                   child: isValidating
                       ? const SizedBox(
                           width: 18,
                           height: 18,
                           child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white),
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
                         )
-                      : const Text('ใช้งาน',
-                          style: TextStyle(fontSize: 13)),
+                      : const Text('ใช้งาน', style: TextStyle(fontSize: 13)),
                 ),
               ),
             ],
@@ -1208,14 +1421,11 @@ class _PromptPayQrSection extends StatelessWidget {
   final String promptPayId;
   final double amount;
 
-  const _PromptPayQrSection({
-    required this.promptPayId,
-    required this.amount,
-  });
+  const _PromptPayQrSection({required this.promptPayId, required this.amount});
 
   @override
   Widget build(BuildContext context) {
-    final qrData    = PromptPayUtils.generatePayload(promptPayId, amount);
+    final qrData = PromptPayUtils.generatePayload(promptPayId, amount);
     final displayId = PromptPayUtils.formatDisplayId(promptPayId);
 
     return Container(
@@ -1245,11 +1455,14 @@ class _PromptPayQrSection extends StatelessWidget {
               children: [
                 Icon(Icons.qr_code_2, color: Colors.white, size: 20),
                 SizedBox(width: 8),
-                Text('PromptPay QR Code',
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold)),
+                Text(
+                  'PromptPay QR Code',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ],
             ),
           ),
@@ -1276,15 +1489,18 @@ class _PromptPayQrSection extends StatelessWidget {
             ),
             child: Column(
               children: [
-                const Text('ยอดที่ต้องชำระ',
-                    style: TextStyle(fontSize: 12, color: Colors.black54)),
+                const Text(
+                  'ยอดที่ต้องชำระ',
+                  style: TextStyle(fontSize: 12, color: Colors.black54),
+                ),
                 const SizedBox(height: 4),
                 Text(
                   '฿${amount.toStringAsFixed(2)}',
                   style: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1565C0)),
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1565C0),
+                  ),
                 ),
               ],
             ),
@@ -1298,8 +1514,10 @@ class _PromptPayQrSection extends StatelessWidget {
               children: [
                 const Icon(Icons.phone, size: 14, color: Colors.black45),
                 const SizedBox(width: 6),
-                Text('PromptPay: $displayId',
-                    style: const TextStyle(fontSize: 13, color: Colors.black54)),
+                Text(
+                  'PromptPay: $displayId',
+                  style: const TextStyle(fontSize: 13, color: Colors.black54),
+                ),
               ],
             ),
           ),
@@ -1337,21 +1555,21 @@ class _PromptPayQrSection extends StatelessWidget {
 // แสดงหลังชำระเงินสำเร็จ กดกลับไปหน้าขาย
 // ─────────────────────────────────────────────────────────────────
 class ReceiptPage extends ConsumerWidget {
-  final String   orderNo;
+  final String orderNo;
   final DateTime orderDate;
-  final String?  customerName;
+  final String? customerName;
   final List<CartItem> items;
   final List<CartItem> freeItems;
-  final double   subtotal;
-  final double   discount;
+  final double subtotal;
+  final double discount;
   final List<AppliedCoupon> appliedCoupons;
-  final double   total;
-  final String   paymentType;
-  final double   paidAmount;
-  final double   changeAmount;
-  final int      earnedPoints;
-  final int      pointsUsed;
-  final int?     pointsBalance;
+  final double total;
+  final String paymentType;
+  final double paidAmount;
+  final double changeAmount;
+  final int earnedPoints;
+  final int pointsUsed;
+  final int? pointsBalance;
 
   const ReceiptPage({
     super.key,
@@ -1365,25 +1583,25 @@ class ReceiptPage extends ConsumerWidget {
     required this.paidAmount,
     required this.changeAmount,
     this.customerName,
-    this.freeItems       = const [],
-    this.appliedCoupons  = const [],
-    this.earnedPoints    = 0,
-    this.pointsUsed      = 0,
+    this.freeItems = const [],
+    this.appliedCoupons = const [],
+    this.earnedPoints = 0,
+    this.pointsUsed = 0,
     this.pointsBalance,
   });
 
   static String _paymentLabel(String type) => switch (type) {
-        'CASH'     => 'เงินสด',
-        'CARD'     => 'บัตรเครดิต/เดบิต',
-        'TRANSFER' => 'โอนเงิน',
-        _          => type,
-      };
+    'CASH' => 'เงินสด',
+    'CARD' => 'บัตรเครดิต/เดบิต',
+    'TRANSFER' => 'โอนเงิน',
+    _ => type,
+  };
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsProvider);
-    final dateFmt  = DateFormat('dd/MM/yyyy HH:mm');
-    final numFmt   = NumberFormat('#,##0.00');
+    final dateFmt = DateFormat('dd/MM/yyyy HH:mm');
+    final numFmt = NumberFormat('#,##0.00');
 
     return Scaffold(
       backgroundColor: const Color(0xFFEEEEEE),
@@ -1392,11 +1610,12 @@ class ReceiptPage extends ConsumerWidget {
         title: const Text('ใบเสร็จรับเงิน'),
         actions: [
           TextButton.icon(
-            onPressed: () =>
-                Navigator.of(context).pop(),
+            onPressed: () => Navigator.of(context).pop(),
             icon: const Icon(Icons.storefront, color: Colors.white),
-            label: const Text('กลับหน้าขาย',
-                style: TextStyle(color: Colors.white)),
+            label: const Text(
+              'กลับหน้าขาย',
+              style: TextStyle(color: Colors.white),
+            ),
           ),
         ],
       ),
@@ -1407,40 +1626,52 @@ class ReceiptPage extends ConsumerWidget {
             children: [
               // ── ใบเสร็จ ─────────────────────────────────────────
               ThermalReceiptWidget(
-                companyName:  settings.companyName,
-                address:      settings.address,
-                phone:        settings.phone,
-                taxId:        settings.taxId,
-                orderNo:      orderNo,
-                orderDate:    dateFmt.format(orderDate),
+                companyName: settings.companyName,
+                address: settings.address,
+                phone: settings.phone,
+                taxId: settings.taxId,
+                orderNo: orderNo,
+                orderDate: dateFmt.format(orderDate),
                 customerName: customerName,
-                items: items.map((i) => ReceiptItem(
-                      name:      i.productName,
-                      quantity:  i.quantity,
-                      unitPrice: i.unitPrice,
-                      amount:    i.amount,
-                    )).toList(),
-                freeItems: freeItems.map((i) => ReceiptFreeItem(
-                      name:          i.productName,
-                      quantity:      i.quantity,
-                      promotionName: i.promotionName,
-                    )).toList(),
-                subtotal:     subtotal,
-                discount:     discount,
-                coupons: appliedCoupons.map((c) => ReceiptCoupon(
-                      code:          c.code,
-                      discount:      c.discount,
-                      promotionName: c.promotionName,
-                    )).toList(),
-                total:        total,
+                items: items
+                    .map(
+                      (i) => ReceiptItem(
+                        name: i.productName,
+                        quantity: i.quantity,
+                        unitPrice: i.unitPrice,
+                        amount: i.amount,
+                      ),
+                    )
+                    .toList(),
+                freeItems: freeItems
+                    .map(
+                      (i) => ReceiptFreeItem(
+                        name: i.productName,
+                        quantity: i.quantity,
+                        promotionName: i.promotionName,
+                      ),
+                    )
+                    .toList(),
+                subtotal: subtotal,
+                discount: discount,
+                coupons: appliedCoupons
+                    .map(
+                      (c) => ReceiptCoupon(
+                        code: c.code,
+                        discount: c.discount,
+                        promotionName: c.promotionName,
+                      ),
+                    )
+                    .toList(),
+                total: total,
                 paymentLabel: _paymentLabel(paymentType),
-                paymentType:  paymentType,
-                paidAmount:   paidAmount,
+                paymentType: paymentType,
+                paidAmount: paidAmount,
                 changeAmount: changeAmount,
-                earnedPoints:  earnedPoints,
-                pointsUsed:    pointsUsed,
+                earnedPoints: earnedPoints,
+                pointsUsed: pointsUsed,
                 pointsBalance: pointsBalance,
-                numFmt:        numFmt,
+                numFmt: numFmt,
               ),
 
               const SizedBox(height: 32),
@@ -1449,18 +1680,30 @@ class ReceiptPage extends ConsumerWidget {
               SizedBox(
                 width: 340,
                 height: 52,
+                child: FilledButton.icon(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.add_shopping_cart, size: 20),
+                  label: const Text(
+                    'เปิดบิลใหม่',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: 340,
+                height: 52,
                 child: ElevatedButton.icon(
-                  onPressed: () =>
-                      Navigator.of(context).pop(),
+                  onPressed: () => Navigator.of(context).pop(),
                   icon: const Icon(Icons.storefront, size: 20),
                   label: const Text(
                     'กลับหน้าขาย',
-                    style: TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.w600),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                   ),
                   style: ElevatedButton.styleFrom(
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     elevation: 0,
                   ),
                 ),
@@ -1478,10 +1721,10 @@ class ReceiptPage extends ConsumerWidget {
 // _PointsSection — แสดงแต้มและให้เลือกใช้แต้มแลกส่วนลด
 // ─────────────────────────────────────────────────────────────────
 class _PointsSection extends StatefulWidget {
-  final int    customerPoints;
-  final int    pointsUsed;
+  final int customerPoints;
+  final int pointsUsed;
   final double cartTotal;
-  final bool   isLoading;
+  final bool isLoading;
   final ValueChanged<int> onApply;
   final VoidCallback onClear;
 
@@ -1528,9 +1771,9 @@ class _PointsSectionState extends State<_PointsSection> {
 
   @override
   Widget build(BuildContext context) {
-    final fmt       = NumberFormat('#,##0', 'th_TH');
+    final fmt = NumberFormat('#,##0', 'th_TH');
     final hasPoints = widget.pointsUsed > 0;
-    final isDark    = Theme.of(context).brightness == Brightness.dark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1540,9 +1783,7 @@ class _PointsSectionState extends State<_PointsSection> {
             : (isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF9F9F9)),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: hasPoints
-              ? Colors.amber
-              : Colors.grey.shade300,
+          color: hasPoints ? Colors.amber : Colors.grey.shade300,
         ),
       ),
       child: Column(
@@ -1551,8 +1792,11 @@ class _PointsSectionState extends State<_PointsSection> {
           // ── Header ──────────────────────────────────────────
           Row(
             children: [
-              Icon(Icons.stars, size: 18,
-                  color: hasPoints ? Colors.amber : Colors.amber[300]),
+              Icon(
+                Icons.stars,
+                size: 18,
+                color: hasPoints ? Colors.amber : Colors.amber[300],
+              ),
               const SizedBox(width: 8),
               Text(
                 'ใช้แต้มสะสม',
@@ -1565,17 +1809,15 @@ class _PointsSectionState extends State<_PointsSection> {
               const Spacer(),
               if (widget.isLoading)
                 const SizedBox(
-                  width: 14, height: 14,
+                  width: 14,
+                  height: 14,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               else
                 Text(
                   'มี ${fmt.format(widget.customerPoints)} แต้ม'
                   ' (สูงสุด ${fmt.format(_maxPoints)} pt)',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Colors.amber[700],
-                  ),
+                  style: TextStyle(fontSize: 11, color: Colors.amber[700]),
                 ),
             ],
           ),
@@ -1584,8 +1826,7 @@ class _PointsSectionState extends State<_PointsSection> {
             const SizedBox(height: 6),
             Row(
               children: [
-                const Icon(Icons.check_circle,
-                    size: 14, color: Colors.amber),
+                const Icon(Icons.check_circle, size: 14, color: Colors.amber),
                 const SizedBox(width: 4),
                 Text(
                   'ใช้ ${fmt.format(widget.pointsUsed)} แต้ม'
@@ -1602,8 +1843,7 @@ class _PointsSectionState extends State<_PointsSection> {
                   borderRadius: BorderRadius.circular(4),
                   child: const Padding(
                     padding: EdgeInsets.all(2),
-                    child: Icon(Icons.close,
-                        size: 16, color: Colors.red),
+                    child: Icon(Icons.close, size: 16, color: Colors.red),
                   ),
                 ),
               ],
@@ -1622,11 +1862,16 @@ class _PointsSectionState extends State<_PointsSection> {
                   decoration: InputDecoration(
                     hintText: 'จำนวนแต้มที่ต้องการใช้',
                     hintStyle: TextStyle(
-                        fontSize: 12, color: Colors.grey.shade500),
+                      fontSize: 12,
+                      color: Colors.grey.shade500,
+                    ),
                     contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 10),
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
                     border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8)),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                 ),
               ),
@@ -1643,10 +1888,11 @@ class _PointsSectionState extends State<_PointsSection> {
                   foregroundColor: Colors.amber[800],
                   side: BorderSide(color: Colors.amber[400]!),
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 12),
+                    horizontal: 10,
+                    vertical: 12,
+                  ),
                 ),
-                child: const Text('ใช้ทั้งหมด',
-                    style: TextStyle(fontSize: 12)),
+                child: const Text('ใช้ทั้งหมด', style: TextStyle(fontSize: 12)),
               ),
               const SizedBox(width: 6),
               ElevatedButton(
@@ -1660,22 +1906,21 @@ class _PointsSectionState extends State<_PointsSection> {
                   backgroundColor: Colors.amber[700],
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 12),
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
                 ),
-                child: const Text('ใช้แต้ม',
-                    style: TextStyle(fontSize: 12)),
+                child: const Text('ใช้แต้ม', style: TextStyle(fontSize: 12)),
               ),
             ],
           ),
           const SizedBox(height: 4),
           Text(
             '1 แต้ม = ส่วนลด ฿1.00',
-            style: TextStyle(
-                fontSize: 11, color: Colors.amber[600]),
+            style: TextStyle(fontSize: 11, color: Colors.amber[600]),
           ),
         ],
       ),
     );
   }
 }
-

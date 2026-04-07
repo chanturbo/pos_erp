@@ -4,6 +4,7 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
+import '../config/app_mode.dart';
 import '../../../../core/client/api_client.dart';
 
 /// OfflineSyncService
@@ -30,6 +31,10 @@ class OfflineSyncService {
 
   /// เริ่ม auto sync ทุก 30 วินาที
   void startAutoSync() {
+    if (AppModeConfig.isStandalone) {
+      print('ℹ️ OfflineSyncService: Standalone mode — auto sync disabled');
+      return;
+    }
     _autoSyncTimer?.cancel();
     _autoSyncTimer = Timer.periodic(
       const Duration(seconds: _syncIntervalSeconds),
@@ -50,6 +55,10 @@ class OfflineSyncService {
 
   /// เรียกใช้จาก UI "Sync ตอนนี้"
   Future<bool> syncNow() async {
+    if (AppModeConfig.isStandalone) {
+      print('ℹ️ Standalone mode — no sync required');
+      return true;
+    }
     if (_isSyncing) {
       print('⚠️ Sync already in progress, skipping');
       return false;
@@ -59,10 +68,11 @@ class OfflineSyncService {
 
   /// Retry เฉพาะรายการที่ FAILED
   Future<void> retryFailed() async {
+    if (AppModeConfig.isStandalone) return;
     final api = _ref.read(apiClientProvider);
     try {
       // Reset FAILED → PENDING
-      await api.post('/api/branches/sync/retry-failed', data: {});
+      await api.post('/api/sync/retry-failed', data: {});
       await syncNow();
     } catch (e) {
       print('❌ retryFailed error: $e');
@@ -79,9 +89,10 @@ class OfflineSyncService {
     required Map<String, dynamic> data,
     String? deviceId,
   }) async {
+    if (AppModeConfig.isStandalone) return;
     final api = _ref.read(apiClientProvider);
     try {
-      await api.post('/api/branches/sync/enqueue', data: {
+      await api.post('/api/sync/enqueue', data: {
         'queue_id': 'Q${DateTime.now().millisecondsSinceEpoch}',
         'device_id': deviceId ?? 'local',
         'table_name': tableName,
@@ -116,7 +127,7 @@ class OfflineSyncService {
 
       // Step 1: Push pending items to master
       final pushRes =
-          await api.post('/api/branches/sync/push-pending', data: {});
+          await api.post('/api/sync/push-pending', data: {});
 
       if (pushRes.statusCode == 200) {
         final pushed = pushRes.data['data']?['pushed'] as int? ?? 0;

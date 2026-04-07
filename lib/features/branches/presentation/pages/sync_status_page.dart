@@ -3,6 +3,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:dio/dio.dart';
+import '../../../../core/client/api_client.dart';
+import '../../../../core/config/app_mode.dart';
+import '../../../../core/services/master_discovery_service.dart';
 import '../../../../core/services/offline_sync_service.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/responsive_utils.dart';
@@ -14,6 +18,7 @@ class SyncStatusPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(posContextBootstrapProvider);
     final syncAsync = ref.watch(syncStatusProvider);
 
     return Scaffold(
@@ -23,9 +28,9 @@ class SyncStatusPage extends ConsumerWidget {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('สถานะการ Sync'),
+            const Text('การเชื่อมต่อ/ซิงก์'),
             Text(
-              'ติดตามคิวการซิงก์ สาขาที่ใช้งาน และสั่ง Sync ด้วยตนเอง',
+              'ตั้งค่าโหมดเครื่อง ตรวจสอบการเชื่อมต่อ และติดตามคิวการส่งข้อมูล',
               style: TextStyle(
                 fontSize: 11,
                 color: Colors.white.withValues(alpha: 0.65),
@@ -213,6 +218,19 @@ class SyncStatusPage extends ConsumerWidget {
           const SizedBox(height: 16),
           _sectionTitle(
             context,
+            AppModeConfig.isStandalone
+                ? 'โหมดการใช้งาน'
+                : 'โหมดการเชื่อมต่อ',
+            AppModeConfig.isStandalone
+                ? Icons.computer_rounded
+                : Icons.router_outlined,
+            AppTheme.primary,
+          ),
+          const SizedBox(height: 8),
+          _buildConnectionPanel(context, ref, sync),
+          const SizedBox(height: 16),
+          _sectionTitle(
+            context,
             'การตั้งค่าสาขา',
             Icons.account_tree_outlined,
             AppTheme.primary,
@@ -280,6 +298,198 @@ class SyncStatusPage extends ConsumerWidget {
     );
   }
 
+  Widget _buildConnectionPanel(
+    BuildContext context,
+    WidgetRef ref,
+    SyncStatusModel sync,
+  ) {
+    final discovery = MasterDiscoveryService.instance;
+
+    return _panelCard(
+      context,
+      child: Padding(
+        padding: context.cardPadding,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              AppModeConfig.isStandalone
+                  ? 'เครื่องนี้กำลังทำงานแบบเครื่องเดียว ไม่ใช้การเชื่อมต่อระหว่างเครื่อง'
+                  : 'ให้เครื่องหลักเป็น Master และเครื่องขายอื่นเชื่อมเข้ามาเป็น Slave',
+              style: _cardTitleStyle(context, fontSize: 13),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              AppModeConfig.isStandalone
+                  ? 'เหมาะสำหรับร้านที่มีเครื่องเดียว ทุกข้อมูลจะบันทึกในฐานข้อมูลของเครื่องนี้โดยตรง'
+                  : 'เมื่อ Slave เชื่อมต่อแล้ว การขายและการบันทึกข้อมูลจะยิง API ไปที่ Master เพื่อเก็บลงฐานข้อมูลเครื่องหลักโดยตรง',
+              style: _cardSubtitleStyle(context),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                ChoiceChip(
+                  label: const Text('Standalone'),
+                  selected: AppModeConfig.mode == AppMode.standalone,
+                  onSelected: (_) =>
+                      _switchMode(context, ref, AppMode.standalone),
+                ),
+                ChoiceChip(
+                  label: const Text('Master'),
+                  selected: AppModeConfig.mode == AppMode.master,
+                  onSelected: (_) => _switchMode(context, ref, AppMode.master),
+                ),
+                ChoiceChip(
+                  label: const Text('Slave POS'),
+                  selected: AppModeConfig.mode == AppMode.clientPOS,
+                  onSelected: (_) => _switchMode(context, ref, AppMode.clientPOS),
+                ),
+                ChoiceChip(
+                  label: const Text('Slave Mobile'),
+                  selected: AppModeConfig.mode == AppMode.clientMobile,
+                  onSelected: (_) =>
+                      _switchMode(context, ref, AppMode.clientMobile),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            _configRow(
+              context,
+              icon: Icons.badge_outlined,
+              title: sync.deviceName ?? AppModeConfig.deviceName,
+              subtitle: AppModeConfig.isStandalone
+                  ? 'ชื่ออุปกรณ์สำหรับใช้งานเครื่องเดียว'
+                  : AppModeConfig.isMaster
+                  ? 'ชื่อ Master ที่เครื่องอื่นจะมองเห็น'
+                  : 'ชื่ออุปกรณ์เครื่องนี้',
+              color: AppTheme.primary,
+              buttonLabel: 'แก้ชื่อ',
+              onTap: () => _editDeviceName(context, ref),
+            ),
+            const SizedBox(height: 10),
+            _configRow(
+              context,
+              icon: AppModeConfig.isStandalone
+                  ? Icons.computer_rounded
+                  : AppModeConfig.isMaster
+                      ? Icons.wifi_tethering_rounded
+                      : Icons.link_rounded,
+              title: AppModeConfig.isStandalone
+                  ? 'โหมดเครื่องเดียว'
+                  : AppModeConfig.isMaster
+                      ? 'Master พร้อมให้เชื่อมต่อ'
+                      : (sync.masterName ?? 'ยังไม่ได้เชื่อมต่อ Master'),
+              subtitle: AppModeConfig.isStandalone
+                  ? 'ปิดระบบ sync และใช้งานฐานข้อมูลในเครื่องนี้เท่านั้น'
+                  : AppModeConfig.isMaster
+                      ? (sync.serverBaseUrl ?? 'กำลังระบุ IP')
+                      : (AppModeConfig.masterIp != null
+                          ? '${AppModeConfig.masterIp}:${AppModeConfig.masterPort}'
+                          : 'เลือก Master ในรายการด้านล่าง'),
+              color: AppModeConfig.isStandalone
+                  ? AppTheme.infoColor
+                  : AppModeConfig.isMaster
+                      ? AppTheme.successColor
+                      : AppTheme.infoColor,
+              buttonLabel: AppModeConfig.isStandalone
+                  ? 'ใช้งานอยู่'
+                  : AppModeConfig.isMaster
+                      ? 'ประกาศอยู่'
+                      : (AppModeConfig.masterIp != null ? 'ยกเลิก' : 'รอเชื่อมต่อ'),
+              onTap: AppModeConfig.isStandalone || AppModeConfig.isMaster
+                  ? () {}
+                  : () => _disconnectMaster(context, ref),
+            ),
+            if (AppModeConfig.isStandalone) ...[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppTheme.infoColor.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  'ไม่ต้องตั้งค่า Master, Slave หรือเชื่อมต่อ Wi‑Fi เพิ่ม สามารถขายและบันทึกข้อมูลในเครื่องนี้ได้ทันที',
+                  style: _cardSubtitleStyle(context),
+                ),
+              ),
+            ],
+            if (!AppModeConfig.isStandalone && !AppModeConfig.isMaster) ...[
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Text(
+                    'Master ที่พบใน Wi-Fi',
+                    style: _cardTitleStyle(context, fontSize: 13),
+                  ),
+                  const Spacer(),
+                  TextButton.icon(
+                    onPressed: () => _refreshDiscovery(context, ref),
+                    icon: const Icon(Icons.refresh, size: 16),
+                    label: const Text('ค้นหาใหม่'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              StreamBuilder<List<DiscoveredMaster>>(
+                stream: discovery.stream,
+                initialData: discovery.masters,
+                builder: (context, snapshot) {
+                  final masters = snapshot.data ?? const <DiscoveredMaster>[];
+                  if (masters.isEmpty) {
+                    return Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppTheme.infoColor.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        'ยังไม่พบ Master ในเครือข่ายเดียวกัน ลองให้เครื่องหลักเปิดโหมด Master และอยู่ใน Wi-Fi เดียวกัน',
+                        style: _cardSubtitleStyle(context),
+                      ),
+                    );
+                  }
+
+                  return Column(
+                    children: masters
+                        .map(
+                          (master) => Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: AppTheme.borderColorOf(context),
+                                ),
+                              ),
+                              child: ListTile(
+                                leading: const Icon(Icons.dns_outlined),
+                                title: Text(master.name),
+                                subtitle: Text('${master.host}:${master.port}'),
+                                trailing: FilledButton(
+                                  onPressed: () =>
+                                      _connectToMaster(context, ref, master),
+                                  child: const Text('เชื่อมต่อ'),
+                                ),
+                              ),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  );
+                },
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildActionPanel(
     BuildContext context,
     WidgetRef ref,
@@ -293,12 +503,16 @@ class SyncStatusPage extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'สั่งงานการซิงก์ด้วยตนเอง',
+              AppModeConfig.isStandalone
+                  ? 'การซิงก์ถูกปิดในโหมดนี้'
+                  : 'สั่งงานการซิงก์ด้วยตนเอง',
               style: _cardTitleStyle(context, fontSize: 13),
             ),
             const SizedBox(height: 4),
             Text(
-              'เหมาะสำหรับกรณีต้องการอัปเดตข้อมูลทันทีหรือทดสอบการเชื่อมต่อ',
+              AppModeConfig.isStandalone
+                  ? 'โหมด Standalone ไม่ต้องเชื่อมต่อเครื่องอื่น และไม่ต้องส่งข้อมูลข้ามเครื่อง'
+                  : 'เหมาะสำหรับกรณีต้องการอัปเดตข้อมูลทันทีหรือทดสอบการเชื่อมต่อ',
               style: _cardSubtitleStyle(context),
             ),
             const SizedBox(height: 12),
@@ -307,14 +521,14 @@ class SyncStatusPage extends ConsumerWidget {
               runSpacing: 10,
               children: [
                 ElevatedButton.icon(
-                  onPressed: sync.isOnline
+                  onPressed: !AppModeConfig.isStandalone && sync.isOnline
                       ? () => _triggerSync(context, ref)
                       : null,
                   icon: const Icon(Icons.cloud_upload_outlined),
                   label: const Text('Sync ตอนนี้'),
                 ),
                 OutlinedButton.icon(
-                  onPressed: sync.failedCount > 0
+                  onPressed: !AppModeConfig.isStandalone && sync.failedCount > 0
                       ? () => _retryFailed(context, ref)
                       : null,
                   icon: const Icon(Icons.replay_rounded),
@@ -609,7 +823,10 @@ class SyncStatusPage extends ConsumerWidget {
                   title: Text(b.branchName),
                   subtitle: Text(b.branchCode),
                   onTap: () {
-                    ref.read(selectedBranchProvider.notifier).state = b;
+                    ref.read(selectedBranchProvider.notifier).setBranch(b);
+                    ref
+                        .read(selectedWarehouseProvider.notifier)
+                        .setWarehouse(null);
                     Navigator.pop(context);
                   },
                 ),
@@ -660,7 +877,7 @@ class SyncStatusPage extends ConsumerWidget {
                   title: Text(w.warehouseName),
                   subtitle: Text(w.warehouseCode),
                   onTap: () {
-                    ref.read(selectedWarehouseProvider.notifier).state = w;
+                    ref.read(selectedWarehouseProvider.notifier).setWarehouse(w);
                     Navigator.pop(context);
                   },
                 ),
@@ -703,6 +920,169 @@ class SyncStatusPage extends ConsumerWidget {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('ลองใหม่แล้ว')));
+    }
+  }
+
+  Future<void> _switchMode(
+    BuildContext context,
+    WidgetRef ref,
+    AppMode mode,
+  ) async {
+    if (AppModeConfig.mode == mode) return;
+
+    if (mode == AppMode.standalone) {
+      await AppModeConfig.setMode(
+        AppMode.standalone,
+        deviceName: AppModeConfig.deviceName,
+      );
+      await AppModeConfig.clearMasterConnection();
+    } else if (mode == AppMode.master) {
+      await AppModeConfig.setMode(
+        AppMode.master,
+        deviceName: AppModeConfig.deviceName,
+      );
+    } else {
+      await AppModeConfig.setMode(
+        mode,
+        masterIp: AppModeConfig.masterIp,
+        masterName: AppModeConfig.masterName,
+        masterPort: AppModeConfig.masterPort,
+        deviceName: AppModeConfig.deviceName,
+      );
+    }
+
+    await MasterDiscoveryService.instance.refresh();
+    ref.invalidate(syncStatusProvider);
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            mode == AppMode.standalone
+                ? 'เครื่องนี้ถูกตั้งเป็น Standalone แล้ว'
+                : mode == AppMode.master
+                ? 'เครื่องนี้ถูกตั้งเป็น Master แล้ว'
+                : 'สลับเป็นโหมด Slave แล้ว',
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _editDeviceName(BuildContext context, WidgetRef ref) async {
+    final ctrl = TextEditingController(text: AppModeConfig.deviceName);
+
+    final nextName = await showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(AppModeConfig.isMaster ? 'ตั้งชื่อ Master' : 'ตั้งชื่ออุปกรณ์'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'ชื่อที่จะแสดง',
+            hintText: 'เช่น POS-Main-Store',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('ยกเลิก'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, ctrl.text.trim()),
+            child: const Text('บันทึก'),
+          ),
+        ],
+      ),
+    );
+
+    if (nextName == null || nextName.isEmpty) return;
+
+    await AppModeConfig.setDeviceName(nextName);
+    await MasterDiscoveryService.instance.refresh();
+    ref.invalidate(syncStatusProvider);
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('บันทึกชื่ออุปกรณ์แล้ว')),
+      );
+    }
+  }
+
+  Future<void> _refreshDiscovery(BuildContext context, WidgetRef ref) async {
+    await MasterDiscoveryService.instance.refresh();
+    ref.invalidate(syncStatusProvider);
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('กำลังค้นหา Master ในเครือข่าย')),
+      );
+    }
+  }
+
+  Future<void> _connectToMaster(
+    BuildContext context,
+    WidgetRef ref,
+    DiscoveredMaster master,
+  ) async {
+    final tempClient = ApiClient(baseUrl: 'http://${master.host}:${master.port}');
+
+    try {
+      final health = await tempClient.get('/api/health');
+      if (health.statusCode != 200) {
+        throw Exception('Master ไม่ตอบสนอง');
+      }
+
+      await AppModeConfig.setMode(
+        AppMode.clientPOS,
+        masterIp: master.host,
+        masterName: master.name,
+        masterPort: master.port,
+        deviceName: AppModeConfig.deviceName,
+      );
+      await MasterDiscoveryService.instance.refresh();
+      ref.invalidate(syncStatusProvider);
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'เชื่อมต่อกับ ${master.name} แล้ว การขายครั้งถัดไปจะบันทึกที่ฐานข้อมูลฝั่ง Master',
+            ),
+          ),
+        );
+      }
+    } on DioException catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('เชื่อมต่อไม่สำเร็จ: ${e.message}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('เชื่อมต่อไม่สำเร็จ: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _disconnectMaster(BuildContext context, WidgetRef ref) async {
+    await AppModeConfig.clearMasterConnection();
+    await MasterDiscoveryService.instance.refresh();
+    ref.invalidate(syncStatusProvider);
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('ตัดการเชื่อมต่อ Master แล้ว')),
+      );
     }
   }
 }

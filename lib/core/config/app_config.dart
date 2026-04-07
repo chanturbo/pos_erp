@@ -2,6 +2,7 @@
 
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'app_mode.dart';
 
 // ─────────────────────────────────────────
 // Environment Enum
@@ -52,7 +53,23 @@ class AppConfig {
   // auto-detect platform + environment
   // ========================================
 
-  static String get apiBaseUrl {
+  static String get apiBaseUrl => resolveApiBaseUrl();
+
+  static String resolveApiBaseUrl() {
+    final masterIp = AppModeConfig.masterIp?.trim();
+    final masterPort = AppModeConfig.masterPort;
+
+    if (AppModeConfig.isStandalone) {
+      if (kIsWeb) {
+        return 'http://127.0.0.1:$defaultServerPort';
+      }
+      return 'http://127.0.0.1:$defaultServerPort';
+    }
+
+    if (AppModeConfig.isClient && masterIp != null && masterIp.isNotEmpty) {
+      return 'http://$masterIp:$masterPort';
+    }
+
     // Production / Staging — ใช้ remote server
     if (isProduction) {
       return 'https://api.yourcompany.com';

@@ -13,6 +13,7 @@ import 'shared/theme/theme_provider.dart'; // 🌙
 import 'routes/app_router.dart';
 import 'core/database/app_database.dart';
 import 'core/server/api_server.dart';
+import 'core/services/master_discovery_service.dart';
 import 'core/utils/crypto_utils.dart';
 import 'core/database/seed_data.dart';
 
@@ -25,6 +26,9 @@ void main() async {
 
   // เริ่ม Server อัตโนมัติ
   await _startServerInBackground();
+
+  // เริ่มประกาศ/ค้นหา Master ในวง Wi-Fi
+  await MasterDiscoveryService.instance.start();
 
   runApp(
     const ProviderScope(

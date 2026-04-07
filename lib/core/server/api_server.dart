@@ -129,8 +129,8 @@ class ApiServer {
           .addHandler(router.call);
 
       // ==================== START SERVER ====================
-      _server = await io.serve(handler, '127.0.0.1', port);
-      print('✅ API Server started at http://127.0.0.1:8080');
+      _server = await io.serve(handler, InternetAddress.anyIPv4, port);
+      print('✅ API Server started at http://0.0.0.0:$port');
     } catch (e, stack) {
       print('❌ Failed to start server: $e');
       print('Stack trace: $stack');

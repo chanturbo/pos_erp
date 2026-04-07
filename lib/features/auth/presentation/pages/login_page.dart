@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/config/app_mode.dart';
 import '../../../../routes/app_router.dart';
 import '../providers/auth_provider.dart'; // ✅ เพิ่ม สำหรับ isCashierRole helper
 
@@ -34,6 +35,11 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     if (!mounted) return;
 
     if (success) {
+      if (AppModeConfig.mode == AppMode.clientMobile) {
+        Navigator.of(context).pushReplacementNamed(AppRouter.mobileOrder);
+        return;
+      }
+
       final user   = ref.read(authProvider).user;
       final roleId = user?.roleId?.toUpperCase() ?? '';
 

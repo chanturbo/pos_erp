@@ -131,6 +131,9 @@ class SyncStatusModel {
   final DateTime? lastSyncAt;
   final bool isOnline;
   final String appMode; // master | clientPOS | clientMobile
+  final String? serverBaseUrl;
+  final String? masterName;
+  final String? deviceName;
 
   SyncStatusModel({
     this.pendingCount = 0,
@@ -138,6 +141,9 @@ class SyncStatusModel {
     this.lastSyncAt,
     this.isOnline = true,
     this.appMode = 'master',
+    this.serverBaseUrl,
+    this.masterName,
+    this.deviceName,
   });
 
   bool get hasPending => pendingCount > 0;
