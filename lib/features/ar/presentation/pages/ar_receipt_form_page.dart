@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
+import 'package:pos_erp/shared/widgets/escape_pop_scope.dart';
 import '../../../../core/client/api_client.dart';
 import '../../data/models/ar_invoice_model.dart';
 import '../../data/models/ar_receipt_allocation_model.dart';
@@ -79,32 +80,34 @@ class _ArReceiptFormPageState extends ConsumerState<ArReceiptFormPage> {
 
     return Scaffold(
       backgroundColor: isDark ? AppTheme.darkBg : const Color(0xFFF0F2F5),
-      body: Column(
-        children: [
-          _RecFormTitleBar(isDark: isDark),
-          Expanded(
-            child: Form(
-              key: _formKey,
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildInfoSection(isDark),
-                    const SizedBox(height: 14),
-                    _buildAllocationSection(isDark),
-                    if (_allocations.isNotEmpty) ...[
+      body: EscapePopScope(
+        child: Column(
+          children: [
+            _RecFormTitleBar(isDark: isDark),
+            Expanded(
+              child: Form(
+                key: _formKey,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildInfoSection(isDark),
                       const SizedBox(height: 14),
-                      _buildSummarySection(isDark),
+                      _buildAllocationSection(isDark),
+                      if (_allocations.isNotEmpty) ...[
+                        const SizedBox(height: 14),
+                        _buildSummarySection(isDark),
+                      ],
+                      const SizedBox(height: 80),
                     ],
-                    const SizedBox(height: 80),
-                  ],
+                  ),
                 ),
               ),
             ),
-          ),
-          _buildBottomBar(isDark),
-        ],
+            _buildBottomBar(isDark),
+          ],
+        ),
       ),
     );
   }

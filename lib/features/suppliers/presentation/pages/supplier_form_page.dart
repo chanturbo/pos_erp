@@ -14,7 +14,7 @@ class SupplierFormPage extends ConsumerStatefulWidget {
 
 class _SupplierFormPageState extends ConsumerState<SupplierFormPage> {
   final _formKey = GlobalKey<FormState>();
-  
+
   late TextEditingController _supplierCodeController;
   late TextEditingController _supplierNameController;
   late TextEditingController _contactPersonController;
@@ -24,7 +24,7 @@ class _SupplierFormPageState extends ConsumerState<SupplierFormPage> {
   late TextEditingController _taxIdController;
   late TextEditingController _creditTermController;
   late TextEditingController _creditLimitController;
-  
+
   bool _isActive = true;
   bool _isLoading = false;
 
@@ -37,15 +37,25 @@ class _SupplierFormPageState extends ConsumerState<SupplierFormPage> {
   void _initializeControllers() {
     if (widget.supplier != null) {
       final supplier = widget.supplier!;
-      _supplierCodeController = TextEditingController(text: supplier.supplierCode);
-      _supplierNameController = TextEditingController(text: supplier.supplierName);
-      _contactPersonController = TextEditingController(text: supplier.contactPerson ?? '');
+      _supplierCodeController = TextEditingController(
+        text: supplier.supplierCode,
+      );
+      _supplierNameController = TextEditingController(
+        text: supplier.supplierName,
+      );
+      _contactPersonController = TextEditingController(
+        text: supplier.contactPerson ?? '',
+      );
       _phoneController = TextEditingController(text: supplier.phone ?? '');
       _emailController = TextEditingController(text: supplier.email ?? '');
       _addressController = TextEditingController(text: supplier.address ?? '');
       _taxIdController = TextEditingController(text: supplier.taxId ?? '');
-      _creditTermController = TextEditingController(text: supplier.creditTerm.toString());
-      _creditLimitController = TextEditingController(text: supplier.creditLimit.toString());
+      _creditTermController = TextEditingController(
+        text: supplier.creditTerm.toString(),
+      );
+      _creditLimitController = TextEditingController(
+        text: supplier.creditLimit.toString(),
+      );
       _isActive = supplier.isActive;
     } else {
       _supplierCodeController = TextEditingController();
@@ -86,7 +96,9 @@ class _SupplierFormPageState extends ConsumerState<SupplierFormPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.supplier == null ? 'เพิ่มซัพพลายเออร์' : 'แก้ไขซัพพลายเออร์'),
+        title: Text(
+          widget.supplier == null ? 'เพิ่มซัพพลายเออร์' : 'แก้ไขซัพพลายเออร์',
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.help_outline),
@@ -101,25 +113,109 @@ class _SupplierFormPageState extends ConsumerState<SupplierFormPage> {
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildSectionHeader('ข้อมูลพื้นฐาน', Icons.business),
-                    _buildBasicInfoSection(),
-                    const SizedBox(height: 24),
-                    _buildSectionHeader('ข้อมูลติดต่อ', Icons.contact_phone),
-                    _buildContactInfoSection(),
-                    const SizedBox(height: 24),
-                    _buildSectionHeader('ข้อมูลภาษี', Icons.receipt_long),
-                    _buildTaxInfoSection(),
-                    const SizedBox(height: 24),
-                    _buildSectionHeader('เงื่อนไขการชำระเงิน', Icons.payments),
-                    _buildPaymentTermsSection(),
-                    const SizedBox(height: 24),
-                    _buildSectionHeader('สถานะ', Icons.toggle_on),
-                    _buildStatusSection(),
-                    const SizedBox(height: 80),
-                  ],
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isWide = constraints.maxWidth >= 1180;
+                    final isMedium = constraints.maxWidth >= 860;
+
+                    final basicSection = _buildSectionGroup(
+                      title: 'ข้อมูลพื้นฐาน',
+                      icon: Icons.business,
+                      child: _buildBasicInfoSection(),
+                    );
+                    final contactSection = _buildSectionGroup(
+                      title: 'ข้อมูลติดต่อ',
+                      icon: Icons.contact_phone,
+                      child: _buildContactInfoSection(),
+                    );
+                    final taxSection = _buildSectionGroup(
+                      title: 'ข้อมูลภาษี',
+                      icon: Icons.receipt_long,
+                      child: _buildTaxInfoSection(),
+                    );
+                    final paymentSection = _buildSectionGroup(
+                      title: 'เงื่อนไขการชำระเงิน',
+                      icon: Icons.payments,
+                      child: _buildPaymentTermsSection(),
+                    );
+                    final statusSection = _buildSectionGroup(
+                      title: 'สถานะ',
+                      icon: Icons.toggle_on,
+                      child: _buildStatusSection(),
+                    );
+
+                    if (isWide) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(child: basicSection),
+                              const SizedBox(width: 16),
+                              Expanded(child: contactSection),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(child: taxSection),
+                              const SizedBox(width: 16),
+                              Expanded(flex: 2, child: paymentSection),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          statusSection,
+                          const SizedBox(height: 80),
+                        ],
+                      );
+                    }
+
+                    if (isMedium) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(child: basicSection),
+                              const SizedBox(width: 16),
+                              Expanded(child: contactSection),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(child: taxSection),
+                              const SizedBox(width: 16),
+                              Expanded(child: paymentSection),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          statusSection,
+                          const SizedBox(height: 80),
+                        ],
+                      );
+                    }
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        basicSection,
+                        const SizedBox(height: 16),
+                        contactSection,
+                        const SizedBox(height: 16),
+                        taxSection,
+                        const SizedBox(height: 16),
+                        paymentSection,
+                        const SizedBox(height: 16),
+                        statusSection,
+                        const SizedBox(height: 80),
+                      ],
+                    );
+                  },
                 ),
               ),
             ),
@@ -139,13 +235,21 @@ class _SupplierFormPageState extends ConsumerState<SupplierFormPage> {
           const SizedBox(width: 8),
           Text(
             title,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildSectionGroup({
+    required String title,
+    required IconData icon,
+    required Widget child,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [_buildSectionHeader(title, icon), child],
     );
   }
 
@@ -237,7 +341,9 @@ class _SupplierFormPageState extends ConsumerState<SupplierFormPage> {
               keyboardType: TextInputType.emailAddress,
               validator: (value) {
                 if (value != null && value.trim().isNotEmpty) {
-                  final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                  final emailRegex = RegExp(
+                    r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                  );
                   if (!emailRegex.hasMatch(value.trim())) {
                     return 'กรุณากรอกอีเมลให้ถูกต้อง';
                   }
@@ -395,8 +501,8 @@ class _SupplierFormPageState extends ConsumerState<SupplierFormPage> {
         child: SwitchListTile(
           title: const Text('เปิดใช้งาน'),
           subtitle: Text(
-            _isActive 
-                ? 'ซัพพลายเออร์นี้สามารถใช้งานได้' 
+            _isActive
+                ? 'ซัพพลายเออร์นี้สามารถใช้งานได้'
                 : 'ซัพพลายเออร์นี้ถูกปิดใช้งาน',
             style: TextStyle(
               fontSize: 12,
@@ -431,36 +537,47 @@ class _SupplierFormPageState extends ConsumerState<SupplierFormPage> {
           ),
         ],
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: OutlinedButton.icon(
-              onPressed: _isLoading ? null : () => Navigator.pop(context),
-              icon: const Icon(Icons.cancel),
-              label: const Text('ยกเลิก'),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final stacked = constraints.maxWidth < 520;
+          final cancelButton = OutlinedButton.icon(
+            onPressed: _isLoading ? null : () => Navigator.pop(context),
+            icon: const Icon(Icons.cancel),
+            label: const Text('ยกเลิก'),
+          );
+          final saveButton = ElevatedButton.icon(
+            onPressed: _isLoading ? null : _saveSupplier,
+            icon: _isLoading
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                : const Icon(Icons.save),
+            label: Text(_isLoading ? 'กำลังบันทึก...' : 'บันทึก'),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 12),
             ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: ElevatedButton.icon(
-              onPressed: _isLoading ? null : _saveSupplier,
-              icon: _isLoading
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : const Icon(Icons.save),
-              label: Text(_isLoading ? 'กำลังบันทึก...' : 'บันทึก'),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-              ),
-            ),
-          ),
-        ],
+          );
+
+          if (stacked) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [saveButton, const SizedBox(height: 10), cancelButton],
+            );
+          }
+
+          return Row(
+            children: [
+              Expanded(child: cancelButton),
+              const SizedBox(width: 16),
+              Expanded(child: saveButton),
+            ],
+          );
+        },
       ),
     );
   }
@@ -479,20 +596,20 @@ class _SupplierFormPageState extends ConsumerState<SupplierFormPage> {
         supplierId: widget.supplier?.supplierId ?? '',
         supplierCode: _supplierCodeController.text.trim(),
         supplierName: _supplierNameController.text.trim(),
-        contactPerson: _contactPersonController.text.trim().isEmpty 
-            ? null 
+        contactPerson: _contactPersonController.text.trim().isEmpty
+            ? null
             : _contactPersonController.text.trim(),
-        phone: _phoneController.text.trim().isEmpty 
-            ? null 
+        phone: _phoneController.text.trim().isEmpty
+            ? null
             : _phoneController.text.trim(),
-        email: _emailController.text.trim().isEmpty 
-            ? null 
+        email: _emailController.text.trim().isEmpty
+            ? null
             : _emailController.text.trim(),
-        address: _addressController.text.trim().isEmpty 
-            ? null 
+        address: _addressController.text.trim().isEmpty
+            ? null
             : _addressController.text.trim(),
-        taxId: _taxIdController.text.trim().isEmpty 
-            ? null 
+        taxId: _taxIdController.text.trim().isEmpty
+            ? null
             : _taxIdController.text.trim(),
         creditTerm: int.parse(_creditTermController.text.trim()),
         creditLimit: double.parse(_creditLimitController.text.trim()),
@@ -503,8 +620,12 @@ class _SupplierFormPageState extends ConsumerState<SupplierFormPage> {
       );
 
       final success = widget.supplier == null
-          ? await ref.read(supplierListProvider.notifier).createSupplier(supplier)
-          : await ref.read(supplierListProvider.notifier).updateSupplier(supplier);
+          ? await ref
+                .read(supplierListProvider.notifier)
+                .createSupplier(supplier)
+          : await ref
+                .read(supplierListProvider.notifier)
+                .updateSupplier(supplier);
 
       if (mounted) {
         if (success) {
@@ -512,8 +633,8 @@ class _SupplierFormPageState extends ConsumerState<SupplierFormPage> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                widget.supplier == null 
-                    ? 'เพิ่มซัพพลายเออร์สำเร็จ' 
+                widget.supplier == null
+                    ? 'เพิ่มซัพพลายเออร์สำเร็จ'
                     : 'แก้ไขซัพพลายเออร์สำเร็จ',
               ),
               backgroundColor: Colors.green,

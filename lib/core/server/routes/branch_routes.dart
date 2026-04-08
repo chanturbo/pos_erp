@@ -14,16 +14,9 @@ class BranchRoutes {
   Router get router {
     final r = Router();
 
-    // Branches
-    r.get('/', _listBranches);
-    r.get('/<id>', _getBranch);
-    r.post('/', _createBranch);
-    r.put('/<id>', _updateBranch);
-    r.delete('/<id>', _deleteBranch);
-
-    // Warehouses
+    // Static routes must come before dynamic `/<id>` routes, otherwise
+    // requests like `/warehouses` are captured as a branch id and return 404.
     r.get('/warehouses', _listWarehouses);
-    r.get('/<branchId>/warehouses', _listWarehousesByBranch);
     r.post('/warehouses', _createWarehouse);
     r.put('/warehouses/<id>', _updateWarehouse);
 
@@ -32,6 +25,14 @@ class BranchRoutes {
     r.post('/sync/push', _pushSyncData);
     r.get('/sync/pull', _pullSyncData);
     r.post('/sync/acknowledge', _acknowledgeSyncData);
+
+    // Branches
+    r.get('/', _listBranches);
+    r.post('/', _createBranch);
+    r.get('/<branchId>/warehouses', _listWarehousesByBranch);
+    r.get('/<id>', _getBranch);
+    r.put('/<id>', _updateBranch);
+    r.delete('/<id>', _deleteBranch);
 
     return r;
   }

@@ -5,25 +5,32 @@ import '../providers/cart_provider.dart';
 import '../pages/payment_page.dart';
 import '../widgets/discount_dialog.dart';
 import '../../../products/presentation/providers/product_provider.dart'; // ✅ scan เพิ่มสินค้า
-import '../../../../shared/services/mobile_scanner_service.dart';        // ✅ MobileScannerService
+import '../../../../shared/services/mobile_scanner_service.dart'; // ✅ MobileScannerService
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/responsive_utils.dart';
 import '../../../../shared/widgets/cart_toast.dart';
 
 // ── OAG Tokens ────────────────────────────────────────────────────
-const _navy    = AppTheme.navyColor;
-const _orange  = AppTheme.primaryColor;
+const _navy = AppTheme.navyColor;
+const _orange = AppTheme.primaryColor;
 const _surface = AppTheme.surfaceColor;
-const _border  = AppTheme.borderColor;
+const _border = AppTheme.borderColor;
 const _success = AppTheme.successColor;
-const _error   = AppTheme.errorColor;
-const _info    = AppTheme.infoColor;
+const _error = AppTheme.errorColor;
+const _info = AppTheme.infoColor;
 
 // ─────────────────────────────────────────────────────────────────
 // CartPanel
 // ─────────────────────────────────────────────────────────────────
 class CartPanel extends ConsumerStatefulWidget {
-  const CartPanel({super.key});
+  final bool showScanRow;
+  final bool autofocusScan;
+
+  const CartPanel({
+    super.key,
+    this.showScanRow = true,
+    this.autofocusScan = true,
+  });
 
   @override
   ConsumerState<CartPanel> createState() => _CartPanelState();
@@ -66,65 +73,156 @@ class _CartPanelState extends ConsumerState<CartPanel> {
       _prevItemCount = cartState.items.length;
     }
 
-    return Container(
-      decoration: const BoxDecoration(
-        color: _surface,
-        border: Border(left: BorderSide(color: _border)),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        children: [
-          // ── Header ──────────────────────────────────────────
-          _CartHeader(
-            itemCount: cartState.itemCount,
-            onClear: cartState.items.isEmpty
-                ? null
-                : () => ref.read(cartProvider.notifier).clear(),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final density = _CartPanelDensity.fromWidth(constraints.maxWidth);
+
+        return Container(
+          decoration: const BoxDecoration(
+            color: _surface,
+            border: Border(left: BorderSide(color: _border)),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
           ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            children: [
+              // ── Header ──────────────────────────────────────────
+              _CartHeader(
+                itemCount: cartState.itemCount,
+                onClear: cartState.items.isEmpty
+                    ? null
+                    : () => ref.read(cartProvider.notifier).clear(),
+              ),
 
-          // ── Scan Row ─────────────────────────────────────────
-          _ScanRow(ref: ref),
+              // ── Scan Row ─────────────────────────────────────────
+              if (widget.showScanRow)
+                _ScanRow(
+                  ref: ref,
+                  autofocus: widget.autofocusScan,
+                  compact: density.compact,
+                ),
 
-          // ── Column labels ────────────────────────────────────
-          if (cartState.items.isNotEmpty) const _ColHeader(),
+              // ── Column labels ────────────────────────────────────
+              if (cartState.items.isNotEmpty && !density.stackedRows)
+                _ColHeader(density: density),
 
-          // ── Cart Items ───────────────────────────────────────
-          Expanded(
-            child: cartState.items.isEmpty && cartState.freeItems.isEmpty
-                ? const _EmptyCart()
-                : ListView.builder(
-                    controller: _scrollController,
-                    padding: EdgeInsets.zero,
-                    itemCount: cartState.items.length +
-                        (cartState.hasFreeItems
-                            ? 1 + cartState.freeItems.length
-                            : 0),
-                    itemBuilder: (_, i) {
-                      // regular items
-                      if (i < cartState.items.length) {
-                        return _CartRow(
-                          item: cartState.items[i],
-                          isEven: i.isEven,
-                        );
-                      }
-                      // free items header
-                      if (i == cartState.items.length) {
-                        return _FreeItemsHeader(
-                            count: cartState.freeItems.length);
-                      }
-                      // free item rows
-                      final fi =
-                          cartState.freeItems[i - cartState.items.length - 1];
-                      return _FreeItemRow(item: fi);
-                    },
-                  ),
+              // ── Cart Items ───────────────────────────────────────
+              Expanded(
+                child: cartState.items.isEmpty && cartState.freeItems.isEmpty
+                    ? const _EmptyCart()
+                    : ListView.builder(
+                        controller: _scrollController,
+                        padding: EdgeInsets.zero,
+                        itemCount:
+                            cartState.items.length +
+                            (cartState.hasFreeItems
+                                ? 1 + cartState.freeItems.length
+                                : 0),
+                        itemBuilder: (_, i) {
+                          // regular items
+                          if (i < cartState.items.length) {
+                            return _CartRow(
+                              item: cartState.items[i],
+                              isEven: i.isEven,
+                              density: density,
+                            );
+                          }
+                          // free items header
+                          if (i == cartState.items.length) {
+                            return _FreeItemsHeader(
+                              count: cartState.freeItems.length,
+                            );
+                          }
+                          // free item rows
+                          final fi = cartState
+                              .freeItems[i - cartState.items.length - 1];
+                          return _FreeItemRow(item: fi, density: density);
+                        },
+                      ),
+              ),
+
+              // ── Summary ──────────────────────────────────────────
+              _CartSummary(cartState: cartState, density: density),
+            ],
           ),
+        );
+      },
+    );
+  }
+}
 
-          // ── Summary ──────────────────────────────────────────
-          _CartSummary(cartState: cartState),
-        ],
-      ),
+class _CartPanelDensity {
+  final bool compact;
+  final bool stackedRows;
+  final double controlWidth;
+  final double amountWidth;
+  final double leadingWidth;
+  final double horizontalPadding;
+  final double qtyBoxWidth;
+  final double qtyBoxHeight;
+  final double rowFontSize;
+  final double metaFontSize;
+  final double amountFontSize;
+
+  const _CartPanelDensity({
+    required this.compact,
+    required this.stackedRows,
+    required this.controlWidth,
+    required this.amountWidth,
+    required this.leadingWidth,
+    required this.horizontalPadding,
+    required this.qtyBoxWidth,
+    required this.qtyBoxHeight,
+    required this.rowFontSize,
+    required this.metaFontSize,
+    required this.amountFontSize,
+  });
+
+  factory _CartPanelDensity.fromWidth(double width) {
+    if (width < 340) {
+      return const _CartPanelDensity(
+        compact: true,
+        stackedRows: true,
+        controlWidth: 120,
+        amountWidth: 88,
+        leadingWidth: 28,
+        horizontalPadding: 8,
+        qtyBoxWidth: 34,
+        qtyBoxHeight: 26,
+        rowFontSize: 11,
+        metaFontSize: 10,
+        amountFontSize: 12,
+      );
+    }
+
+    if (width < 420) {
+      return const _CartPanelDensity(
+        compact: true,
+        stackedRows: false,
+        controlWidth: 80,
+        amountWidth: 60,
+        leadingWidth: 24,
+        horizontalPadding: 6,
+        qtyBoxWidth: 30,
+        qtyBoxHeight: 24,
+        rowFontSize: 11,
+        metaFontSize: 9,
+        amountFontSize: 11,
+      );
+    }
+
+    return const _CartPanelDensity(
+      compact: false,
+      stackedRows: false,
+      controlWidth: 92,
+      amountWidth: 68,
+      leadingWidth: 28,
+      horizontalPadding: 8,
+      qtyBoxWidth: 36,
+      qtyBoxHeight: 26,
+      rowFontSize: 12,
+      metaFontSize: 10,
+      amountFontSize: 12,
     );
   }
 }
@@ -145,13 +243,11 @@ class _CartHeader extends StatelessWidget {
       decoration: const BoxDecoration(
         color: _navy,
         borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-        border: Border(
-            bottom: BorderSide(color: AppTheme.navyBorder)),
+        border: Border(bottom: BorderSide(color: AppTheme.navyBorder)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.receipt_long,
-              color: Colors.white70, size: 16),
+          const Icon(Icons.receipt_long, color: Colors.white70, size: 16),
           const SizedBox(width: 8),
           const Text(
             'รายการสินค้า',
@@ -164,8 +260,7 @@ class _CartHeader extends StatelessWidget {
           if (itemCount > 0) ...[
             const SizedBox(width: 6),
             Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 7, vertical: 1),
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
               decoration: BoxDecoration(
                 color: _orange,
                 borderRadius: BorderRadius.circular(10),
@@ -186,19 +281,20 @@ class _CartHeader extends StatelessWidget {
               onTap: onClear,
               borderRadius: BorderRadius.circular(6),
               child: const Padding(
-                padding: EdgeInsets.symmetric(
-                    horizontal: 6, vertical: 3),
+                padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.delete_outline,
-                        size: 14,
-                        color: Color(0xFFEF9A9A)),
+                    Icon(
+                      Icons.delete_outline,
+                      size: 14,
+                      color: Color(0xFFEF9A9A),
+                    ),
                     SizedBox(width: 3),
-                    Text('ล้าง',
-                        style: TextStyle(
-                            fontSize: 11,
-                            color: Color(0xFFEF9A9A))),
+                    Text(
+                      'ล้าง',
+                      style: TextStyle(fontSize: 11, color: Color(0xFFEF9A9A)),
+                    ),
                   ],
                 ),
               ),
@@ -216,24 +312,32 @@ class _CartHeader extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────
 class _ScanRow extends ConsumerStatefulWidget {
   final WidgetRef ref;
-  const _ScanRow({required this.ref});
+  final bool autofocus;
+  final bool compact;
+
+  const _ScanRow({
+    required this.ref,
+    this.autofocus = true,
+    this.compact = false,
+  });
 
   @override
   ConsumerState<_ScanRow> createState() => _ScanRowState();
 }
 
 class _ScanRowState extends ConsumerState<_ScanRow> {
-  final _ctrl      = TextEditingController();
+  final _ctrl = TextEditingController();
   final _focusNode = FocusNode();
-  String _query    = '';
+  String _query = '';
 
   @override
   void initState() {
     super.initState();
-    // Focus ทันทีที่ widget mount (เปิดหน้า POS)
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _focusNode.requestFocus();
-    });
+    if (widget.autofocus) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _focusNode.requestFocus();
+      });
+    }
   }
 
   @override
@@ -253,19 +357,20 @@ class _ScanRowState extends ConsumerState<_ScanRow> {
 
     final match = productsAsync.value!.firstWhere(
       (p) =>
-          (p.barcode?.toLowerCase() == b) ||
-          p.productCode.toLowerCase() == b,
+          (p.barcode?.toLowerCase() == b) || p.productCode.toLowerCase() == b,
       orElse: () => throw _NotFoundError(),
     );
 
-    ref.read(cartProvider.notifier).addItem(
-      productId:   match.productId,
-      productCode: match.productCode,
-      productName: match.productName,
-      unit:        match.baseUnit,
-      unitPrice:   match.priceLevel1,
-      groupId:     match.groupId,
-    );
+    ref
+        .read(cartProvider.notifier)
+        .addItem(
+          productId: match.productId,
+          productCode: match.productCode,
+          productName: match.productName,
+          unit: match.baseUnit,
+          unitPrice: match.priceLevel1,
+          groupId: match.groupId,
+        );
 
     // ล้าง field + focus กลับทันที (พร้อมสแกนชิ้นถัดไป)
     _ctrl.clear();
@@ -273,10 +378,12 @@ class _ScanRowState extends ConsumerState<_ScanRow> {
     _focusNode.requestFocus();
 
     if (context.mounted) {
-      ref.read(cartToastProvider.notifier).show(
-        'เพิ่ม ${match.productName} แล้ว',
-        duration: const Duration(milliseconds: 1200),
-      );
+      ref
+          .read(cartToastProvider.notifier)
+          .show(
+            'เพิ่ม ${match.productName} แล้ว',
+            duration: const Duration(milliseconds: 1200),
+          );
     }
   }
 
@@ -296,121 +403,143 @@ class _ScanRowState extends ConsumerState<_ScanRow> {
   // ── กรณีไม่พบสินค้า ──────────────────────────────────────────
   void _notFound(BuildContext context, String barcode) {
     if (!context.mounted) return;
-    ref.read(cartToastProvider.notifier).show(
-      'ไม่พบสินค้า: $barcode',
-      backgroundColor: AppTheme.errorColor,
-      icon: Icons.search_off,
-      duration: const Duration(seconds: 2),
-    );
+    ref
+        .read(cartToastProvider.notifier)
+        .show(
+          'ไม่พบสินค้า: $barcode',
+          backgroundColor: AppTheme.errorColor,
+          icon: Icons.search_off,
+          duration: const Duration(seconds: 2),
+        );
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark    = Theme.of(context).brightness == Brightness.dark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final textColor = isDark ? Colors.white : const Color(0xFF1A1A1A);
-    final hintColor = isDark ? AppTheme.darkElement.withValues(alpha: 0.6)
-                             : AppTheme.subtextColor;
-    final bgColor   = isDark ? AppTheme.darkCard   : Colors.white;
-    final iconColor = isDark ? Colors.white70       : AppTheme.subtextColor;
+    final hintColor = isDark
+        ? AppTheme.darkElement.withValues(alpha: 0.6)
+        : AppTheme.subtextColor;
+    final bgColor = isDark ? AppTheme.darkCard : Colors.white;
+    final iconColor = isDark ? Colors.white70 : AppTheme.subtextColor;
     final borderColor = isDark ? const Color(0xFF333333) : _border;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: bgColor,
-        border: Border(bottom: BorderSide(color: borderColor)),
-      ),
-      child: Row(
-        children: [
-          // ── Barcode / productCode input ───────────────────────
-          Expanded(
-            child: SizedBox(
-              height: 34,
-              child: TextField(
-                controller:  _ctrl,
-                focusNode:   _focusNode,
-                autofocus:   true,
-                decoration: InputDecoration(
-                  hintText: 'บาร์โค้ด / รหัสสินค้า...',
-                  hintStyle: TextStyle(fontSize: 12, color: hintColor),
-                  prefixIcon: Icon(Icons.search, size: 16, color: iconColor),
-                  suffixIcon: _query.isNotEmpty
-                      ? IconButton(
-                          icon: Icon(Icons.clear, size: 14, color: iconColor),
-                          padding: EdgeInsets.zero,
-                          onPressed: () {
-                            _ctrl.clear();
-                            setState(() => _query = '');
-                          },
-                        )
-                      : null,
-                  isDense: true,
-                  contentPadding: EdgeInsets.zero,
-                  filled: true,
-                  fillColor: isDark ? AppTheme.darkElement : Colors.white,
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(6),
-                      borderSide: BorderSide(color: borderColor)),
-                  enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(6),
-                      borderSide: BorderSide(color: borderColor)),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(6),
-                    borderSide:
-                        const BorderSide(color: _orange, width: 1.5),
-                  ),
-                ),
-                style: TextStyle(fontSize: 12, color: textColor),
-                onChanged: (v) => setState(() => _query = v),
-                onSubmitted: (v) async {
-                  try {
-                    await _addByBarcode(context, v);
-                  } on _NotFoundError {
-                    if (context.mounted) _notFound(context, v);
-                  }
-                },
-              ),
-            ),
+    final inputField = SizedBox(
+      height: 34,
+      child: TextField(
+        controller: _ctrl,
+        focusNode: _focusNode,
+        autofocus: widget.autofocus,
+        decoration: InputDecoration(
+          hintText: 'บาร์โค้ด / รหัสสินค้า...',
+          hintStyle: TextStyle(fontSize: 12, color: hintColor),
+          prefixIcon: Icon(Icons.search, size: 16, color: iconColor),
+          suffixIcon: _query.isNotEmpty
+              ? IconButton(
+                  icon: Icon(Icons.clear, size: 14, color: iconColor),
+                  padding: EdgeInsets.zero,
+                  onPressed: () {
+                    _ctrl.clear();
+                    setState(() => _query = '');
+                  },
+                )
+              : null,
+          isDense: true,
+          contentPadding: EdgeInsets.zero,
+          filled: true,
+          fillColor: isDark ? AppTheme.darkElement : Colors.white,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(6),
+            borderSide: BorderSide(color: borderColor),
           ),
-          const SizedBox(width: 8),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(6),
+            borderSide: BorderSide(color: borderColor),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(6),
+            borderSide: const BorderSide(color: _orange, width: 1.5),
+          ),
+        ),
+        style: TextStyle(fontSize: 12, color: textColor),
+        onChanged: (v) => setState(() => _query = v),
+        onSubmitted: (v) async {
+          try {
+            await _addByBarcode(context, v);
+          } on _NotFoundError {
+            if (context.mounted) _notFound(context, v);
+          }
+        },
+      ),
+    );
 
-          // ── Scan button ──────────────────────────────────────
-          Tooltip(
-            message: 'สแกน QR / Barcode เพิ่มสินค้า',
-            child: InkWell(
-              onTap: () async {
-                try {
-                  await _onScanTap(context);
-                } on _NotFoundError catch (_) {
-                  // handled inside _addByBarcode → _notFound
-                }
-              },
-              borderRadius: BorderRadius.circular(6),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: _orange,
-                  borderRadius: BorderRadius.circular(6),
+    final scanButton = Tooltip(
+      message: 'สแกน QR / Barcode เพิ่มสินค้า',
+      child: InkWell(
+        onTap: () async {
+          try {
+            await _onScanTap(context);
+          } on _NotFoundError catch (_) {
+            // handled inside _addByBarcode → _notFound
+          }
+        },
+        borderRadius: BorderRadius.circular(6),
+        child: Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: widget.compact ? 8 : 10,
+            vertical: 6,
+          ),
+          decoration: BoxDecoration(
+            color: _orange,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.qr_code_scanner, size: 15, color: Colors.white),
+              SizedBox(width: 5),
+              Text(
+                'สแกน',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
                 ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final stackedControls = widget.compact && constraints.maxWidth < 360;
+
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          decoration: BoxDecoration(
+            color: bgColor,
+            border: Border(bottom: BorderSide(color: borderColor)),
+          ),
+          child: stackedControls
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Icon(Icons.qr_code_scanner,
-                        size: 15, color: Colors.white),
-                    SizedBox(width: 5),
-                    Text('สแกน',
-                        style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600)),
+                    inputField,
+                    const SizedBox(height: 8),
+                    Align(alignment: Alignment.centerRight, child: scanButton),
+                  ],
+                )
+              : Row(
+                  children: [
+                    Expanded(child: inputField),
+                    const SizedBox(width: 8),
+                    scanButton,
                   ],
                 ),
-              ),
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -421,47 +550,60 @@ class _NotFoundError implements Exception {}
 // Column labels
 // ─────────────────────────────────────────────────────────────────
 class _ColHeader extends StatelessWidget {
-  const _ColHeader();
+  final _CartPanelDensity density;
+
+  const _ColHeader({required this.density});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       color: const Color(0xFFEEEEEE),
-      padding:
-          const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-      child: const Row(
+      padding: EdgeInsets.symmetric(
+        horizontal: density.horizontalPadding,
+        vertical: 5,
+      ),
+      child: Row(
         children: [
-          SizedBox(width: 22),
-          Expanded(
+          SizedBox(width: density.leadingWidth - density.horizontalPadding),
+          const Expanded(
             flex: 5,
-            child: Text('สินค้า',
+            child: Text(
+              'สินค้า',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey,
+              ),
+            ),
+          ),
+          SizedBox(
+            width: density.controlWidth,
+            child: const Center(
+              child: Text(
+                'จำนวน',
                 style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey)),
-          ),
-          SizedBox(
-            width: 92,
-            child: Center(
-              child: Text('จำนวน',
-                  style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey)),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey,
+                ),
+              ),
             ),
           ),
           SizedBox(
-            width: 68,
-            child: Align(
+            width: density.amountWidth,
+            child: const Align(
               alignment: Alignment.centerRight,
-              child: Text('รวม',
-                  style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey)),
+              child: Text(
+                'รวม',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey,
+                ),
+              ),
             ),
           ),
-          SizedBox(width: 6),
+          SizedBox(width: density.horizontalPadding - 2),
         ],
       ),
     );
@@ -475,8 +617,13 @@ class _ColHeader extends StatelessWidget {
 class _CartRow extends ConsumerStatefulWidget {
   final CartItem item;
   final bool isEven;
+  final _CartPanelDensity density;
 
-  const _CartRow({required this.item, required this.isEven});
+  const _CartRow({
+    required this.item,
+    required this.isEven,
+    required this.density,
+  });
 
   @override
   ConsumerState<_CartRow> createState() => _CartRowState();
@@ -491,7 +638,8 @@ class _CartRowState extends ConsumerState<_CartRow> {
   void initState() {
     super.initState();
     _qtyCtrl = TextEditingController(
-        text: widget.item.quantity.toStringAsFixed(0));
+      text: widget.item.quantity.toStringAsFixed(0),
+    );
     _focusNode.addListener(() {
       if (!_focusNode.hasFocus && _editingQty) _commitQty();
     });
@@ -501,8 +649,7 @@ class _CartRowState extends ConsumerState<_CartRow> {
   void didUpdateWidget(_CartRow old) {
     super.didUpdateWidget(old);
     // sync ตัวเลขเมื่อ quantity เปลี่ยนจากภายนอก
-    if (!_editingQty &&
-        old.item.quantity != widget.item.quantity) {
+    if (!_editingQty && old.item.quantity != widget.item.quantity) {
       _qtyCtrl.text = widget.item.quantity.toStringAsFixed(0);
     }
   }
@@ -517,172 +664,194 @@ class _CartRowState extends ConsumerState<_CartRow> {
   void _commitQty() {
     final qty = double.tryParse(_qtyCtrl.text) ?? 1;
     final safe = qty < 0.001 ? 1.0 : qty;
-    ref
-        .read(cartProvider.notifier)
-        .setQuantity(widget.item.productId, safe);
+    ref.read(cartProvider.notifier).setQuantity(widget.item.productId, safe);
     setState(() => _editingQty = false);
   }
 
   @override
   Widget build(BuildContext context) {
     final item = widget.item;
-
-    return Container(
-      color: widget.isEven ? Colors.white : const Color(0xFFF9F9F7),
+    final density = widget.density;
+    final productInfo = Expanded(
+      flex: 5,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              item.productName,
+              style: TextStyle(
+                fontSize: density.rowFontSize,
+                fontWeight: FontWeight.w500,
+                color: const Color(0xFF1A1A1A),
+              ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: density.compact ? 2 : 1,
+            ),
+            Text(
+              '฿${item.unitPrice.toStringAsFixed(2)} / ${item.unit}',
+              style: TextStyle(
+                fontSize: density.metaFontSize,
+                color: AppTheme.subtextColor,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    final qtyControl = SizedBox(
+      width: density.controlWidth,
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Delete button
-          SizedBox(
-            width: 28,
-            child: InkWell(
-              onTap: () => ref
-                  .read(cartProvider.notifier)
-                  .removeItem(item.productId),
-              child: const Padding(
-                padding: EdgeInsets.all(6),
-                child: Icon(Icons.close, size: 13, color: _error),
-              ),
-            ),
+          _QtyBtn(
+            icon: Icons.remove,
+            compact: density.compact,
+            onTap: () => ref
+                .read(cartProvider.notifier)
+                .decreaseQuantity(item.productId),
           ),
-
-          // Product name + unit price
-          Expanded(
-            flex: 5,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    item.productName,
-                    style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: Color(0xFF1A1A1A)), // ✅ เข้มเสมอ
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
-                  ),
-                  Text(
-                    // ✅ รักษา unitPrice จากไฟล์เดิม
-                    '฿${item.unitPrice.toStringAsFixed(2)} / ${item.unit}',
-                    style: const TextStyle(
-                        fontSize: 10,
-                        color: AppTheme.subtextColor),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Qty control — inline edit เมื่อแตะตัวเลข
-          SizedBox(
-            width: 92,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Decrease — ✅ รักษา decreaseQuantity จากไฟล์เดิม
-                _QtyBtn(
-                  icon: Icons.remove,
-                  onTap: () => ref
-                      .read(cartProvider.notifier)
-                      .decreaseQuantity(item.productId),
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _editingQty = true;
+                _qtyCtrl.text = item.quantity.toStringAsFixed(0);
+                _qtyCtrl.selection = TextSelection(
+                  baseOffset: 0,
+                  extentOffset: _qtyCtrl.text.length,
+                );
+              });
+              Future.microtask(() => _focusNode.requestFocus());
+            },
+            child: Container(
+              width: density.qtyBoxWidth,
+              height: density.qtyBoxHeight,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(
+                  color: _editingQty ? _orange : _border,
+                  width: _editingQty ? 1.5 : 1,
                 ),
-
-                // Qty box — แตะเพื่อ edit inline
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _editingQty = true;
-                      _qtyCtrl.text =
-                          item.quantity.toStringAsFixed(0);
-                      _qtyCtrl.selection = TextSelection(
-                        baseOffset: 0,
-                        extentOffset: _qtyCtrl.text.length,
-                      );
-                    });
-                    Future.microtask(
-                        () => _focusNode.requestFocus());
-                  },
-                  child: Container(
-                    width: 36,
-                    height: 26,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(
-                        color:
-                            _editingQty ? _orange : _border,
-                        width: _editingQty ? 1.5 : 1,
+              ),
+              child: _editingQty
+                  ? TextField(
+                      controller: _qtyCtrl,
+                      focusNode: _focusNode,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: density.rowFontSize,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF1A1A1A),
+                      ),
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'[\d.]')),
+                      ],
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        isDense: true,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      onSubmitted: (_) => _commitQty(),
+                    )
+                  : Text(
+                      item.quantity.toStringAsFixed(0),
+                      style: TextStyle(
+                        fontSize: density.rowFontSize,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF1A1A1A),
                       ),
                     ),
-                    child: _editingQty
-                        ? TextField(
-                            controller: _qtyCtrl,
-                            focusNode: _focusNode,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF1A1A1A)), // ✅
-                            keyboardType:
-                                TextInputType.number,
-                            inputFormatters: [
-                              FilteringTextInputFormatter
-                                  .allow(RegExp(r'[\d.]'))
-                            ],
-                            decoration:
-                                const InputDecoration(
-                              border: InputBorder.none,
-                              isDense: true,
-                              contentPadding: EdgeInsets.zero,
-                            ),
-                            onSubmitted: (_) => _commitQty(),
-                          )
-                        : Text(
-                            item.quantity.toStringAsFixed(0),
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF1A1A1A), // ✅ เข้มเสมอ
-                            ),
-                          ),
-                  ),
-                ),
-
-                // Increase — ✅ รักษา increaseQuantity จากไฟล์เดิม
-                _QtyBtn(
-                  icon: Icons.add,
-                  onTap: () => ref
-                      .read(cartProvider.notifier)
-                      .increaseQuantity(item.productId),
-                ),
-              ],
             ),
           ),
-
-          // Amount — ✅ รักษา item.amount จากไฟล์เดิม
-          SizedBox(
-            width: 68,
-            child: Padding(
-              padding: const EdgeInsets.only(right: 6),
-              child: Align(
-                alignment: Alignment.centerRight,
-                child: Text(
-                  '฿${item.amount.toStringAsFixed(2)}',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: _info,
-                  ),
-                ),
-              ),
-            ),
+          _QtyBtn(
+            icon: Icons.add,
+            compact: density.compact,
+            onTap: () => ref
+                .read(cartProvider.notifier)
+                .increaseQuantity(item.productId),
           ),
         ],
       ),
+    );
+    final amountText = Text(
+      '฿${item.amount.toStringAsFixed(2)}',
+      style: TextStyle(
+        fontSize: density.amountFontSize,
+        fontWeight: FontWeight.bold,
+        color: _info,
+      ),
+    );
+
+    return Container(
+      color: widget.isEven ? Colors.white : const Color(0xFFF9F9F7),
+      padding: EdgeInsets.symmetric(horizontal: density.horizontalPadding),
+      child: density.stackedRows
+          ? Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Column(
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        width: density.leadingWidth,
+                        child: InkWell(
+                          onTap: () => ref
+                              .read(cartProvider.notifier)
+                              .removeItem(item.productId),
+                          child: const Padding(
+                            padding: EdgeInsets.all(6),
+                            child: Icon(Icons.close, size: 13, color: _error),
+                          ),
+                        ),
+                      ),
+                      productInfo,
+                      const SizedBox(width: 8),
+                      amountText,
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [qtyControl],
+                  ),
+                ],
+              ),
+            )
+          : Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: density.leadingWidth,
+                  child: InkWell(
+                    onTap: () => ref
+                        .read(cartProvider.notifier)
+                        .removeItem(item.productId),
+                    child: const Padding(
+                      padding: EdgeInsets.all(6),
+                      child: Icon(Icons.close, size: 13, color: _error),
+                    ),
+                  ),
+                ),
+                productInfo,
+                qtyControl,
+                SizedBox(
+                  width: density.amountWidth,
+                  child: Padding(
+                    padding: EdgeInsets.only(right: density.compact ? 2 : 6),
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: amountText,
+                    ),
+                  ),
+                ),
+              ],
+            ),
     );
   }
 }
@@ -693,7 +862,13 @@ class _CartRowState extends ConsumerState<_CartRow> {
 class _QtyBtn extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
-  const _QtyBtn({required this.icon, required this.onTap});
+  final bool compact;
+
+  const _QtyBtn({
+    required this.icon,
+    required this.onTap,
+    this.compact = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -701,8 +876,8 @@ class _QtyBtn extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(4),
       child: Padding(
-        padding: const EdgeInsets.all(3),
-        child: Icon(icon, size: 14, color: _navy),
+        padding: EdgeInsets.all(compact ? 2 : 3),
+        child: Icon(icon, size: compact ? 13 : 14, color: _navy),
       ),
     );
   }
@@ -749,89 +924,161 @@ class _FreeItemsHeader extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────
 class _FreeItemRow extends StatelessWidget {
   final CartItem item;
-  const _FreeItemRow({required this.item});
+  final _CartPanelDensity density;
+
+  const _FreeItemRow({required this.item, required this.density});
+
+  @override
+  Widget build(BuildContext context) {
+    final amountText = Text(
+      '฿0.00',
+      style: TextStyle(
+        fontSize: density.amountFontSize,
+        fontWeight: FontWeight.bold,
+        color: Colors.green,
+      ),
+    );
+
+    return Container(
+      color: const Color(0xFFF1FFF3),
+      padding: EdgeInsets.symmetric(
+        horizontal: density.horizontalPadding,
+        vertical: 7,
+      ),
+      child: density.stackedRows
+          ? Column(
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: density.leadingWidth,
+                      child: const Icon(
+                        Icons.card_giftcard,
+                        size: 15,
+                        color: Colors.green,
+                      ),
+                    ),
+                    Expanded(
+                      flex: 5,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            item.productName,
+                            style: TextStyle(
+                              fontSize: density.rowFontSize,
+                              fontWeight: FontWeight.w500,
+                              color: const Color(0xFF1A1A1A),
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 2,
+                          ),
+                          Text(
+                            'ของแถมฟรี',
+                            style: TextStyle(
+                              fontSize: density.metaFontSize,
+                              color: Colors.green,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    amountText,
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [_FreeQtyChip(item: item, density: density)],
+                ),
+              ],
+            )
+          : Row(
+              children: [
+                SizedBox(
+                  width: density.leadingWidth,
+                  child: const Icon(
+                    Icons.card_giftcard,
+                    size: 15,
+                    color: Colors.green,
+                  ),
+                ),
+                Expanded(
+                  flex: 5,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        item.productName,
+                        style: TextStyle(
+                          fontSize: density.rowFontSize,
+                          fontWeight: FontWeight.w500,
+                          color: const Color(0xFF1A1A1A),
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: density.compact ? 2 : 1,
+                      ),
+                      Text(
+                        'ของแถมฟรี',
+                        style: TextStyle(
+                          fontSize: density.metaFontSize,
+                          color: Colors.green,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(
+                  width: density.controlWidth,
+                  child: Center(
+                    child: _FreeQtyChip(item: item, density: density),
+                  ),
+                ),
+                SizedBox(
+                  width: density.amountWidth,
+                  child: Padding(
+                    padding: EdgeInsets.only(right: density.compact ? 2 : 6),
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: amountText,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+}
+
+class _FreeQtyChip extends StatelessWidget {
+  final CartItem item;
+  final _CartPanelDensity density;
+
+  const _FreeQtyChip({required this.item, required this.density});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: const Color(0xFFF1FFF3),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
-      child: Row(
-        children: [
-          // 🎁 icon แทน delete button
-          const SizedBox(
-            width: 28,
-            child: Icon(Icons.card_giftcard, size: 15, color: Colors.green),
-          ),
-
-          // ชื่อสินค้า
-          Expanded(
-            flex: 5,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  item.productName,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: Color(0xFF1A1A1A),
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
-                ),
-                const Text(
-                  'ของแถมฟรี',
-                  style: TextStyle(fontSize: 10, color: Colors.green),
-                ),
-              ],
-            ),
-          ),
-
-          // จำนวน (แสดงอย่างเดียว ไม่มี +/-)
-          SizedBox(
-            width: 92,
-            child: Center(
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.green.shade50,
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: Colors.green.shade200),
-                ),
-                child: Text(
-                  'x${item.quantity.toStringAsFixed(0)}',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.green,
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-          // ราคา ฿0
-          const SizedBox(
-            width: 68,
-            child: Padding(
-              padding: EdgeInsets.only(right: 6),
-              child: Align(
-                alignment: Alignment.centerRight,
-                child: Text(
-                  '฿0.00',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.green,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
+      padding: EdgeInsets.symmetric(
+        horizontal: density.compact ? 8 : 10,
+        vertical: 4,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.green.shade50,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: Colors.green.shade200),
+      ),
+      child: Text(
+        'x${item.quantity.toStringAsFixed(0)}',
+        style: TextStyle(
+          fontSize: density.rowFontSize,
+          fontWeight: FontWeight.bold,
+          color: Colors.green,
+        ),
       ),
     );
   }
@@ -849,16 +1096,17 @@ class _EmptyCart extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.shopping_cart_outlined,
-              size: 52, color: Colors.grey),
+          Icon(Icons.shopping_cart_outlined, size: 52, color: Colors.grey),
           SizedBox(height: 10),
-          Text('ตะกร้าว่าง',
-              style:
-                  TextStyle(color: Colors.grey, fontSize: 13)),
+          Text(
+            'ตะกร้าว่าง',
+            style: TextStyle(color: Colors.grey, fontSize: 13),
+          ),
           SizedBox(height: 4),
-          Text('กดสินค้าเพื่อเพิ่มลงตะกร้า',
-              style:
-                  TextStyle(color: Colors.grey, fontSize: 11)),
+          Text(
+            'กดสินค้าเพื่อเพิ่มลงตะกร้า',
+            style: TextStyle(color: Colors.grey, fontSize: 11),
+          ),
         ],
       ),
     );
@@ -871,16 +1119,22 @@ class _EmptyCart extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────
 class _CartSummary extends StatelessWidget {
   final CartState cartState;
-  const _CartSummary({required this.cartState});
+  final _CartPanelDensity density;
+
+  const _CartSummary({required this.cartState, required this.density});
 
   @override
   Widget build(BuildContext context) {
-    final isDark        = Theme.of(context).brightness == Brightness.dark;
-    final totalFontSize = context.isMobile ? 18.0 : 20.0;
-    final bgColor       = isDark ? AppTheme.darkCard    : Colors.white;
-    final textColor     = isDark ? Colors.white         : const Color(0xFF1A1A1A);
-    final subTextColor  = isDark ? AppTheme.darkElement.withValues(alpha: 0.8) : Colors.grey;
-    final dividerColor  = isDark ? const Color(0xFF333333) : _border;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final totalFontSize = density.compact
+        ? 18.0
+        : (context.isMobile ? 18.0 : 20.0);
+    final bgColor = isDark ? AppTheme.darkCard : Colors.white;
+    final textColor = isDark ? Colors.white : const Color(0xFF1A1A1A);
+    final subTextColor = isDark
+        ? AppTheme.darkElement.withValues(alpha: 0.8)
+        : Colors.grey;
+    final dividerColor = isDark ? const Color(0xFF333333) : _border;
     final disabledColor = isDark ? const Color(0xFF2A2A2A) : Colors.grey[300];
 
     return Container(
@@ -896,9 +1150,10 @@ class _CartSummary extends StatelessWidget {
             child: Column(
               children: [
                 _SummaryRow(
-                    label: 'รวม',
-                    value: '฿${cartState.subtotal.toStringAsFixed(2)}',
-                    valueColor: textColor),
+                  label: 'รวม',
+                  value: '฿${cartState.subtotal.toStringAsFixed(2)}',
+                  valueColor: textColor,
+                ),
 
                 if (cartState.totalDiscount > 0) ...[
                   const SizedBox(height: 3),
@@ -914,30 +1169,67 @@ class _CartSummary extends StatelessWidget {
                   child: Divider(height: 1, color: dividerColor),
                 ),
 
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('ยอดชำระ',
-                        style: TextStyle(
-                            fontSize: 14,
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final compactSummary =
+                        density.compact || constraints.maxWidth < 360;
+
+                    if (compactSummary) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'ยอดชำระ',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: textColor,
+                                ),
+                              ),
+                              Text(
+                                '฿${cartState.total.toStringAsFixed(2)}',
+                                style: TextStyle(
+                                  fontSize: totalFontSize,
+                                  fontWeight: FontWeight.bold,
+                                  color: _success,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          _DiscountButton(cartState: cartState, isDark: isDark),
+                        ],
+                      );
+                    }
+
+                    return Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'ยอดชำระ',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: textColor,
+                            ),
+                          ),
+                        ),
+                        _DiscountButton(cartState: cartState, isDark: isDark),
+                        const SizedBox(width: 12),
+                        Text(
+                          '฿${cartState.total.toStringAsFixed(2)}',
+                          style: TextStyle(
+                            fontSize: totalFontSize,
                             fontWeight: FontWeight.bold,
-                            color: textColor)),
-
-                    // ── ปุ่มส่วนลด ─────────────────────────────
-                    _DiscountButton(
-                      cartState:  cartState,
-                      isDark:     isDark,
-                    ),
-
-                    Text(
-                      '฿${cartState.total.toStringAsFixed(2)}',
-                      style: TextStyle(
-                        fontSize: totalFontSize,
-                        fontWeight: FontWeight.bold,
-                        color: _success,
-                      ),
-                    ),
-                  ],
+                            color: _success,
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ],
             ),
@@ -949,15 +1241,19 @@ class _CartSummary extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
               child: Container(
                 padding: const EdgeInsets.symmetric(
-                    horizontal: 10, vertical: 3),
+                  horizontal: 10,
+                  vertical: 3,
+                ),
                 decoration: BoxDecoration(
                   color: isDark
                       ? AppTheme.darkElement.withValues(alpha: 0.5)
                       : _navy.withValues(alpha: 0.06),
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                child: Wrap(
+                  spacing: 10,
+                  runSpacing: 4,
+                  alignment: WrapAlignment.spaceBetween,
                   children: [
                     Text(
                       '${cartState.itemCount} รายการ',
@@ -995,10 +1291,9 @@ class _CartSummary extends StatelessWidget {
                 onPressed: cartState.items.isEmpty
                     ? null
                     : () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => const PaymentPage()),
-                        ),
+                        context,
+                        MaterialPageRoute(builder: (_) => const PaymentPage()),
+                      ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -1040,15 +1335,18 @@ class _SummaryRow extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label,
-            style: const TextStyle(
-                fontSize: 13,
-                color: AppTheme.subtextColor)),
-        Text(value,
-            style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: valueColor)),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 13, color: AppTheme.subtextColor),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: valueColor,
+          ),
+        ),
       ],
     );
   }
@@ -1062,12 +1360,9 @@ class _SummaryRow extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────
 class _DiscountButton extends ConsumerWidget {
   final CartState cartState;
-  final bool      isDark;
+  final bool isDark;
 
-  const _DiscountButton({
-    required this.cartState,
-    required this.isDark,
-  });
+  const _DiscountButton({required this.cartState, required this.isDark});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1094,14 +1389,16 @@ class _DiscountButton extends ConsumerWidget {
             context: context,
             builder: (_) => DiscountDialog(
               currentPercent: cartState.discountPercent,
-              currentAmount:  cartState.discountAmount,
+              currentAmount: cartState.discountAmount,
             ),
           );
           if (result != null) {
-            ref.read(cartProvider.notifier).setDiscount(
-              percent: result['percent'],
-              amount:  result['amount'],
-            );
+            ref
+                .read(cartProvider.notifier)
+                .setDiscount(
+                  percent: result['percent'],
+                  amount: result['amount'],
+                );
           }
         },
         borderRadius: BorderRadius.circular(8),
@@ -1111,25 +1408,19 @@ class _DiscountButton extends ConsumerWidget {
           decoration: BoxDecoration(
             color: hasDiscount
                 ? _orange.withValues(alpha: 0.12)
-                : (isDark
-                    ? AppTheme.darkElement
-                    : const Color(0xFFF5F5F5)),
+                : (isDark ? AppTheme.darkElement : const Color(0xFFF5F5F5)),
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
               color: hasDiscount
                   ? _orange.withValues(alpha: 0.6)
-                  : (isDark
-                      ? const Color(0xFF444444)
-                      : AppTheme.borderColor),
+                  : (isDark ? const Color(0xFF444444) : AppTheme.borderColor),
             ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                hasDiscount
-                    ? Icons.local_offer
-                    : Icons.local_offer_outlined,
+                hasDiscount ? Icons.local_offer : Icons.local_offer_outlined,
                 size: 13,
                 color: hasDiscount
                     ? _orange
@@ -1140,9 +1431,7 @@ class _DiscountButton extends ConsumerWidget {
                 label,
                 style: TextStyle(
                   fontSize: 12,
-                  fontWeight: hasDiscount
-                      ? FontWeight.w700
-                      : FontWeight.w500,
+                  fontWeight: hasDiscount ? FontWeight.w700 : FontWeight.w500,
                   color: hasDiscount
                       ? _orange
                       : (isDark ? Colors.white54 : AppTheme.subtextColor),

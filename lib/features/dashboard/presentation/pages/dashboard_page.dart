@@ -7,6 +7,7 @@ import '../../../products/presentation/pages/product_list_page.dart';
 import '../../../customers/presentation/pages/customer_list_page.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/responsive_utils.dart';
+import '../../../../shared/widgets/escape_pop_scope.dart';
 
 class DashboardPage extends ConsumerWidget {
   final VoidCallback? onGoToPos;
@@ -29,63 +30,66 @@ class DashboardPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dashboardAsync = ref.watch(dashboardProvider);
+    final canPop = Navigator.of(context).canPop();
 
-    return Scaffold(
-      backgroundColor: AppTheme.surfaceColor,
-      appBar: AppBar(
-        // ซ่อน leading เมื่อ sidebar permanent (desktop) — มี sidebar แล้ว
-        automaticallyImplyLeading: !context.hasPermanentSidebar,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('แดชบอร์ด'),
-            Text(
-              'ภาพรวมระบบ',
-              style: TextStyle(
-                fontSize: 11,
-                color: Colors.white.withValues(alpha: 0.65),
-                fontWeight: FontWeight.normal,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: 'รีเฟรช',
-            onPressed: () => ref.read(dashboardProvider.notifier).refresh(),
-          ),
-        ],
-      ),
-
-      body: dashboardAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+    return EscapePopScope(
+      child: Scaffold(
+        backgroundColor: AppTheme.surfaceColor,
+        appBar: AppBar(
+          automaticallyImplyLeading: canPop,
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(
-                Icons.error_outline,
-                size: 72,
-                color: AppTheme.errorColor,
-              ),
-              const SizedBox(height: 16),
-              Text('เกิดข้อผิดพลาด: $error'),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () => ref.read(dashboardProvider.notifier).refresh(),
-                child: const Text('ลองใหม่'),
+              const Text('แดชบอร์ด'),
+              Text(
+                'ภาพรวมระบบ',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.white.withValues(alpha: 0.65),
+                  fontWeight: FontWeight.normal,
+                ),
               ),
             ],
           ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              tooltip: 'รีเฟรช',
+              onPressed: () => ref.read(dashboardProvider.notifier).refresh(),
+            ),
+          ],
         ),
-        data: (stats) => _DashboardBody(
-          stats: stats,
-          onGoToPos: onGoToPos,
-          onGoToProducts: onGoToProducts,
-          onGoToCustomers: onGoToCustomers,
-          onGoToSalesHistory: onGoToSalesHistory,
-          onGoToTodaySales: onGoToTodaySales,
+
+        body: dashboardAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (error, _) => Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.error_outline,
+                  size: 72,
+                  color: AppTheme.errorColor,
+                ),
+                const SizedBox(height: 16),
+                Text('เกิดข้อผิดพลาด: $error'),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () =>
+                      ref.read(dashboardProvider.notifier).refresh(),
+                  child: const Text('ลองใหม่'),
+                ),
+              ],
+            ),
+          ),
+          data: (stats) => _DashboardBody(
+            stats: stats,
+            onGoToPos: onGoToPos,
+            onGoToProducts: onGoToProducts,
+            onGoToCustomers: onGoToCustomers,
+            onGoToSalesHistory: onGoToSalesHistory,
+            onGoToTodaySales: onGoToTodaySales,
+          ),
         ),
       ),
     );
@@ -118,54 +122,59 @@ class _DashboardBody extends StatelessWidget {
 
     return SingleChildScrollView(
       padding: padding,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (context.isDesktopOrWider) ...[
-            // ── Desktop: Stats ก่อน แล้ว Quick + Overview คู่กัน ──────
-            _buildStatsGrid(context),
-            const SizedBox(height: 24),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: _QuickActionsCard(
-                    onGoToPos: onGoToPos,
-                    onGoToProducts: onGoToProducts,
-                    onGoToCustomers: onGoToCustomers,
-                    onGoToSalesHistory: onGoToSalesHistory,
-                  ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compactDesktop =
+              context.isDesktopOrWider && constraints.maxWidth < 1180;
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (context.isDesktopOrWider && !compactDesktop) ...[
+                _buildStatsGrid(context),
+                const SizedBox(height: 24),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: _QuickActionsCard(
+                        onGoToPos: onGoToPos,
+                        onGoToProducts: onGoToProducts,
+                        onGoToCustomers: onGoToCustomers,
+                        onGoToSalesHistory: onGoToSalesHistory,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _TodayCard(
+                        stats: stats,
+                        onOpenAllSales: () => _openAllSales(context),
+                        onOpenTodaySales: () => _openTodaySales(context),
+                        onOpenMonthSales: () => _openMonthSales(context),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _TodayCard(
-                    stats: stats,
-                    onOpenAllSales: () => _openAllSales(context),
-                    onOpenTodaySales: () => _openTodaySales(context),
-                    onOpenMonthSales: () => _openMonthSales(context),
-                  ),
+              ] else ...[
+                _TodayCard(
+                  stats: stats,
+                  onOpenAllSales: () => _openAllSales(context),
+                  onOpenTodaySales: () => _openTodaySales(context),
+                  onOpenMonthSales: () => _openMonthSales(context),
                 ),
+                SizedBox(height: context.isMobile ? 12 : 16),
+                _QuickActionsCard(
+                  onGoToPos: onGoToPos,
+                  onGoToProducts: onGoToProducts,
+                  onGoToCustomers: onGoToCustomers,
+                  onGoToSalesHistory: onGoToSalesHistory,
+                ),
+                SizedBox(height: context.isMobile ? 12 : 16),
+                _buildStatsGrid(context),
               ],
-            ),
-          ] else ...[
-            // ── Mobile/Tablet: Overview ก่อน → เมนูด่วน → Stats ────────
-            _TodayCard(
-              stats: stats,
-              onOpenAllSales: () => _openAllSales(context),
-              onOpenTodaySales: () => _openTodaySales(context),
-              onOpenMonthSales: () => _openMonthSales(context),
-            ),
-            SizedBox(height: context.isMobile ? 12 : 16),
-            _QuickActionsCard(
-              onGoToPos: onGoToPos,
-              onGoToProducts: onGoToProducts,
-              onGoToCustomers: onGoToCustomers,
-              onGoToSalesHistory: onGoToSalesHistory,
-            ),
-            SizedBox(height: context.isMobile ? 12 : 16),
-            _buildStatsGrid(context),
-          ],
-        ],
+            ],
+          );
+        },
       ),
     );
   }
@@ -269,19 +278,30 @@ class _DashboardBody extends StatelessWidget {
       ),
     ];
 
-    // Responsive columns: mobile=2, tablet=2, desktop+=4
-    final cols = context.statsGridColumns;
-    // Aspect ratio ปรับตามขนาด
-    final aspectRatio = context.isMobile ? 1.6 : (context.isTablet ? 1.8 : 2.0);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final cols = width >= 1320
+            ? 4
+            : width >= 900
+            ? 3
+            : 2;
+        final aspectRatio = width >= 1320
+            ? 2.0
+            : width >= 900
+            ? 1.75
+            : 1.6;
 
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: cols,
-      childAspectRatio: aspectRatio,
-      crossAxisSpacing: context.isMobile ? 10 : 14,
-      mainAxisSpacing: context.isMobile ? 10 : 14,
-      children: cards.map((c) => _StatCard(data: c)).toList(),
+        return GridView.count(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisCount: cols,
+          childAspectRatio: aspectRatio,
+          crossAxisSpacing: context.isMobile ? 10 : 14,
+          mainAxisSpacing: context.isMobile ? 10 : 14,
+          children: cards.map((c) => _StatCard(data: c)).toList(),
+        );
+      },
     );
   }
 }
@@ -598,40 +618,80 @@ class _OverviewRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: context.isMobile ? 12 : 13,
-                  color: AppTheme.subtextColor,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: context.isMobile ? 12 : 14,
-                fontWeight: FontWeight.w600,
-                color: color,
-              ),
-            ),
-            const SizedBox(width: 6),
-            Icon(
-              Icons.open_in_new_rounded,
-              size: context.isMobile ? 14 : 15,
-              color: AppTheme.subtextColor,
-            ),
-          ],
-        ),
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final stacked = constraints.maxWidth < 340;
+
+        return InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(10),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+            child: stacked
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: context.isMobile ? 12 : 13,
+                          color: AppTheme.subtextColor,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              value,
+                              style: TextStyle(
+                                fontSize: context.isMobile ? 12 : 14,
+                                fontWeight: FontWeight.w600,
+                                color: color,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Icon(
+                            Icons.open_in_new_rounded,
+                            size: context.isMobile ? 14 : 15,
+                            color: AppTheme.subtextColor,
+                          ),
+                        ],
+                      ),
+                    ],
+                  )
+                : Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          label,
+                          style: TextStyle(
+                            fontSize: context.isMobile ? 12 : 13,
+                            color: AppTheme.subtextColor,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        value,
+                        style: TextStyle(
+                          fontSize: context.isMobile ? 12 : 14,
+                          fontWeight: FontWeight.w600,
+                          color: color,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Icon(
+                        Icons.open_in_new_rounded,
+                        size: context.isMobile ? 14 : 15,
+                        color: AppTheme.subtextColor,
+                      ),
+                    ],
+                  ),
+          ),
+        );
+      },
     );
   }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
+import 'package:pos_erp/shared/widgets/escape_pop_scope.dart';
 
 import '../../../inventory/presentation/providers/stock_provider.dart';
 import '../../../products/data/models/product_model.dart';
@@ -22,8 +23,7 @@ class GoodsReceiptFormPage extends ConsumerStatefulWidget {
       _GoodsReceiptFormPageState();
 }
 
-class _GoodsReceiptFormPageState
-    extends ConsumerState<GoodsReceiptFormPage> {
+class _GoodsReceiptFormPageState extends ConsumerState<GoodsReceiptFormPage> {
   final _formKey = GlobalKey<FormState>();
 
   DateTime _grDate = DateTime.now();
@@ -104,204 +104,220 @@ class _GoodsReceiptFormPageState
     ref.watch(productListProvider);
 
     return Scaffold(
-      backgroundColor:
-          isDark ? AppTheme.darkBg : const Color(0xFFF5F5F5),
-      body: Column(
-        children: [
-          // ── Title Bar ─────────────────────────────────────────
-          _GRFormTitleBar(
-            title: _pageTitle,
-            isViewMode: _isViewMode,
-            onHelp: _isViewMode ? null : _showHelp,
-          ),
+      backgroundColor: isDark ? AppTheme.darkBg : const Color(0xFFF5F5F5),
+      body: EscapePopScope(
+        child: Column(
+          children: [
+            // ── Title Bar ─────────────────────────────────────────
+            _GRFormTitleBar(
+              title: _pageTitle,
+              isViewMode: _isViewMode,
+              onHelp: _isViewMode ? null : _showHelp,
+            ),
 
-          // ── Form Body ─────────────────────────────────────────
-          Expanded(
-            child: Form(
-              key: _formKey,
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    // Section 0 — Method Selection (create mode, no PO yet)
-                    if (widget.receipt == null && _poId == null &&
-                        _supplierId == null) ...[
+            // ── Form Body ─────────────────────────────────────────
+            Expanded(
+              child: Form(
+                key: _formKey,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      // Section 0 — Method Selection (create mode, no PO yet)
+                      if (widget.receipt == null &&
+                          _poId == null &&
+                          _supplierId == null) ...[
+                        _GRSectionCard(
+                          icon: Icons.alt_route_outlined,
+                          iconColor: AppTheme.info,
+                          title: 'เลือกวิธีสร้างใบรับสินค้า',
+                          child: _buildMethodSelection(isDark),
+                        ),
+                        const SizedBox(height: 14),
+                      ],
+
+                      // Section 1 — ข้อมูลทั่วไป
                       _GRSectionCard(
-                        icon: Icons.alt_route_outlined,
-                        iconColor: AppTheme.info,
-                        title: 'เลือกวิธีสร้างใบรับสินค้า',
-                        child: _buildMethodSelection(isDark),
-                      ),
-                      const SizedBox(height: 14),
-                    ],
-
-                    // Section 1 — ข้อมูลทั่วไป
-                    _GRSectionCard(
-                      icon: Icons.local_shipping_outlined,
-                      iconColor: AppTheme.success,
-                      title: 'ข้อมูลทั่วไป',
-                      child: _buildGeneralSection(isDark),
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Section 2 — รายการสินค้า
-                    _GRSectionCard(
-                      icon: Icons.inventory_2_outlined,
-                      iconColor: AppTheme.info,
-                      title: 'รายการสินค้า',
-                      trailing: (!_isViewMode && _supplierId != null)
-                          ? Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                _GRSmallIconBtn(
-                                  icon: _isCardView
-                                      ? Icons.view_list_outlined
-                                      : Icons.grid_view_outlined,
-                                  tooltip: _isCardView
-                                      ? 'List View'
-                                      : 'Card View',
-                                  isDark: isDark,
-                                  onTap: () => setState(
-                                      () => _isCardView = !_isCardView),
-                                ),
-                                const SizedBox(width: 6),
-                                ElevatedButton.icon(
-                                  onPressed: _addItem,
-                                  icon: const Icon(Icons.add, size: 16),
-                                  label: const Text('เพิ่ม',
-                                      style: TextStyle(fontSize: 13)),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppTheme.info,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 14, vertical: 14),
-                                    minimumSize: Size.zero,
-                                    tapTargetSize:
-                                        MaterialTapTargetSize.shrinkWrap,
-                                    shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(8)),
-                                    elevation: 0,
-                                  ),
-                                ),
-                              ],
-                            )
-                          : (_isViewMode
-                              ? null
-                              : _GRSmallIconBtn(
-                                  icon: _isCardView
-                                      ? Icons.view_list_outlined
-                                      : Icons.grid_view_outlined,
-                                  tooltip: _isCardView
-                                      ? 'List View'
-                                      : 'Card View',
-                                  isDark: isDark,
-                                  onTap: () => setState(
-                                      () => _isCardView = !_isCardView),
-                                )),
-                      child: _buildItemsSection(isDark),
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Section 3 — สรุปยอด
-                    if (_items.isNotEmpty) ...[
-                      _GRSectionCard(
-                        icon: Icons.summarize_outlined,
+                        icon: Icons.local_shipping_outlined,
                         iconColor: AppTheme.success,
-                        title: 'สรุปรายการ',
-                        child: _buildSummarySection(isDark),
+                        title: 'ข้อมูลทั่วไป',
+                        child: _buildGeneralSection(isDark),
                       ),
                       const SizedBox(height: 14),
-                    ],
 
-                    // Section 4 — หมายเหตุ
-                    _GRSectionCard(
-                      icon: Icons.note_outlined,
-                      iconColor: AppTheme.textSub,
-                      title: 'หมายเหตุ',
-                      child: _isViewMode
-                          ? _GRReadOnlyField(
-                              label: _remarkController.text.isEmpty
-                                  ? '-'
-                                  : _remarkController.text,
-                              icon: Icons.edit_note,
-                              isDark: isDark,
-                            )
-                          : _GRTextField(
-                              controller: _remarkController,
-                              hint: 'บันทึกเพิ่มเติม (ถ้ามี)',
-                              icon: Icons.edit_note,
-                              maxLines: 3,
-                              isDark: isDark,
-                            ),
-                    ),
-                    const SizedBox(height: 80),
-                  ],
+                      // Section 2 — รายการสินค้า
+                      _GRSectionCard(
+                        icon: Icons.inventory_2_outlined,
+                        iconColor: AppTheme.info,
+                        title: 'รายการสินค้า',
+                        trailing: (!_isViewMode && _supplierId != null)
+                            ? Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  _GRSmallIconBtn(
+                                    icon: _isCardView
+                                        ? Icons.view_list_outlined
+                                        : Icons.grid_view_outlined,
+                                    tooltip: _isCardView
+                                        ? 'List View'
+                                        : 'Card View',
+                                    isDark: isDark,
+                                    onTap: () => setState(
+                                      () => _isCardView = !_isCardView,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  ElevatedButton.icon(
+                                    onPressed: _addItem,
+                                    icon: const Icon(Icons.add, size: 16),
+                                    label: const Text(
+                                      'เพิ่ม',
+                                      style: TextStyle(fontSize: 13),
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppTheme.info,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 14,
+                                        vertical: 14,
+                                      ),
+                                      minimumSize: Size.zero,
+                                      tapTargetSize:
+                                          MaterialTapTargetSize.shrinkWrap,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      elevation: 0,
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : (_isViewMode
+                                  ? null
+                                  : _GRSmallIconBtn(
+                                      icon: _isCardView
+                                          ? Icons.view_list_outlined
+                                          : Icons.grid_view_outlined,
+                                      tooltip: _isCardView
+                                          ? 'List View'
+                                          : 'Card View',
+                                      isDark: isDark,
+                                      onTap: () => setState(
+                                        () => _isCardView = !_isCardView,
+                                      ),
+                                    )),
+                        child: _buildItemsSection(isDark),
+                      ),
+                      const SizedBox(height: 14),
+
+                      // Section 3 — สรุปยอด
+                      if (_items.isNotEmpty) ...[
+                        _GRSectionCard(
+                          icon: Icons.summarize_outlined,
+                          iconColor: AppTheme.success,
+                          title: 'สรุปรายการ',
+                          child: _buildSummarySection(isDark),
+                        ),
+                        const SizedBox(height: 14),
+                      ],
+
+                      // Section 4 — หมายเหตุ
+                      _GRSectionCard(
+                        icon: Icons.note_outlined,
+                        iconColor: AppTheme.textSub,
+                        title: 'หมายเหตุ',
+                        child: _isViewMode
+                            ? _GRReadOnlyField(
+                                label: _remarkController.text.isEmpty
+                                    ? '-'
+                                    : _remarkController.text,
+                                icon: Icons.edit_note,
+                                isDark: isDark,
+                              )
+                            : _GRTextField(
+                                controller: _remarkController,
+                                hint: 'บันทึกเพิ่มเติม (ถ้ามี)',
+                                icon: Icons.edit_note,
+                                maxLines: 3,
+                                isDark: isDark,
+                              ),
+                      ),
+                      const SizedBox(height: 80),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
 
-          // ── Bottom Action Bar ─────────────────────────────────
-          if (!_isViewMode)
-            Container(
-              color: isDark ? AppTheme.darkTopBar : Colors.white,
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 20, vertical: 14),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  OutlinedButton(
-                    onPressed:
-                        _isLoading ? null : () => Navigator.pop(context),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 24, vertical: 12),
-                      side: BorderSide(
-                          color: isDark
-                              ? Colors.white24
-                              : AppTheme.border),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8)),
-                    ),
-                    child: Text('ยกเลิก',
+            // ── Bottom Action Bar ─────────────────────────────────
+            if (!_isViewMode)
+              Container(
+                color: isDark ? AppTheme.darkTopBar : Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 14,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    OutlinedButton(
+                      onPressed: _isLoading
+                          ? null
+                          : () => Navigator.pop(context),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
+                        side: BorderSide(
+                          color: isDark ? Colors.white24 : AppTheme.border,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: Text(
+                        'ยกเลิก',
                         style: TextStyle(
-                            color: isDark
-                                ? Colors.white60
-                                : AppTheme.textSub)),
-                  ),
-                  const SizedBox(width: 12),
-                  ElevatedButton.icon(
-                    onPressed: _isLoading ? null : _saveReceipt,
-                    icon: _isLoading
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
+                          color: isDark ? Colors.white60 : AppTheme.textSub,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    ElevatedButton.icon(
+                      onPressed: _isLoading ? null : _saveReceipt,
+                      icon: _isLoading
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                color: Colors.white),
-                          )
-                        : const Icon(Icons.save_outlined, size: 18),
-                    label: Text(
-                      widget.receipt == null
-                          ? 'สร้างใบรับสินค้า'
-                          : 'บันทึก',
-                      style: const TextStyle(fontSize: 14),
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.save_outlined, size: 18),
+                      label: Text(
+                        widget.receipt == null ? 'สร้างใบรับสินค้า' : 'บันทึก',
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.success,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        elevation: 0,
+                      ),
                     ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.success,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 24, vertical: 12),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8)),
-                      elevation: 0,
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -351,37 +367,38 @@ class _GoodsReceiptFormPageState
           borderRadius: BorderRadius.circular(8),
           onTap: _isViewMode ? null : _selectDate,
           child: Container(
-            padding: const EdgeInsets.symmetric(
-                horizontal: 12, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             decoration: BoxDecoration(
               color: _isViewMode
-                  ? (isDark
-                      ? AppTheme.darkCard
-                      : const Color(0xFFF5F5F5))
+                  ? (isDark ? AppTheme.darkCard : const Color(0xFFF5F5F5))
                   : (isDark ? AppTheme.darkElement : Colors.white),
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                  color: isDark ? Colors.white24 : AppTheme.border),
+                color: isDark ? Colors.white24 : AppTheme.border,
+              ),
             ),
             child: Row(
               children: [
-                Icon(Icons.calendar_today_outlined,
-                    size: 17,
-                    color: isDark ? Colors.white54 : AppTheme.textSub),
+                Icon(
+                  Icons.calendar_today_outlined,
+                  size: 17,
+                  color: isDark ? Colors.white54 : AppTheme.textSub,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   DateFormat('dd/MM/yyyy').format(_grDate),
                   style: TextStyle(
-                      fontSize: 13,
-                      color: isDark ? Colors.white : Colors.black87),
+                    fontSize: 13,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
                 ),
                 const Spacer(),
                 if (!_isViewMode)
-                  Icon(Icons.chevron_right,
-                      size: 18,
-                      color: isDark
-                          ? Colors.white38
-                          : AppTheme.textSub),
+                  Icon(
+                    Icons.chevron_right,
+                    size: 18,
+                    color: isDark ? Colors.white38 : AppTheme.textSub,
+                  ),
               ],
             ),
           ),
@@ -390,28 +407,31 @@ class _GoodsReceiptFormPageState
 
         // PO Reference (ถ้ามี)
         if (_poNo != null) ...[
-          _GRFieldLabel(
-              label: 'อ้างอิง Purchase Order', isDark: isDark),
+          _GRFieldLabel(label: 'อ้างอิง Purchase Order', isDark: isDark),
           const SizedBox(height: 6),
           Container(
-            padding: const EdgeInsets.symmetric(
-                horizontal: 12, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             decoration: BoxDecoration(
               color: AppTheme.info.withValues(alpha: 0.06),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                  color: AppTheme.info.withValues(alpha: 0.3)),
+              border: Border.all(color: AppTheme.info.withValues(alpha: 0.3)),
             ),
             child: Row(
               children: [
-                const Icon(Icons.receipt_long_outlined,
-                    size: 17, color: AppTheme.info),
+                const Icon(
+                  Icons.receipt_long_outlined,
+                  size: 17,
+                  color: AppTheme.info,
+                ),
                 const SizedBox(width: 8),
-                Text(_poNo!,
-                    style: const TextStyle(
-                        fontSize: 13,
-                        color: AppTheme.info,
-                        fontWeight: FontWeight.w600)),
+                Text(
+                  _poNo!,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppTheme.info,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ],
             ),
           ),
@@ -422,27 +442,28 @@ class _GoodsReceiptFormPageState
         _GRFieldLabel(label: 'ซัพพลายเออร์', isDark: isDark),
         const SizedBox(height: 6),
         Container(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           decoration: BoxDecoration(
-            color: isDark
-                ? AppTheme.darkCard
-                : const Color(0xFFF5F5F5),
+            color: isDark ? AppTheme.darkCard : const Color(0xFFF5F5F5),
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-                color: isDark ? Colors.white12 : AppTheme.border),
+              color: isDark ? Colors.white12 : AppTheme.border,
+            ),
           ),
           child: Row(
             children: [
-              Icon(Icons.business_outlined,
-                  size: 17,
-                  color: isDark ? Colors.white38 : AppTheme.textSub),
+              Icon(
+                Icons.business_outlined,
+                size: 17,
+                color: isDark ? Colors.white38 : AppTheme.textSub,
+              ),
               const SizedBox(width: 8),
               Text(
                 _supplierName ?? '-',
                 style: TextStyle(
-                    fontSize: 13,
-                    color: isDark ? Colors.white70 : Colors.black87),
+                  fontSize: 13,
+                  color: isDark ? Colors.white70 : Colors.black87,
+                ),
               ),
             ],
           ),
@@ -454,96 +475,101 @@ class _GoodsReceiptFormPageState
         const SizedBox(height: 6),
         if (_isViewMode)
           Container(
-            padding: const EdgeInsets.symmetric(
-                horizontal: 12, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             decoration: BoxDecoration(
-              color: isDark
-                  ? AppTheme.darkCard
-                  : const Color(0xFFF5F5F5),
+              color: isDark ? AppTheme.darkCard : const Color(0xFFF5F5F5),
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                  color: isDark ? Colors.white12 : AppTheme.border),
+                color: isDark ? Colors.white12 : AppTheme.border,
+              ),
             ),
             child: Row(
               children: [
-                Icon(Icons.warehouse_outlined,
-                    size: 17,
-                    color:
-                        isDark ? Colors.white38 : AppTheme.textSub),
+                Icon(
+                  Icons.warehouse_outlined,
+                  size: 17,
+                  color: isDark ? Colors.white38 : AppTheme.textSub,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   _warehouseName,
                   style: TextStyle(
-                      fontSize: 13,
-                      color: isDark
-                          ? Colors.white54
-                          : AppTheme.textSub),
+                    fontSize: 13,
+                    color: isDark ? Colors.white54 : AppTheme.textSub,
+                  ),
                 ),
               ],
             ),
           )
         else
-          ref.watch(stockBalanceProvider).when(
-            data: (stocks) {
-              final seen = <String>{};
-              final warehouses = stocks
-                  .where((s) => seen.add(s.warehouseId))
-                  .map((s) =>
-                      {'id': s.warehouseId, 'name': s.warehouseName})
-                  .toList();
-              if (warehouses.isEmpty) {
-                warehouses
-                    .add({'id': 'WH001', 'name': 'คลังสาขาหลัก'});
-              }
-              return _GRDialogDropdown<String>(
-                value: _warehouseId,
-                hint: 'เลือกคลังสินค้า',
-                icon: Icons.warehouse_outlined,
-                isDark: isDark,
-                items: warehouses
-                    .map((w) => DropdownMenuItem(
-                          value: w['id'],
-                          child: Text(w['name']!,
+          ref
+              .watch(stockBalanceProvider)
+              .when(
+                data: (stocks) {
+                  final seen = <String>{};
+                  final warehouses = stocks
+                      .where((s) => seen.add(s.warehouseId))
+                      .map(
+                        (s) => {'id': s.warehouseId, 'name': s.warehouseName},
+                      )
+                      .toList();
+                  if (warehouses.isEmpty) {
+                    warehouses.add({'id': 'WH001', 'name': 'คลังสาขาหลัก'});
+                  }
+                  return _GRDialogDropdown<String>(
+                    value: _warehouseId,
+                    hint: 'เลือกคลังสินค้า',
+                    icon: Icons.warehouse_outlined,
+                    isDark: isDark,
+                    items: warehouses
+                        .map(
+                          (w) => DropdownMenuItem(
+                            value: w['id'],
+                            child: Text(
+                              w['name']!,
                               style: TextStyle(
-                                  fontSize: 13,
-                                  color: isDark
-                                      ? Colors.white
-                                      : Colors.black87)),
-                        ))
-                    .toList(),
-                onChanged: (v) {
-                  final w = warehouses
-                      .firstWhere((w) => w['id'] == v);
-                  setState(() {
-                    _warehouseId = v!;
-                    _warehouseName = w['name']!;
-                  });
+                                fontSize: 13,
+                                color: isDark ? Colors.white : Colors.black87,
+                              ),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) {
+                      final w = warehouses.firstWhere((w) => w['id'] == v);
+                      setState(() {
+                        _warehouseId = v!;
+                        _warehouseName = w['name']!;
+                      });
+                    },
+                  );
                 },
-              );
-            },
-            loading: () => LinearProgressIndicator(
-                color: AppTheme.success,
-                backgroundColor:
-                    isDark ? AppTheme.darkElement : AppTheme.border),
-            error: (_, _) => _GRDialogDropdown<String>(
-              value: _warehouseId,
-              hint: 'คลังสินค้า',
-              icon: Icons.warehouse_outlined,
-              isDark: isDark,
-              items: [
-                DropdownMenuItem(
-                  value: 'WH001',
-                  child: Text('คลังสาขาหลัก',
-                      style: TextStyle(
+                loading: () => LinearProgressIndicator(
+                  color: AppTheme.success,
+                  backgroundColor: isDark
+                      ? AppTheme.darkElement
+                      : AppTheme.border,
+                ),
+                error: (_, _) => _GRDialogDropdown<String>(
+                  value: _warehouseId,
+                  hint: 'คลังสินค้า',
+                  icon: Icons.warehouse_outlined,
+                  isDark: isDark,
+                  items: [
+                    DropdownMenuItem(
+                      value: 'WH001',
+                      child: Text(
+                        'คลังสาขาหลัก',
+                        style: TextStyle(
                           fontSize: 13,
-                          color: isDark
-                              ? Colors.white
-                              : Colors.black87)),
-                )
-              ],
-              onChanged: (v) {},
-            ),
-          ),
+                          color: isDark ? Colors.white : Colors.black87,
+                        ),
+                      ),
+                    ),
+                  ],
+                  onChanged: (v) {},
+                ),
+              ),
       ],
     );
   }
@@ -570,9 +596,7 @@ class _GoodsReceiptFormPageState
                     ? Icons.alt_route_outlined
                     : Icons.add_shopping_cart_outlined,
                 size: 48,
-                color: isDark
-                    ? const Color(0xFF444444)
-                    : Colors.grey[300],
+                color: isDark ? const Color(0xFF444444) : Colors.grey[300],
               ),
               const SizedBox(height: 8),
               Text(
@@ -581,10 +605,9 @@ class _GoodsReceiptFormPageState
                     : 'ยังไม่มีรายการสินค้า\nกดปุ่ม "เพิ่ม" เพื่อเพิ่มสินค้า',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                    fontSize: 13,
-                    color: isDark
-                        ? const Color(0xFF888888)
-                        : Colors.grey[500]),
+                  fontSize: 13,
+                  color: isDark ? const Color(0xFF888888) : Colors.grey[500],
+                ),
               ),
             ],
           ),
@@ -604,15 +627,13 @@ class _GoodsReceiptFormPageState
   }
 
   // Item Card View
-  Widget _buildItemCard(
-      GoodsReceiptItemModel item, int index, bool isDark) {
+  Widget _buildItemCard(GoodsReceiptItemModel item, int index, bool isDark) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: isDark ? AppTheme.darkElement : const Color(0xFFF9FAFB),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-            color: isDark ? Colors.white12 : AppTheme.border),
+        border: Border.all(color: isDark ? Colors.white12 : AppTheme.border),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -629,28 +650,35 @@ class _GoodsReceiptFormPageState
                     color: AppTheme.success.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.inventory_2_outlined,
-                      size: 16, color: AppTheme.success),
+                  child: const Icon(
+                    Icons.inventory_2_outlined,
+                    size: 16,
+                    color: AppTheme.success,
+                  ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(item.productName,
-                          style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: isDark
-                                  ? Colors.white
-                                  : const Color(0xFF1A1A1A))),
+                      Text(
+                        item.productName,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: isDark
+                              ? Colors.white
+                              : const Color(0xFF1A1A1A),
+                        ),
+                      ),
                       const SizedBox(height: 2),
-                      Text(item.productCode,
-                          style: TextStyle(
-                              fontSize: 11,
-                              color: isDark
-                                  ? Colors.white54
-                                  : AppTheme.textSub)),
+                      Text(
+                        item.productCode,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: isDark ? Colors.white54 : AppTheme.textSub,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -671,8 +699,7 @@ class _GoodsReceiptFormPageState
                         tooltip: 'ลบ',
                         isDark: isDark,
                         color: AppTheme.error,
-                        onTap: () =>
-                            setState(() => _items.removeAt(index)),
+                        onTap: () => setState(() => _items.removeAt(index)),
                       ),
                     ],
                   ),
@@ -680,8 +707,9 @@ class _GoodsReceiptFormPageState
             ),
             const SizedBox(height: 10),
             Divider(
-                height: 1,
-                color: isDark ? Colors.white12 : AppTheme.border),
+              height: 1,
+              color: isDark ? Colors.white12 : AppTheme.border,
+            ),
             const SizedBox(height: 10),
 
             // Qty row
@@ -747,12 +775,10 @@ class _GoodsReceiptFormPageState
   }
 
   // Item List Row (compact)
-  Widget _buildItemListRow(
-      GoodsReceiptItemModel item, int index, bool isDark) {
+  Widget _buildItemListRow(GoodsReceiptItemModel item, int index, bool isDark) {
     final isEven = index.isEven;
     return Container(
-      padding:
-          const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       decoration: BoxDecoration(
         color: isEven
             ? (isDark ? AppTheme.darkElement : const Color(0xFFF9FAFB))
@@ -768,29 +794,34 @@ class _GoodsReceiptFormPageState
         children: [
           SizedBox(
             width: 24,
-            child: Text('${index + 1}',
-                style: TextStyle(
-                    fontSize: 11,
-                    color: isDark ? Colors.white38 : AppTheme.textSub)),
+            child: Text(
+              '${index + 1}',
+              style: TextStyle(
+                fontSize: 11,
+                color: isDark ? Colors.white38 : AppTheme.textSub,
+              ),
+            ),
           ),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(item.productName,
-                    style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: isDark
-                            ? Colors.white
-                            : const Color(0xFF1A1A1A)),
-                    overflow: TextOverflow.ellipsis),
-                Text(item.productCode,
-                    style: TextStyle(
-                        fontSize: 10,
-                        color: isDark
-                            ? Colors.white54
-                            : AppTheme.textSub)),
+                Text(
+                  item.productName,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  item.productCode,
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: isDark ? Colors.white54 : AppTheme.textSub,
+                  ),
+                ),
               ],
             ),
           ),
@@ -801,15 +832,17 @@ class _GoodsReceiptFormPageState
               Text(
                 'สั่ง ${item.orderedQuantity.toStringAsFixed(0)}',
                 style: TextStyle(
-                    fontSize: 10,
-                    color: isDark ? Colors.white38 : AppTheme.textSub),
+                  fontSize: 10,
+                  color: isDark ? Colors.white38 : AppTheme.textSub,
+                ),
               ),
               Text(
                 'รับ ${item.receivedQuantity.toStringAsFixed(0)} ${item.unit}',
                 style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.success),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.success,
+                ),
               ),
             ],
           ),
@@ -820,19 +853,23 @@ class _GoodsReceiptFormPageState
               onTap: () => _editItem(item, index),
               child: Padding(
                 padding: const EdgeInsets.all(4),
-                child: Icon(Icons.edit_outlined,
-                    size: 15, color: AppTheme.info),
+                child: Icon(
+                  Icons.edit_outlined,
+                  size: 15,
+                  color: AppTheme.info,
+                ),
               ),
             ),
             InkWell(
               borderRadius: BorderRadius.circular(4),
-              onTap: () =>
-                  setState(() => _items.removeAt(index)),
+              onTap: () => setState(() => _items.removeAt(index)),
               child: Padding(
                 padding: const EdgeInsets.all(4),
-                child: Icon(Icons.close,
-                    size: 15,
-                    color: isDark ? Colors.white38 : AppTheme.textSub),
+                child: Icon(
+                  Icons.close,
+                  size: 15,
+                  color: isDark ? Colors.white38 : AppTheme.textSub,
+                ),
               ),
             ),
           ],
@@ -845,10 +882,14 @@ class _GoodsReceiptFormPageState
   // Summary Section
   // ─────────────────────────────────────────────────────────────
   Widget _buildSummarySection(bool isDark) {
-    final totalOrdered =
-        _items.fold<double>(0, (s, i) => s + i.orderedQuantity);
-    final totalReceived =
-        _items.fold<double>(0, (s, i) => s + i.receivedQuantity);
+    final totalOrdered = _items.fold<double>(
+      0,
+      (s, i) => s + i.orderedQuantity,
+    );
+    final totalReceived = _items.fold<double>(
+      0,
+      (s, i) => s + i.receivedQuantity,
+    );
 
     return Column(
       children: [
@@ -864,25 +905,25 @@ class _GoodsReceiptFormPageState
           valueColor: AppTheme.info,
           isDark: isDark,
         ),
-        Divider(
-            height: 20,
-            color: isDark ? Colors.white12 : AppTheme.border),
+        Divider(height: 20, color: isDark ? Colors.white12 : AppTheme.border),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('จำนวนที่รับจริง',
-                style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: isDark
-                        ? Colors.white
-                        : const Color(0xFF1A1A1A))),
+            Text(
+              'จำนวนที่รับจริง',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+              ),
+            ),
             Text(
               totalReceived.toStringAsFixed(0),
               style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.success),
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.success,
+              ),
             ),
           ],
         ),
@@ -907,8 +948,7 @@ class _GoodsReceiptFormPageState
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) =>
-          const Center(child: CircularProgressIndicator()),
+      builder: (_) => const Center(child: CircularProgressIndicator()),
     );
 
     final pendingPOs = await ref
@@ -940,10 +980,8 @@ class _GoodsReceiptFormPageState
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor:
-            isDark ? AppTheme.darkCard : Colors.white,
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12)),
+        backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         title: Row(
           children: [
             Container(
@@ -952,30 +990,37 @@ class _GoodsReceiptFormPageState
                 color: AppTheme.primaryDark.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(Icons.edit_outlined,
-                  size: 18, color: AppTheme.primaryDark),
+              child: const Icon(
+                Icons.edit_outlined,
+                size: 18,
+                color: AppTheme.primaryDark,
+              ),
             ),
             const SizedBox(width: 10),
-            Text('สร้างใบรับสินค้าเอง',
-                style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color:
-                        isDark ? Colors.white : const Color(0xFF1A1A1A))),
+            Text(
+              'สร้างใบรับสินค้าเอง',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+              ),
+            ),
           ],
         ),
         content: Text(
           'คุณต้องการสร้างใบรับสินค้าโดยไม่อ้างอิง PO ใช่หรือไม่?\n\n'
           'คุณจะต้องเลือกซัพพลายเออร์และเพิ่มรายการสินค้าเอง',
-          style: TextStyle(
-              color: isDark ? Colors.white70 : Colors.black87),
+          style: TextStyle(color: isDark ? Colors.white70 : Colors.black87),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text('ยกเลิก',
-                style: TextStyle(
-                    color: isDark ? Colors.white60 : AppTheme.textSub)),
+            child: Text(
+              'ยกเลิก',
+              style: TextStyle(
+                color: isDark ? Colors.white60 : AppTheme.textSub,
+              ),
+            ),
           ),
           ElevatedButton(
             onPressed: () {
@@ -986,7 +1031,8 @@ class _GoodsReceiptFormPageState
               backgroundColor: AppTheme.primaryDark,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
+                borderRadius: BorderRadius.circular(8),
+              ),
               elevation: 0,
             ),
             child: const Text('ดำเนินการต่อ'),
@@ -999,10 +1045,12 @@ class _GoodsReceiptFormPageState
   Future<void> _addItem() async {
     final products = ref.read(productListProvider).value;
     if (products == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('กำลังโหลดข้อมูลสินค้า...'),
-        duration: Duration(seconds: 1),
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('กำลังโหลดข้อมูลสินค้า...'),
+          duration: Duration(seconds: 1),
+        ),
+      );
       return;
     }
     final result = await showDialog<GoodsReceiptItemModel>(
@@ -1025,20 +1073,24 @@ class _GoodsReceiptFormPageState
     if (!_formKey.currentState!.validate()) return;
 
     if (_supplierId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('กรุณาเลือกซัพพลายเออร์'),
-        backgroundColor: AppTheme.error,
-        behavior: SnackBarBehavior.floating,
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('กรุณาเลือกซัพพลายเออร์'),
+          backgroundColor: AppTheme.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
       return;
     }
 
     if (_items.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('กรุณาเพิ่มรายการสินค้าอย่างน้อย 1 รายการ'),
-        backgroundColor: AppTheme.error,
-        behavior: SnackBarBehavior.floating,
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('กรุณาเพิ่มรายการสินค้าอย่างน้อย 1 รายการ'),
+          backgroundColor: AppTheme.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
       return;
     }
 
@@ -1056,9 +1108,7 @@ class _GoodsReceiptFormPageState
       warehouseName: _warehouseName,
       userId: 'USR001',
       status: 'DRAFT',
-      remark: _remarkController.text.isEmpty
-          ? null
-          : _remarkController.text,
+      remark: _remarkController.text.isEmpty ? null : _remarkController.text,
       createdAt: widget.receipt?.createdAt ?? DateTime.now(),
       updatedAt: DateTime.now(),
       items: _items,
@@ -1066,29 +1116,35 @@ class _GoodsReceiptFormPageState
 
     final success = widget.receipt == null
         ? await ref
-            .read(goodsReceiptListProvider.notifier)
-            .createGoodsReceipt(receipt)
+              .read(goodsReceiptListProvider.notifier)
+              .createGoodsReceipt(receipt)
         : await ref
-            .read(goodsReceiptListProvider.notifier)
-            .updateGoodsReceipt(receipt);
+              .read(goodsReceiptListProvider.notifier)
+              .updateGoodsReceipt(receipt);
 
     if (mounted) {
       setState(() => _isLoading = false);
       if (success) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(widget.receipt == null
-              ? 'สร้างใบรับสินค้าสำเร็จ'
-              : 'แก้ไขใบรับสินค้าสำเร็จ'),
-          backgroundColor: AppTheme.success,
-          behavior: SnackBarBehavior.floating,
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              widget.receipt == null
+                  ? 'สร้างใบรับสินค้าสำเร็จ'
+                  : 'แก้ไขใบรับสินค้าสำเร็จ',
+            ),
+            backgroundColor: AppTheme.success,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('บันทึกไม่สำเร็จ กรุณาลองใหม่'),
-          backgroundColor: AppTheme.error,
-          behavior: SnackBarBehavior.floating,
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('บันทึกไม่สำเร็จ กรุณาลองใหม่'),
+            backgroundColor: AppTheme.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
     }
   }
@@ -1097,8 +1153,7 @@ class _GoodsReceiptFormPageState
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) =>
-          const Center(child: CircularProgressIndicator()),
+      builder: (_) => const Center(child: CircularProgressIndicator()),
     );
 
     final po = await ref
@@ -1109,11 +1164,13 @@ class _GoodsReceiptFormPageState
     Navigator.pop(context);
 
     if (po == null || po.items == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('ไม่สามารถโหลดข้อมูล PO ได้'),
-        backgroundColor: AppTheme.error,
-        behavior: SnackBarBehavior.floating,
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('ไม่สามารถโหลดข้อมูล PO ได้'),
+          backgroundColor: AppTheme.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
       return;
     }
 
@@ -1129,30 +1186,35 @@ class _GoodsReceiptFormPageState
         final poItem = po.items![i];
         final remaining = poItem.remainingQuantity;
         if (remaining > 0) {
-          _items.add(GoodsReceiptItemModel(
-            itemId: '',
-            grId: '',
-            lineNo: i + 1,
-            poItemId: poItem.itemId,
-            productId: poItem.productId,
-            productCode: poItem.productCode ?? '',
-            productName: poItem.productName ?? '',
-            unit: poItem.unit ?? '',
-            orderedQuantity: poItem.quantity,
-            receivedQuantity: remaining,
-            unitPrice: poItem.unitPrice,
-            amount: remaining * poItem.unitPrice,
-          ));
+          _items.add(
+            GoodsReceiptItemModel(
+              itemId: '',
+              grId: '',
+              lineNo: i + 1,
+              poItemId: poItem.itemId,
+              productId: poItem.productId,
+              productCode: poItem.productCode ?? '',
+              productName: poItem.productName ?? '',
+              unit: poItem.unit ?? '',
+              orderedQuantity: poItem.quantity,
+              receivedQuantity: remaining,
+              unitPrice: poItem.unitPrice,
+              amount: remaining * poItem.unitPrice,
+            ),
+          );
         }
       }
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(
-          'โหลดข้อมูลจาก PO: ${po.poNo} สำเร็จ (${_items.length} รายการ)'),
-      backgroundColor: AppTheme.success,
-      behavior: SnackBarBehavior.floating,
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'โหลดข้อมูลจาก PO: ${po.poNo} สำเร็จ (${_items.length} รายการ)',
+        ),
+        backgroundColor: AppTheme.success,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   Future<void> _showSupplierSelection() async {
@@ -1161,19 +1223,20 @@ class _GoodsReceiptFormPageState
       data: (suppliers) async {
         final selected = await showDialog<Map<String, String>>(
           context: context,
-          builder: (ctx) =>
-              _SupplierSelectionDialog(suppliers: suppliers),
+          builder: (ctx) => _SupplierSelectionDialog(suppliers: suppliers),
         );
         if (selected != null && mounted) {
           setState(() {
             _supplierId = selected['id'];
             _supplierName = selected['name'];
           });
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('เลือกซัพพลายเออร์: ${selected['name']}'),
-            backgroundColor: AppTheme.success,
-            behavior: SnackBarBehavior.floating,
-          ));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('เลือกซัพพลายเออร์: ${selected['name']}'),
+              backgroundColor: AppTheme.success,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
         }
       },
       loading: () {},
@@ -1186,10 +1249,8 @@ class _GoodsReceiptFormPageState
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor:
-            isDark ? AppTheme.darkCard : Colors.white,
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12)),
+        backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         title: Row(
           children: [
             Container(
@@ -1198,16 +1259,21 @@ class _GoodsReceiptFormPageState
                 color: AppTheme.info.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(Icons.help_outline,
-                  size: 18, color: AppTheme.info),
+              child: const Icon(
+                Icons.help_outline,
+                size: 18,
+                color: AppTheme.info,
+              ),
             ),
             const SizedBox(width: 10),
-            Text('คำแนะนำ',
-                style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color:
-                        isDark ? Colors.white : const Color(0xFF1A1A1A))),
+            Text(
+              'คำแนะนำ',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+              ),
+            ),
           ],
         ),
         content: SingleChildScrollView(
@@ -1231,15 +1297,13 @@ class _GoodsReceiptFormPageState
               const SizedBox(height: 10),
               _HelpItem(
                 title: 'แก้ไขจำนวน',
-                detail:
-                    'กดปุ่มดินสอที่รายการเพื่อแก้ไขจำนวนที่รับจริง',
+                detail: 'กดปุ่มดินสอที่รายการเพื่อแก้ไขจำนวนที่รับจริง',
                 isDark: isDark,
               ),
               const SizedBox(height: 10),
               _HelpItem(
                 title: 'Lot Number & วันหมดอายุ',
-                detail:
-                    'สามารถเพิ่ม Lot Number และวันหมดอายุได้ในแต่ละรายการ',
+                detail: 'สามารถเพิ่ม Lot Number และวันหมดอายุได้ในแต่ละรายการ',
                 isDark: isDark,
               ),
             ],
@@ -1252,7 +1316,8 @@ class _GoodsReceiptFormPageState
               backgroundColor: AppTheme.info,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
+                borderRadius: BorderRadius.circular(8),
+              ),
               elevation: 0,
             ),
             child: const Text('เข้าใจแล้ว'),
@@ -1262,23 +1327,23 @@ class _GoodsReceiptFormPageState
     );
   }
 
-  void _showInfoDialog(
-      {required String title, required String message}) {
+  void _showInfoDialog({required String title, required String message}) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor:
-            isDark ? AppTheme.darkCard : Colors.white,
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12)),
-        title: Text(title,
-            style: TextStyle(
-                color:
-                    isDark ? Colors.white : const Color(0xFF1A1A1A))),
-        content: Text(message,
-            style: TextStyle(
-                color: isDark ? Colors.white70 : Colors.black87)),
+        backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Text(
+          title,
+          style: TextStyle(
+            color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+          ),
+        ),
+        content: Text(
+          message,
+          style: TextStyle(color: isDark ? Colors.white70 : Colors.black87),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
@@ -1311,8 +1376,7 @@ class _GRFormTitleBar extends StatelessWidget {
 
     return Container(
       color: isDark ? AppTheme.darkTopBar : Colors.white,
-      padding:
-          const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
       child: Row(
         children: [
           if (canPop) ...[
@@ -1321,10 +1385,11 @@ class _GRFormTitleBar extends StatelessWidget {
               borderRadius: BorderRadius.circular(6),
               child: Padding(
                 padding: const EdgeInsets.all(4),
-                child: Icon(Icons.arrow_back,
-                    size: 20,
-                    color:
-                        isDark ? Colors.white70 : AppTheme.textSub),
+                child: Icon(
+                  Icons.arrow_back,
+                  size: 20,
+                  color: isDark ? Colors.white70 : AppTheme.textSub,
+                ),
               ),
             ),
             const SizedBox(width: 10),
@@ -1335,8 +1400,11 @@ class _GRFormTitleBar extends StatelessWidget {
               color: AppTheme.successContainer,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(Icons.local_shipping_outlined,
-                color: AppTheme.success, size: 20),
+            child: const Icon(
+              Icons.local_shipping_outlined,
+              color: AppTheme.success,
+              size: 20,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -1345,8 +1413,7 @@ class _GRFormTitleBar extends StatelessWidget {
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color:
-                    isDark ? Colors.white : const Color(0xFF1A1A1A),
+                color: isDark ? Colors.white : const Color(0xFF1A1A1A),
               ),
               overflow: TextOverflow.ellipsis,
             ),
@@ -1359,10 +1426,11 @@ class _GRFormTitleBar extends StatelessWidget {
                 borderRadius: BorderRadius.circular(6),
                 child: Padding(
                   padding: const EdgeInsets.all(4),
-                  child: Icon(Icons.help_outline,
-                      size: 20,
-                      color:
-                          isDark ? Colors.white54 : AppTheme.textSub),
+                  child: Icon(
+                    Icons.help_outline,
+                    size: 20,
+                    color: isDark ? Colors.white54 : AppTheme.textSub,
+                  ),
                 ),
               ),
             ),
@@ -1374,10 +1442,11 @@ class _GRFormTitleBar extends StatelessWidget {
               borderRadius: BorderRadius.circular(6),
               child: Padding(
                 padding: const EdgeInsets.all(4),
-                child: Icon(Icons.close,
-                    size: 20,
-                    color:
-                        isDark ? Colors.white54 : AppTheme.textSub),
+                child: Icon(
+                  Icons.close,
+                  size: 20,
+                  color: isDark ? Colors.white54 : AppTheme.textSub,
+                ),
               ),
             ),
         ],
@@ -1411,15 +1480,13 @@ class _GRSectionCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? AppTheme.darkCard : Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-            color: isDark ? Colors.white12 : AppTheme.border),
+        border: Border.all(color: isDark ? Colors.white12 : AppTheme.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(
-                horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
               color: isDark ? AppTheme.darkElement : AppTheme.headerBg,
               borderRadius: const BorderRadius.only(
@@ -1427,9 +1494,10 @@ class _GRSectionCard extends StatelessWidget {
                 topRight: Radius.circular(12),
               ),
               border: Border(
-                  bottom: BorderSide(
-                      color:
-                          isDark ? Colors.white12 : AppTheme.border)),
+                bottom: BorderSide(
+                  color: isDark ? Colors.white12 : AppTheme.border,
+                ),
+              ),
             ),
             child: Row(
               children: [
@@ -1442,22 +1510,19 @@ class _GRSectionCard extends StatelessWidget {
                   child: Icon(icon, size: 15, color: iconColor),
                 ),
                 const SizedBox(width: 8),
-                Text(title,
-                    style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: iconColor)),
-                if (trailing != null) ...[
-                  const Spacer(),
-                  trailing!,
-                ],
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: iconColor,
+                  ),
+                ),
+                if (trailing != null) ...[const Spacer(), trailing!],
               ],
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: child,
-          ),
+          Padding(padding: const EdgeInsets.all(16), child: child),
         ],
       ),
     );
@@ -1485,18 +1550,15 @@ class _POSelectionDialogState extends State<_POSelectionDialog> {
         ? widget.pos
         : widget.pos.where((po) {
             final q = _search.toLowerCase();
-            return (po['po_no'] as String? ?? '')
-                    .toLowerCase()
-                    .contains(q) ||
-                (po['supplier_name'] as String? ?? '')
-                    .toLowerCase()
-                    .contains(q);
+            return (po['po_no'] as String? ?? '').toLowerCase().contains(q) ||
+                (po['supplier_name'] as String? ?? '').toLowerCase().contains(
+                  q,
+                );
           }).toList();
 
     return AlertDialog(
       backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
-      shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       title: Row(
         children: [
           Container(
@@ -1505,15 +1567,21 @@ class _POSelectionDialogState extends State<_POSelectionDialog> {
               color: AppTheme.info.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(Icons.receipt_long_outlined,
-                size: 18, color: AppTheme.info),
+            child: const Icon(
+              Icons.receipt_long_outlined,
+              size: 18,
+              color: AppTheme.info,
+            ),
           ),
           const SizedBox(width: 10),
-          Text('เลือก Purchase Order',
-              style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white : const Color(0xFF1A1A1A))),
+          Text(
+            'เลือก Purchase Order',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+            ),
+          ),
         ],
       ),
       content: SizedBox(
@@ -1526,40 +1594,42 @@ class _POSelectionDialogState extends State<_POSelectionDialog> {
               height: 38,
               child: TextField(
                 style: TextStyle(
-                    fontSize: 13,
-                    color: isDark ? Colors.white : Colors.black87),
+                  fontSize: 13,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
                 decoration: InputDecoration(
                   hintText: 'ค้นหาเลขที่ PO, ซัพพลายเออร์...',
                   hintStyle: TextStyle(
-                      fontSize: 13,
-                      color: isDark
-                          ? const Color(0xFF666666)
-                          : AppTheme.textSub),
-                  prefixIcon: Icon(Icons.search,
-                      size: 17,
-                      color: isDark
-                          ? Colors.white38
-                          : AppTheme.textSub),
+                    fontSize: 13,
+                    color: isDark ? const Color(0xFF666666) : AppTheme.textSub,
+                  ),
+                  prefixIcon: Icon(
+                    Icons.search,
+                    size: 17,
+                    color: isDark ? Colors.white38 : AppTheme.textSub,
+                  ),
                   contentPadding: EdgeInsets.zero,
                   border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(
-                          color: isDark
-                              ? Colors.white24
-                              : AppTheme.border)),
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(
+                      color: isDark ? Colors.white24 : AppTheme.border,
+                    ),
+                  ),
                   enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(
-                          color: isDark
-                              ? Colors.white24
-                              : AppTheme.border)),
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(
+                      color: isDark ? Colors.white24 : AppTheme.border,
+                    ),
+                  ),
                   focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(
-                          color: AppTheme.primary, width: 1.5)),
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(
+                      color: AppTheme.primary,
+                      width: 1.5,
+                    ),
+                  ),
                   filled: true,
-                  fillColor:
-                      isDark ? AppTheme.darkElement : Colors.white,
+                  fillColor: isDark ? AppTheme.darkElement : Colors.white,
                 ),
                 onChanged: (v) => setState(() => _search = v),
               ),
@@ -1569,15 +1639,14 @@ class _POSelectionDialogState extends State<_POSelectionDialog> {
             Expanded(
               child: ListView.separated(
                 itemCount: filtered.length,
-                separatorBuilder: (_, _) =>
-                    const SizedBox(height: 6),
+                separatorBuilder: (_, _) => const SizedBox(height: 6),
                 itemBuilder: (ctx, i) {
                   final po = filtered[i];
                   final isApproved = po['status'] == 'APPROVED';
-                  final statusColor =
-                      isApproved ? AppTheme.info : AppTheme.warning;
-                  final statusLabel =
-                      isApproved ? 'รอรับสินค้า' : 'รับบางส่วน';
+                  final statusColor = isApproved
+                      ? AppTheme.info
+                      : AppTheme.warning;
+                  final statusLabel = isApproved ? 'รอรับสินค้า' : 'รับบางส่วน';
                   final fmt = NumberFormat('#,##0.00', 'th_TH');
 
                   return InkWell(
@@ -1591,9 +1660,8 @@ class _POSelectionDialogState extends State<_POSelectionDialog> {
                             : const Color(0xFFF9FAFB),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                            color: isDark
-                                ? Colors.white12
-                                : AppTheme.border),
+                          color: isDark ? Colors.white12 : AppTheme.border,
+                        ),
                       ),
                       child: Row(
                         children: [
@@ -1608,60 +1676,70 @@ class _POSelectionDialogState extends State<_POSelectionDialog> {
                           const SizedBox(width: 10),
                           Expanded(
                             child: Column(
-                              crossAxisAlignment:
-                                  CrossAxisAlignment.start,
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(po['po_no'] ?? '',
-                                    style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w700,
-                                        color: isDark
-                                            ? Colors.white
-                                            : const Color(0xFF1A1A1A))),
-                                Text(po['supplier_name'] ?? '',
-                                    style: TextStyle(
-                                        fontSize: 11,
-                                        color: isDark
-                                            ? const Color(0xFFAAAAAA)
-                                            : AppTheme.textSub)),
                                 Text(
-                                  DateFormat('dd/MM/yyyy').format(
-                                      DateTime.parse(po['po_date'])),
+                                  po['po_no'] ?? '',
                                   style: TextStyle(
-                                      fontSize: 11,
-                                      color: isDark
-                                          ? const Color(0xFFAAAAAA)
-                                          : AppTheme.textSub),
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: isDark
+                                        ? Colors.white
+                                        : const Color(0xFF1A1A1A),
+                                  ),
+                                ),
+                                Text(
+                                  po['supplier_name'] ?? '',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: isDark
+                                        ? const Color(0xFFAAAAAA)
+                                        : AppTheme.textSub,
+                                  ),
+                                ),
+                                Text(
+                                  DateFormat(
+                                    'dd/MM/yyyy',
+                                  ).format(DateTime.parse(po['po_date'])),
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: isDark
+                                        ? const Color(0xFFAAAAAA)
+                                        : AppTheme.textSub,
+                                  ),
                                 ),
                               ],
                             ),
                           ),
                           Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.end,
+                            crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: statusColor
-                                      .withValues(alpha: 0.12),
-                                  borderRadius:
-                                      BorderRadius.circular(10),
+                                  horizontal: 8,
+                                  vertical: 3,
                                 ),
-                                child: Text(statusLabel,
-                                    style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w600,
-                                        color: statusColor)),
+                                decoration: BoxDecoration(
+                                  color: statusColor.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  statusLabel,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: statusColor,
+                                  ),
+                                ),
                               ),
                               const SizedBox(height: 4),
                               Text(
                                 '฿${fmt.format(po['total_amount'] ?? 0)}',
                                 style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppTheme.info),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppTheme.info,
+                                ),
                               ),
                             ],
                           ),
@@ -1678,9 +1756,10 @@ class _POSelectionDialogState extends State<_POSelectionDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: Text('ยกเลิก',
-              style: TextStyle(
-                  color: isDark ? Colors.white60 : AppTheme.textSub)),
+          child: Text(
+            'ยกเลิก',
+            style: TextStyle(color: isDark ? Colors.white60 : AppTheme.textSub),
+          ),
         ),
       ],
     );
@@ -1699,8 +1778,7 @@ class _SupplierSelectionDialog extends StatefulWidget {
       _SupplierSelectionDialogState();
 }
 
-class _SupplierSelectionDialogState
-    extends State<_SupplierSelectionDialog> {
+class _SupplierSelectionDialogState extends State<_SupplierSelectionDialog> {
   String _search = '';
 
   @override
@@ -1716,8 +1794,7 @@ class _SupplierSelectionDialogState
 
     return AlertDialog(
       backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
-      shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       title: Row(
         children: [
           Container(
@@ -1726,15 +1803,21 @@ class _SupplierSelectionDialogState
               color: AppTheme.primaryDark.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(Icons.business_outlined,
-                size: 18, color: AppTheme.primaryDark),
+            child: const Icon(
+              Icons.business_outlined,
+              size: 18,
+              color: AppTheme.primaryDark,
+            ),
           ),
           const SizedBox(width: 10),
-          Text('เลือกซัพพลายเออร์',
-              style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white : const Color(0xFF1A1A1A))),
+          Text(
+            'เลือกซัพพลายเออร์',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+            ),
+          ),
         ],
       ),
       content: SizedBox(
@@ -1746,40 +1829,42 @@ class _SupplierSelectionDialogState
               height: 38,
               child: TextField(
                 style: TextStyle(
-                    fontSize: 13,
-                    color: isDark ? Colors.white : Colors.black87),
+                  fontSize: 13,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
                 decoration: InputDecoration(
                   hintText: 'ค้นหาชื่อ / รหัสซัพพลายเออร์...',
                   hintStyle: TextStyle(
-                      fontSize: 13,
-                      color: isDark
-                          ? const Color(0xFF666666)
-                          : AppTheme.textSub),
-                  prefixIcon: Icon(Icons.search,
-                      size: 17,
-                      color: isDark
-                          ? Colors.white38
-                          : AppTheme.textSub),
+                    fontSize: 13,
+                    color: isDark ? const Color(0xFF666666) : AppTheme.textSub,
+                  ),
+                  prefixIcon: Icon(
+                    Icons.search,
+                    size: 17,
+                    color: isDark ? Colors.white38 : AppTheme.textSub,
+                  ),
                   contentPadding: EdgeInsets.zero,
                   border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(
-                          color: isDark
-                              ? Colors.white24
-                              : AppTheme.border)),
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(
+                      color: isDark ? Colors.white24 : AppTheme.border,
+                    ),
+                  ),
                   enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(
-                          color: isDark
-                              ? Colors.white24
-                              : AppTheme.border)),
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(
+                      color: isDark ? Colors.white24 : AppTheme.border,
+                    ),
+                  ),
                   focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(
-                          color: AppTheme.primary, width: 1.5)),
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(
+                      color: AppTheme.primary,
+                      width: 1.5,
+                    ),
+                  ),
                   filled: true,
-                  fillColor:
-                      isDark ? AppTheme.darkElement : Colors.white,
+                  fillColor: isDark ? AppTheme.darkElement : Colors.white,
                 ),
                 onChanged: (v) => setState(() => _search = v),
               ),
@@ -1788,8 +1873,7 @@ class _SupplierSelectionDialogState
             Expanded(
               child: ListView.separated(
                 itemCount: filtered.length,
-                separatorBuilder: (_, _) =>
-                    const SizedBox(height: 4),
+                separatorBuilder: (_, _) => const SizedBox(height: 4),
                 itemBuilder: (ctx, i) {
                   final s = filtered[i];
                   return InkWell(
@@ -1800,60 +1884,68 @@ class _SupplierSelectionDialogState
                     }),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 10),
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
                       decoration: BoxDecoration(
                         color: isDark
                             ? AppTheme.darkElement
                             : const Color(0xFFF9FAFB),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                            color: isDark
-                                ? Colors.white12
-                                : AppTheme.border),
+                          color: isDark ? Colors.white12 : AppTheme.border,
+                        ),
                       ),
                       child: Row(
                         children: [
                           CircleAvatar(
                             radius: 16,
-                            backgroundColor: AppTheme.primaryDark
-                                .withValues(alpha: 0.15),
+                            backgroundColor: AppTheme.primaryDark.withValues(
+                              alpha: 0.15,
+                            ),
                             child: Text(
                               s.supplierName.isNotEmpty
                                   ? s.supplierName[0].toUpperCase()
                                   : 'S',
                               style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.primaryDark),
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.primaryDark,
+                              ),
                             ),
                           ),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Column(
-                              crossAxisAlignment:
-                                  CrossAxisAlignment.start,
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(s.supplierName,
-                                    style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                        color: isDark
-                                            ? Colors.white
-                                            : const Color(0xFF1A1A1A))),
-                                Text(s.supplierCode,
-                                    style: TextStyle(
-                                        fontSize: 11,
-                                        color: isDark
-                                            ? const Color(0xFFAAAAAA)
-                                            : AppTheme.textSub)),
+                                Text(
+                                  s.supplierName,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: isDark
+                                        ? Colors.white
+                                        : const Color(0xFF1A1A1A),
+                                  ),
+                                ),
+                                Text(
+                                  s.supplierCode,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: isDark
+                                        ? const Color(0xFFAAAAAA)
+                                        : AppTheme.textSub,
+                                  ),
+                                ),
                               ],
                             ),
                           ),
-                          Icon(Icons.chevron_right,
-                              size: 16,
-                              color: isDark
-                                  ? Colors.white38
-                                  : AppTheme.textSub),
+                          Icon(
+                            Icons.chevron_right,
+                            size: 16,
+                            color: isDark ? Colors.white38 : AppTheme.textSub,
+                          ),
                         ],
                       ),
                     ),
@@ -1867,9 +1959,10 @@ class _SupplierSelectionDialogState
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: Text('ยกเลิก',
-              style: TextStyle(
-                  color: isDark ? Colors.white60 : AppTheme.textSub)),
+          child: Text(
+            'ยกเลิก',
+            style: TextStyle(color: isDark ? Colors.white60 : AppTheme.textSub),
+          ),
         ),
       ],
     );
@@ -1891,10 +1984,10 @@ class _ItemDialog extends ConsumerStatefulWidget {
 class _ItemDialogState extends ConsumerState<_ItemDialog> {
   String? _selectedProductId;
   ProductUnitOption? _selectedUnit; // หน่วยที่เลือก (null = base unit)
-  final _quantityController  = TextEditingController(text: '1');
+  final _quantityController = TextEditingController(text: '1');
   final _unitPriceController = TextEditingController(text: '0');
-  final _lotController       = TextEditingController();
-  final _remarkController    = TextEditingController();
+  final _lotController = TextEditingController();
+  final _remarkController = TextEditingController();
   DateTime? _expiryDate;
   String _productSearch = '';
 
@@ -1907,14 +2000,14 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
 
   /// จำนวนใน base unit = qty × factor
   double get _baseQty {
-    final qty    = double.tryParse(_quantityController.text) ?? 0;
+    final qty = double.tryParse(_quantityController.text) ?? 0;
     final factor = _selectedUnit?.factor ?? 1;
     return qty * factor;
   }
 
   /// ราคาต้นทุน/base unit = unitPrice / factor
   double get _baseCost {
-    final price  = double.tryParse(_unitPriceController.text) ?? 0;
+    final price = double.tryParse(_unitPriceController.text) ?? 0;
     final factor = _selectedUnit?.factor ?? 1;
     return factor > 0 ? price / factor : price;
   }
@@ -1942,8 +2035,7 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
 
     return AlertDialog(
       backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
-      shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       title: Row(
         children: [
           Container(
@@ -1952,15 +2044,21 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
               color: AppTheme.success.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(Icons.add_shopping_cart_outlined,
-                size: 18, color: AppTheme.success),
+            child: const Icon(
+              Icons.add_shopping_cart_outlined,
+              size: 18,
+              color: AppTheme.success,
+            ),
           ),
           const SizedBox(width: 10),
-          Text('เพิ่มรายการสินค้า',
-              style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white : const Color(0xFF1A1A1A))),
+          Text(
+            'เพิ่มรายการสินค้า',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+            ),
+          ),
           const Spacer(),
           ScannerButton(
             tooltip: 'สแกนบาร์โค้ด',
@@ -1968,10 +2066,11 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
             onScanned: (value) {
               setState(() {
                 _productSearch = value;
-                final matched = widget.products.where((p) =>
-                    (p.barcode?.toLowerCase() == value.toLowerCase()) ||
-                    (p.productCode?.toLowerCase() ==
-                        value.toLowerCase()));
+                final matched = widget.products.where(
+                  (p) =>
+                      (p.barcode?.toLowerCase() == value.toLowerCase()) ||
+                      (p.productCode?.toLowerCase() == value.toLowerCase()),
+                );
                 if (matched.length == 1) {
                   _selectedProductId = matched.first.productId;
                 }
@@ -2004,18 +2103,19 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
                 icon: Icons.inventory_2_outlined,
                 isDark: isDark,
                 items: filteredProducts
-                    .map<DropdownMenuItem<String>>((p) =>
-                        DropdownMenuItem(
-                          value: p.productId,
-                          child: Text(
-                              '${p.productCode} — ${p.productName}',
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  color: isDark
-                                      ? Colors.white
-                                      : Colors.black87),
-                              overflow: TextOverflow.ellipsis),
-                        ))
+                    .map<DropdownMenuItem<String>>(
+                      (p) => DropdownMenuItem(
+                        value: p.productId,
+                        child: Text(
+                          '${p.productCode} — ${p.productName}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isDark ? Colors.white : Colors.black87,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    )
                     .toList(),
                 onChanged: (v) => setState(() {
                   _selectedProductId = v;
@@ -2032,34 +2132,39 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
                   icon: Icons.straighten_outlined,
                   isDark: isDark,
                   items: _product!.allUnits
-                      .map<DropdownMenuItem<String>>((u) => DropdownMenuItem(
-                            value: u.unit,
-                            child: Row(
-                              children: [
-                                Text(u.unit,
-                                    style: TextStyle(
-                                        fontSize: 13,
-                                        color: isDark
-                                            ? Colors.white
-                                            : Colors.black87)),
-                                if (u.factor > 1) ...[
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    '(1 ${u.unit} = ${u.factor.toStringAsFixed(u.factor == u.factor.truncate() ? 0 : 2)} ${_product!.baseUnit})',
-                                    style: TextStyle(
-                                        fontSize: 11,
-                                        color: isDark
-                                            ? Colors.white38
-                                            : AppTheme.textSub),
+                      .map<DropdownMenuItem<String>>(
+                        (u) => DropdownMenuItem(
+                          value: u.unit,
+                          child: Row(
+                            children: [
+                              Text(
+                                u.unit,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: isDark ? Colors.white : Colors.black87,
+                                ),
+                              ),
+                              if (u.factor > 1) ...[
+                                const SizedBox(width: 8),
+                                Text(
+                                  '(1 ${u.unit} = ${u.factor.toStringAsFixed(u.factor == u.factor.truncate() ? 0 : 2)} ${_product!.baseUnit})',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: isDark
+                                        ? Colors.white38
+                                        : AppTheme.textSub,
                                   ),
-                                ],
+                                ),
                               ],
-                            ),
-                          ))
+                            ],
+                          ),
+                        ),
+                      )
                       .toList(),
                   onChanged: (v) => setState(() {
-                    _selectedUnit = _product!.allUnits
-                        .firstWhere((u) => u.unit == v);
+                    _selectedUnit = _product!.allUnits.firstWhere(
+                      (u) => u.unit == v,
+                    );
                   }),
                 ),
                 const SizedBox(height: 10),
@@ -2086,7 +2191,9 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
                       hint: 'ราคา/หน่วย',
                       icon: Icons.attach_money,
                       isDark: isDark,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
                       onChanged: (_) => setState(() {}),
                     ),
                   ),
@@ -2099,39 +2206,64 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
                   (double.tryParse(_quantityController.text) ?? 0) > 0) ...[
                 const SizedBox(height: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: AppTheme.info.withValues(alpha: 0.07),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppTheme.info.withValues(alpha: 0.25)),
+                    border: Border.all(
+                      color: AppTheme.info.withValues(alpha: 0.25),
+                    ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.swap_horiz, size: 14, color: AppTheme.info),
+                          const Icon(
+                            Icons.swap_horiz,
+                            size: 14,
+                            color: AppTheme.info,
+                          ),
                           const SizedBox(width: 6),
                           Text(
                             '${_quantityController.text} ${_selectedUnit!.unit} = ${_baseQty.toStringAsFixed(_baseQty == _baseQty.truncate() ? 0 : 2)} ${_product!.baseUnit}',
-                            style: const TextStyle(fontSize: 12, color: AppTheme.info, fontWeight: FontWeight.w600),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.info,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ],
                       ),
-                      if ((double.tryParse(_unitPriceController.text) ?? 0) > 0) ...[
+                      if ((double.tryParse(_unitPriceController.text) ?? 0) >
+                          0) ...[
                         const SizedBox(height: 3),
                         Row(
                           children: [
-                            const Icon(Icons.monetization_on_outlined, size: 14, color: AppTheme.success),
+                            const Icon(
+                              Icons.monetization_on_outlined,
+                              size: 14,
+                              color: AppTheme.success,
+                            ),
                             const SizedBox(width: 6),
                             Text(
                               'ต้นทุน/${_product!.baseUnit}: ฿${_baseCost.toStringAsFixed(2)}',
-                              style: const TextStyle(fontSize: 12, color: AppTheme.success),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppTheme.success,
+                              ),
                             ),
                             const SizedBox(width: 12),
                             Text(
                               'รวม: ฿${(_baseCost * _baseQty).toStringAsFixed(2)}',
-                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.success),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.success,
+                              ),
                             ),
                           ],
                         ),
@@ -2159,48 +2291,47 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
                 onTap: _selectExpiryDate,
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 10),
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
                     color: isDark ? AppTheme.darkElement : Colors.white,
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                        color:
-                            isDark ? Colors.white24 : AppTheme.border),
+                      color: isDark ? Colors.white24 : AppTheme.border,
+                    ),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.event_outlined,
-                          size: 17,
-                          color: isDark
-                              ? Colors.white54
-                              : AppTheme.textSub),
+                      Icon(
+                        Icons.event_outlined,
+                        size: 17,
+                        color: isDark ? Colors.white54 : AppTheme.textSub,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           _expiryDate != null
-                              ? DateFormat('dd/MM/yyyy')
-                                  .format(_expiryDate!)
+                              ? DateFormat('dd/MM/yyyy').format(_expiryDate!)
                               : 'ไม่ระบุ',
                           style: TextStyle(
-                              fontSize: 13,
-                              color: _expiryDate != null
-                                  ? (isDark
-                                      ? Colors.white
-                                      : Colors.black87)
-                                  : (isDark
+                            fontSize: 13,
+                            color: _expiryDate != null
+                                ? (isDark ? Colors.white : Colors.black87)
+                                : (isDark
                                       ? const Color(0xFF666666)
-                                      : AppTheme.textSub)),
+                                      : AppTheme.textSub),
+                          ),
                         ),
                       ),
                       if (_expiryDate != null)
                         InkWell(
-                          onTap: () =>
-                              setState(() => _expiryDate = null),
-                          child: Icon(Icons.clear,
-                              size: 15,
-                              color: isDark
-                                  ? Colors.white38
-                                  : AppTheme.textSub),
+                          onTap: () => setState(() => _expiryDate = null),
+                          child: Icon(
+                            Icons.clear,
+                            size: 15,
+                            color: isDark ? Colors.white38 : AppTheme.textSub,
+                          ),
                         ),
                     ],
                   ),
@@ -2223,9 +2354,10 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: Text('ยกเลิก',
-              style: TextStyle(
-                  color: isDark ? Colors.white60 : AppTheme.textSub)),
+          child: Text(
+            'ยกเลิก',
+            style: TextStyle(color: isDark ? Colors.white60 : AppTheme.textSub),
+          ),
         ),
         ElevatedButton.icon(
           icon: const Icon(Icons.add, size: 16),
@@ -2234,7 +2366,8 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
             backgroundColor: AppTheme.success,
             foregroundColor: Colors.white,
             shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8)),
+              borderRadius: BorderRadius.circular(8),
+            ),
             elevation: 0,
           ),
           onPressed: _addItem,
@@ -2246,8 +2379,7 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
   Future<void> _selectExpiryDate() async {
     final date = await showDatePicker(
       context: context,
-      initialDate:
-          _expiryDate ?? DateTime.now().add(const Duration(days: 365)),
+      initialDate: _expiryDate ?? DateTime.now().add(const Duration(days: 365)),
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 3650)),
     );
@@ -2256,30 +2388,35 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
 
   void _addItem() {
     if (_selectedProductId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('กรุณาเลือกสินค้า'),
-        backgroundColor: AppTheme.error,
-        behavior: SnackBarBehavior.floating,
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('กรุณาเลือกสินค้า'),
+          backgroundColor: AppTheme.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
       return;
     }
     final qty = double.tryParse(_quantityController.text) ?? 0;
     if (qty <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('กรุณาระบุจำนวนที่ถูกต้อง'),
-        backgroundColor: AppTheme.error,
-        behavior: SnackBarBehavior.floating,
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('กรุณาระบุจำนวนที่ถูกต้อง'),
+          backgroundColor: AppTheme.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
       return;
     }
 
-    final product = widget.products
-        .firstWhere((p) => p.productId == _selectedProductId);
+    final product = widget.products.firstWhere(
+      (p) => p.productId == _selectedProductId,
+    );
 
     // แปลงเป็น base unit เสมอ
-    final baseQty   = _baseQty;       // qty × factor
-    final baseCost  = _baseCost;      // unitPrice / factor (ต้นทุน/base unit)
-    final totalAmt  = baseCost * baseQty;
+    final baseQty = _baseQty; // qty × factor
+    final baseCost = _baseCost; // unitPrice / factor (ต้นทุน/base unit)
+    final totalAmt = baseCost * baseQty;
 
     Navigator.pop(
       context,
@@ -2292,15 +2429,12 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
         productName: product.productName,
         unit: product.baseUnit, // เก็บเป็น base unit เสมอ
         orderedQuantity: 0,
-        receivedQuantity: baseQty,  // จำนวนใน base unit
-        unitPrice: baseCost,        // ราคาต้นทุน/base unit
+        receivedQuantity: baseQty, // จำนวนใน base unit
+        unitPrice: baseCost, // ราคาต้นทุน/base unit
         amount: totalAmt,
-        lotNumber:
-            _lotController.text.isEmpty ? null : _lotController.text,
+        lotNumber: _lotController.text.isEmpty ? null : _lotController.text,
         expiryDate: _expiryDate,
-        remark: _remarkController.text.isEmpty
-            ? null
-            : _remarkController.text,
+        remark: _remarkController.text.isEmpty ? null : _remarkController.text,
       ),
     );
   }
@@ -2327,11 +2461,10 @@ class _ItemEditDialogState extends State<_ItemEditDialog> {
   void initState() {
     super.initState();
     _quantityController = TextEditingController(
-        text: widget.item.receivedQuantity.toStringAsFixed(0));
-    _lotController =
-        TextEditingController(text: widget.item.lotNumber ?? '');
-    _remarkController =
-        TextEditingController(text: widget.item.remark ?? '');
+      text: widget.item.receivedQuantity.toStringAsFixed(0),
+    );
+    _lotController = TextEditingController(text: widget.item.lotNumber ?? '');
+    _remarkController = TextEditingController(text: widget.item.remark ?? '');
     _expiryDate = widget.item.expiryDate;
   }
 
@@ -2349,8 +2482,7 @@ class _ItemEditDialogState extends State<_ItemEditDialog> {
 
     return AlertDialog(
       backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
-      shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       title: Row(
         children: [
           Container(
@@ -2359,15 +2491,21 @@ class _ItemEditDialogState extends State<_ItemEditDialog> {
               color: AppTheme.info.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(Icons.edit_outlined,
-                size: 18, color: AppTheme.info),
+            child: const Icon(
+              Icons.edit_outlined,
+              size: 18,
+              color: AppTheme.info,
+            ),
           ),
           const SizedBox(width: 10),
-          Text('แก้ไขรายการ',
-              style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white : const Color(0xFF1A1A1A))),
+          Text(
+            'แก้ไขรายการ',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+            ),
+          ),
         ],
       ),
       content: SizedBox(
@@ -2386,7 +2524,8 @@ class _ItemEditDialogState extends State<_ItemEditDialog> {
                       : const Color(0xFFF9FAFB),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                      color: isDark ? Colors.white12 : AppTheme.border),
+                    color: isDark ? Colors.white12 : AppTheme.border,
+                  ),
                 ),
                 child: Row(
                   children: [
@@ -2396,27 +2535,34 @@ class _ItemEditDialogState extends State<_ItemEditDialog> {
                         color: AppTheme.info.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(6),
                       ),
-                      child: const Icon(Icons.inventory_2_outlined,
-                          size: 15, color: AppTheme.info),
+                      child: const Icon(
+                        Icons.inventory_2_outlined,
+                        size: 15,
+                        color: AppTheme.info,
+                      ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(widget.item.productName,
-                              style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: isDark
-                                      ? Colors.white
-                                      : const Color(0xFF1A1A1A))),
-                          Text(widget.item.productCode,
-                              style: TextStyle(
-                                  fontSize: 11,
-                                  color: isDark
-                                      ? Colors.white54
-                                      : AppTheme.textSub)),
+                          Text(
+                            widget.item.productName,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: isDark
+                                  ? Colors.white
+                                  : const Color(0xFF1A1A1A),
+                            ),
+                          ),
+                          Text(
+                            widget.item.productCode,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isDark ? Colors.white54 : AppTheme.textSub,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -2429,22 +2575,30 @@ class _ItemEditDialogState extends State<_ItemEditDialog> {
               if (widget.item.orderedQuantity > 0) ...[
                 Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 8),
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: AppTheme.info.withValues(alpha: 0.06),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                        color: AppTheme.info.withValues(alpha: 0.2)),
+                      color: AppTheme.info.withValues(alpha: 0.2),
+                    ),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.shopping_cart_outlined,
-                          size: 15, color: AppTheme.info),
+                      const Icon(
+                        Icons.shopping_cart_outlined,
+                        size: 15,
+                        color: AppTheme.info,
+                      ),
                       const SizedBox(width: 6),
                       Text(
                         'จำนวนที่สั่ง: ${widget.item.orderedQuantity.toStringAsFixed(0)} ${widget.item.unit}',
                         style: const TextStyle(
-                            fontSize: 12, color: AppTheme.info),
+                          fontSize: 12,
+                          color: AppTheme.info,
+                        ),
                       ),
                     ],
                   ),
@@ -2455,8 +2609,7 @@ class _ItemEditDialogState extends State<_ItemEditDialog> {
               // Received qty
               _GRDialogField(
                 controller: _quantityController,
-                hint:
-                    'จำนวนที่รับจริง * (${widget.item.unit})',
+                hint: 'จำนวนที่รับจริง * (${widget.item.unit})',
                 icon: Icons.numbers,
                 isDark: isDark,
                 keyboardType: TextInputType.number,
@@ -2480,46 +2633,47 @@ class _ItemEditDialogState extends State<_ItemEditDialog> {
                 onTap: _selectExpiryDate,
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 10),
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
-                    color:
-                        isDark ? AppTheme.darkElement : Colors.white,
+                    color: isDark ? AppTheme.darkElement : Colors.white,
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                        color: isDark ? Colors.white24 : AppTheme.border),
+                      color: isDark ? Colors.white24 : AppTheme.border,
+                    ),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.event_outlined,
-                          size: 17,
-                          color: isDark
-                              ? Colors.white54
-                              : AppTheme.textSub),
+                      Icon(
+                        Icons.event_outlined,
+                        size: 17,
+                        color: isDark ? Colors.white54 : AppTheme.textSub,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           _expiryDate != null
-                              ? DateFormat('dd/MM/yyyy')
-                                  .format(_expiryDate!)
+                              ? DateFormat('dd/MM/yyyy').format(_expiryDate!)
                               : 'ไม่ระบุ',
                           style: TextStyle(
-                              fontSize: 13,
-                              color: _expiryDate != null
-                                  ? (isDark ? Colors.white : Colors.black87)
-                                  : (isDark
+                            fontSize: 13,
+                            color: _expiryDate != null
+                                ? (isDark ? Colors.white : Colors.black87)
+                                : (isDark
                                       ? const Color(0xFF666666)
-                                      : AppTheme.textSub)),
+                                      : AppTheme.textSub),
+                          ),
                         ),
                       ),
                       if (_expiryDate != null)
                         InkWell(
-                          onTap: () =>
-                              setState(() => _expiryDate = null),
-                          child: Icon(Icons.clear,
-                              size: 15,
-                              color: isDark
-                                  ? Colors.white38
-                                  : AppTheme.textSub),
+                          onTap: () => setState(() => _expiryDate = null),
+                          child: Icon(
+                            Icons.clear,
+                            size: 15,
+                            color: isDark ? Colors.white38 : AppTheme.textSub,
+                          ),
                         ),
                     ],
                   ),
@@ -2542,9 +2696,10 @@ class _ItemEditDialogState extends State<_ItemEditDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: Text('ยกเลิก',
-              style: TextStyle(
-                  color: isDark ? Colors.white60 : AppTheme.textSub)),
+          child: Text(
+            'ยกเลิก',
+            style: TextStyle(color: isDark ? Colors.white60 : AppTheme.textSub),
+          ),
         ),
         ElevatedButton.icon(
           icon: const Icon(Icons.save_outlined, size: 16),
@@ -2553,7 +2708,8 @@ class _ItemEditDialogState extends State<_ItemEditDialog> {
             backgroundColor: AppTheme.info,
             foregroundColor: Colors.white,
             shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8)),
+              borderRadius: BorderRadius.circular(8),
+            ),
             elevation: 0,
           ),
           onPressed: _saveItem,
@@ -2565,8 +2721,7 @@ class _ItemEditDialogState extends State<_ItemEditDialog> {
   Future<void> _selectExpiryDate() async {
     final date = await showDatePicker(
       context: context,
-      initialDate:
-          _expiryDate ?? DateTime.now().add(const Duration(days: 365)),
+      initialDate: _expiryDate ?? DateTime.now().add(const Duration(days: 365)),
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 3650)),
     );
@@ -2576,11 +2731,13 @@ class _ItemEditDialogState extends State<_ItemEditDialog> {
   void _saveItem() {
     final qty = double.tryParse(_quantityController.text) ?? 0;
     if (qty <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('กรุณาระบุจำนวนที่ถูกต้อง'),
-        backgroundColor: AppTheme.error,
-        behavior: SnackBarBehavior.floating,
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('กรุณาระบุจำนวนที่ถูกต้อง'),
+          backgroundColor: AppTheme.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
       return;
     }
     Navigator.pop(
@@ -2588,12 +2745,9 @@ class _ItemEditDialogState extends State<_ItemEditDialog> {
       widget.item.copyWith(
         receivedQuantity: qty,
         amount: qty * widget.item.unitPrice,
-        lotNumber:
-            _lotController.text.isEmpty ? null : _lotController.text,
+        lotNumber: _lotController.text.isEmpty ? null : _lotController.text,
         expiryDate: _expiryDate,
-        remark: _remarkController.text.isEmpty
-            ? null
-            : _remarkController.text,
+        remark: _remarkController.text.isEmpty ? null : _remarkController.text,
       ),
     );
   }
@@ -2609,11 +2763,14 @@ class _GRFieldLabel extends StatelessWidget {
   const _GRFieldLabel({required this.label, required this.isDark});
 
   @override
-  Widget build(BuildContext context) => Text(label,
-      style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w500,
-          color: isDark ? Colors.white60 : AppTheme.textSub));
+  Widget build(BuildContext context) => Text(
+    label,
+    style: TextStyle(
+      fontSize: 12,
+      fontWeight: FontWeight.w500,
+      color: isDark ? Colors.white60 : AppTheme.textSub,
+    ),
+  );
 }
 
 class _GRTextField extends StatelessWidget {
@@ -2632,75 +2789,81 @@ class _GRTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => TextField(
-        controller: controller,
-        maxLines: maxLines,
-        style: TextStyle(
-            fontSize: 13,
-            color: isDark ? Colors.white : Colors.black87),
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: TextStyle(
-              fontSize: 13,
-              color: isDark
-                  ? const Color(0xFF666666)
-                  : AppTheme.textSub),
-          prefixIcon: Icon(icon,
-              size: 17,
-              color: isDark ? Colors.white38 : AppTheme.textSub),
-          contentPadding: const EdgeInsets.symmetric(
-              horizontal: 12, vertical: 12),
-          border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(
-                  color:
-                      isDark ? Colors.white24 : AppTheme.border)),
-          enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(
-                  color:
-                      isDark ? Colors.white24 : AppTheme.border)),
-          focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(
-                  color: AppTheme.primary, width: 1.5)),
-          filled: true,
-          fillColor: isDark ? AppTheme.darkElement : Colors.white,
+    controller: controller,
+    maxLines: maxLines,
+    style: TextStyle(
+      fontSize: 13,
+      color: isDark ? Colors.white : Colors.black87,
+    ),
+    decoration: InputDecoration(
+      hintText: hint,
+      hintStyle: TextStyle(
+        fontSize: 13,
+        color: isDark ? const Color(0xFF666666) : AppTheme.textSub,
+      ),
+      prefixIcon: Icon(
+        icon,
+        size: 17,
+        color: isDark ? Colors.white38 : AppTheme.textSub,
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(
+          color: isDark ? Colors.white24 : AppTheme.border,
         ),
-      );
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(
+          color: isDark ? Colors.white24 : AppTheme.border,
+        ),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
+      ),
+      filled: true,
+      fillColor: isDark ? AppTheme.darkElement : Colors.white,
+    ),
+  );
 }
 
 class _GRReadOnlyField extends StatelessWidget {
   final String label;
   final IconData icon;
   final bool isDark;
-  const _GRReadOnlyField(
-      {required this.label, required this.icon, required this.isDark});
+  const _GRReadOnlyField({
+    required this.label,
+    required this.icon,
+    required this.isDark,
+  });
 
   @override
   Widget build(BuildContext context) => Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        decoration: BoxDecoration(
-          color: isDark ? AppTheme.darkCard : const Color(0xFFF5F5F5),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-              color: isDark ? Colors.white12 : AppTheme.border),
-        ),
-        child: Row(
-          children: [
-            Icon(icon,
-                size: 17,
-                color: isDark ? Colors.white38 : AppTheme.textSub),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(label,
-                  style: TextStyle(
-                      fontSize: 13,
-                      color: isDark ? Colors.white54 : AppTheme.textSub)),
+    width: double.infinity,
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+    decoration: BoxDecoration(
+      color: isDark ? AppTheme.darkCard : const Color(0xFFF5F5F5),
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(color: isDark ? Colors.white12 : AppTheme.border),
+    ),
+    child: Row(
+      children: [
+        Icon(icon, size: 17, color: isDark ? Colors.white38 : AppTheme.textSub),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              color: isDark ? Colors.white54 : AppTheme.textSub,
             ),
-          ],
+          ),
         ),
-      );
+      ],
+    ),
+  );
 }
 
 class _GRDialogField extends StatelessWidget {
@@ -2724,43 +2887,46 @@ class _GRDialogField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => TextField(
-        controller: controller,
-        maxLines: maxLines,
-        keyboardType: keyboardType,
-        style: TextStyle(
-            fontSize: 13,
-            color: isDark ? Colors.white : Colors.black87),
-        onChanged: onChanged,
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: TextStyle(
-              fontSize: 12,
-              color: isDark
-                  ? const Color(0xFF666666)
-                  : AppTheme.textSub),
-          prefixIcon: Icon(icon,
-              size: 16,
-              color: isDark ? Colors.white38 : AppTheme.textSub),
-          contentPadding: const EdgeInsets.symmetric(
-              horizontal: 12, vertical: 10),
-          border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(
-                  color:
-                      isDark ? Colors.white24 : AppTheme.border)),
-          enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(
-                  color:
-                      isDark ? Colors.white24 : AppTheme.border)),
-          focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(
-                  color: AppTheme.primary, width: 1.5)),
-          filled: true,
-          fillColor: isDark ? AppTheme.darkElement : Colors.white,
+    controller: controller,
+    maxLines: maxLines,
+    keyboardType: keyboardType,
+    style: TextStyle(
+      fontSize: 13,
+      color: isDark ? Colors.white : Colors.black87,
+    ),
+    onChanged: onChanged,
+    decoration: InputDecoration(
+      hintText: hint,
+      hintStyle: TextStyle(
+        fontSize: 12,
+        color: isDark ? const Color(0xFF666666) : AppTheme.textSub,
+      ),
+      prefixIcon: Icon(
+        icon,
+        size: 16,
+        color: isDark ? Colors.white38 : AppTheme.textSub,
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(
+          color: isDark ? Colors.white24 : AppTheme.border,
         ),
-      );
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(
+          color: isDark ? Colors.white24 : AppTheme.border,
+        ),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
+      ),
+      filled: true,
+      fillColor: isDark ? AppTheme.darkElement : Colors.white,
+    ),
+  );
 }
 
 class _GRDialogDropdown<T> extends StatelessWidget {
@@ -2782,43 +2948,46 @@ class _GRDialogDropdown<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => DropdownButtonFormField<T>(
-        initialValue: value,
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: TextStyle(
-              fontSize: 12,
-              color: isDark
-                  ? const Color(0xFF666666)
-                  : AppTheme.textSub),
-          prefixIcon: Icon(icon,
-              size: 16,
-              color: isDark ? Colors.white38 : AppTheme.textSub),
-          contentPadding: const EdgeInsets.symmetric(
-              horizontal: 12, vertical: 10),
-          border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(
-                  color:
-                      isDark ? Colors.white24 : AppTheme.border)),
-          enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(
-                  color:
-                      isDark ? Colors.white24 : AppTheme.border)),
-          focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(
-                  color: AppTheme.primary, width: 1.5)),
-          filled: true,
-          fillColor: isDark ? AppTheme.darkElement : Colors.white,
+    initialValue: value,
+    decoration: InputDecoration(
+      hintText: hint,
+      hintStyle: TextStyle(
+        fontSize: 12,
+        color: isDark ? const Color(0xFF666666) : AppTheme.textSub,
+      ),
+      prefixIcon: Icon(
+        icon,
+        size: 16,
+        color: isDark ? Colors.white38 : AppTheme.textSub,
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(
+          color: isDark ? Colors.white24 : AppTheme.border,
         ),
-        dropdownColor: isDark ? AppTheme.darkCard : Colors.white,
-        style: TextStyle(
-            fontSize: 12,
-            color: isDark ? Colors.white : Colors.black87),
-        items: items,
-        onChanged: onChanged,
-      );
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(
+          color: isDark ? Colors.white24 : AppTheme.border,
+        ),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
+      ),
+      filled: true,
+      fillColor: isDark ? AppTheme.darkElement : Colors.white,
+    ),
+    dropdownColor: isDark ? AppTheme.darkCard : Colors.white,
+    style: TextStyle(
+      fontSize: 12,
+      color: isDark ? Colors.white : Colors.black87,
+    ),
+    items: items,
+    onChanged: onChanged,
+  );
 }
 
 class _GRSmallIconBtn extends StatelessWidget {
@@ -2838,35 +3007,31 @@ class _GRSmallIconBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Tooltip(
-        message: tooltip,
-        child: InkWell(
-          onTap: onTap,
+    message: tooltip,
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.all(6),
+        decoration: BoxDecoration(
+          color: color != null
+              ? color!.withValues(alpha: 0.1)
+              : (isDark ? AppTheme.darkElement : const Color(0xFFF5F5F5)),
           borderRadius: BorderRadius.circular(6),
-          child: Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: color != null
-                  ? color!.withValues(alpha: 0.1)
-                  : (isDark
-                      ? AppTheme.darkElement
-                      : const Color(0xFFF5F5F5)),
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(
-                  color: color != null
-                      ? color!.withValues(alpha: 0.3)
-                      : (isDark
-                          ? const Color(0xFF444444)
-                          : AppTheme.border)),
-            ),
-            child: Icon(icon,
-                size: 15,
-                color: color ??
-                    (isDark
-                        ? Colors.white54
-                        : AppTheme.textSub)),
+          border: Border.all(
+            color: color != null
+                ? color!.withValues(alpha: 0.3)
+                : (isDark ? const Color(0xFF444444) : AppTheme.border),
           ),
         ),
-      );
+        child: Icon(
+          icon,
+          size: 15,
+          color: color ?? (isDark ? Colors.white54 : AppTheme.textSub),
+        ),
+      ),
+    ),
+  );
 }
 
 class _QtyStat extends StatelessWidget {
@@ -2886,22 +3051,26 @@ class _QtyStat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label,
-              style: TextStyle(
-                  fontSize: 10,
-                  color: isDark ? Colors.white38 : AppTheme.textSub)),
-          const SizedBox(height: 2),
-          Text(
-            '${qty.toStringAsFixed(0)} $unit',
-            style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: color),
-          ),
-        ],
-      );
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        label,
+        style: TextStyle(
+          fontSize: 10,
+          color: isDark ? Colors.white38 : AppTheme.textSub,
+        ),
+      ),
+      const SizedBox(height: 2),
+      Text(
+        '${qty.toStringAsFixed(0)} $unit',
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          color: color,
+        ),
+      ),
+    ],
+  );
 }
 
 class _GRBadge extends StatelessWidget {
@@ -2909,25 +3078,27 @@ class _GRBadge extends StatelessWidget {
   final String text;
   final bool isDark;
 
-  const _GRBadge(
-      {required this.icon, required this.text, required this.isDark});
+  const _GRBadge({
+    required this.icon,
+    required this.text,
+    required this.isDark,
+  });
 
   @override
   Widget build(BuildContext context) => Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon,
-              size: 12,
-              color: isDark ? Colors.white38 : AppTheme.textSub),
-          const SizedBox(width: 3),
-          Text(text,
-              style: TextStyle(
-                  fontSize: 11,
-                  color: isDark
-                      ? const Color(0xFFAAAAAA)
-                      : AppTheme.textSub)),
-        ],
-      );
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Icon(icon, size: 12, color: isDark ? Colors.white38 : AppTheme.textSub),
+      const SizedBox(width: 3),
+      Text(
+        text,
+        style: TextStyle(
+          fontSize: 11,
+          color: isDark ? const Color(0xFFAAAAAA) : AppTheme.textSub,
+        ),
+      ),
+    ],
+  );
 }
 
 class _GRSummaryRow extends StatelessWidget {
@@ -2945,20 +3116,25 @@ class _GRSummaryRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label,
-              style: TextStyle(
-                  fontSize: 13,
-                  color: isDark ? Colors.white70 : AppTheme.textSub)),
-          Text(value,
-              style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: valueColor ??
-                      (isDark ? Colors.white70 : Colors.black87))),
-        ],
-      );
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+      Text(
+        label,
+        style: TextStyle(
+          fontSize: 13,
+          color: isDark ? Colors.white70 : AppTheme.textSub,
+        ),
+      ),
+      Text(
+        value,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: valueColor ?? (isDark ? Colors.white70 : Colors.black87),
+        ),
+      ),
+    ],
+  );
 }
 
 class _GRMethodBtn extends StatelessWidget {
@@ -2980,66 +3156,79 @@ class _GRMethodBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => InkWell(
-        onTap: onTap,
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(10),
+    child: Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.07),
         borderRadius: BorderRadius.circular(10),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.07),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: color.withValues(alpha: 0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 22, color: color),
           ),
-          child: Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, size: 22, color: color),
-              ),
-              const SizedBox(height: 8),
-              Text(label,
-                  style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: color)),
-              const SizedBox(height: 2),
-              Text(sublabel,
-                  style: TextStyle(
-                      fontSize: 11,
-                      color: isDark
-                          ? Colors.white54
-                          : AppTheme.textSub),
-                  textAlign: TextAlign.center),
-            ],
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
           ),
-        ),
-      );
+          const SizedBox(height: 2),
+          Text(
+            sublabel,
+            style: TextStyle(
+              fontSize: 11,
+              color: isDark ? Colors.white54 : AppTheme.textSub,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _HelpItem extends StatelessWidget {
   final String title;
   final String detail;
   final bool isDark;
-  const _HelpItem(
-      {required this.title, required this.detail, required this.isDark});
+  const _HelpItem({
+    required this.title,
+    required this.detail,
+    required this.isDark,
+  });
 
   @override
   Widget build(BuildContext context) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title,
-              style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: isDark ? Colors.white : const Color(0xFF1A1A1A))),
-          const SizedBox(height: 2),
-          Text(detail,
-              style: TextStyle(
-                  fontSize: 12,
-                  color: isDark ? Colors.white60 : AppTheme.textSub)),
-        ],
-      );
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        title,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+        ),
+      ),
+      const SizedBox(height: 2),
+      Text(
+        detail,
+        style: TextStyle(
+          fontSize: 12,
+          color: isDark ? Colors.white60 : AppTheme.textSub,
+        ),
+      ),
+    ],
+  );
 }

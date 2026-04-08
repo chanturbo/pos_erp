@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
+import 'package:pos_erp/shared/widgets/escape_pop_scope.dart';
 import '../../../customers/presentation/providers/customer_provider.dart';
 import '../../../products/presentation/providers/product_provider.dart';
 import '../../data/models/ar_invoice_model.dart';
@@ -80,189 +81,196 @@ class _ArInvoiceFormPageState extends ConsumerState<ArInvoiceFormPage> {
 
     return Scaffold(
       backgroundColor: isDark ? AppTheme.darkBg : const Color(0xFFF5F5F5),
-      body: Column(
-        children: [
-          _ArFormTitleBar(
-            isEdit: isEdit,
-            isView: _isViewMode,
-            status: widget.invoice?.status,
-            invoice: widget.invoice,
-            onReceive: widget.invoice == null || widget.invoice!.isFullyPaid
-                ? null
-                : () => _createReceipt(widget.invoice!),
-          ),
-          Expanded(
-            child: Form(
-              key: _formKey,
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    _SectionCard(
-                      icon: Icons.receipt_long_outlined,
-                      iconColor: AppTheme.primary,
-                      title: 'ข้อมูลทั่วไป',
-                      child: _buildGeneralSection(isDark),
-                    ),
-                    const SizedBox(height: 14),
-                    _SectionCard(
-                      icon: Icons.shopping_cart_outlined,
-                      iconColor: AppTheme.info,
-                      title: 'รายการสินค้า',
-                      trailing: _isViewMode
-                          ? null
-                          : Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                _SmallIconBtn(
-                                  icon: _isCardView
-                                      ? Icons.view_list_outlined
-                                      : Icons.grid_view_outlined,
-                                  tooltip: _isCardView
-                                      ? 'List View'
-                                      : 'Card View',
-                                  isDark: isDark,
-                                  onTap: () => setState(
-                                    () => _isCardView = !_isCardView,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                ElevatedButton.icon(
-                                  onPressed: _addItem,
-                                  icon: const Icon(Icons.add, size: 16),
-                                  label: const Text(
-                                    'เพิ่ม',
-                                    style: TextStyle(fontSize: 13),
-                                  ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppTheme.info,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 14,
-                                      vertical: 14,
-                                    ),
-                                    minimumSize: Size.zero,
-                                    tapTargetSize:
-                                        MaterialTapTargetSize.shrinkWrap,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    elevation: 0,
-                                  ),
-                                ),
-                              ],
-                            ),
-                      child: _buildItemsSection(isDark),
-                    ),
-                    const SizedBox(height: 14),
-                    if (_items.isNotEmpty) ...[
+      body: EscapePopScope(
+        child: Column(
+          children: [
+            _ArFormTitleBar(
+              isEdit: isEdit,
+              isView: _isViewMode,
+              status: widget.invoice?.status,
+              invoice: widget.invoice,
+              onReceive: widget.invoice == null || widget.invoice!.isFullyPaid
+                  ? null
+                  : () => _createReceipt(widget.invoice!),
+            ),
+            Expanded(
+              child: Form(
+                key: _formKey,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
                       _SectionCard(
-                        icon: Icons.calculate_outlined,
-                        iconColor: AppTheme.success,
-                        title: 'สรุปยอด',
-                        child: _buildSummarySection(isDark),
+                        icon: Icons.receipt_long_outlined,
+                        iconColor: AppTheme.primary,
+                        title: 'ข้อมูลทั่วไป',
+                        child: _buildGeneralSection(isDark),
                       ),
                       const SizedBox(height: 14),
-                    ],
-                    if (_isViewMode && widget.invoice != null) ...[
                       _SectionCard(
-                        icon: Icons.account_balance_wallet_outlined,
+                        icon: Icons.shopping_cart_outlined,
                         iconColor: AppTheme.info,
-                        title: 'สถานะการรับเงิน',
-                        child: _buildPaymentStatusSection(
-                          isDark,
-                          widget.invoice!,
-                        ),
+                        title: 'รายการสินค้า',
+                        trailing: _isViewMode
+                            ? null
+                            : Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  _SmallIconBtn(
+                                    icon: _isCardView
+                                        ? Icons.view_list_outlined
+                                        : Icons.grid_view_outlined,
+                                    tooltip: _isCardView
+                                        ? 'List View'
+                                        : 'Card View',
+                                    isDark: isDark,
+                                    onTap: () => setState(
+                                      () => _isCardView = !_isCardView,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  ElevatedButton.icon(
+                                    onPressed: _addItem,
+                                    icon: const Icon(Icons.add, size: 16),
+                                    label: const Text(
+                                      'เพิ่ม',
+                                      style: TextStyle(fontSize: 13),
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppTheme.info,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 14,
+                                        vertical: 14,
+                                      ),
+                                      minimumSize: Size.zero,
+                                      tapTargetSize:
+                                          MaterialTapTargetSize.shrinkWrap,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      elevation: 0,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                        child: _buildItemsSection(isDark),
                       ),
                       const SizedBox(height: 14),
+                      if (_items.isNotEmpty) ...[
+                        _SectionCard(
+                          icon: Icons.calculate_outlined,
+                          iconColor: AppTheme.success,
+                          title: 'สรุปยอด',
+                          child: _buildSummarySection(isDark),
+                        ),
+                        const SizedBox(height: 14),
+                      ],
+                      if (_isViewMode && widget.invoice != null) ...[
+                        _SectionCard(
+                          icon: Icons.account_balance_wallet_outlined,
+                          iconColor: AppTheme.info,
+                          title: 'สถานะการรับเงิน',
+                          child: _buildPaymentStatusSection(
+                            isDark,
+                            widget.invoice!,
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                      ],
+                      _SectionCard(
+                        icon: Icons.note_outlined,
+                        iconColor: AppTheme.textSub,
+                        title: 'หมายเหตุ',
+                        child: _isViewMode
+                            ? _ViewText(
+                                text: _remarkController.text.isEmpty
+                                    ? '-'
+                                    : _remarkController.text,
+                                isDark: isDark,
+                              )
+                            : _ArTextField(
+                                controller: _remarkController,
+                                hint: 'บันทึกเพิ่มเติม (ถ้ามี)',
+                                icon: Icons.edit_note,
+                                maxLines: 3,
+                                isDark: isDark,
+                              ),
+                      ),
+                      const SizedBox(height: 80),
                     ],
-                    _SectionCard(
-                      icon: Icons.note_outlined,
-                      iconColor: AppTheme.textSub,
-                      title: 'หมายเหตุ',
-                      child: _isViewMode
-                          ? _ViewText(
-                              text: _remarkController.text.isEmpty
-                                  ? '-'
-                                  : _remarkController.text,
-                              isDark: isDark,
-                            )
-                          : _ArTextField(
-                              controller: _remarkController,
-                              hint: 'บันทึกเพิ่มเติม (ถ้ามี)',
-                              icon: Icons.edit_note,
-                              maxLines: 3,
-                              isDark: isDark,
-                            ),
-                    ),
-                    const SizedBox(height: 80),
-                  ],
+                  ),
                 ),
               ),
             ),
-          ),
-          if (!_isViewMode)
-            Container(
-              color: isDark ? AppTheme.darkTopBar : Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  OutlinedButton(
-                    onPressed: _isLoading ? null : () => Navigator.pop(context),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 12,
+            if (!_isViewMode)
+              Container(
+                color: isDark ? AppTheme.darkTopBar : Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 14,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    OutlinedButton(
+                      onPressed: _isLoading
+                          ? null
+                          : () => Navigator.pop(context),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
+                        side: BorderSide(
+                          color: isDark ? Colors.white24 : AppTheme.border,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
-                      side: BorderSide(
-                        color: isDark ? Colors.white24 : AppTheme.border,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                      child: Text(
+                        'ยกเลิก',
+                        style: TextStyle(
+                          color: isDark ? Colors.white60 : AppTheme.textSub,
+                        ),
                       ),
                     ),
-                    child: Text(
-                      'ยกเลิก',
-                      style: TextStyle(
-                        color: isDark ? Colors.white60 : AppTheme.textSub,
+                    const SizedBox(width: 12),
+                    ElevatedButton.icon(
+                      onPressed: _isLoading ? null : _saveInvoice,
+                      icon: _isLoading
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.save_outlined, size: 18),
+                      label: Text(
+                        isEdit ? 'บันทึก' : 'สร้างใบแจ้งหนี้',
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        elevation: 0,
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  ElevatedButton.icon(
-                    onPressed: _isLoading ? null : _saveInvoice,
-                    icon: _isLoading
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Icon(Icons.save_outlined, size: 18),
-                    label: Text(
-                      isEdit ? 'บันทึก' : 'สร้างใบแจ้งหนี้',
-                      style: const TextStyle(fontSize: 14),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 12,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      elevation: 0,
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }

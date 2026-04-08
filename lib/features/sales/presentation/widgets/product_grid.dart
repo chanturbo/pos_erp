@@ -5,7 +5,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../products/data/models/product_model.dart';
 import '../providers/cart_provider.dart';
 import '../../../../shared/theme/app_theme.dart';
-import '../../../../shared/utils/responsive_utils.dart';
 import '../../../../shared/widgets/cart_toast.dart';
 
 // ── Color Tokens ──────────────────────────────────────────────────
@@ -384,28 +383,34 @@ class _GridView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final w = context.screenWidth;
-    int cols;
-    if (w < 900) {
-      cols = 2;
-    } else if (w < 1280) {
-      cols = 3;
-    } else if (w < 1600) {
-      cols = 4;
-    } else {
-      cols = 5;
-    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final panelWidth = constraints.maxWidth;
+        int cols;
+        if (panelWidth < 560) {
+          cols = 2;
+        } else if (panelWidth < 860) {
+          cols = 3;
+        } else if (panelWidth < 1160) {
+          cols = 4;
+        } else {
+          cols = 5;
+        }
 
-    return GridView.builder(
-      padding: const EdgeInsets.all(12),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: cols,
-        childAspectRatio: 0.82,
-        crossAxisSpacing: 10,
-        mainAxisSpacing: 10,
-      ),
-      itemCount: products.length,
-      itemBuilder: (_, i) => _ProductGridCard(product: products[i]),
+        final childAspectRatio = panelWidth < 700 ? 0.76 : 0.82;
+
+        return GridView.builder(
+          padding: const EdgeInsets.all(12),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: cols,
+            childAspectRatio: childAspectRatio,
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10,
+          ),
+          itemCount: products.length,
+          itemBuilder: (_, i) => _ProductGridCard(product: products[i]),
+        );
+      },
     );
   }
 }

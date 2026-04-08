@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
 import 'package:pos_erp/shared/widgets/pagination_bar.dart';
+import 'package:pos_erp/shared/widgets/escape_pop_scope.dart';
 import 'package:pos_erp/shared/pdf/pdf_report_button.dart';
 import '../../../settings/presentation/pages/settings_page.dart';
 import '../providers/purchase_return_provider.dart';
@@ -50,86 +51,88 @@ class _PurchaseReturnListPageState
 
     return Scaffold(
       backgroundColor: isDark ? AppTheme.darkBg : const Color(0xFFF5F5F5),
-      body: Column(
-        children: [
-          // ── Top Bar ──────────────────────────────────────────
-          _PRListTopBar(
-            searchController: _searchController,
-            searchQuery: _searchQuery,
-            isCardView: _isCardView,
-            onSearchChanged: (v) => setState(() {
-              _searchQuery = v.toLowerCase();
-              _currentPage = 1;
-            }),
-            onSearchCleared: () {
-              _searchController.clear();
-              setState(() {
-                _searchQuery = '';
+      body: EscapePopScope(
+        child: Column(
+          children: [
+            // ── Top Bar ──────────────────────────────────────────
+            _PRListTopBar(
+              searchController: _searchController,
+              searchQuery: _searchQuery,
+              isCardView: _isCardView,
+              onSearchChanged: (v) => setState(() {
+                _searchQuery = v.toLowerCase();
                 _currentPage = 1;
-              });
-            },
-            onToggleView: () => setState(() => _isCardView = !_isCardView),
-            onRefresh: () =>
-                ref.read(purchaseReturnListProvider.notifier).refresh(),
-            onAdd: () =>
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const PurchaseReturnFormPage(),
-                  ),
-                ).then(
-                  (_) =>
-                      ref.read(purchaseReturnListProvider.notifier).refresh(),
-                ),
-          ),
-
-          // ── Summary + Status Filter Bar ──────────────────────
-          _buildSummaryBar(returnsAsync),
-
-          // ── Content ─────────────────────────────────────────
-          Expanded(
-            child: returnsAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => _buildError(e),
-              data: (returns) {
-                final filtered = _filter(returns);
-                if (filtered.isEmpty) return _buildEmpty();
-                final totalPages = (filtered.length / pageSize).ceil().clamp(
-                  1,
-                  9999,
-                );
-                final safePage = _currentPage.clamp(1, totalPages);
-                final start = (safePage - 1) * pageSize;
-                final end = (start + pageSize).clamp(0, filtered.length);
-                final pageItems = filtered.sublist(start, end);
-                return Column(
-                  children: [
-                    Expanded(
-                      child: _isCardView
-                          ? _buildCardView(pageItems)
-                          : _buildListView(pageItems),
-                    ),
-                    PaginationBar(
-                      currentPage: safePage,
-                      totalItems: filtered.length,
-                      pageSize: pageSize,
-                      onPageChanged: (p) => setState(() => _currentPage = p),
-                      trailing: PdfReportButton(
-                        emptyMessage: 'ไม่มีข้อมูลการคืนสินค้า',
-                        title: 'รายงานการคืนสินค้า',
-                        filename: () =>
-                            PdfFilename.generate('purchase_return_report'),
-                        buildPdf: () =>
-                            PurchaseReturnPdfBuilder.build(filtered),
-                        hasData: filtered.isNotEmpty,
-                      ),
-                    ),
-                  ],
-                );
+              }),
+              onSearchCleared: () {
+                _searchController.clear();
+                setState(() {
+                  _searchQuery = '';
+                  _currentPage = 1;
+                });
               },
+              onToggleView: () => setState(() => _isCardView = !_isCardView),
+              onRefresh: () =>
+                  ref.read(purchaseReturnListProvider.notifier).refresh(),
+              onAdd: () =>
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const PurchaseReturnFormPage(),
+                    ),
+                  ).then(
+                    (_) =>
+                        ref.read(purchaseReturnListProvider.notifier).refresh(),
+                  ),
             ),
-          ),
-        ],
+
+            // ── Summary + Status Filter Bar ──────────────────────
+            _buildSummaryBar(returnsAsync),
+
+            // ── Content ─────────────────────────────────────────
+            Expanded(
+              child: returnsAsync.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, _) => _buildError(e),
+                data: (returns) {
+                  final filtered = _filter(returns);
+                  if (filtered.isEmpty) return _buildEmpty();
+                  final totalPages = (filtered.length / pageSize).ceil().clamp(
+                    1,
+                    9999,
+                  );
+                  final safePage = _currentPage.clamp(1, totalPages);
+                  final start = (safePage - 1) * pageSize;
+                  final end = (start + pageSize).clamp(0, filtered.length);
+                  final pageItems = filtered.sublist(start, end);
+                  return Column(
+                    children: [
+                      Expanded(
+                        child: _isCardView
+                            ? _buildCardView(pageItems)
+                            : _buildListView(pageItems),
+                      ),
+                      PaginationBar(
+                        currentPage: safePage,
+                        totalItems: filtered.length,
+                        pageSize: pageSize,
+                        onPageChanged: (p) => setState(() => _currentPage = p),
+                        trailing: PdfReportButton(
+                          emptyMessage: 'ไม่มีข้อมูลการคืนสินค้า',
+                          title: 'รายงานการคืนสินค้า',
+                          filename: () =>
+                              PdfFilename.generate('purchase_return_report'),
+                          buildPdf: () =>
+                              PurchaseReturnPdfBuilder.build(filtered),
+                          hasData: filtered.isNotEmpty,
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

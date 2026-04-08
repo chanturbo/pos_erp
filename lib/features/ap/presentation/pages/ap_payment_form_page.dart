@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
+import 'package:pos_erp/shared/widgets/escape_pop_scope.dart';
 import '../../data/models/ap_payment_model.dart';
 import '../../data/models/ap_payment_allocation_model.dart';
 import '../../data/models/ap_invoice_model.dart';
@@ -14,8 +15,7 @@ class ApPaymentFormPage extends ConsumerStatefulWidget {
   const ApPaymentFormPage({super.key});
 
   @override
-  ConsumerState<ApPaymentFormPage> createState() =>
-      _ApPaymentFormPageState();
+  ConsumerState<ApPaymentFormPage> createState() => _ApPaymentFormPageState();
 }
 
 class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
@@ -41,10 +41,11 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
     super.initState();
     final ts = DateTime.now().millisecondsSinceEpoch;
     _paymentNoController = TextEditingController(
-        text: 'APPAY${ts.toString().substring(8)}');
+      text: 'APPAY${ts.toString().substring(8)}',
+    );
     _referenceNoController = TextEditingController();
-    _bankNameController    = TextEditingController();
-    _remarkController      = TextEditingController();
+    _bankNameController = TextEditingController();
+    _remarkController = TextEditingController();
   }
 
   @override
@@ -59,8 +60,7 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
   // ─────────────────────────────────────────────────────────────
   Color get _accentColor => AppTheme.tealColor;
 
-  double get _totalAmount =>
-      _allocations.values.fold(0, (s, v) => s + v);
+  double get _totalAmount => _allocations.values.fold(0, (s, v) => s + v);
 
   // ─────────────────────────────────────────────────────────────
   @override
@@ -68,34 +68,35 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor:
-          isDark ? AppTheme.darkBg : const Color(0xFFF0F2F5),
-      body: Column(
-        children: [
-          _PayFormTitleBar(isDark: isDark),
-          Expanded(
-            child: Form(
-              key: _formKey,
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildInfoSection(isDark),
-                    const SizedBox(height: 14),
-                    _buildAllocationSection(isDark),
-                    if (_allocations.isNotEmpty) ...[
+      backgroundColor: isDark ? AppTheme.darkBg : const Color(0xFFF0F2F5),
+      body: EscapePopScope(
+        child: Column(
+          children: [
+            _PayFormTitleBar(isDark: isDark),
+            Expanded(
+              child: Form(
+                key: _formKey,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildInfoSection(isDark),
                       const SizedBox(height: 14),
-                      _buildSummarySection(isDark),
+                      _buildAllocationSection(isDark),
+                      if (_allocations.isNotEmpty) ...[
+                        const SizedBox(height: 14),
+                        _buildSummarySection(isDark),
+                      ],
+                      const SizedBox(height: 80),
                     ],
-                    const SizedBox(height: 80),
-                  ],
+                  ),
                 ),
               ),
             ),
-          ),
-          _buildBottomBar(isDark),
-        ],
+            _buildBottomBar(isDark),
+          ],
+        ),
       ),
     );
   }
@@ -151,8 +152,7 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
           ),
 
           // ฟิลด์เพิ่มเติมตามวิธีจ่าย
-          if (_paymentMethod == 'TRANSFER' ||
-              _paymentMethod == 'CHEQUE') ...[
+          if (_paymentMethod == 'TRANSFER' || _paymentMethod == 'CHEQUE') ...[
             const SizedBox(height: 12),
             _PayTextField(
               controller: _bankNameController,
@@ -163,9 +163,7 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
             const SizedBox(height: 12),
             _PayTextField(
               controller: _referenceNoController,
-              hint: _paymentMethod == 'CHEQUE'
-                  ? 'เลขที่เช็ค'
-                  : 'เลขที่อ้างอิง',
+              hint: _paymentMethod == 'CHEQUE' ? 'เลขที่เช็ค' : 'เลขที่อ้างอิง',
               icon: Icons.confirmation_number_outlined,
               isDark: isDark,
             ),
@@ -198,7 +196,9 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
               onTap: _autoAllocate,
               child: Container(
                 padding: const EdgeInsets.symmetric(
-                    horizontal: 10, vertical: 5),
+                  horizontal: 10,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
                   color: _accentColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8),
@@ -206,14 +206,16 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.auto_awesome,
-                        size: 14, color: _accentColor),
+                    Icon(Icons.auto_awesome, size: 14, color: _accentColor),
                     const SizedBox(width: 4),
-                    Text('จัดสรรอัตโนมัติ',
-                        style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: _accentColor)),
+                    Text(
+                      'จัดสรรอัตโนมัติ',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: _accentColor,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -226,23 +228,22 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
               isDark: isDark,
             )
           : _isLoadingInvoices
-              ? const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 32),
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              : _unpaidInvoices.isEmpty
-                  ? _buildAllocationPlaceholder(
-                      icon: Icons.check_circle_outline,
-                      message: 'ไม่มีใบแจ้งหนี้ค้างชำระ',
-                      color: AppTheme.success,
-                      isDark: isDark,
-                    )
-                  : Column(
-                      children: _unpaidInvoices
-                          .map((inv) =>
-                              _buildAllocationRow(inv, isDark))
-                          .toList(),
-                    ),
+          ? const Padding(
+              padding: EdgeInsets.symmetric(vertical: 32),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          : _unpaidInvoices.isEmpty
+          ? _buildAllocationPlaceholder(
+              icon: Icons.check_circle_outline,
+              message: 'ไม่มีใบแจ้งหนี้ค้างชำระ',
+              color: AppTheme.success,
+              isDark: isDark,
+            )
+          : Column(
+              children: _unpaidInvoices
+                  .map((inv) => _buildAllocationRow(inv, isDark))
+                  .toList(),
+            ),
     );
   }
 
@@ -252,8 +253,7 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
     Color? color,
     required bool isDark,
   }) {
-    final c = color ??
-        (isDark ? const Color(0xFF666666) : Colors.grey[400]!);
+    final c = color ?? (isDark ? const Color(0xFF666666) : Colors.grey[400]!);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 32),
       child: Center(
@@ -261,12 +261,13 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
           children: [
             Icon(icon, size: 48, color: c),
             const SizedBox(height: 12),
-            Text(message,
-                style: TextStyle(
-                    fontSize: 14,
-                    color: isDark
-                        ? const Color(0xFF888888)
-                        : Colors.grey[500])),
+            Text(
+              message,
+              style: TextStyle(
+                fontSize: 14,
+                color: isDark ? const Color(0xFF888888) : Colors.grey[500],
+              ),
+            ),
           ],
         ),
       ),
@@ -276,9 +277,7 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
   Widget _buildAllocationRow(ApInvoiceModel invoice, bool isDark) {
     final currentAlloc = _allocations[invoice.invoiceId] ?? 0;
     final controller = TextEditingController(
-      text: currentAlloc > 0
-          ? currentAlloc.toStringAsFixed(2)
-          : '',
+      text: currentAlloc > 0 ? currentAlloc.toStringAsFixed(2) : '',
     );
     final fmt = NumberFormat('#,##0.00', 'th_TH');
 
@@ -286,16 +285,12 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isDark
-            ? AppTheme.darkElement
-            : const Color(0xFFF9FAFB),
+        color: isDark ? AppTheme.darkElement : const Color(0xFFF9FAFB),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: invoice.isOverdue
               ? AppTheme.error.withValues(alpha: 0.3)
-              : (isDark
-                  ? const Color(0xFF333333)
-                  : AppTheme.border),
+              : (isDark ? const Color(0xFF333333) : AppTheme.border),
         ),
       ),
       child: Column(
@@ -310,19 +305,19 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
                     Text(
                       invoice.invoiceNo,
                       style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: isDark
-                              ? Colors.white
-                              : const Color(0xFF1A1A1A)),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+                      ),
                     ),
                     Text(
                       'วันที่: ${DateFormat('dd/MM/yyyy').format(invoice.invoiceDate)}',
                       style: TextStyle(
-                          fontSize: 11,
-                          color: isDark
-                              ? const Color(0xFFAAAAAA)
-                              : AppTheme.textSub),
+                        fontSize: 11,
+                        color: isDark
+                            ? const Color(0xFFAAAAAA)
+                            : AppTheme.textSub,
+                      ),
                     ),
                   ],
                 ),
@@ -330,16 +325,21 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
               if (invoice.isOverdue)
                 Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 7, vertical: 2),
+                    horizontal: 7,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: AppTheme.error.withValues(alpha: 0.10),
                     borderRadius: BorderRadius.circular(6),
                   ),
-                  child: const Text('เลยกำหนด',
-                      style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.error)),
+                  child: const Text(
+                    'เลยกำหนด',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.error,
+                    ),
+                  ),
                 ),
             ],
           ),
@@ -351,18 +351,22 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('ยอดคงเหลือ',
-                        style: TextStyle(
-                            fontSize: 10,
-                            color: isDark
-                                ? const Color(0xFFAAAAAA)
-                                : AppTheme.textSub)),
+                    Text(
+                      'ยอดคงเหลือ',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: isDark
+                            ? const Color(0xFFAAAAAA)
+                            : AppTheme.textSub,
+                      ),
+                    ),
                     Text(
                       '฿${fmt.format(invoice.remainingAmount)}',
                       style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.warning),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.warning,
+                      ),
                     ),
                   ],
                 ),
@@ -375,39 +379,43 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
                     controller: controller,
                     keyboardType: TextInputType.number,
                     style: TextStyle(
-                        fontSize: 13,
-                        color:
-                            isDark ? Colors.white : Colors.black87),
+                      fontSize: 13,
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
                     decoration: InputDecoration(
                       hintText: '0.00',
                       prefixText: '฿',
                       hintStyle: TextStyle(
-                          color: isDark
-                              ? const Color(0xFF666666)
-                              : Colors.grey[400]),
-                      contentPadding:
-                          const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 0),
+                        color: isDark
+                            ? const Color(0xFF666666)
+                            : Colors.grey[400],
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 0,
+                      ),
                       border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(
-                              color: isDark
-                                  ? const Color(0xFF444444)
-                                  : AppTheme.border)),
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(
+                          color: isDark
+                              ? const Color(0xFF444444)
+                              : AppTheme.border,
+                        ),
+                      ),
                       enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(
-                              color: isDark
-                                  ? const Color(0xFF444444)
-                                  : AppTheme.border)),
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(
+                          color: isDark
+                              ? const Color(0xFF444444)
+                              : AppTheme.border,
+                        ),
+                      ),
                       focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(
-                              color: _accentColor, width: 1.5)),
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: _accentColor, width: 1.5),
+                      ),
                       filled: true,
-                      fillColor: isDark
-                          ? AppTheme.darkCard
-                          : Colors.white,
+                      fillColor: isDark ? AppTheme.darkCard : Colors.white,
                     ),
                     onChanged: (v) {
                       final amount = double.tryParse(v) ?? 0;
@@ -427,23 +435,22 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
                 height: 40,
                 child: OutlinedButton(
                   onPressed: () {
-                    controller.text =
-                        invoice.remainingAmount.toStringAsFixed(2);
+                    controller.text = invoice.remainingAmount.toStringAsFixed(
+                      2,
+                    );
                     setState(() {
-                      _allocations[invoice.invoiceId] =
-                          invoice.remainingAmount;
+                      _allocations[invoice.invoiceId] = invoice.remainingAmount;
                     });
                   },
                   style: OutlinedButton.styleFrom(
                     foregroundColor: _accentColor,
                     side: BorderSide(color: _accentColor),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8)),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
-                  child: const Text('เต็ม',
-                      style: TextStyle(fontSize: 12)),
+                  child: const Text('เต็ม', style: TextStyle(fontSize: 12)),
                 ),
               ),
             ],
@@ -470,27 +477,28 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
           ),
           const SizedBox(height: 8),
           Divider(
-              height: 1,
-              color: isDark
-                  ? const Color(0xFF333333)
-                  : AppTheme.border),
+            height: 1,
+            color: isDark ? const Color(0xFF333333) : AppTheme.border,
+          ),
           const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('ยอดรวมที่จ่าย',
-                  style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: isDark
-                          ? Colors.white
-                          : const Color(0xFF1A1A1A))),
+              Text(
+                'ยอดรวมที่จ่าย',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+                ),
+              ),
               Text(
                 '฿${fmt.format(_totalAmount)}',
                 style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.tealColor),
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.tealColor,
+                ),
               ),
             ],
           ),
@@ -519,20 +527,19 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
             child: OutlinedButton(
               onPressed: () => Navigator.pop(context),
               style: OutlinedButton.styleFrom(
-                foregroundColor:
-                    isDark ? Colors.white70 : AppTheme.textSub,
+                foregroundColor: isDark ? Colors.white70 : AppTheme.textSub,
                 side: BorderSide(
-                    color: isDark
-                        ? const Color(0xFF444444)
-                        : AppTheme.border),
-                padding:
-                    const EdgeInsets.symmetric(vertical: 13),
+                  color: isDark ? const Color(0xFF444444) : AppTheme.border,
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 13),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
-              child: const Text('ยกเลิก',
-                  style: TextStyle(
-                      fontSize: 14, fontWeight: FontWeight.w600)),
+              child: const Text(
+                'ยกเลิก',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              ),
             ),
           ),
           const SizedBox(width: 12),
@@ -544,23 +551,27 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
                 backgroundColor: _accentColor,
                 foregroundColor: Colors.white,
                 elevation: 0,
-                padding:
-                    const EdgeInsets.symmetric(vertical: 13),
+                padding: const EdgeInsets.symmetric(vertical: 13),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
               child: _isLoading
                   ? const SizedBox(
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white),
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
                     )
-                  : const Text('บันทึกการจ่ายเงิน',
+                  : const Text(
+                      'บันทึกการจ่ายเงิน',
                       style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700)),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
             ),
           ),
         ],
@@ -588,93 +599,97 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
           context: context,
           builder: (ctx) {
             String q = '';
-            return StatefulBuilder(builder: (ctx2, setS) {
-              final filtered = suppliers
-                  .where((s) =>
-                      s.supplierName.toLowerCase().contains(q))
-                  .toList();
-              return AlertDialog(
-                backgroundColor:
-                    isDark ? AppTheme.darkCard : Colors.white,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-                title: Text('เลือกซัพพลายเออร์',
-                    style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: isDark
-                            ? Colors.white
-                            : const Color(0xFF1A1A1A))),
-                content: SizedBox(
-                  width: 420,
-                  height: 400,
-                  child: Column(
-                    children: [
-                      SizedBox(
-                        height: 38,
-                        child: TextField(
-                          autofocus: true,
-                          style: TextStyle(
-                              fontSize: 13,
-                              color: isDark
-                                  ? Colors.white
-                                  : Colors.black87),
-                          decoration: InputDecoration(
-                            hintText: 'ค้นหา...',
-                            prefixIcon: const Icon(
-                                Icons.search, size: 16),
-                            border: OutlineInputBorder(
-                                borderRadius:
-                                    BorderRadius.circular(8)),
-                            contentPadding: EdgeInsets.zero,
-                            filled: true,
-                            fillColor: isDark
-                                ? AppTheme.darkElement
-                                : const Color(0xFFF5F5F5),
-                          ),
-                          onChanged: (v) =>
-                              setS(() => q = v.toLowerCase()),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Expanded(
-                        child: ListView.builder(
-                          itemCount: filtered.length,
-                          itemBuilder: (_, i) {
-                            final s = filtered[i];
-                            return ListTile(
-                              dense: true,
-                              title: Text(s.supplierName,
-                                  style: TextStyle(
-                                      fontSize: 13,
-                                      color: isDark
-                                          ? Colors.white
-                                          : Colors.black87)),
-                              subtitle: s.currentBalance > 0
-                                  ? Text(
-                                      'ค้างชำระ: ฿${NumberFormat('#,##0.00', 'th_TH').format(s.currentBalance)}',
-                                      style: const TextStyle(
-                                          fontSize: 11,
-                                          color: AppTheme.warning))
-                                  : null,
-                              onTap: () => Navigator.pop(ctx, {
-                                'id': s.supplierId,
-                                'name': s.supplierName,
-                              }),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
+            return StatefulBuilder(
+              builder: (ctx2, setS) {
+                final filtered = suppliers
+                    .where((s) => s.supplierName.toLowerCase().contains(q))
+                    .toList();
+                return AlertDialog(
+                  backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                ),
-              );
-            });
+                  title: Text(
+                    'เลือกซัพพลายเออร์',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+                    ),
+                  ),
+                  content: SizedBox(
+                    width: 420,
+                    height: 400,
+                    child: Column(
+                      children: [
+                        SizedBox(
+                          height: 38,
+                          child: TextField(
+                            autofocus: true,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: isDark ? Colors.white : Colors.black87,
+                            ),
+                            decoration: InputDecoration(
+                              hintText: 'ค้นหา...',
+                              prefixIcon: const Icon(Icons.search, size: 16),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              contentPadding: EdgeInsets.zero,
+                              filled: true,
+                              fillColor: isDark
+                                  ? AppTheme.darkElement
+                                  : const Color(0xFFF5F5F5),
+                            ),
+                            onChanged: (v) => setS(() => q = v.toLowerCase()),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Expanded(
+                          child: ListView.builder(
+                            itemCount: filtered.length,
+                            itemBuilder: (_, i) {
+                              final s = filtered[i];
+                              return ListTile(
+                                dense: true,
+                                title: Text(
+                                  s.supplierName,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: isDark
+                                        ? Colors.white
+                                        : Colors.black87,
+                                  ),
+                                ),
+                                subtitle: s.currentBalance > 0
+                                    ? Text(
+                                        'ค้างชำระ: ฿${NumberFormat('#,##0.00', 'th_TH').format(s.currentBalance)}',
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          color: AppTheme.warning,
+                                        ),
+                                      )
+                                    : null,
+                                onTap: () => Navigator.pop(ctx, {
+                                  'id': s.supplierId,
+                                  'name': s.supplierName,
+                                }),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            );
           },
         );
         if (selected != null) {
           setState(() {
-            _supplierId   = selected['id'];
+            _supplierId = selected['id'];
             _supplierName = selected['name'];
             _allocations.clear();
           });
@@ -693,8 +708,8 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
         .read(apInvoiceListProvider.notifier)
         .getUnpaidInvoices(_supplierId!);
     setState(() {
-      _unpaidInvoices      = invoices;
-      _isLoadingInvoices   = false;
+      _unpaidInvoices = invoices;
+      _isLoadingInvoices = false;
     });
   }
 
@@ -720,46 +735,56 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
     }
 
     for (final entry in _allocations.entries) {
-      final inv = _unpaidInvoices
-          .firstWhere((i) => i.invoiceId == entry.key);
+      final inv = _unpaidInvoices.firstWhere((i) => i.invoiceId == entry.key);
       if (entry.value > inv.remainingAmount) {
-        _snackbar('ใบแจ้งหนี้ ${inv.invoiceNo} จ่ายเกินยอดคงเหลือ',
-            isError: true);
+        _snackbar(
+          'ใบแจ้งหนี้ ${inv.invoiceNo} จ่ายเกินยอดคงเหลือ',
+          isError: true,
+        );
         return;
       }
     }
 
     setState(() => _isLoading = true);
 
-    final authState  = ref.read(authProvider);
-    final allocations = _allocations.entries.map((e) =>
-        ApPaymentAllocationModel(
-          allocationId:   '',
-          paymentId:      '',
-          invoiceId:      e.key,
-          allocatedAmount: e.value,
-          createdAt:      DateTime.now(),
-        )).toList();
+    final authState = ref.read(authProvider);
+    final allocations = _allocations.entries
+        .map(
+          (e) => ApPaymentAllocationModel(
+            allocationId: '',
+            paymentId: '',
+            invoiceId: e.key,
+            allocatedAmount: e.value,
+            createdAt: DateTime.now(),
+          ),
+        )
+        .toList();
 
     final payment = ApPaymentModel(
-      paymentId:     '',
-      paymentNo:     _paymentNoController.text.trim(),
-      paymentDate:   _paymentDate,
-      supplierId:    _supplierId!,
-      supplierName:  _supplierName!,
-      totalAmount:   _totalAmount,
+      paymentId: '',
+      paymentNo: _paymentNoController.text.trim(),
+      paymentDate: _paymentDate,
+      supplierId: _supplierId!,
+      supplierName: _supplierName!,
+      totalAmount: _totalAmount,
       paymentMethod: _paymentMethod,
       bankName: _bankNameController.text.trim().isEmpty
-          ? null : _bankNameController.text.trim(),
-      transferRef: _paymentMethod == 'TRANSFER' &&
+          ? null
+          : _bankNameController.text.trim(),
+      transferRef:
+          _paymentMethod == 'TRANSFER' &&
               _referenceNoController.text.trim().isNotEmpty
-          ? _referenceNoController.text.trim() : null,
-      chequeNo: _paymentMethod == 'CHEQUE' &&
+          ? _referenceNoController.text.trim()
+          : null,
+      chequeNo:
+          _paymentMethod == 'CHEQUE' &&
               _referenceNoController.text.trim().isNotEmpty
-          ? _referenceNoController.text.trim() : null,
-      userId:    authState.user!.userId,
-      remark:    _remarkController.text.trim().isEmpty
-          ? null : _remarkController.text.trim(),
+          ? _referenceNoController.text.trim()
+          : null,
+      userId: authState.user!.userId,
+      remark: _remarkController.text.trim().isEmpty
+          ? null
+          : _remarkController.text.trim(),
       createdAt: DateTime.now(),
       allocations: allocations,
     );
@@ -775,22 +800,26 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
       ref.read(apInvoiceListProvider.notifier).refresh();
       ref.read(supplierListProvider.notifier).refresh();
       Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: const Text('บันทึกการจ่ายเงินสำเร็จ'),
-        backgroundColor: AppTheme.success,
-        behavior: SnackBarBehavior.floating,
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('บันทึกการจ่ายเงินสำเร็จ'),
+          backgroundColor: AppTheme.success,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     } else {
       _snackbar('บันทึกไม่สำเร็จ', isError: true);
     }
   }
 
   void _snackbar(String msg, {bool isError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg),
-      backgroundColor: isError ? AppTheme.error : AppTheme.success,
-      behavior: SnackBarBehavior.floating,
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: isError ? AppTheme.error : AppTheme.success,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 }
 
@@ -821,15 +850,16 @@ class _PayFormTitleBar extends StatelessWidget {
                       : const Color(0xFFF5F5F5),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                      color: isDark
-                          ? const Color(0xFF333333)
-                          : AppTheme.border),
+                    color: isDark ? const Color(0xFF333333) : AppTheme.border,
+                  ),
                 ),
-                child: Icon(Icons.arrow_back_ios_new,
-                    size: 15,
-                    color: isDark
-                        ? const Color(0xFFAAAAAA)
-                        : const Color(0xFF8A8A8A)),
+                child: Icon(
+                  Icons.arrow_back_ios_new,
+                  size: 15,
+                  color: isDark
+                      ? const Color(0xFFAAAAAA)
+                      : const Color(0xFF8A8A8A),
+                ),
               ),
             ),
             const SizedBox(width: 12),
@@ -840,26 +870,31 @@ class _PayFormTitleBar extends StatelessWidget {
               color: AppTheme.tealColor.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(Icons.payments_outlined,
-                size: 18, color: AppTheme.tealColor),
+            child: const Icon(
+              Icons.payments_outlined,
+              size: 18,
+              color: AppTheme.tealColor,
+            ),
           ),
           const SizedBox(width: 12),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('จ่ายเงินซัพพลายเออร์',
-                  style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: isDark
-                          ? Colors.white
-                          : const Color(0xFF1A1A1A))),
-              Text('บันทึกการชำระเงินและจัดสรรใบแจ้งหนี้',
-                  style: TextStyle(
-                      fontSize: 11,
-                      color: isDark
-                          ? const Color(0xFF888888)
-                          : AppTheme.textSub)),
+              Text(
+                'จ่ายเงินซัพพลายเออร์',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+                ),
+              ),
+              Text(
+                'บันทึกการชำระเงินและจัดสรรใบแจ้งหนี้',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: isDark ? const Color(0xFF888888) : AppTheme.textSub,
+                ),
+              ),
             ],
           ),
         ],
@@ -890,56 +925,51 @@ class _SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        decoration: BoxDecoration(
-          color: isDark ? AppTheme.darkCard : Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-              color: isDark
-                  ? const Color(0xFF2C2C2C)
-                  : AppTheme.border),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 14, vertical: 11),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.08),
-                borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(12)),
-                border: Border(
-                  bottom: BorderSide(
-                      color: isDark
-                          ? const Color(0xFF2C2C2C)
-                          : color.withValues(alpha: 0.15)),
+    decoration: BoxDecoration(
+      color: isDark ? AppTheme.darkCard : Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(
+        color: isDark ? const Color(0xFF2C2C2C) : AppTheme.border,
+      ),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.08),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+            border: Border(
+              bottom: BorderSide(
+                color: isDark
+                    ? const Color(0xFF2C2C2C)
+                    : color.withValues(alpha: 0.15),
+              ),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, size: 16, color: color),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: color,
                 ),
               ),
-              child: Row(
-                children: [
-                  Icon(icon, size: 16, color: color),
-                  const SizedBox(width: 8),
-                  Text(title,
-                      style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: color)),
-                  if (trailing != null) ...[
-                    const Spacer(),
-                    trailing!,
-                  ],
-                ],
-              ),
-            ),
-            // Body
-            Padding(
-              padding: const EdgeInsets.all(14),
-              child: child,
-            ),
-          ],
+              if (trailing != null) ...[const Spacer(), trailing!],
+            ],
+          ),
         ),
-      );
+        // Body
+        Padding(padding: const EdgeInsets.all(14), child: child),
+      ],
+    ),
+  );
 }
 
 // ── Form Fields ────────────────────────────────────────────────
@@ -963,52 +993,49 @@ class _PayTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => TextFormField(
-        controller: controller,
-        maxLines: maxLines,
-        readOnly: readOnly,
-        style: TextStyle(
-            fontSize: 13,
-            color: isDark
-                ? (readOnly ? Colors.white38 : Colors.white)
-                : (readOnly ? Colors.black38 : Colors.black87)),
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: TextStyle(
-              fontSize: 13,
-              color: isDark
-                  ? const Color(0xFF666666)
-                  : AppTheme.textSub),
-          prefixIcon: Icon(icon,
-              size: 17,
-              color: isDark
-                  ? const Color(0xFF666666)
-                  : AppTheme.textSub),
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(
-                  color: isDark
-                      ? const Color(0xFF3A3A3A)
-                      : AppTheme.border)),
-          enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(
-                  color: isDark
-                      ? const Color(0xFF3A3A3A)
-                      : AppTheme.border)),
-          focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(
-                  color: AppTheme.tealColor, width: 1.5)),
-          filled: true,
-          fillColor: isDark
-              ? AppTheme.darkElement
-              : (readOnly
-                  ? const Color(0xFFF5F5F5)
-                  : Colors.white),
+    controller: controller,
+    maxLines: maxLines,
+    readOnly: readOnly,
+    style: TextStyle(
+      fontSize: 13,
+      color: isDark
+          ? (readOnly ? Colors.white38 : Colors.white)
+          : (readOnly ? Colors.black38 : Colors.black87),
+    ),
+    decoration: InputDecoration(
+      hintText: hint,
+      hintStyle: TextStyle(
+        fontSize: 13,
+        color: isDark ? const Color(0xFF666666) : AppTheme.textSub,
+      ),
+      prefixIcon: Icon(
+        icon,
+        size: 17,
+        color: isDark ? const Color(0xFF666666) : AppTheme.textSub,
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(
+          color: isDark ? const Color(0xFF3A3A3A) : AppTheme.border,
         ),
-      );
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(
+          color: isDark ? const Color(0xFF3A3A3A) : AppTheme.border,
+        ),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: AppTheme.tealColor, width: 1.5),
+      ),
+      filled: true,
+      fillColor: isDark
+          ? AppTheme.darkElement
+          : (readOnly ? const Color(0xFFF5F5F5) : Colors.white),
+    ),
+  );
 }
 
 class _DatePickerField extends StatelessWidget {
@@ -1028,44 +1055,43 @@ class _DatePickerField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => InkWell(
-        onTap: onPick,
+    onTap: onPick,
+    borderRadius: BorderRadius.circular(8),
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkElement : Colors.white,
         borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(
-              horizontal: 12, vertical: 12),
-          decoration: BoxDecoration(
-            color: isDark ? AppTheme.darkElement : Colors.white,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-                color: isDark
-                    ? const Color(0xFF3A3A3A)
-                    : AppTheme.border),
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.calendar_today_outlined,
-                  size: 17,
-                  color: isDark
-                      ? const Color(0xFF666666)
-                      : AppTheme.textSub),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  '$label: ${DateFormat('dd/MM/yyyy').format(date)}',
-                  style: TextStyle(
-                      fontSize: 13,
-                      color: isDark ? Colors.white : Colors.black87),
-                ),
-              ),
-              Icon(Icons.chevron_right,
-                  size: 18,
-                  color: isDark
-                      ? const Color(0xFF666666)
-                      : AppTheme.textSub),
-            ],
-          ),
+        border: Border.all(
+          color: isDark ? const Color(0xFF3A3A3A) : AppTheme.border,
         ),
-      );
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.calendar_today_outlined,
+            size: 17,
+            color: isDark ? const Color(0xFF666666) : AppTheme.textSub,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              '$label: ${DateFormat('dd/MM/yyyy').format(date)}',
+              style: TextStyle(
+                fontSize: 13,
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+            ),
+          ),
+          Icon(
+            Icons.chevron_right,
+            size: 18,
+            color: isDark ? const Color(0xFF666666) : AppTheme.textSub,
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _SupplierPickerField extends StatelessWidget {
@@ -1083,54 +1109,49 @@ class _SupplierPickerField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => InkWell(
-        onTap: onPick,
+    onTap: onPick,
+    borderRadius: BorderRadius.circular(8),
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkElement : Colors.white,
         borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(
-              horizontal: 12, vertical: 12),
-          decoration: BoxDecoration(
-            color: isDark ? AppTheme.darkElement : Colors.white,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-                color: supplierName == null
-                    ? (isDark
-                        ? const Color(0xFF3A3A3A)
-                        : AppTheme.border)
-                    : accentColor.withValues(alpha: 0.4)),
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.business_outlined,
-                  size: 17,
-                  color: supplierName != null
-                      ? accentColor
-                      : (isDark
-                          ? const Color(0xFF666666)
-                          : AppTheme.textSub)),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  supplierName ?? 'เลือกซัพพลายเออร์',
-                  style: TextStyle(
-                      fontSize: 13,
-                      color: supplierName != null
-                          ? (isDark
-                              ? Colors.white
-                              : Colors.black87)
-                          : (isDark
-                              ? const Color(0xFF666666)
-                              : AppTheme.textSub)),
-                ),
-              ),
-              Icon(Icons.chevron_right,
-                  size: 18,
-                  color: isDark
-                      ? const Color(0xFF666666)
-                      : AppTheme.textSub),
-            ],
-          ),
+        border: Border.all(
+          color: supplierName == null
+              ? (isDark ? const Color(0xFF3A3A3A) : AppTheme.border)
+              : accentColor.withValues(alpha: 0.4),
         ),
-      );
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.business_outlined,
+            size: 17,
+            color: supplierName != null
+                ? accentColor
+                : (isDark ? const Color(0xFF666666) : AppTheme.textSub),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              supplierName ?? 'เลือกซัพพลายเออร์',
+              style: TextStyle(
+                fontSize: 13,
+                color: supplierName != null
+                    ? (isDark ? Colors.white : Colors.black87)
+                    : (isDark ? const Color(0xFF666666) : AppTheme.textSub),
+              ),
+            ),
+          ),
+          Icon(
+            Icons.chevron_right,
+            size: 18,
+            color: isDark ? const Color(0xFF666666) : AppTheme.textSub,
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _PayMethodDropdown extends StatelessWidget {
@@ -1148,55 +1169,54 @@ class _PayMethodDropdown extends StatelessWidget {
 
   Color get _methodColor {
     switch (value) {
-      case 'CASH':     return AppTheme.success;
-      case 'TRANSFER': return AppTheme.info;
-      case 'CHEQUE':   return AppTheme.warning;
-      default:         return accentColor;
+      case 'CASH':
+        return AppTheme.success;
+      case 'TRANSFER':
+        return AppTheme.info;
+      case 'CHEQUE':
+        return AppTheme.warning;
+      default:
+        return accentColor;
     }
   }
 
   @override
   Widget build(BuildContext context) => DropdownButtonFormField<String>(
-        initialValue: value,
-        decoration: InputDecoration(
-          prefixIcon: Icon(Icons.payment_outlined,
-              size: 17, color: _methodColor),
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(
-                  color: isDark
-                      ? const Color(0xFF3A3A3A)
-                      : AppTheme.border)),
-          enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(
-                  color: isDark
-                      ? const Color(0xFF3A3A3A)
-                      : AppTheme.border)),
-          focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(
-                  color: accentColor, width: 1.5)),
-          filled: true,
-          fillColor:
-              isDark ? AppTheme.darkElement : Colors.white,
+    initialValue: value,
+    decoration: InputDecoration(
+      prefixIcon: Icon(Icons.payment_outlined, size: 17, color: _methodColor),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(
+          color: isDark ? const Color(0xFF3A3A3A) : AppTheme.border,
         ),
-        dropdownColor: isDark ? AppTheme.darkCard : Colors.white,
-        style: TextStyle(
-            fontSize: 13,
-            color: isDark ? Colors.white : Colors.black87),
-        items: const [
-          DropdownMenuItem(value: 'CASH',
-              child: Text('เงินสด')),
-          DropdownMenuItem(value: 'TRANSFER',
-              child: Text('โอนเงิน')),
-          DropdownMenuItem(value: 'CHEQUE',
-              child: Text('เช็ค')),
-        ],
-        onChanged: onChanged,
-      );
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(
+          color: isDark ? const Color(0xFF3A3A3A) : AppTheme.border,
+        ),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(color: accentColor, width: 1.5),
+      ),
+      filled: true,
+      fillColor: isDark ? AppTheme.darkElement : Colors.white,
+    ),
+    dropdownColor: isDark ? AppTheme.darkCard : Colors.white,
+    style: TextStyle(
+      fontSize: 13,
+      color: isDark ? Colors.white : Colors.black87,
+    ),
+    items: const [
+      DropdownMenuItem(value: 'CASH', child: Text('เงินสด')),
+      DropdownMenuItem(value: 'TRANSFER', child: Text('โอนเงิน')),
+      DropdownMenuItem(value: 'CHEQUE', child: Text('เช็ค')),
+    ],
+    onChanged: onChanged,
+  );
 }
 
 class _SummaryRow extends StatelessWidget {
@@ -1204,28 +1224,31 @@ class _SummaryRow extends StatelessWidget {
   final String value;
   final bool isDark;
 
-  const _SummaryRow(
-      {required this.label,
-      required this.value,
-      required this.isDark});
+  const _SummaryRow({
+    required this.label,
+    required this.value,
+    required this.isDark,
+  });
 
   @override
   Widget build(BuildContext context) => Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label,
-              style: TextStyle(
-                  fontSize: 13,
-                  color: isDark
-                      ? const Color(0xFFAAAAAA)
-                      : AppTheme.textSub)),
-          Text(value,
-              style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: isDark
-                      ? Colors.white
-                      : const Color(0xFF1A1A1A))),
-        ],
-      );
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+      Text(
+        label,
+        style: TextStyle(
+          fontSize: 13,
+          color: isDark ? const Color(0xFFAAAAAA) : AppTheme.textSub,
+        ),
+      ),
+      Text(
+        value,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+        ),
+      ),
+    ],
+  );
 }

@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import '../providers/promotion_provider.dart';
 import '../../data/models/promotion_model.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
+import 'package:pos_erp/shared/widgets/escape_pop_scope.dart';
 import '../../../products/presentation/providers/product_provider.dart';
 import '../../../products/data/models/product_model.dart';
 
@@ -39,16 +40,17 @@ class _PromotionFormPageState extends ConsumerState<PromotionFormPage> {
   String _promotionType = 'DISCOUNT_PERCENT';
   String _applyTo = 'ALL';
   List<String> _applyToIds = [];
+
   /// cache: id → display name (ใช้แสดงใน chips)
   final Map<String, String> _idToLabel = {};
+
   /// BUY_X_GET_Y — สินค้าแถม (null = สินค้าเดิม)
   String? _getProductId;
   String? _getProductName;
   bool _isExclusive = false;
   bool _isActive = true;
   DateTime _startDate = DateTime.now();
-  DateTime _endDate =
-      DateTime.now().add(const Duration(days: 30));
+  DateTime _endDate = DateTime.now().add(const Duration(days: 30));
 
   final _dateFmt = DateFormat('dd/MM/yyyy', 'th_TH');
 
@@ -57,7 +59,10 @@ class _PromotionFormPageState extends ConsumerState<PromotionFormPage> {
   String _buildCode() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     final rng = Random();
-    final suffix = List.generate(6, (_) => chars[rng.nextInt(chars.length)]).join();
+    final suffix = List.generate(
+      6,
+      (_) => chars[rng.nextInt(chars.length)],
+    ).join();
     return 'PROMO$suffix';
   }
 
@@ -72,23 +77,24 @@ class _PromotionFormPageState extends ConsumerState<PromotionFormPage> {
     _codeCtrl = TextEditingController(text: p?.promotionCode ?? _buildCode());
     _nameCtrl = TextEditingController(text: p?.promotionName ?? '');
     _discountValueCtrl = TextEditingController(
-        text: p?.discountValue != null && p!.discountValue > 0
-            ? p.discountValue.toString()
-            : '');
+      text: p?.discountValue != null && p!.discountValue > 0
+          ? p.discountValue.toString()
+          : '',
+    );
     _maxDiscountCtrl = TextEditingController(
-        text: p?.maxDiscountAmount?.toString() ?? '');
+      text: p?.maxDiscountAmount?.toString() ?? '',
+    );
     _minAmountCtrl = TextEditingController(
-        text: p?.minAmount != null && p!.minAmount > 0
-            ? p.minAmount.toString()
-            : '');
-    _buyQtyCtrl =
-        TextEditingController(text: p?.buyQty?.toString() ?? '');
-    _getQtyCtrl =
-        TextEditingController(text: p?.getQty?.toString() ?? '');
-    _maxUsesCtrl =
-        TextEditingController(text: p?.maxUses?.toString() ?? '');
+      text: p?.minAmount != null && p!.minAmount > 0
+          ? p.minAmount.toString()
+          : '',
+    );
+    _buyQtyCtrl = TextEditingController(text: p?.buyQty?.toString() ?? '');
+    _getQtyCtrl = TextEditingController(text: p?.getQty?.toString() ?? '');
+    _maxUsesCtrl = TextEditingController(text: p?.maxUses?.toString() ?? '');
     _maxUsesPerCustomerCtrl = TextEditingController(
-        text: p?.maxUsesPerCustomer?.toString() ?? '');
+      text: p?.maxUsesPerCustomer?.toString() ?? '',
+    );
 
     if (p != null) {
       _promotionType = p.promotionType;
@@ -121,41 +127,42 @@ class _PromotionFormPageState extends ConsumerState<PromotionFormPage> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor:
-          isDark ? AppTheme.darkBg : const Color(0xFFF5F5F5),
-      body: Column(
-        children: [
-          // ── Title Bar ───────────────────────────────────────────
-          _TitleBar(isEdit: isEdit, isLoading: _isLoading, onSave: _save),
+      backgroundColor: isDark ? AppTheme.darkBg : const Color(0xFFF5F5F5),
+      body: EscapePopScope(
+        child: Column(
+          children: [
+            // ── Title Bar ───────────────────────────────────────────
+            _TitleBar(isEdit: isEdit, isLoading: _isLoading, onSave: _save),
 
-          // ── Form Body ───────────────────────────────────────────
-          Expanded(
-            child: Form(
-              key: _formKey,
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    _buildBasicInfoCard(),
-                    const SizedBox(height: 12),
-                    _buildPromotionTypeCard(),
-                    const SizedBox(height: 12),
-                    _buildDiscountDetailCard(),
-                    const SizedBox(height: 12),
-                    _buildConditionCard(),
-                    const SizedBox(height: 12),
-                    _buildPeriodCard(),
-                    const SizedBox(height: 12),
-                    _buildLimitCard(),
-                    const SizedBox(height: 12),
-                    _buildSettingsCard(),
-                    const SizedBox(height: 32),
-                  ],
+            // ── Form Body ───────────────────────────────────────────
+            Expanded(
+              child: Form(
+                key: _formKey,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      _buildBasicInfoCard(),
+                      const SizedBox(height: 12),
+                      _buildPromotionTypeCard(),
+                      const SizedBox(height: 12),
+                      _buildDiscountDetailCard(),
+                      const SizedBox(height: 12),
+                      _buildConditionCard(),
+                      const SizedBox(height: 12),
+                      _buildPeriodCard(),
+                      const SizedBox(height: 12),
+                      _buildLimitCard(),
+                      const SizedBox(height: 12),
+                      _buildSettingsCard(),
+                      const SizedBox(height: 32),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -170,19 +177,23 @@ class _PromotionFormPageState extends ConsumerState<PromotionFormPage> {
           TextFormField(
             controller: _codeCtrl,
             textCapitalization: TextCapitalization.characters,
-            decoration: _inputDeco(label: 'รหัสโปรโมชั่น *', icon: Icons.tag).copyWith(
-              suffixIcon: IconButton(
-                icon: const Icon(Icons.auto_awesome, size: 20),
-                tooltip: 'สร้างรหัสอัตโนมัติ',
-                onPressed: isEdit ? null : _generateCode,
-              ),
-            ),
+            decoration: _inputDeco(label: 'รหัสโปรโมชั่น *', icon: Icons.tag)
+                .copyWith(
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.auto_awesome, size: 20),
+                    tooltip: 'สร้างรหัสอัตโนมัติ',
+                    onPressed: isEdit ? null : _generateCode,
+                  ),
+                ),
             validator: (v) => v == null || v.isEmpty ? 'กรุณากรอกรหัส' : null,
           ),
           const SizedBox(height: 12),
           TextFormField(
             controller: _nameCtrl,
-            decoration: _inputDeco(label: 'ชื่อโปรโมชั่น *', icon: Icons.label_outline),
+            decoration: _inputDeco(
+              label: 'ชื่อโปรโมชั่น *',
+              icon: Icons.label_outline,
+            ),
             validator: (v) => v == null || v.isEmpty ? 'กรุณากรอกชื่อ' : null,
           ),
         ],
@@ -190,30 +201,43 @@ class _PromotionFormPageState extends ConsumerState<PromotionFormPage> {
     );
   }
 
-  InputDecoration _inputDeco({required String label, IconData? icon, String? prefix, String? suffix}) =>
-      InputDecoration(
-        labelText: label,
-        labelStyle: const TextStyle(color: AppTheme.textSub, fontSize: 13),
-        floatingLabelStyle: const TextStyle(color: AppTheme.infoColor, fontSize: 12),
-        prefixIcon: icon != null ? Icon(icon, size: 18) : null,
-        prefixText: prefix,
-        suffixText: suffix,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: AppTheme.border)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: AppTheme.border)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: AppTheme.primary, width: 1.5)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-      );
+  InputDecoration _inputDeco({
+    required String label,
+    IconData? icon,
+    String? prefix,
+    String? suffix,
+  }) => InputDecoration(
+    labelText: label,
+    labelStyle: const TextStyle(color: AppTheme.textSub, fontSize: 13),
+    floatingLabelStyle: const TextStyle(
+      color: AppTheme.infoColor,
+      fontSize: 12,
+    ),
+    prefixIcon: icon != null ? Icon(icon, size: 18) : null,
+    prefixText: prefix,
+    suffixText: suffix,
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: const BorderSide(color: AppTheme.border),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: const BorderSide(color: AppTheme.border),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
+    ),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+  );
 
   // ─── Promotion Type ───────────────────────────────────────────────────────
   Widget _buildPromotionTypeCard() {
     const types = [
-      ('DISCOUNT_PERCENT', 'ลดเปอร์เซ็นต์', Icons.percent,     Color(0xFF9C27B0)),
-      ('DISCOUNT_AMOUNT',  'ลดจำนวนเงิน',   Icons.money,        AppTheme.successColor),
-      ('BUY_X_GET_Y',      'ซื้อ X แถม Y',   Icons.card_giftcard, AppTheme.errorColor),
-      ('FREE_ITEM',        'ของแถมฟรี',       Icons.free_breakfast, Color(0xFF009688)),
+      ('DISCOUNT_PERCENT', 'ลดเปอร์เซ็นต์', Icons.percent, Color(0xFF9C27B0)),
+      ('DISCOUNT_AMOUNT', 'ลดจำนวนเงิน', Icons.money, AppTheme.successColor),
+      ('BUY_X_GET_Y', 'ซื้อ X แถม Y', Icons.card_giftcard, AppTheme.errorColor),
+      ('FREE_ITEM', 'ของแถมฟรี', Icons.free_breakfast, Color(0xFF009688)),
     ];
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -240,20 +264,30 @@ class _PromotionFormPageState extends ConsumerState<PromotionFormPage> {
                     ? color.withValues(alpha: 0.12)
                     : (isDark ? AppTheme.darkBg : const Color(0xFFF5F5F5)),
                 border: Border.all(
-                    color: selected ? color : AppTheme.border,
-                    width: selected ? 1.5 : 1),
+                  color: selected ? color : AppTheme.border,
+                  width: selected ? 1.5 : 1,
+                ),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(t.$3, color: selected ? color : AppTheme.textSub, size: 18),
+                  Icon(
+                    t.$3,
+                    color: selected ? color : AppTheme.textSub,
+                    size: 18,
+                  ),
                   const SizedBox(width: 6),
-                  Text(t.$2,
-                      style: TextStyle(
-                          color: selected ? color : AppTheme.textSub,
-                          fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-                          fontSize: 13)),
+                  Text(
+                    t.$2,
+                    style: TextStyle(
+                      color: selected ? color : AppTheme.textSub,
+                      fontWeight: selected
+                          ? FontWeight.w600
+                          : FontWeight.normal,
+                      fontSize: 13,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -279,23 +313,33 @@ class _PromotionFormPageState extends ConsumerState<PromotionFormPage> {
               validator: (v) {
                 if (v == null || v.isEmpty) return 'กรุณากรอกค่า';
                 final n = double.tryParse(v);
-                if (n == null || n <= 0 || n > 100) return 'ต้องอยู่ระหว่าง 1-100';
+                if (n == null || n <= 0 || n > 100)
+                  return 'ต้องอยู่ระหว่าง 1-100';
                 return null;
               },
             ),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
-              children: [5, 10, 15, 20, 25, 30, 50].map((v) => ActionChip(
-                label: Text('$v%', style: const TextStyle(fontSize: 12)),
-                onPressed: () => setState(() => _discountValueCtrl.text = v.toString()),
-              )).toList(),
+              children: [5, 10, 15, 20, 25, 30, 50]
+                  .map(
+                    (v) => ActionChip(
+                      label: Text('$v%', style: const TextStyle(fontSize: 12)),
+                      onPressed: () => setState(
+                        () => _discountValueCtrl.text = v.toString(),
+                      ),
+                    ),
+                  )
+                  .toList(),
             ),
             const SizedBox(height: 12),
             TextFormField(
               controller: _maxDiscountCtrl,
               keyboardType: TextInputType.number,
-              decoration: _inputDeco(label: 'ลดสูงสุด (฿) — ไม่ระบุ = ไม่จำกัด', prefix: '฿ '),
+              decoration: _inputDeco(
+                label: 'ลดสูงสุด (฿) — ไม่ระบุ = ไม่จำกัด',
+                prefix: '฿ ',
+              ),
             ),
           ] else if (_promotionType == 'DISCOUNT_AMOUNT') ...[
             TextFormField(
@@ -312,10 +356,16 @@ class _PromotionFormPageState extends ConsumerState<PromotionFormPage> {
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
-              children: [20, 50, 100, 150, 200, 500].map((v) => ActionChip(
-                label: Text('฿$v', style: const TextStyle(fontSize: 12)),
-                onPressed: () => setState(() => _discountValueCtrl.text = v.toString()),
-              )).toList(),
+              children: [20, 50, 100, 150, 200, 500]
+                  .map(
+                    (v) => ActionChip(
+                      label: Text('฿$v', style: const TextStyle(fontSize: 12)),
+                      onPressed: () => setState(
+                        () => _discountValueCtrl.text = v.toString(),
+                      ),
+                    ),
+                  )
+                  .toList(),
             ),
           ] else if (_promotionType == 'BUY_X_GET_Y') ...[
             Row(
@@ -325,19 +375,24 @@ class _PromotionFormPageState extends ConsumerState<PromotionFormPage> {
                     controller: _buyQtyCtrl,
                     keyboardType: TextInputType.number,
                     decoration: _inputDeco(label: 'ซื้อ (ชิ้น) *'),
-                    validator: (v) => v == null || v.isEmpty ? 'กรุณากรอก' : null,
+                    validator: (v) =>
+                        v == null || v.isEmpty ? 'กรุณากรอก' : null,
                   ),
                 ),
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 12),
-                  child: Text('แถม', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  child: Text(
+                    'แถม',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
                 ),
                 Expanded(
                   child: TextFormField(
                     controller: _getQtyCtrl,
                     keyboardType: TextInputType.number,
                     decoration: _inputDeco(label: 'ได้ฟรี (ชิ้น) *'),
-                    validator: (v) => v == null || v.isEmpty ? 'กรุณากรอก' : null,
+                    validator: (v) =>
+                        v == null || v.isEmpty ? 'กรุณากรอก' : null,
                   ),
                 ),
               ],
@@ -346,10 +401,16 @@ class _PromotionFormPageState extends ConsumerState<PromotionFormPage> {
             // ── Free product picker ──────────────────────────────
             Row(
               children: [
-                const Icon(Icons.card_giftcard, size: 16, color: AppTheme.textSub),
+                const Icon(
+                  Icons.card_giftcard,
+                  size: 16,
+                  color: AppTheme.textSub,
+                ),
                 const SizedBox(width: 8),
-                const Text('สินค้าแถม:',
-                    style: TextStyle(fontSize: 13, color: AppTheme.textSub)),
+                const Text(
+                  'สินค้าแถม:',
+                  style: TextStyle(fontSize: 13, color: AppTheme.textSub),
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -373,7 +434,11 @@ class _PromotionFormPageState extends ConsumerState<PromotionFormPage> {
                 ),
                 if (_getProductId != null)
                   IconButton(
-                    icon: const Icon(Icons.close, size: 16, color: AppTheme.textSub),
+                    icon: const Icon(
+                      Icons.close,
+                      size: 16,
+                      color: AppTheme.textSub,
+                    ),
                     tooltip: 'ใช้สินค้าเดิม',
                     onPressed: () => setState(() {
                       _getProductId = null;
@@ -403,16 +468,25 @@ class _PromotionFormPageState extends ConsumerState<PromotionFormPage> {
           TextFormField(
             controller: _minAmountCtrl,
             keyboardType: TextInputType.number,
-            decoration: _inputDeco(label: 'ยอดซื้อขั้นต่ำ (฿) — ไม่ระบุ = ไม่มีขั้นต่ำ', prefix: '฿ '),
+            decoration: _inputDeco(
+              label: 'ยอดซื้อขั้นต่ำ (฿) — ไม่ระบุ = ไม่มีขั้นต่ำ',
+              prefix: '฿ ',
+            ),
           ),
           const SizedBox(height: 16),
-          const Text('ใช้ได้กับ',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textSub)),
+          const Text(
+            'ใช้ได้กับ',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textSub,
+            ),
+          ),
           const SizedBox(height: 8),
           SegmentedButton<String>(
             segments: const [
-              ButtonSegment(value: 'ALL',      label: Text('ทุกสินค้า')),
-              ButtonSegment(value: 'PRODUCT',  label: Text('สินค้าที่เลือก')),
+              ButtonSegment(value: 'ALL', label: Text('ทุกสินค้า')),
+              ButtonSegment(value: 'PRODUCT', label: Text('สินค้าที่เลือก')),
               ButtonSegment(value: 'CATEGORY', label: Text('หมวดหมู่')),
             ],
             selected: {_applyTo},
@@ -431,15 +505,19 @@ class _PromotionFormPageState extends ConsumerState<PromotionFormPage> {
             OutlinedButton.icon(
               onPressed: _openProductSelector,
               icon: const Icon(Icons.checklist, size: 18),
-              label: Text(_applyToIds.isEmpty
-                  ? 'เลือกสินค้า'
-                  : 'แก้ไขสินค้าที่เลือก (${_applyToIds.length})'),
+              label: Text(
+                _applyToIds.isEmpty
+                    ? 'เลือกสินค้า'
+                    : 'แก้ไขสินค้าที่เลือก (${_applyToIds.length})',
+              ),
             ),
             if (_applyToIds.isEmpty)
               const Padding(
                 padding: EdgeInsets.only(top: 8),
-                child: Text('* กรุณาเลือกสินค้าอย่างน้อย 1 รายการ',
-                    style: TextStyle(color: AppTheme.errorColor, fontSize: 12)),
+                child: Text(
+                  '* กรุณาเลือกสินค้าอย่างน้อย 1 รายการ',
+                  style: TextStyle(color: AppTheme.errorColor, fontSize: 12),
+                ),
               ),
           ] else if (_applyTo == 'CATEGORY') ...[
             const SizedBox(height: 12),
@@ -451,15 +529,19 @@ class _PromotionFormPageState extends ConsumerState<PromotionFormPage> {
             OutlinedButton.icon(
               onPressed: _openCategorySelector,
               icon: const Icon(Icons.category_outlined, size: 18),
-              label: Text(_applyToIds.isEmpty
-                  ? 'เลือกหมวดหมู่'
-                  : 'แก้ไขหมวดหมู่ที่เลือก (${_applyToIds.length})'),
+              label: Text(
+                _applyToIds.isEmpty
+                    ? 'เลือกหมวดหมู่'
+                    : 'แก้ไขหมวดหมู่ที่เลือก (${_applyToIds.length})',
+              ),
             ),
             if (_applyToIds.isEmpty)
               const Padding(
                 padding: EdgeInsets.only(top: 8),
-                child: Text('* กรุณาเลือกหมวดหมู่อย่างน้อย 1 รายการ',
-                    style: TextStyle(color: AppTheme.errorColor, fontSize: 12)),
+                child: Text(
+                  '* กรุณาเลือกหมวดหมู่อย่างน้อย 1 รายการ',
+                  style: TextStyle(color: AppTheme.errorColor, fontSize: 12),
+                ),
               ),
           ],
         ],
@@ -478,13 +560,20 @@ class _PromotionFormPageState extends ConsumerState<PromotionFormPage> {
       child: Wrap(
         spacing: 6,
         runSpacing: 4,
-        children: ids.map((id) => Chip(
-          label: Text(labelBuilder(id), style: const TextStyle(fontSize: 12)),
-          deleteIcon: const Icon(Icons.close, size: 14),
-          onDeleted: () => onRemove(id),
-          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          visualDensity: VisualDensity.compact,
-        )).toList(),
+        children: ids
+            .map(
+              (id) => Chip(
+                label: Text(
+                  labelBuilder(id),
+                  style: const TextStyle(fontSize: 12),
+                ),
+                deleteIcon: const Icon(Icons.close, size: 14),
+                onDeleted: () => onRemove(id),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                visualDensity: VisualDensity.compact,
+              ),
+            )
+            .toList(),
       ),
     );
   }
@@ -492,23 +581,22 @@ class _PromotionFormPageState extends ConsumerState<PromotionFormPage> {
   // ─── Product Selector ─────────────────────────────────────────────────────
   Future<void> _openProductSelector() async {
     // โหลดสินค้าถ้ายังไม่มี
-    List<ProductModel> allProducts =
-        ref.read(productListProvider).value ?? [];
+    List<ProductModel> allProducts = ref.read(productListProvider).value ?? [];
     if (allProducts.isEmpty) {
-      await ref
-          .read(productListProvider.notifier)
-          .refresh(activeOnly: true);
+      await ref.read(productListProvider.notifier).refresh(activeOnly: true);
       allProducts = ref.read(productListProvider).value ?? [];
     }
 
     if (!mounted) return;
 
     final items = allProducts
-        .map((p) => _SelectableItem(
-              id: p.productId,
-              primaryText: p.productName,
-              secondaryText: p.productCode,
-            ))
+        .map(
+          (p) => _SelectableItem(
+            id: p.productId,
+            primaryText: p.productName,
+            secondaryText: p.productCode,
+          ),
+        )
         .toList();
 
     // อัปเดต cache ชื่อสินค้า เพื่อแสดงใน chips
@@ -543,11 +631,13 @@ class _PromotionFormPageState extends ConsumerState<PromotionFormPage> {
     if (!mounted) return;
 
     final items = allGroups
-        .map((g) => _SelectableItem(
-              id: g.groupId,
-              primaryText: g.groupName,
-              secondaryText: g.groupCode,
-            ))
+        .map(
+          (g) => _SelectableItem(
+            id: g.groupId,
+            primaryText: g.groupName,
+            secondaryText: g.groupCode,
+          ),
+        )
         .toList();
 
     // อัปเดต cache ชื่อหมวดหมู่ เพื่อแสดงใน chips
@@ -570,8 +660,7 @@ class _PromotionFormPageState extends ConsumerState<PromotionFormPage> {
 
   // ─── Free Product Selector (BUY_X_GET_Y) ────────────────────────────────
   Future<void> _openFreeProductSelector() async {
-    List<ProductModel> allProducts =
-        ref.read(productListProvider).value ?? [];
+    List<ProductModel> allProducts = ref.read(productListProvider).value ?? [];
     if (allProducts.isEmpty) {
       await ref.read(productListProvider.notifier).refresh(activeOnly: true);
       allProducts = ref.read(productListProvider).value ?? [];
@@ -585,11 +674,13 @@ class _PromotionFormPageState extends ConsumerState<PromotionFormPage> {
     }
 
     final items = allProducts
-        .map((p) => _SelectableItem(
-              id: p.productId,
-              primaryText: p.productName,
-              secondaryText: p.productCode,
-            ))
+        .map(
+          (p) => _SelectableItem(
+            id: p.productId,
+            primaryText: p.productName,
+            secondaryText: p.productCode,
+          ),
+        )
         .toList();
 
     final selected = await showDialog<List<String>>(
@@ -623,9 +714,21 @@ class _PromotionFormPageState extends ConsumerState<PromotionFormPage> {
         children: [
           Row(
             children: [
-              Expanded(child: _dateField(label: 'เริ่มต้น', value: _startDate, onTap: () => _pickDate(isStart: true))),
+              Expanded(
+                child: _dateField(
+                  label: 'เริ่มต้น',
+                  value: _startDate,
+                  onTap: () => _pickDate(isStart: true),
+                ),
+              ),
               const SizedBox(width: 12),
-              Expanded(child: _dateField(label: 'สิ้นสุด', value: _endDate, onTap: () => _pickDate(isStart: false))),
+              Expanded(
+                child: _dateField(
+                  label: 'สิ้นสุด',
+                  value: _endDate,
+                  onTap: () => _pickDate(isStart: false),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 8),
@@ -644,29 +747,48 @@ class _PromotionFormPageState extends ConsumerState<PromotionFormPage> {
     );
   }
 
-  Widget _dateField({required String label, required DateTime value, required VoidCallback onTap}) {
+  Widget _dateField({
+    required String label,
+    required DateTime value,
+    required VoidCallback onTap,
+  }) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
       child: InputDecorator(
         decoration: InputDecoration(
           labelText: label,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: AppTheme.border)),
-          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: AppTheme.border)),
-          suffixIcon: const Icon(Icons.calendar_today, size: 16, color: AppTheme.textSub),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: AppTheme.border),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: AppTheme.border),
+          ),
+          suffixIcon: const Icon(
+            Icons.calendar_today,
+            size: 16,
+            color: AppTheme.textSub,
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 14,
+          ),
         ),
-        child: Text(_dateFmt.format(value), style: const TextStyle(fontSize: 14)),
+        child: Text(
+          _dateFmt.format(value),
+          style: const TextStyle(fontSize: 14),
+        ),
       ),
     );
   }
 
   Widget _durationChip(String label, int days) => ActionChip(
-        label: Text(label, style: const TextStyle(fontSize: 12)),
-        onPressed: () => setState(() => _endDate = _startDate.add(Duration(days: days))),
-      );
+    label: Text(label, style: const TextStyle(fontSize: 12)),
+    onPressed: () =>
+        setState(() => _endDate = _startDate.add(Duration(days: days))),
+  );
 
   // ─── Usage Limit ──────────────────────────────────────────────────────────
   Widget _buildLimitCard() {
@@ -704,8 +826,10 @@ class _PromotionFormPageState extends ConsumerState<PromotionFormPage> {
         children: [
           SwitchListTile(
             title: const Text('เปิดใช้งาน'),
-            subtitle: const Text('โปรโมชั่นนี้จะถูกใช้งานในระบบ',
-                style: TextStyle(fontSize: 12, color: AppTheme.textSub)),
+            subtitle: const Text(
+              'โปรโมชั่นนี้จะถูกใช้งานในระบบ',
+              style: TextStyle(fontSize: 12, color: AppTheme.textSub),
+            ),
             value: _isActive,
             activeThumbColor: AppTheme.primaryColor,
             onChanged: (v) => setState(() => _isActive = v),
@@ -714,8 +838,10 @@ class _PromotionFormPageState extends ConsumerState<PromotionFormPage> {
           const Divider(height: 1, color: AppTheme.border),
           SwitchListTile(
             title: const Text('Exclusive'),
-            subtitle: const Text('เมื่อ Exclusive — โปรโมชั่นอื่นจะไม่ถูกรวมด้วย',
-                style: TextStyle(fontSize: 12, color: AppTheme.textSub)),
+            subtitle: const Text(
+              'เมื่อ Exclusive — โปรโมชั่นอื่นจะไม่ถูกรวมด้วย',
+              style: TextStyle(fontSize: 12, color: AppTheme.textSub),
+            ),
             value: _isExclusive,
             activeThumbColor: AppTheme.primaryColor,
             onChanged: (v) => setState(() => _isExclusive = v),
@@ -761,9 +887,11 @@ class _PromotionFormPageState extends ConsumerState<PromotionFormPage> {
     if (_applyTo != 'ALL' && _applyToIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(_applyTo == 'PRODUCT'
-              ? 'กรุณาเลือกสินค้าอย่างน้อย 1 รายการ'
-              : 'กรุณาเลือกหมวดหมู่อย่างน้อย 1 รายการ'),
+          content: Text(
+            _applyTo == 'PRODUCT'
+                ? 'กรุณาเลือกสินค้าอย่างน้อย 1 รายการ'
+                : 'กรุณาเลือกหมวดหมู่อย่างน้อย 1 รายการ',
+          ),
         ),
       );
       return;
@@ -773,31 +901,30 @@ class _PromotionFormPageState extends ConsumerState<PromotionFormPage> {
 
     final now = DateTime.now();
     final promo = PromotionModel(
-      promotionId: widget.promotion?.promotionId ??
-          'PROMO${now.millisecondsSinceEpoch}',
+      promotionId:
+          widget.promotion?.promotionId ?? 'PROMO${now.millisecondsSinceEpoch}',
       promotionCode: _codeCtrl.text.trim().toUpperCase(),
       promotionName: _nameCtrl.text.trim(),
       promotionType: _promotionType,
       discountType: _promotionType == 'DISCOUNT_PERCENT'
           ? 'PERCENT'
           : _promotionType == 'DISCOUNT_AMOUNT'
-              ? 'AMOUNT'
-              : null,
-      discountValue:
-          double.tryParse(_discountValueCtrl.text) ?? 0,
-      maxDiscountAmount:
-          double.tryParse(_maxDiscountCtrl.text),
+          ? 'AMOUNT'
+          : null,
+      discountValue: double.tryParse(_discountValueCtrl.text) ?? 0,
+      maxDiscountAmount: double.tryParse(_maxDiscountCtrl.text),
       buyQty: int.tryParse(_buyQtyCtrl.text),
       getQty: int.tryParse(_getQtyCtrl.text),
       getProductId: _promotionType == 'BUY_X_GET_Y' ? _getProductId : null,
       minAmount: double.tryParse(_minAmountCtrl.text) ?? 0,
       applyTo: _applyTo,
-      applyToIds: _applyTo == 'ALL' ? null : (_applyToIds.isEmpty ? null : List<String>.from(_applyToIds)),
+      applyToIds: _applyTo == 'ALL'
+          ? null
+          : (_applyToIds.isEmpty ? null : List<String>.from(_applyToIds)),
       startDate: _startDate,
       endDate: _endDate,
       maxUses: int.tryParse(_maxUsesCtrl.text),
-      maxUsesPerCustomer:
-          int.tryParse(_maxUsesPerCustomerCtrl.text),
+      maxUsesPerCustomer: int.tryParse(_maxUsesPerCustomerCtrl.text),
       isExclusive: _isExclusive,
       isActive: _isActive,
       createdAt: widget.promotion?.createdAt ?? now,
@@ -821,14 +948,15 @@ class _PromotionFormPageState extends ConsumerState<PromotionFormPage> {
       if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text(
-                  isEdit ? 'อัพเดทโปรโมชั่นแล้ว' : 'สร้างโปรโมชั่นแล้ว')),
+            content: Text(
+              isEdit ? 'อัพเดทโปรโมชั่นแล้ว' : 'สร้างโปรโมชั่นแล้ว',
+            ),
+          ),
         );
         Navigator.pop(context);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('เกิดข้อผิดพลาด กรุณาลองใหม่')),
+          const SnackBar(content: Text('เกิดข้อผิดพลาด กรุณาลองใหม่')),
         );
       }
     }
@@ -864,8 +992,11 @@ class _TitleBar extends StatelessWidget {
               borderRadius: BorderRadius.circular(6),
               child: Padding(
                 padding: const EdgeInsets.all(4),
-                child: Icon(Icons.arrow_back, size: 20,
-                    color: isDark ? Colors.white70 : AppTheme.textSub),
+                child: Icon(
+                  Icons.arrow_back,
+                  size: 20,
+                  color: isDark ? Colors.white70 : AppTheme.textSub,
+                ),
               ),
             ),
             const SizedBox(width: 10),
@@ -876,22 +1007,30 @@ class _TitleBar extends StatelessWidget {
               color: AppTheme.infoContainer,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(Icons.local_offer, color: AppTheme.infoColor, size: 20),
+            child: const Icon(
+              Icons.local_offer,
+              color: AppTheme.infoColor,
+              size: 20,
+            ),
           ),
           const SizedBox(width: 12),
           Text(
             isEdit ? 'แก้ไขโปรโมชั่น' : 'สร้างโปรโมชั่น',
             style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white : const Color(0xFF1A1A1A)),
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+            ),
           ),
           const Spacer(),
           if (isLoading)
             const SizedBox(
-              width: 20, height: 20,
+              width: 20,
+              height: 20,
               child: CircularProgressIndicator(
-                  color: AppTheme.primaryColor, strokeWidth: 2),
+                color: AppTheme.primaryColor,
+                strokeWidth: 2,
+              ),
             )
           else
             ElevatedButton.icon(
@@ -899,7 +1038,10 @@ class _TitleBar extends StatelessWidget {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primaryColor,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
               ),
               icon: const Icon(Icons.save, size: 16),
               label: const Text('บันทึก'),
@@ -947,20 +1089,20 @@ class _SectionCard extends StatelessWidget {
               children: [
                 Icon(icon, size: 16, color: AppTheme.infoColor),
                 const SizedBox(width: 8),
-                Text(title,
-                    style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF1A1A1A))),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1A1A1A),
+                  ),
+                ),
               ],
             ),
           ),
           const Divider(height: 1, color: AppTheme.border),
           // Body
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: child,
-          ),
+          Padding(padding: const EdgeInsets.all(16), child: child),
         ],
       ),
     );
@@ -976,24 +1118,25 @@ class _InfoBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: AppTheme.infoContainer,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppTheme.infoColor.withValues(alpha: 0.3)),
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: AppTheme.infoContainer,
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(color: AppTheme.infoColor.withValues(alpha: 0.3)),
+    ),
+    child: Row(
+      children: [
+        const Icon(Icons.info_outline, color: AppTheme.infoColor, size: 16),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(color: AppTheme.infoColor, fontSize: 12),
+          ),
         ),
-        child: Row(
-          children: [
-            const Icon(Icons.info_outline, color: AppTheme.infoColor, size: 16),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(text,
-                  style: const TextStyle(
-                      color: AppTheme.infoColor, fontSize: 12)),
-            ),
-          ],
-        ),
-      );
+      ],
+    ),
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -1064,8 +1207,10 @@ class _ItemSelectorDialogState extends State<_ItemSelectorDialog> {
   Widget build(BuildContext context) {
     final filtered = _filtered;
     return AlertDialog(
-      title: Text(widget.title,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+      title: Text(
+        widget.title,
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+      ),
       contentPadding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       content: SizedBox(
         width: 420,
@@ -1088,10 +1233,13 @@ class _ItemSelectorDialogState extends State<_ItemSelectorDialog> {
                       )
                     : null,
                 border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: AppTheme.border)),
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: AppTheme.border),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
                 isDense: true,
               ),
               onChanged: (v) => setState(() => _search = v),
@@ -1105,21 +1253,31 @@ class _ItemSelectorDialogState extends State<_ItemSelectorDialog> {
                     onPressed: filtered.isEmpty
                         ? null
                         : () => setState(
-                            () => _selected = filtered.map((e) => e.id).toList()),
-                    child: const Text('เลือกทั้งหมด',
-                        style: TextStyle(fontSize: 12)),
+                            () =>
+                                _selected = filtered.map((e) => e.id).toList(),
+                          ),
+                    child: const Text(
+                      'เลือกทั้งหมด',
+                      style: TextStyle(fontSize: 12),
+                    ),
                   ),
                   TextButton(
                     onPressed: _selected.isEmpty
                         ? null
                         : () => setState(() => _selected.clear()),
-                    child: const Text('ยกเลิกทั้งหมด',
-                        style: TextStyle(fontSize: 12)),
+                    child: const Text(
+                      'ยกเลิกทั้งหมด',
+                      style: TextStyle(fontSize: 12),
+                    ),
                   ),
                   const Spacer(),
-                  Text('เลือก ${_selected.length} รายการ',
-                      style: const TextStyle(
-                          fontSize: 12, color: AppTheme.textSub)),
+                  Text(
+                    'เลือก ${_selected.length} รายการ',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.textSub,
+                    ),
+                  ),
                 ],
               ),
             const Divider(height: 1, color: AppTheme.border),
@@ -1127,15 +1285,19 @@ class _ItemSelectorDialogState extends State<_ItemSelectorDialog> {
             Expanded(
               child: filtered.isEmpty
                   ? const Center(
-                      child: Text('ไม่พบรายการ',
-                          style: TextStyle(color: AppTheme.textSub)))
+                      child: Text(
+                        'ไม่พบรายการ',
+                        style: TextStyle(color: AppTheme.textSub),
+                      ),
+                    )
                   : ListView.builder(
                       itemCount: filtered.length,
                       itemBuilder: (_, i) {
                         final item = filtered[i];
                         final checked = _selected.contains(item.id);
                         if (widget.singleSelect) {
-                          final isSelected = _selected.isNotEmpty &&
+                          final isSelected =
+                              _selected.isNotEmpty &&
                               _selected.first == item.id;
                           return ListTile(
                             leading: Icon(
@@ -1147,17 +1309,23 @@ class _ItemSelectorDialogState extends State<_ItemSelectorDialog> {
                                   : AppTheme.textSub,
                               size: 20,
                             ),
-                            title: Text(item.primaryText,
-                                style: const TextStyle(fontSize: 13)),
+                            title: Text(
+                              item.primaryText,
+                              style: const TextStyle(fontSize: 13),
+                            ),
                             subtitle: item.secondaryText != null
-                                ? Text(item.secondaryText!,
+                                ? Text(
+                                    item.secondaryText!,
                                     style: const TextStyle(
-                                        fontSize: 11,
-                                        color: AppTheme.textSub))
+                                      fontSize: 11,
+                                      color: AppTheme.textSub,
+                                    ),
+                                  )
                                 : null,
                             dense: true,
-                            contentPadding:
-                                const EdgeInsets.symmetric(horizontal: 4),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 4,
+                            ),
                             onTap: () {
                               Navigator.pop(context, [item.id]);
                             },
@@ -1172,19 +1340,25 @@ class _ItemSelectorDialogState extends State<_ItemSelectorDialog> {
                               _selected.remove(item.id);
                             }
                           }),
-                          title: Text(item.primaryText,
-                              style: const TextStyle(fontSize: 13)),
+                          title: Text(
+                            item.primaryText,
+                            style: const TextStyle(fontSize: 13),
+                          ),
                           subtitle: item.secondaryText != null
-                              ? Text(item.secondaryText!,
+                              ? Text(
+                                  item.secondaryText!,
                                   style: const TextStyle(
-                                      fontSize: 11,
-                                      color: AppTheme.textSub))
+                                    fontSize: 11,
+                                    color: AppTheme.textSub,
+                                  ),
+                                )
                               : null,
                           activeColor: AppTheme.primaryColor,
                           controlAffinity: ListTileControlAffinity.leading,
                           dense: true,
-                          contentPadding:
-                              const EdgeInsets.symmetric(horizontal: 4),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                          ),
                         );
                       },
                     ),

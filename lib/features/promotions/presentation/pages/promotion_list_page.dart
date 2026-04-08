@@ -7,6 +7,7 @@ import 'promotion_form_page.dart';
 import 'coupon_list_page.dart';
 import 'promotion_usage_report_page.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
+import 'package:pos_erp/shared/widgets/escape_pop_scope.dart';
 import 'package:pos_erp/shared/widgets/pagination_bar.dart';
 import 'package:pos_erp/features/settings/presentation/pages/settings_page.dart';
 
@@ -45,7 +46,9 @@ class _PromotionListPageState extends ConsumerState<PromotionListPage> {
       }
       switch (_filter) {
         case 'ACTIVE':
-          return p.isActive && now.isAfter(p.startDate) && now.isBefore(p.endDate);
+          return p.isActive &&
+              now.isAfter(p.startDate) &&
+              now.isBefore(p.endDate);
         case 'UPCOMING':
           return p.isActive && now.isBefore(p.startDate);
         case 'EXPIRED':
@@ -99,116 +102,129 @@ class _PromotionListPageState extends ConsumerState<PromotionListPage> {
     final pageSize = ref.watch(settingsProvider).listPageSize;
 
     void openCoupon() => Navigator.push(
-          context, MaterialPageRoute(builder: (_) => const CouponListPage()));
+      context,
+      MaterialPageRoute(builder: (_) => const CouponListPage()),
+    );
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
-      body: Column(
-        children: [
-          // ── Top Bar ─────────────────────────────────────────
-          _TopBar(
-            searchController: _searchController,
-            searchQuery: _searchQuery,
-            hasFilter: _hasFilter,
-            onSearchChanged: (v) => setState(() {
-              _searchQuery = v;
-              _currentPage = 1;
-            }),
-            onSearchCleared: () {
-              _searchController.clear();
-              setState(() {
-                _searchQuery = '';
+      body: EscapePopScope(
+        child: Column(
+          children: [
+            // ── Top Bar ─────────────────────────────────────────
+            _TopBar(
+              searchController: _searchController,
+              searchQuery: _searchQuery,
+              hasFilter: _hasFilter,
+              onSearchChanged: (v) => setState(() {
+                _searchQuery = v;
                 _currentPage = 1;
-              });
-            },
-            onRefresh: () =>
-                ref.read(promotionListProvider.notifier).refresh(),
-            onClearFilter: _hasFilter ? _clearFilters : null,
-            onReport: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) => const PromotionUsageReportPage()),
-            ),
-          ),
-
-          // ── Filter Bar ──────────────────────────────────────
-          _FilterBar(
-            filter: _filter,
-            onFilterChanged: (v) => setState(() {
-              _filter = v;
-              _currentPage = 1;
-            }),
-          ),
-
-          // ── Body ────────────────────────────────────────────
-          Expanded(
-            child: promotionsAsync.when(
-              loading: () => const Center(
-                child: CircularProgressIndicator(color: AppTheme.primary),
+              }),
+              onSearchCleared: () {
+                _searchController.clear();
+                setState(() {
+                  _searchQuery = '';
+                  _currentPage = 1;
+                });
+              },
+              onRefresh: () =>
+                  ref.read(promotionListProvider.notifier).refresh(),
+              onClearFilter: _hasFilter ? _clearFilters : null,
+              onReport: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const PromotionUsageReportPage(),
+                ),
               ),
-              error: (e, _) => _buildError(e),
-              data: (promotions) {
-                final filtered = _applyFilter(promotions);
-                final summary = _calcSummary(promotions);
+            ),
 
-                final totalFiltered = filtered.length;
-                final totalPages =
-                    totalFiltered == 0 ? 1 : (totalFiltered / pageSize).ceil();
-                final page = _currentPage.clamp(1, totalPages);
-                final pageStart = (page - 1) * pageSize;
-                final pageEnd = (pageStart + pageSize).clamp(0, totalFiltered);
-                final pageItems = totalFiltered == 0
-                    ? <PromotionModel>[]
-                    : filtered.sublist(pageStart, pageEnd);
+            // ── Filter Bar ──────────────────────────────────────
+            _FilterBar(
+              filter: _filter,
+              onFilterChanged: (v) => setState(() {
+                _filter = v;
+                _currentPage = 1;
+              }),
+            ),
 
-                if (filtered.isEmpty) return _buildEmpty(promotions.isEmpty, openCoupon);
+            // ── Body ────────────────────────────────────────────
+            Expanded(
+              child: promotionsAsync.when(
+                loading: () => const Center(
+                  child: CircularProgressIndicator(color: AppTheme.primary),
+                ),
+                error: (e, _) => _buildError(e),
+                data: (promotions) {
+                  final filtered = _applyFilter(promotions);
+                  final summary = _calcSummary(promotions);
 
-                return Container(
-                  margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppTheme.border),
-                  ),
-                  child: Column(
-                    children: [
-                      // ── Summary Bar ──────────────────
-                      _SummaryBar(summary: summary),
-                      const Divider(height: 1, color: AppTheme.border),
+                  final totalFiltered = filtered.length;
+                  final totalPages = totalFiltered == 0
+                      ? 1
+                      : (totalFiltered / pageSize).ceil();
+                  final page = _currentPage.clamp(1, totalPages);
+                  final pageStart = (page - 1) * pageSize;
+                  final pageEnd = (pageStart + pageSize).clamp(
+                    0,
+                    totalFiltered,
+                  );
+                  final pageItems = totalFiltered == 0
+                      ? <PromotionModel>[]
+                      : filtered.sublist(pageStart, pageEnd);
 
-                      // ── List ─────────────────────────
-                      Expanded(
-                        child: ListView.separated(
-                          padding: EdgeInsets.zero,
-                          itemCount: pageItems.length,
-                          separatorBuilder: (_, _) => const Divider(
-                              height: 1, color: AppTheme.border),
-                          itemBuilder: (ctx, i) => _PromotionRow(
-                            promotion: pageItems[i],
-                            fmt: _fmt,
-                            dateFmt: _dateFmt,
-                            onEdit: () => _openForm(pageItems[i]),
-                            onToggle: () => _toggleActive(pageItems[i]),
-                            onDelete: () => _confirmDelete(pageItems[i]),
+                  if (filtered.isEmpty)
+                    return _buildEmpty(promotions.isEmpty, openCoupon);
+
+                  return Container(
+                    margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppTheme.border),
+                    ),
+                    child: Column(
+                      children: [
+                        // ── Summary Bar ──────────────────
+                        _SummaryBar(summary: summary),
+                        const Divider(height: 1, color: AppTheme.border),
+
+                        // ── List ─────────────────────────
+                        Expanded(
+                          child: ListView.separated(
+                            padding: EdgeInsets.zero,
+                            itemCount: pageItems.length,
+                            separatorBuilder: (_, _) => const Divider(
+                              height: 1,
+                              color: AppTheme.border,
+                            ),
+                            itemBuilder: (ctx, i) => _PromotionRow(
+                              promotion: pageItems[i],
+                              fmt: _fmt,
+                              dateFmt: _dateFmt,
+                              onEdit: () => _openForm(pageItems[i]),
+                              onToggle: () => _toggleActive(pageItems[i]),
+                              onDelete: () => _confirmDelete(pageItems[i]),
+                            ),
                           ),
                         ),
-                      ),
 
-                      // ── Footer / Pagination ──────────
-                      PaginationBar(
-                        currentPage: page,
-                        totalItems: totalFiltered,
-                        pageSize: pageSize,
-                        onPageChanged: (p) => setState(() => _currentPage = p),
-                        trailing: _buildFooterBtns(openCoupon),
-                      ),
-                    ],
-                  ),
-                );
-              },
+                        // ── Footer / Pagination ──────────
+                        PaginationBar(
+                          currentPage: page,
+                          totalItems: totalFiltered,
+                          pageSize: pageSize,
+                          onPageChanged: (p) =>
+                              setState(() => _currentPage = p),
+                          trailing: _buildFooterBtns(openCoupon),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -228,12 +244,20 @@ class _PromotionListPageState extends ConsumerState<PromotionListPage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.local_offer_outlined,
-                      size: 80, color: Colors.grey.withValues(alpha: 0.4)),
+                  Icon(
+                    Icons.local_offer_outlined,
+                    size: 80,
+                    color: Colors.grey.withValues(alpha: 0.4),
+                  ),
                   const SizedBox(height: 16),
                   Text(
-                    noData ? 'ยังไม่มีโปรโมชั่น' : 'ไม่พบโปรโมชั่นที่ตรงกับเงื่อนไข',
-                    style: const TextStyle(fontSize: 15, color: AppTheme.textSub),
+                    noData
+                        ? 'ยังไม่มีโปรโมชั่น'
+                        : 'ไม่พบโปรโมชั่นที่ตรงกับเงื่อนไข',
+                    style: const TextStyle(
+                      fontSize: 15,
+                      color: AppTheme.textSub,
+                    ),
                   ),
                   if (_hasFilter) ...[
                     const SizedBox(height: 12),
@@ -332,33 +356,40 @@ class _PromotionListPageState extends ConsumerState<PromotionListPage> {
               Navigator.pop(ctx);
               await _performDelete(p);
             },
-            child: const Text('ลบ',
-                style: TextStyle(color: AppTheme.errorColor)),
+            child: const Text(
+              'ลบ',
+              style: TextStyle(color: AppTheme.errorColor),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Future<void> _performDelete(PromotionModel p,
-      {bool forceDeleteCoupons = false}) async {
+  Future<void> _performDelete(
+    PromotionModel p, {
+    bool forceDeleteCoupons = false,
+  }) async {
     if (!mounted) return;
 
     final result = await ref
         .read(promotionListProvider.notifier)
-        .deletePromotion(p.promotionId,
-            forceDeleteCoupons: forceDeleteCoupons);
+        .deletePromotion(p.promotionId, forceDeleteCoupons: forceDeleteCoupons);
 
     if (!mounted) return;
     final code = result['code'] as String?;
 
     if (result['success'] == true) {
       final cancelled = (result['coupons_cancelled'] as int?) ?? 0;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(cancelled > 0
-            ? 'ลบโปรโมชั่นแล้ว (ยกเลิกคูปอง $cancelled ใบ)'
-            : 'ลบโปรโมชั่นแล้ว'),
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            cancelled > 0
+                ? 'ลบโปรโมชั่นแล้ว (ยกเลิกคูปอง $cancelled ใบ)'
+                : 'ลบโปรโมชั่นแล้ว',
+          ),
+        ),
+      );
       return;
     }
 
@@ -375,13 +406,20 @@ class _PromotionListPageState extends ConsumerState<PromotionListPage> {
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('เกิดข้อผิดพลาด: ${result['message'] ?? 'ไม่ทราบสาเหตุ'}'),
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'เกิดข้อผิดพลาด: ${result['message'] ?? 'ไม่ทราบสาเหตุ'}',
+        ),
+      ),
+    );
   }
 
   void _showBlockedDialog(
-      PromotionModel p, int orderCount, int usedCouponCount) {
+    PromotionModel p,
+    int orderCount,
+    int usedCouponCount,
+  ) {
     final detail = [
       if (orderCount > 0) 'ออเดอร์ $orderCount รายการ',
       if (usedCouponCount > 0) 'คูปองที่ใช้แล้ว $usedCouponCount ใบ',
@@ -390,11 +428,13 @@ class _PromotionListPageState extends ConsumerState<PromotionListPage> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Row(children: [
-          const Icon(Icons.block, color: AppTheme.errorColor, size: 20),
-          const SizedBox(width: 8),
-          const Text('ไม่สามารถลบได้'),
-        ]),
+        title: Row(
+          children: [
+            const Icon(Icons.block, color: AppTheme.errorColor, size: 20),
+            const SizedBox(width: 8),
+            const Text('ไม่สามารถลบได้'),
+          ],
+        ),
         content: Text(
           'โปรโมชั่น "${p.promotionName}" ถูกใช้งานแล้วใน $detail\n\n'
           'ต้องการปิดการใช้งานแทนหรือไม่?',
@@ -434,12 +474,17 @@ class _PromotionListPageState extends ConsumerState<PromotionListPage> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Row(children: [
-          const Icon(Icons.confirmation_number_outlined,
-              color: AppTheme.warningColor, size: 20),
-          const SizedBox(width: 8),
-          const Text('มีคูปองที่ยังไม่ได้ใช้'),
-        ]),
+        title: Row(
+          children: [
+            const Icon(
+              Icons.confirmation_number_outlined,
+              color: AppTheme.warningColor,
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            const Text('มีคูปองที่ยังไม่ได้ใช้'),
+          ],
+        ),
         content: Text(
           'โปรโมชั่น "${p.promotionName}" มีคูปองที่ยังไม่ถูกใช้อีก $couponCount ใบ\n\n'
           'ต้องการยกเลิกคูปองทั้งหมดและลบโปรโมชั่นนี้ด้วยหรือไม่?',
@@ -519,9 +564,10 @@ class _TopBar extends StatelessWidget {
         const Text(
           'โปรโมชั่น',
           style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1A1A1A)),
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF1A1A1A),
+          ),
         ),
         const Spacer(),
         ConstrainedBox(
@@ -565,9 +611,10 @@ class _TopBar extends StatelessWidget {
             const Text(
               'โปรโมชั่น',
               style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1A1A1A)),
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1A1A1A),
+              ),
             ),
             const Spacer(),
             if (hasFilter && onClearFilter != null)
@@ -598,11 +645,11 @@ class _FilterBar extends StatelessWidget {
   const _FilterBar({required this.filter, required this.onFilterChanged});
 
   static const _items = [
-    ('ALL',      'ทั้งหมด',         null),
-    ('ACTIVE',   'กำลังใช้งาน',    AppTheme.successColor),
-    ('UPCOMING', 'เร็วๆ นี้',       AppTheme.infoColor),
-    ('EXPIRED',  'หมดอายุ',         AppTheme.errorColor),
-    ('INACTIVE', 'ปิดการใช้งาน',   AppTheme.textSub),
+    ('ALL', 'ทั้งหมด', null),
+    ('ACTIVE', 'กำลังใช้งาน', AppTheme.successColor),
+    ('UPCOMING', 'เร็วๆ นี้', AppTheme.infoColor),
+    ('EXPIRED', 'หมดอายุ', AppTheme.errorColor),
+    ('INACTIVE', 'ปิดการใช้งาน', AppTheme.textSub),
   ];
 
   @override
@@ -622,18 +669,18 @@ class _FilterBar extends StatelessWidget {
             return Padding(
               padding: const EdgeInsets.only(right: 8),
               child: FilterChip(
-                label: Text(label,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: selected ? color : AppTheme.textSub,
-                      fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-                    )),
+                label: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: selected ? color : AppTheme.textSub,
+                    fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                ),
                 selected: selected,
                 selectedColor: color.withValues(alpha: 0.12),
                 checkmarkColor: color,
-                side: BorderSide(
-                  color: selected ? color : AppTheme.border,
-                ),
+                side: BorderSide(color: selected ? color : AppTheme.border),
                 backgroundColor: const Color(0xFFF5F5F5),
                 onSelected: (_) => onFilterChanged(value),
               ),
@@ -694,8 +741,11 @@ class _SummaryChip extends StatelessWidget {
   final String label;
   final Color color;
 
-  const _SummaryChip(
-      {required this.icon, required this.label, required this.color});
+  const _SummaryChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -707,7 +757,10 @@ class _SummaryChip extends StatelessWidget {
         Text(
           label,
           style: TextStyle(
-              fontSize: 12, fontWeight: FontWeight.w600, color: color),
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: color,
+          ),
         ),
       ],
     );
@@ -738,16 +791,28 @@ class _PromotionRow extends StatelessWidget {
     final now = DateTime.now();
     if (!p.isActive) {
       return _PromotionStatus(
-          label: 'ปิด', color: AppTheme.textSub, icon: Icons.block);
+        label: 'ปิด',
+        color: AppTheme.textSub,
+        icon: Icons.block,
+      );
     } else if (now.isAfter(p.startDate) && now.isBefore(p.endDate)) {
       return _PromotionStatus(
-          label: 'ใช้งานอยู่', color: AppTheme.successColor, icon: Icons.play_circle);
+        label: 'ใช้งานอยู่',
+        color: AppTheme.successColor,
+        icon: Icons.play_circle,
+      );
     } else if (now.isBefore(p.startDate)) {
       return _PromotionStatus(
-          label: 'เร็วๆ นี้', color: AppTheme.infoColor, icon: Icons.schedule);
+        label: 'เร็วๆ นี้',
+        color: AppTheme.infoColor,
+        icon: Icons.schedule,
+      );
     } else {
       return _PromotionStatus(
-          label: 'หมดอายุ', color: AppTheme.errorColor, icon: Icons.cancel);
+        label: 'หมดอายุ',
+        color: AppTheme.errorColor,
+        icon: Icons.cancel,
+      );
     }
   }
 
@@ -828,22 +893,31 @@ class _PromotionRow extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(p.promotionName,
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
-                              color: Color(0xFF1A1A1A))),
+                      Text(
+                        p.promotionName,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                          color: Color(0xFF1A1A1A),
+                        ),
+                      ),
                       const SizedBox(height: 2),
-                      Text(p.promotionCode,
-                          style: const TextStyle(
-                              fontSize: 12, color: AppTheme.textSub)),
+                      Text(
+                        p.promotionCode,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.textSub,
+                        ),
+                      ),
                     ],
                   ),
                 ),
                 // Status badge
                 Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 4),
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: st.color.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(20),
@@ -853,11 +927,14 @@ class _PromotionRow extends StatelessWidget {
                     children: [
                       Icon(st.icon, size: 13, color: st.color),
                       const SizedBox(width: 4),
-                      Text(st.label,
-                          style: TextStyle(
-                              fontSize: 11,
-                              color: st.color,
-                              fontWeight: FontWeight.w600)),
+                      Text(
+                        st.label,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: st.color,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -868,25 +945,26 @@ class _PromotionRow extends StatelessWidget {
             // ── Discount info ────────────────────────────────────
             Row(
               children: [
-                Icon(Icons.local_offer,
-                    size: 14, color: AppTheme.primaryColor),
+                Icon(Icons.local_offer, size: 14, color: AppTheme.primaryColor),
                 const SizedBox(width: 6),
                 Text(
                   _discountLabel(p, fmt),
                   style: TextStyle(
-                      color: AppTheme.primaryColor,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13),
+                    color: AppTheme.primaryColor,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
                 ),
                 if (p.minAmount > 0) ...[
                   const SizedBox(width: 12),
-                  Icon(Icons.shopping_cart,
-                      size: 13, color: AppTheme.textSub),
+                  Icon(Icons.shopping_cart, size: 13, color: AppTheme.textSub),
                   const SizedBox(width: 4),
                   Text(
                     'ขั้นต่ำ ฿${fmt.format(p.minAmount)}',
                     style: const TextStyle(
-                        fontSize: 12, color: AppTheme.textSub),
+                      fontSize: 12,
+                      color: AppTheme.textSub,
+                    ),
                   ),
                 ],
               ],
@@ -896,13 +974,11 @@ class _PromotionRow extends StatelessWidget {
             // ── Period ───────────────────────────────────────────
             Row(
               children: [
-                const Icon(Icons.date_range,
-                    size: 13, color: AppTheme.textSub),
+                const Icon(Icons.date_range, size: 13, color: AppTheme.textSub),
                 const SizedBox(width: 4),
                 Text(
                   '${dateFmt.format(p.startDate)} – ${dateFmt.format(p.endDate)}',
-                  style: const TextStyle(
-                      fontSize: 12, color: AppTheme.textSub),
+                  style: const TextStyle(fontSize: 12, color: AppTheme.textSub),
                 ),
                 if (p.maxUses != null) ...[
                   const Spacer(),
@@ -911,7 +987,9 @@ class _PromotionRow extends StatelessWidget {
                   Text(
                     '${p.currentUses}/${p.maxUses} ครั้ง',
                     style: const TextStyle(
-                        fontSize: 12, color: AppTheme.textSub),
+                      fontSize: 12,
+                      color: AppTheme.textSub,
+                    ),
                   ),
                 ],
               ],
@@ -1029,8 +1107,11 @@ class _PromotionStatus {
   final String label;
   final Color color;
   final IconData icon;
-  const _PromotionStatus(
-      {required this.label, required this.color, required this.icon});
+  const _PromotionStatus({
+    required this.label,
+    required this.color,
+    required this.icon,
+  });
 }
 
 class _ActionBtn extends StatelessWidget {
@@ -1048,16 +1129,16 @@ class _ActionBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => TextButton.icon(
-        onPressed: onTap,
-        style: TextButton.styleFrom(
-          foregroundColor: color,
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          minimumSize: Size.zero,
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        ),
-        icon: Icon(icon, size: 15),
-        label: Text(label, style: const TextStyle(fontSize: 12)),
-      );
+    onPressed: onTap,
+    style: TextButton.styleFrom(
+      foregroundColor: color,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      minimumSize: Size.zero,
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    ),
+    icon: Icon(icon, size: 15),
+    label: Text(label, style: const TextStyle(fontSize: 12)),
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -1066,14 +1147,13 @@ class _ActionBtn extends StatelessWidget {
 class _PageIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(7),
-        decoration: BoxDecoration(
-          color: AppTheme.infoContainer,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: const Icon(Icons.local_offer,
-            color: AppTheme.infoColor, size: 18),
-      );
+    padding: const EdgeInsets.all(7),
+    decoration: BoxDecoration(
+      color: AppTheme.infoContainer,
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child: const Icon(Icons.local_offer, color: AppTheme.infoColor, size: 18),
+  );
 }
 
 class _SearchField extends StatelessWidget {
@@ -1091,41 +1171,40 @@ class _SearchField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SizedBox(
-        height: 38,
-        child: TextField(
-          controller: controller,
-          style: const TextStyle(fontSize: 13, color: Color(0xFF1A1A1A)),
-          decoration: InputDecoration(
-            hintText: 'ค้นหาชื่อ, รหัสโปรโมชั่น...',
-            hintStyle: const TextStyle(fontSize: 13, color: AppTheme.textSub),
-            prefixIcon: const Icon(Icons.search, size: 17, color: AppTheme.textSub),
-            suffixIcon: query.isNotEmpty
-                ? IconButton(
-                    icon: const Icon(Icons.clear, size: 15),
-                    onPressed: onCleared,
-                  )
-                : null,
-            contentPadding: EdgeInsets.zero,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: AppTheme.border),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: AppTheme.border),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
-            ),
-            filled: true,
-            fillColor: Colors.white,
-          ),
-          onChanged: onChanged,
+    height: 38,
+    child: TextField(
+      controller: controller,
+      style: const TextStyle(fontSize: 13, color: Color(0xFF1A1A1A)),
+      decoration: InputDecoration(
+        hintText: 'ค้นหาชื่อ, รหัสโปรโมชั่น...',
+        hintStyle: const TextStyle(fontSize: 13, color: AppTheme.textSub),
+        prefixIcon: const Icon(Icons.search, size: 17, color: AppTheme.textSub),
+        suffixIcon: query.isNotEmpty
+            ? IconButton(
+                icon: const Icon(Icons.clear, size: 15),
+                onPressed: onCleared,
+              )
+            : null,
+        contentPadding: EdgeInsets.zero,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: AppTheme.border),
         ),
-      );
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: AppTheme.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
+        ),
+        filled: true,
+        fillColor: Colors.white,
+      ),
+      onChanged: onChanged,
+    ),
+  );
 }
-
 
 class _RefreshBtn extends StatelessWidget {
   final VoidCallback onTap;
@@ -1133,21 +1212,21 @@ class _RefreshBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Tooltip(
-        message: 'รีเฟรช',
-        child: InkWell(
-          onTap: onTap,
+    message: 'รีเฟรช',
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.all(7),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF5F5F5),
           borderRadius: BorderRadius.circular(8),
-          child: Container(
-            padding: const EdgeInsets.all(7),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF5F5F5),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppTheme.border),
-            ),
-            child: const Icon(Icons.refresh, size: 17, color: AppTheme.textSub),
-          ),
+          border: Border.all(color: AppTheme.border),
         ),
-      );
+        child: const Icon(Icons.refresh, size: 17, color: AppTheme.textSub),
+      ),
+    ),
+  );
 }
 
 class _ClearFilterBtn extends StatelessWidget {
@@ -1156,36 +1235,35 @@ class _ClearFilterBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Tooltip(
-        message: 'ล้างตัวกรองทั้งหมด',
-        child: InkWell(
-          onTap: onTap,
+    message: 'ล้างตัวกรองทั้งหมด',
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        decoration: BoxDecoration(
+          color: AppTheme.errorContainer,
           borderRadius: BorderRadius.circular(8),
-          child: Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-            decoration: BoxDecoration(
-              color: AppTheme.errorContainer,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFEF9A9A)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.filter_alt_off,
-                    size: 15, color: AppTheme.error),
-                const SizedBox(width: 5),
-                const Text(
-                  'ล้างตัวกรอง',
-                  style: TextStyle(
-                      fontSize: 12,
-                      color: AppTheme.error,
-                      fontWeight: FontWeight.w500),
-                ),
-              ],
-            ),
-          ),
+          border: Border.all(color: const Color(0xFFEF9A9A)),
         ),
-      );
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.filter_alt_off, size: 15, color: AppTheme.error),
+            const SizedBox(width: 5),
+            const Text(
+              'ล้างตัวกรอง',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppTheme.error,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 class _BackBtn extends StatelessWidget {
@@ -1194,16 +1272,16 @@ class _BackBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => InkWell(
-        onTap: onTap,
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(8),
+    child: Container(
+      padding: const EdgeInsets.all(7),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F5F5),
         borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.all(7),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF5F5F5),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppTheme.border),
-          ),
-          child: const Icon(Icons.arrow_back, size: 17, color: AppTheme.textSub),
-        ),
-      );
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: const Icon(Icons.arrow_back, size: 17, color: AppTheme.textSub),
+    ),
+  );
 }

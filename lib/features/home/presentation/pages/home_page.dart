@@ -177,6 +177,17 @@ class _HomePageState extends ConsumerState<HomePage> {
   void _push(BuildContext context, Widget page) =>
       Navigator.push(context, MaterialPageRoute(builder: (_) => page));
 
+  void _openShortcutPage({
+    required int index,
+    required Widget page,
+  }) {
+    if (context.hasPermanentSidebar) {
+      _selectItem(index);
+    } else {
+      _push(context, page);
+    }
+  }
+
   Future<void> _handleLogout(BuildContext context) async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -225,13 +236,57 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
 
     return KeyboardShortcuts(
-      onPosShortcut:          () => _push(context, const PosPage()),
-      onProductShortcut:      () => _push(context, const ProductListPage()),
-      onCustomerShortcut:     () => _push(context, const CustomerListPage()),
-      onSalesHistoryShortcut: () => _push(context, const SalesHistoryPage()),
-      onDashboardShortcut:    () => setState(() => _selectedIndex = 0),
-      onInventoryShortcut:    () => _push(context, const StockBalancePage()),
-      onReportsShortcut:      () => _push(context, const ReportsPage()),
+      onPosShortcut: () => _openShortcutPage(
+        index: 1,
+        page: const PosPage(),
+      ),
+      onProductShortcut: () => _openShortcutPage(
+        index: 4,
+        page: const ProductListPage(),
+      ),
+      onCustomerShortcut: () => _openShortcutPage(
+        index: 7,
+        page: const CustomerListPage(),
+      ),
+      onSalesHistoryShortcut: () => _openShortcutPage(
+        index: 2,
+        page: const SalesHistoryPage(),
+      ),
+      onDashboardShortcut: () => _openShortcutPage(
+        index: 0,
+        page: DashboardPage(
+          onGoToPos: () => context.hasPermanentSidebar
+              ? _selectItem(1)
+              : _push(context, const PosPage()),
+          onGoToSalesHistory: () => context.hasPermanentSidebar
+              ? _selectItem(2)
+              : _push(context, const SalesHistoryPage()),
+          onGoToProducts: () => context.hasPermanentSidebar
+              ? _selectItem(4)
+              : _push(context, const ProductListPage()),
+          onGoToCustomers: () => context.hasPermanentSidebar
+              ? _selectItem(7)
+              : _push(context, const CustomerListPage()),
+          onGoToTodaySales: () {
+            final today = DateTime.now();
+            _showOverridePage(
+              SalesHistoryPage(
+                initialDateFrom: DateTime(today.year, today.month, today.day),
+                initialDateTo: DateTime(today.year, today.month, today.day),
+              ),
+              2,
+            );
+          },
+        ),
+      ),
+      onInventoryShortcut: () => _openShortcutPage(
+        index: 5,
+        page: const StockBalancePage(),
+      ),
+      onReportsShortcut: () => _openShortcutPage(
+        index: 16,
+        page: const ReportsPage(),
+      ),
       child: context.hasPermanentSidebar
           // ── Desktop/Wide: Permanent sidebar ────────────────
           ? Scaffold(

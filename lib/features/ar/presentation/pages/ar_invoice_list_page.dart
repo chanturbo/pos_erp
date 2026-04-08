@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
 import 'package:pos_erp/shared/widgets/pagination_bar.dart';
+import 'package:pos_erp/shared/widgets/escape_pop_scope.dart';
 import '../../../settings/presentation/pages/settings_page.dart';
 import '../../data/models/ar_invoice_model.dart';
 import '../providers/ar_invoice_provider.dart';
@@ -51,64 +52,67 @@ class _ArInvoiceListPageState extends ConsumerState<ArInvoiceListPage> {
 
     return Scaffold(
       backgroundColor: isDark ? AppTheme.darkBg : const Color(0xFFF5F5F5),
-      body: Column(
-        children: [
-          _ArListTopBar(
-            searchController: _searchController,
-            searchQuery: _searchQuery,
-            isCardView: _isCardView,
-            onSearchChanged: (v) => setState(() {
-              _searchQuery = v.toLowerCase();
-              _currentPage = 1;
-            }),
-            onSearchCleared: () {
-              _searchController.clear();
-              setState(() {
-                _searchQuery = '';
+      body: EscapePopScope(
+        child: Column(
+          children: [
+            _ArListTopBar(
+              searchController: _searchController,
+              searchQuery: _searchQuery,
+              isCardView: _isCardView,
+              onSearchChanged: (v) => setState(() {
+                _searchQuery = v.toLowerCase();
                 _currentPage = 1;
-              });
-            },
-            onToggleView: () => setState(() => _isCardView = !_isCardView),
-            onRefresh: () => ref.read(arInvoiceListProvider.notifier).refresh(),
-            onAdd: _createNewInvoice,
-          ),
-          _buildSummaryBar(invoicesAsync),
-          Expanded(
-            child: invoicesAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => _buildError(e),
-              data: (invoices) {
-                final filtered = _filter(invoices);
-                if (filtered.isEmpty) return _buildEmpty();
-
-                final totalPages = (filtered.length / pageSize).ceil().clamp(
-                  1,
-                  9999,
-                );
-                final safePage = _currentPage.clamp(1, totalPages);
-                final start = (safePage - 1) * pageSize;
-                final end = (start + pageSize).clamp(0, filtered.length);
-                final pageItems = filtered.sublist(start, end);
-
-                return Column(
-                  children: [
-                    Expanded(
-                      child: _isCardView
-                          ? _buildCardView(pageItems)
-                          : _buildListView(pageItems),
-                    ),
-                    PaginationBar(
-                      currentPage: safePage,
-                      totalItems: filtered.length,
-                      pageSize: pageSize,
-                      onPageChanged: (p) => setState(() => _currentPage = p),
-                    ),
-                  ],
-                );
+              }),
+              onSearchCleared: () {
+                _searchController.clear();
+                setState(() {
+                  _searchQuery = '';
+                  _currentPage = 1;
+                });
               },
+              onToggleView: () => setState(() => _isCardView = !_isCardView),
+              onRefresh: () =>
+                  ref.read(arInvoiceListProvider.notifier).refresh(),
+              onAdd: _createNewInvoice,
             ),
-          ),
-        ],
+            _buildSummaryBar(invoicesAsync),
+            Expanded(
+              child: invoicesAsync.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, _) => _buildError(e),
+                data: (invoices) {
+                  final filtered = _filter(invoices);
+                  if (filtered.isEmpty) return _buildEmpty();
+
+                  final totalPages = (filtered.length / pageSize).ceil().clamp(
+                    1,
+                    9999,
+                  );
+                  final safePage = _currentPage.clamp(1, totalPages);
+                  final start = (safePage - 1) * pageSize;
+                  final end = (start + pageSize).clamp(0, filtered.length);
+                  final pageItems = filtered.sublist(start, end);
+
+                  return Column(
+                    children: [
+                      Expanded(
+                        child: _isCardView
+                            ? _buildCardView(pageItems)
+                            : _buildListView(pageItems),
+                      ),
+                      PaginationBar(
+                        currentPage: safePage,
+                        totalItems: filtered.length,
+                        pageSize: pageSize,
+                        onPageChanged: (p) => setState(() => _currentPage = p),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -50,6 +50,9 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
   Map<String, int> _productUsageCounts = const {};
   List<String> _favoriteProductIds = const [];
   String? _loadedFavoriteScope;
+  bool _showMobileHeaderDetails = false;
+  final ScrollController _productListController = ScrollController();
+  bool _isProductListScrolled = false;
 
   static const _groupPalette = <Color>[
     Color(0xFF1565C0),
@@ -75,6 +78,7 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
 
   @override
   void dispose() {
+    _productListController.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -82,6 +86,13 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
   @override
   void initState() {
     super.initState();
+    _productListController.addListener(() {
+      final isScrolled = _productListController.hasClients &&
+          _productListController.offset > 6;
+      if (isScrolled != _isProductListScrolled && mounted) {
+        setState(() => _isProductListScrolled = isScrolled);
+      }
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadMobilePreferences();
     });
@@ -281,6 +292,14 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
   Future<void> _feedbackError() async {
     await SystemSound.play(SystemSoundType.alert);
     await MobileConfig.hapticError();
+  }
+
+  Future<void> _feedbackTap() async {
+    await HapticFeedback.lightImpact();
+  }
+
+  Future<void> _feedbackSelection() async {
+    await HapticFeedback.selectionClick();
   }
 
   Map<String, double> _currentStockMap() {
@@ -878,6 +897,8 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
   }
 
   Future<void> _holdCurrentOrder() async {
+    await _feedbackSelection();
+    if (!mounted) return;
     final cartState = ref.read(cartProvider);
     if (cartState.items.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -956,6 +977,8 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
   }
 
   Future<void> _goToCheckout() async {
+    await _feedbackTap();
+    if (!mounted) return;
     final cartState = ref.read(cartProvider);
     if (cartState.items.isEmpty) return;
     if (ref.read(selectedBranchProvider) == null ||
@@ -1026,6 +1049,121 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
     ).pushNamedAndRemoveUntil(AppRouter.login, (_) => false);
   }
 
+  String _groupNameOf(String? groupId) {
+    if (groupId == null || groupId.isEmpty) return 'ไม่ระบุหมวด';
+    final groups = ref.read(productGroupsProvider).value ?? const [];
+    for (final group in groups) {
+      if (group.groupId == groupId) return group.groupName;
+    }
+    return 'หมวดสินค้า';
+  }
+
+  void _showProductMetaSheet(
+    ProductModel product, {
+    required PriceLookupResult lookup,
+    required double availableStock,
+    required double qtyInCart,
+  }) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => SafeArea(
+        top: false,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+          decoration: BoxDecoration(
+            color: Theme.of(context).cardColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 42,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade400,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+              Text(
+                product.productName,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _CompactStatusChip(
+                    icon: Icons.qr_code_2_rounded,
+                    label: product.productCode,
+                    color: AppTheme.primaryColor,
+                  ),
+                  _CompactStatusChip(
+                    icon: Icons.category_outlined,
+                    label: _groupNameOf(product.groupId),
+                    color: _groupColor(product.groupId),
+                  ),
+                  _CompactStatusChip(
+                    icon: availableStock > 0
+                        ? Icons.inventory_2_outlined
+                        : Icons.inventory_2_rounded,
+                    label: availableStock > 0
+                        ? 'คงเหลือ ${availableStock.toStringAsFixed(0)}'
+                        : 'หมดสต๊อก',
+                    color: availableStock > 0
+                        ? AppTheme.successColor
+                        : AppTheme.errorColor,
+                  ),
+                  if (qtyInCart > 0)
+                    _CompactStatusChip(
+                      icon: Icons.shopping_bag_outlined,
+                      label:
+                          'ในบิล ${qtyInCart.toStringAsFixed(qtyInCart % 1 == 0 ? 0 : 2)}',
+                      color: AppTheme.successColor,
+                    ),
+                  if (!product.isActive)
+                    const _CompactStatusChip(
+                      icon: Icons.hide_source,
+                      label: 'Inactive',
+                      color: Colors.grey,
+                    ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'ราคาขาย ฿${lookup.price.toStringAsFixed(2)} / ${product.baseUnit}',
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.primaryColor,
+                ),
+              ),
+              if (lookup.isFallback) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'ราคา Level ที่เลือกยังไม่ได้ตั้งค่า ระบบจึงใช้ราคา Level 1 แทน',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.orange.shade900,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.watch(posContextBootstrapProvider);
@@ -1081,21 +1219,6 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
           ],
         ),
         actions: [
-          IconButton(
-            tooltip: 'ตั้งค่ามือถือ',
-            onPressed: _openEmployeeSettings,
-            icon: const Icon(Icons.phone_iphone_rounded),
-          ),
-          IconButton(
-            tooltip: 'รีเฟรชข้อมูล',
-            onPressed: _refreshData,
-            icon: const Icon(Icons.refresh_rounded),
-          ),
-          IconButton(
-            tooltip: 'การเชื่อมต่อ/ซิงก์',
-            onPressed: _openConnectionSettings,
-            icon: const Icon(Icons.tune_rounded),
-          ),
           Stack(
             children: [
               IconButton(
@@ -1125,52 +1248,47 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                       ),
                     ),
                   ),
+                    ),
+                ],
+              ),
+          PopupMenuButton<String>(
+            tooltip: 'ตัวเลือกเพิ่มเติม',
+            onSelected: (value) {
+              switch (value) {
+                case 'settings':
+                  _openEmployeeSettings();
+                  break;
+                case 'refresh':
+                  _refreshData();
+                  break;
+                case 'connection':
+                  _openConnectionSettings();
+                  break;
+                case 'summary':
+                  _openOrderSummarySheet();
+                  break;
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem<String>(
+                value: 'settings',
+                child: Text('ตั้งค่ามือถือ'),
+              ),
+              const PopupMenuItem<String>(
+                value: 'refresh',
+                child: Text('รีเฟรชข้อมูล'),
+              ),
+              const PopupMenuItem<String>(
+                value: 'connection',
+                child: Text('การเชื่อมต่อ/ซิงก์'),
+              ),
+              if (cartState.items.isNotEmpty)
+                const PopupMenuItem<String>(
+                  value: 'summary',
+                  child: Text('สรุปออเดอร์'),
                 ),
             ],
-          ),
-          connectionAsync.when(
-            data: (connection) => Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: Center(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: connection.isConnected
-                        ? AppTheme.successColor.withValues(alpha: 0.16)
-                        : AppTheme.errorColor.withValues(alpha: 0.16),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        connection.isConnected ? Icons.wifi : Icons.wifi_off,
-                        size: 14,
-                        color: connection.isConnected
-                            ? AppTheme.successColor
-                            : AppTheme.errorColor,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        connection.isConnected ? 'Connected' : 'Disconnected',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: connection.isConnected
-                              ? AppTheme.successColor
-                              : AppTheme.errorColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            loading: () => const SizedBox.shrink(),
-            error: (_, _) => const SizedBox.shrink(),
+            icon: const Icon(Icons.more_vert_rounded),
           ),
         ],
       ),
@@ -1184,21 +1302,23 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 InkWell(
-                  onTap: _selectCustomer,
+                  onTap: () => setState(
+                    () => _showMobileHeaderDetails = !_showMobileHeaderDetails,
+                  ),
                   borderRadius: BorderRadius.circular(12),
                   child: Ink(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: AppTheme.borderColorOf(context),
-                      ),
-                      color: AppTheme.primary.withValues(alpha: 0.05),
+                      border: Border.all(color: AppTheme.borderColorOf(context)),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.person_outline),
-                        const SizedBox(width: 10),
+                        const Icon(Icons.tune_rounded, size: 18),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1206,483 +1326,526 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                               Text(
                                 cartState.customerName ?? 'ลูกค้าทั่วไป',
                                 style: const TextStyle(
+                                  fontSize: 13,
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
                               Text(
-                                'แตะเพื่อเลือกลูกค้าสำหรับเปิดบิล',
+                                'สินค้า ${cartState.items.fold<double>(0, (sum, item) => sum + item.quantity).toStringAsFixed(0)} • บิลพัก ${holdOrdersState.orders.length}',
                                 style: TextStyle(
-                                  fontSize: 12,
+                                  fontSize: 11,
                                   color: AppTheme.subtextColorOf(context),
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        const Icon(Icons.chevron_right_rounded),
+                        Icon(
+                          _showMobileHeaderDetails
+                              ? Icons.expand_less_rounded
+                              : Icons.expand_more_rounded,
+                        ),
                       ],
                     ),
                   ),
                 ),
-                const SizedBox(height: 10),
-                connectionAsync.when(
-                  data: (connection) => Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      color: connection.isConnected
-                          ? AppTheme.successColor.withValues(alpha: 0.08)
-                          : AppTheme.errorColor.withValues(alpha: 0.08),
-                      border: Border.all(
-                        color: connection.isConnected
-                            ? AppTheme.successColor.withValues(alpha: 0.24)
-                            : AppTheme.errorColor.withValues(alpha: 0.24),
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              connection.isConnected
-                                  ? Icons.cloud_done_outlined
-                                  : Icons.cloud_off_outlined,
-                              size: 18,
-                              color: connection.isConnected
-                                  ? AppTheme.successColor
-                                  : AppTheme.errorColor,
+                AnimatedCrossFade(
+                  duration: const Duration(milliseconds: 180),
+                  crossFadeState: _showMobileHeaderDetails
+                      ? CrossFadeState.showSecond
+                      : CrossFadeState.showFirst,
+                  firstChild: const SizedBox.shrink(),
+                  secondChild: Column(
+                    children: [
+                      const SizedBox(height: 10),
+                      InkWell(
+                        onTap: _selectCustomer,
+                        borderRadius: BorderRadius.circular(12),
+                        child: Ink(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: AppTheme.borderColorOf(context),
                             ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                connection.title,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  color: connection.isConnected
-                                      ? AppTheme.successColor
-                                      : AppTheme.errorColor,
-                                ),
-                              ),
-                            ),
-                            if ((syncValue?.pendingCount ?? 0) > 0)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.orange.withValues(alpha: 0.16),
-                                  borderRadius: BorderRadius.circular(999),
-                                ),
-                                child: Text(
-                                  'รอส่ง ${syncValue!.pendingCount}',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.orange.shade900,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          connection.detail,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppTheme.subtextColorOf(context),
+                            color: AppTheme.primary.withValues(alpha: 0.05),
                           ),
-                        ),
-                        if (!connection.isConnected &&
-                            (syncValue?.pendingCount ?? 0) == 0) ...[
-                          const SizedBox(height: 8),
-                          Text(
-                            'ยังเปิดรับออเดอร์ได้ แต่เมื่อกดชำระเงิน ระบบอาจเก็บคิวไว้ในเครื่องแล้วส่งขึ้น Master ภายหลัง',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AppTheme.subtextColorOf(context),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  loading: () => const SizedBox.shrink(),
-                  error: (_, _) => const SizedBox.shrink(),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _MiniDashboardCard(
-                        icon: Icons.pause_circle_outline,
-                        label: 'บิลพัก',
-                        value: '${holdOrdersState.orders.length}',
-                        color: Colors.orange,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _MiniDashboardCard(
-                        icon: Icons.shopping_bag_outlined,
-                        label: 'สินค้าในบิล',
-                        value: cartState.items
-                            .fold<double>(0, (sum, item) => sum + item.quantity)
-                            .toStringAsFixed(0),
-                        color: AppTheme.primaryColor,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _MiniDashboardCard(
-                        icon: Icons.sync_problem_outlined,
-                        label: 'รอส่ง',
-                        value: '${syncValue?.pendingCount ?? 0}',
-                        color: Colors.teal,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                if (_favoriteProductIds.isNotEmpty)
-                  productAsync.maybeWhen(
-                    data: (products) {
-                      final favorites = _favoriteProductIds
-                          .map(
-                            (id) => products
-                                .where((product) => product.productId == id)
-                                .firstOrNull,
-                          )
-                          .whereType<ProductModel>()
-                          .toList();
-
-                      if (favorites.isEmpty) {
-                        return const SizedBox.shrink();
-                      }
-
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
+                          child: Row(
                             children: [
-                              const Expanded(
-                                child: Text(
-                                  'ปุ่มขายด่วน',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                              const Icon(Icons.person_outline),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      cartState.customerName ?? 'ลูกค้าทั่วไป',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    Text(
+                                      'แตะเพื่อเลือกลูกค้าสำหรับเปิดบิล',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: AppTheme.subtextColorOf(context),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                              TextButton.icon(
-                                onPressed: () => _openFavoriteManager(products),
-                                icon: const Icon(
-                                  Icons.drag_indicator,
-                                  size: 16,
-                                ),
-                                label: const Text('จัดเรียง'),
-                              ),
+                              const Icon(Icons.chevron_right_rounded),
                             ],
                           ),
-                          const SizedBox(height: 8),
-                          SizedBox(
-                            height: 44,
-                            child: ListView.separated(
-                              scrollDirection: Axis.horizontal,
-                              itemCount: favorites.length,
-                              separatorBuilder: (_, _) =>
-                                  const SizedBox(width: 8),
-                              itemBuilder: (_, index) {
-                                final product = favorites[index];
-                                final color = _groupColor(product.groupId);
-                                return FilledButton.tonal(
-                                  onPressed: () => _promptAddProduct(product),
-                                  style: FilledButton.styleFrom(
-                                    backgroundColor: color.withValues(
-                                      alpha: 0.12,
-                                    ),
-                                    foregroundColor: color,
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        _groupIcon(product.groupId),
-                                        size: 16,
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Text(product.productName),
-                                    ],
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                        ],
-                      );
-                    },
-                    orElse: () => const SizedBox.shrink(),
-                  ),
-                productGroupsAsync.when(
-                  data: (groups) => SizedBox(
-                    height: 42,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: FilterChip(
-                            selected: _selectedGroupId == null,
-                            backgroundColor: Colors.transparent,
-                            selectedColor: AppTheme.primaryColor.withValues(
-                              alpha: 0.12,
-                            ),
-                            side: BorderSide(
-                              color: AppTheme.primaryColor.withValues(
-                                alpha: 0.28,
-                              ),
-                            ),
-                            avatar: const Icon(Icons.apps_rounded, size: 18),
-                            label: const Text('ทั้งหมด'),
-                            onSelected: (_) {
-                              setState(() => _selectedGroupId = null);
-                            },
-                          ),
                         ),
-                        for (final group in groups)
-                          Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: Builder(
-                              builder: (_) {
-                                final color = _groupColor(group.groupId);
-                                return FilterChip(
-                                  selected: _selectedGroupId == group.groupId,
-                                  backgroundColor: color.withValues(
-                                    alpha: 0.08,
-                                  ),
-                                  selectedColor: color.withValues(alpha: 0.18),
-                                  side: BorderSide(
-                                    color: color.withValues(alpha: 0.28),
-                                  ),
-                                  avatar: Icon(
-                                    _groupIcon(group.groupId),
-                                    size: 18,
-                                    color: color,
-                                  ),
-                                  label: Text(group.groupName),
-                                  onSelected: (_) {
-                                    setState(() {
-                                      _selectedGroupId =
-                                          _selectedGroupId == group.groupId
-                                          ? null
-                                          : group.groupId;
-                                    });
-                                  },
-                                );
-                              },
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  loading: () => const SizedBox.shrink(),
-                  error: (_, _) => const SizedBox.shrink(),
-                ),
-                if (_selectedGroupId != null) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    'กำลังกรองตามหมวดสินค้า',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppTheme.subtextColorOf(context),
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    FilterChip(
-                      selected: _hideInactiveProducts,
-                      label: const Text('ซ่อนสินค้าไม่ active'),
-                      onSelected: (value) {
-                        setState(() => _hideInactiveProducts = value);
-                      },
-                    ),
-                    FilterChip(
-                      selected: _hideOutOfStockProducts,
-                      label: const Text('ซ่อนสินค้าหมดสต๊อก'),
-                      onSelected: (value) {
-                        setState(() => _hideOutOfStockProducts = value);
-                      },
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Text(
-                      'โหมดสแกน:',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppTheme.subtextColorOf(context),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    SegmentedButton<String>(
-                      segments: const [
-                        ButtonSegment<String>(value: 'unit', label: Text('1')),
-                        ButtonSegment<String>(
-                          value: 'pack',
-                          label: Text('แพ็ก'),
-                        ),
-                        ButtonSegment<String>(
-                          value: 'case',
-                          label: Text('ลัง'),
-                        ),
-                      ],
-                      selected: {_scanDefaultMode},
-                      onSelectionChanged: (selection) {
-                        setState(() {
-                          _scanDefaultMode = selection.first;
-                        });
-                        _persistScanDefaultMode();
-                      },
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _InfoChip(
-                        icon: Icons.storefront_outlined,
-                        label:
-                            selectedBranch?.branchName ?? 'ยังไม่ได้เลือกสาขา',
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _InfoChip(
-                        icon: Icons.warehouse_outlined,
-                        label:
-                            selectedWarehouse?.warehouseName ??
-                            'ยังไม่ได้เลือกคลัง',
-                      ),
-                    ),
-                  ],
-                ),
-                if (selectedBranch == null || selectedWarehouse == null) ...[
-                  const SizedBox(height: 8),
-                  InkWell(
+                      const SizedBox(height: 10),
+                      connectionAsync.when(
+                  data: (connection) => InkWell(
                     onTap: _openConnectionSettings,
                     borderRadius: BorderRadius.circular(12),
                     child: Ink(
                       width: double.infinity,
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(12),
-                        color: Colors.orange.withValues(alpha: 0.08),
+                        color: connection.isConnected
+                            ? AppTheme.successColor.withValues(alpha: 0.08)
+                            : AppTheme.errorColor.withValues(alpha: 0.08),
                         border: Border.all(
-                          color: Colors.orange.withValues(alpha: 0.32),
+                          color: connection.isConnected
+                              ? AppTheme.successColor.withValues(alpha: 0.24)
+                              : AppTheme.errorColor.withValues(alpha: 0.24),
                         ),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.info_outline, color: Colors.orange),
-                          const SizedBox(width: 10),
-                          const Expanded(
+                          Icon(
+                            connection.isConnected
+                                ? Icons.cloud_done_outlined
+                                : Icons.cloud_off_outlined,
+                            size: 18,
+                            color: connection.isConnected
+                                ? AppTheme.successColor
+                                : AppTheme.errorColor,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
                             child: Text(
-                              'ตั้งค่าสาขาและคลังของเครื่องนี้ก่อน เพื่อให้บิลถูกบันทึกลงปลายทางที่ถูกต้อง',
-                              style: TextStyle(fontSize: 12),
+                              connection.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: connection.isConnected
+                                    ? AppTheme.successColor
+                                    : AppTheme.errorColor,
+                              ),
                             ),
                           ),
+                          if ((syncValue?.pendingCount ?? 0) > 0)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.withValues(alpha: 0.16),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                'รอส่ง ${syncValue!.pendingCount}',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.orange.shade900,
+                                ),
+                              ),
+                            ),
+                          const SizedBox(width: 6),
                           const Icon(Icons.chevron_right_rounded),
                         ],
                       ),
                     ),
                   ),
-                ],
-                const SizedBox(height: 10),
-                Row(
+                  loading: () => const SizedBox.shrink(),
+                  error: (_, _) => const SizedBox.shrink(),
+                ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
                   children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _searchController,
-                        onChanged: (value) =>
-                            setState(() => _searchQuery = value),
-                        decoration: InputDecoration(
-                          hintText: 'ค้นหาสินค้า / บาร์โค้ด',
-                          prefixIcon: const Icon(Icons.search),
-                          suffixIcon: _searchQuery.isEmpty
-                              ? null
-                              : IconButton(
-                                  icon: const Icon(Icons.clear),
-                                  onPressed: () {
-                                    _searchController.clear();
-                                    setState(() => _searchQuery = '');
+                    _CompactStatusChip(
+                      icon: Icons.pause_circle_outline,
+                      label: 'บิลพัก ${holdOrdersState.orders.length}',
+                      color: Colors.orange,
+                    ),
+                    _CompactStatusChip(
+                      icon: Icons.shopping_bag_outlined,
+                      label:
+                          'สินค้า ${cartState.items.fold<double>(0, (sum, item) => sum + item.quantity).toStringAsFixed(0)}',
+                      color: AppTheme.primaryColor,
+                    ),
+                    _CompactStatusChip(
+                      icon: Icons.sync_problem_outlined,
+                      label: 'รอส่ง ${syncValue?.pendingCount ?? 0}',
+                      color: Colors.teal,
+                    ),
+                  ],
+                ),
+                      const SizedBox(height: 10),
+                      if (_favoriteProductIds.isNotEmpty)
+                        productAsync.maybeWhen(
+                          data: (products) {
+                            final favorites = _favoriteProductIds
+                                .map(
+                                  (id) => products
+                                      .where(
+                                        (product) => product.productId == id,
+                                      )
+                                      .firstOrNull,
+                                )
+                                .whereType<ProductModel>()
+                                .toList();
+
+                            if (favorites.isEmpty) {
+                              return const SizedBox.shrink();
+                            }
+
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Expanded(
+                                      child: Text(
+                                        'ปุ่มขายด่วน',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                    TextButton.icon(
+                                      onPressed: () =>
+                                          _openFavoriteManager(products),
+                                      icon: const Icon(
+                                        Icons.drag_indicator,
+                                        size: 16,
+                                      ),
+                                      label: const Text('จัดเรียง'),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                SizedBox(
+                                  height: 44,
+                                  child: ListView.separated(
+                                    scrollDirection: Axis.horizontal,
+                                    itemCount: favorites.length,
+                                    separatorBuilder: (_, _) =>
+                                        const SizedBox(width: 8),
+                                    itemBuilder: (_, index) {
+                                      final product = favorites[index];
+                                      final color = _groupColor(product.groupId);
+                                      return FilledButton.tonal(
+                                        onPressed: () =>
+                                            _promptAddProduct(product),
+                                        style: FilledButton.styleFrom(
+                                          backgroundColor: color.withValues(
+                                            alpha: 0.12,
+                                          ),
+                                          foregroundColor: color,
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              _groupIcon(product.groupId),
+                                              size: 16,
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Text(product.productName),
+                                          ],
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                          orElse: () => const SizedBox.shrink(),
+                        ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _InfoChip(
+                              icon: Icons.storefront_outlined,
+                              label:
+                                  selectedBranch?.branchName ??
+                                  'ยังไม่ได้เลือกสาขา',
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _InfoChip(
+                              icon: Icons.warehouse_outlined,
+                              label:
+                                  selectedWarehouse?.warehouseName ??
+                                  'ยังไม่ได้เลือกคลัง',
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (selectedBranch == null || selectedWarehouse == null) ...[
+                        const SizedBox(height: 8),
+                        InkWell(
+                          onTap: _openConnectionSettings,
+                          borderRadius: BorderRadius.circular(12),
+                          child: Ink(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              color: Colors.orange.withValues(alpha: 0.08),
+                              border: Border.all(
+                                color: Colors.orange.withValues(alpha: 0.32),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.info_outline,
+                                  color: Colors.orange,
+                                ),
+                                const SizedBox(width: 10),
+                                const Expanded(
+                                  child: Text(
+                                    'ตั้งค่าสาขาและคลังของเครื่องนี้ก่อน เพื่อให้บิลถูกบันทึกลงปลายทางที่ถูกต้อง',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
+                                ),
+                                const Icon(Icons.chevron_right_rounded),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOutCubic,
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardColor,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: _isProductListScrolled
+                          ? AppTheme.primaryColor.withValues(alpha: 0.24)
+                          : AppTheme.borderColorOf(context).withValues(alpha: 0.9),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(
+                          alpha: _isProductListScrolled ? 0.10 : 0.06,
+                        ),
+                        blurRadius: _isProductListScrolled ? 22 : 16,
+                        spreadRadius: _isProductListScrolled ? 0.5 : 0,
+                        offset: Offset(0, _isProductListScrolled ? 8 : 6),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _searchController,
+                              onChanged: (value) =>
+                                  setState(() => _searchQuery = value),
+                              decoration: InputDecoration(
+                                hintText: 'ค้นหาสินค้า / บาร์โค้ด',
+                                prefixIcon: const Icon(Icons.search),
+                                suffixIcon: _searchQuery.isEmpty
+                                    ? null
+                                    : IconButton(
+                                        icon: const Icon(Icons.clear),
+                                        onPressed: () {
+                                          _searchController.clear();
+                                          setState(() => _searchQuery = '');
+                                        },
+                                      ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          FilledButton.tonal(
+                            onPressed: _scanAndSearch,
+                            style: FilledButton.styleFrom(
+                              minimumSize: const Size(52, 52),
+                              padding: EdgeInsets.zero,
+                            ),
+                            child: const Icon(Icons.fullscreen),
+                          ),
+                          const SizedBox(width: 8),
+                          OutlinedButton(
+                            onPressed: _openContinuousScanner,
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size(52, 52),
+                              padding: EdgeInsets.zero,
+                            ),
+                            child: const Icon(Icons.qr_code_scanner),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      productGroupsAsync.when(
+                        data: (groups) => SizedBox(
+                          height: 42,
+                          child: ListView(
+                            scrollDirection: Axis.horizontal,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: FilterChip(
+                                  selected: _selectedGroupId == null,
+                                  backgroundColor: Colors.transparent,
+                                  selectedColor:
+                                      AppTheme.primaryColor.withValues(alpha: 0.12),
+                                  side: BorderSide(
+                                    color: AppTheme.primaryColor.withValues(
+                                      alpha: 0.28,
+                                    ),
+                                  ),
+                                  avatar: const Icon(Icons.apps_rounded, size: 18),
+                                  label: const Text('ทั้งหมด'),
+                                  onSelected: (_) {
+                                    _feedbackSelection();
+                                    setState(() => _selectedGroupId = null);
                                   },
                                 ),
+                              ),
+                              for (final group in groups)
+                                Padding(
+                                  padding: const EdgeInsets.only(right: 8),
+                                  child: Builder(
+                                    builder: (_) {
+                                      final color = _groupColor(group.groupId);
+                                      return FilterChip(
+                                        selected:
+                                            _selectedGroupId == group.groupId,
+                                        backgroundColor: color.withValues(
+                                          alpha: 0.08,
+                                        ),
+                                        selectedColor:
+                                            color.withValues(alpha: 0.18),
+                                        side: BorderSide(
+                                          color: color.withValues(alpha: 0.28),
+                                        ),
+                                        avatar: Icon(
+                                          _groupIcon(group.groupId),
+                                          size: 18,
+                                          color: color,
+                                        ),
+                                        label: Text(group.groupName),
+                                        onSelected: (_) {
+                                          _feedbackSelection();
+                                          setState(() {
+                                            _selectedGroupId =
+                                                _selectedGroupId == group.groupId
+                                                ? null
+                                                : group.groupId;
+                                          });
+                                        },
+                                      );
+                                    },
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        loading: () => const SizedBox.shrink(),
+                        error: (_, _) => const SizedBox.shrink(),
+                      ),
+                      AnimatedOpacity(
+                        duration: const Duration(milliseconds: 180),
+                        opacity: _isProductListScrolled ? 1 : 0.92,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (_selectedGroupId != null) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'กำลังกรองตามหมวดสินค้า',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppTheme.subtextColorOf(context),
+                                ),
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () =>
+                                  setState(() => _selectedGroupId = null),
+                              child: const Text('ล้าง'),
+                            ),
+                          ],
+                        ),
+                            ],
+                            if (_searchQuery.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'ค้นหา "$_searchQuery"',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.subtextColorOf(context),
+                          ),
+                        ),
+                            ],
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                FilterChip(
+                                  selected: _hideInactiveProducts,
+                                  label: const Text('ซ่อนสินค้าไม่ active'),
+                                  onSelected: (value) {
+                                    _feedbackSelection();
+                                    setState(() => _hideInactiveProducts = value);
+                                  },
+                                ),
+                                FilterChip(
+                                  selected: _hideOutOfStockProducts,
+                                  label: const Text('ซ่อนสินค้าหมดสต๊อก'),
+                                  onSelected: (value) {
+                                    _feedbackSelection();
+                                    setState(
+                                      () => _hideOutOfStockProducts = value,
+                                    );
+                                  },
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: FilledButton.tonalIcon(
-                        onPressed: _scanAndSearch,
-                        icon: const Icon(Icons.fullscreen),
-                        label: const Text('สแกนเต็มจอ'),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _openContinuousScanner,
-                        icon: const Icon(Icons.qr_code_scanner),
-                        label: const Text('สแกนต่อเนื่อง'),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: holdOrdersState.orders.isEmpty
-                            ? _holdCurrentOrder
-                            : _openHeldOrders,
-                        icon: Icon(
-                          holdOrdersState.orders.isEmpty
-                              ? Icons.pause_circle_outline
-                              : Icons.folder_open_outlined,
-                        ),
-                        label: Text(
-                          holdOrdersState.orders.isEmpty
-                              ? 'พักบิล'
-                              : 'บิลที่พัก',
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: cartState.items.isEmpty
-                            ? null
-                            : _openOrderSummarySheet,
-                        icon: const Icon(Icons.view_list_outlined),
-                        label: const Text('สรุปออเดอร์'),
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -1698,6 +1861,7 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                 }
 
                 return ListView.separated(
+                  controller: _productListController,
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
                   itemCount: filtered.length,
                   separatorBuilder: (_, _) => const SizedBox(height: 8),
@@ -1710,6 +1874,9 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                     final qtyInCart = cartState.items
                         .where((item) => item.productId == product.productId)
                         .fold<double>(0, (sum, item) => sum + item.quantity);
+                    final screenWidth = MediaQuery.sizeOf(context).width;
+                    final isCompactCard = screenWidth < 380;
+                    final isRegularCard = !isCompactCard;
 
                     return Material(
                       color: Theme.of(context).cardColor,
@@ -1717,13 +1884,19 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                       child: InkWell(
                         borderRadius: BorderRadius.circular(14),
                         onTap: () => _promptAddProduct(product),
+                        onLongPress: () => _showProductMetaSheet(
+                          product,
+                          lookup: lookup,
+                          availableStock: availableStock,
+                          qtyInCart: qtyInCart,
+                        ),
                         child: Padding(
-                          padding: const EdgeInsets.all(14),
+                          padding: EdgeInsets.all(isCompactCard ? 11 : 15),
                           child: Row(
                             children: [
                               Container(
-                                width: 44,
-                                height: 44,
+                                width: isCompactCard ? 38 : 46,
+                                height: isCompactCard ? 38 : 46,
                                 decoration: BoxDecoration(
                                   color: groupColor.withValues(alpha: 0.14),
                                   borderRadius: BorderRadius.circular(12),
@@ -1733,7 +1906,7 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                                   color: groupColor,
                                 ),
                               ),
-                              const SizedBox(width: 12),
+                              SizedBox(width: isCompactCard ? 10 : 12),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1743,9 +1916,10 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                                         Expanded(
                                           child: Text(
                                             product.productName,
-                                            maxLines: 2,
+                                            maxLines: isCompactCard ? 1 : 2,
                                             overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
+                                            style: TextStyle(
+                                              fontSize: isCompactCard ? 12.5 : 14,
                                               fontWeight: FontWeight.w700,
                                             ),
                                           ),
@@ -1773,18 +1947,20 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                                         ),
                                       ],
                                     ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      product.productCode,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: AppTheme.subtextColorOf(context),
+                                    if (isRegularCard) ...[
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        product.productCode,
+                                        style: TextStyle(
+                                          fontSize: isCompactCard ? 11 : 12,
+                                          color: AppTheme.subtextColorOf(context),
+                                        ),
                                       ),
-                                    ),
-                                    const SizedBox(height: 4),
+                                    ],
+                                    SizedBox(height: isCompactCard ? 3 : 4),
                                     Row(
                                       children: [
-                                        if (!product.isActive)
+                                        if (isRegularCard && !product.isActive)
                                           Container(
                                             margin: const EdgeInsets.only(
                                               right: 6,
@@ -1809,9 +1985,9 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                                             ),
                                           ),
                                         Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 8,
-                                            vertical: 3,
+                                          padding: EdgeInsets.symmetric(
+                                            horizontal: isCompactCard ? 6 : 8,
+                                            vertical: isCompactCard ? 2 : 3,
                                           ),
                                           decoration: BoxDecoration(
                                             color: availableStock > 0
@@ -1825,10 +2001,12 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                                           ),
                                           child: Text(
                                             availableStock > 0
-                                                ? 'คงเหลือ ${availableStock.toStringAsFixed(0)}'
+                                                ? isCompactCard
+                                                    ? 'สต๊อก ${availableStock.toStringAsFixed(0)}'
+                                                    : 'คงเหลือ ${availableStock.toStringAsFixed(0)}'
                                                 : 'หมดสต๊อก',
                                             style: TextStyle(
-                                              fontSize: 10,
+                                              fontSize: isCompactCard ? 9.5 : 10,
                                               fontWeight: FontWeight.w700,
                                               color: availableStock > 0
                                                   ? AppTheme.successColor
@@ -1838,7 +2016,7 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                                         ),
                                       ],
                                     ),
-                                    if (product.groupId != null) ...[
+                                    if (isRegularCard && product.groupId != null) ...[
                                       const SizedBox(height: 6),
                                       Container(
                                         padding: const EdgeInsets.symmetric(
@@ -1880,7 +2058,8 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                                       children: [
                                         Text(
                                           '฿${lookup.price.toStringAsFixed(2)}',
-                                          style: const TextStyle(
+                                          style: TextStyle(
+                                            fontSize: isCompactCard ? 12.5 : 14,
                                             color: AppTheme.primaryColor,
                                             fontWeight: FontWeight.w700,
                                           ),
@@ -1909,6 +2088,20 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                                             ),
                                           ),
                                         ],
+                                        if (isCompactCard && qtyInCart > 0) ...[
+                                          const SizedBox(width: 8),
+                                          Flexible(
+                                            child: Text(
+                                              'ในบิล ${qtyInCart.toStringAsFixed(qtyInCart % 1 == 0 ? 0 : 2)}',
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w700,
+                                                color: AppTheme.successColor,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ],
                                     ),
                                   ],
@@ -1916,7 +2109,7 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                               ),
                               Column(
                                 children: [
-                                  if (qtyInCart > 0)
+                                  if (isRegularCard && qtyInCart > 0)
                                     Container(
                                       margin: const EdgeInsets.only(bottom: 8),
                                       padding: const EdgeInsets.symmetric(
@@ -1941,9 +2134,17 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                                       ),
                                     ),
                                   FilledButton(
-                                    onPressed: () => _promptAddProduct(product),
+                                    onPressed: () {
+                                      _feedbackTap();
+                                      _promptAddProduct(product);
+                                    },
                                     style: FilledButton.styleFrom(
                                       backgroundColor: groupColor,
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: isCompactCard ? 10 : 16,
+                                        vertical: isCompactCard ? 0 : 2,
+                                      ),
+                                      minimumSize: Size(0, isCompactCard ? 34 : 38),
                                     ),
                                     child: const Text('เพิ่ม'),
                                   ),
@@ -1961,41 +2162,99 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
           ),
         ],
       ),
-      bottomSheet: Material(
-        elevation: 16,
-        color: Theme.of(context).cardColor,
-        child: SafeArea(
-          top: false,
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Material(
+          elevation: 16,
+          color: Theme.of(context).cardColor,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-            child: Row(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: cartState.items.isEmpty
-                        ? null
-                        : _holdCurrentOrder,
-                    icon: const Icon(Icons.pause_circle_outline),
-                    label: const Text('พักบิล'),
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: cartState.items.isEmpty
+                            ? null
+                            : () {
+                                _feedbackTap();
+                                _openCartSheet();
+                              },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Ink(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: AppTheme.borderColorOf(context),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.shopping_bag_outlined),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'ตะกร้า ${cartState.itemCount} รายการ',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    Text(
+                                      cartState.items.isEmpty
+                                          ? 'ยังไม่มีสินค้าในบิล'
+                                          : 'ยอดรวม ฿${cartState.total.toStringAsFixed(2)}',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: AppTheme.subtextColorOf(context),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const Icon(Icons.chevron_right_rounded),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    OutlinedButton(
+                      onPressed: cartState.items.isEmpty ? null : _holdCurrentOrder,
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(56, 56),
+                        padding: EdgeInsets.zero,
+                      ),
+                      child: const Icon(Icons.pause_circle_outline),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: cartState.items.isEmpty ? null : _openCartSheet,
-                    icon: const Icon(Icons.shopping_bag_outlined),
-                    label: Text('ตะกร้า ${cartState.itemCount}'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
                   child: FilledButton.icon(
                     onPressed: isReadyForCheckout ? _goToCheckout : null,
-                    icon: const Icon(Icons.receipt_long_outlined),
+                    icon: Icon(
+                      selectedBranch == null || selectedWarehouse == null
+                          ? Icons.settings_ethernet_rounded
+                          : Icons.receipt_long_outlined,
+                    ),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(52),
+                    ),
                     label: Text(
                       selectedBranch == null || selectedWarehouse == null
-                          ? 'ตั้งค่าสาขา/คลัง'
-                          : 'ชำระเงิน ฿${cartState.total.toStringAsFixed(0)}',
+                          ? 'ตั้งค่าสาขา/คลังก่อนชำระเงิน'
+                          : 'ชำระเงิน ฿${cartState.total.toStringAsFixed(2)}',
                     ),
                   ),
                 ),
@@ -2052,47 +2311,37 @@ Map<String, double> _buildStockMap(
   return map;
 }
 
-class _MiniDashboardCard extends StatelessWidget {
+class _CompactStatusChip extends StatelessWidget {
   final IconData icon;
   final String label;
-  final String value;
   final Color color;
 
-  const _MiniDashboardCard({
+  const _CompactStatusChip({
     required this.icon,
     required this.label,
-    required this.value,
     required this.color,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(999),
         color: color.withValues(alpha: 0.08),
         border: Border.all(color: color.withValues(alpha: 0.18)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 18, color: color),
-          const SizedBox(height: 10),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              color: color,
-            ),
-          ),
-          const SizedBox(height: 2),
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 6),
           Text(
             label,
             style: TextStyle(
               fontSize: 11,
-              color: AppTheme.subtextColorOf(context),
+              fontWeight: FontWeight.w700,
+              color: color,
             ),
           ),
         ],

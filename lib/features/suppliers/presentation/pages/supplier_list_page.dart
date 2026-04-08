@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/responsive_utils.dart';
+import '../../../../shared/widgets/escape_pop_scope.dart';
 import '../../../../shared/widgets/pagination_bar.dart';
 import '../../../../shared/pdf/pdf_report_button.dart';
 import '../../../settings/presentation/pages/settings_page.dart';
@@ -63,298 +64,304 @@ class _SupplierListPageState extends ConsumerState<SupplierListPage> {
   Widget build(BuildContext context) {
     final supplierAsync = ref.watch(supplierListProvider);
     final pageSize = ref.watch(settingsProvider).listPageSize;
+    final canPop = Navigator.of(context).canPop();
 
-    return Scaffold(
-      backgroundColor: AppTheme.surfaceColorOf(context),
-      appBar: AppBar(
-        automaticallyImplyLeading: !context.hasPermanentSidebar,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('ซัพพลายเออร์'),
-            Text(
-              'ค้นหา จัดการ และติดตามข้อมูลซัพพลายเออร์ในระบบ',
-              style: TextStyle(
-                fontSize: 11,
-                color: Colors.white.withValues(alpha: 0.65),
-                fontWeight: FontWeight.normal,
-              ),
-            ),
-          ],
-        ),
-      ),
-      body: Align(
-        alignment: Alignment.topCenter,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: context.contentMaxWidth),
-          child: Column(
+    return EscapePopScope(
+      child: Scaffold(
+        backgroundColor: AppTheme.surfaceColorOf(context),
+        appBar: AppBar(
+          automaticallyImplyLeading: canPop,
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── Top Bar ───────────────────────────────────────────
-              _SupplierListTopBar(
-                searchController: _searchController,
-                searchQuery: _searchQuery,
-                activeOnly: _activeOnly,
-                isTableView: _isTableView,
-                onSearchChanged: (v) => setState(() {
-                  _searchQuery = v;
-                  _currentPage = 1;
-                }),
-                onSearchCleared: () {
-                  _searchController.clear();
-                  setState(() {
-                    _searchQuery = '';
-                    _currentPage = 1;
-                  });
-                },
-                onToggleActive: () => setState(() {
-                  _activeOnly = !_activeOnly;
-                  _currentPage = 1;
-                }),
-                onToggleView: () =>
-                    setState(() => _isTableView = !_isTableView),
-                onRefresh: () =>
-                    ref.read(supplierListProvider.notifier).refresh(),
-                onAdd: () async {
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const SupplierFormPage()),
-                  );
-                  if (context.mounted) {
-                    ref.read(supplierListProvider.notifier).refresh();
-                  }
-                },
+              const Text('ซัพพลายเออร์'),
+              Text(
+                'ค้นหา จัดการ และติดตามข้อมูลซัพพลายเออร์ในระบบ',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.white.withValues(alpha: 0.65),
+                  fontWeight: FontWeight.normal,
+                ),
               ),
-              // ── Content ──────────────────────────────────────────
-              Expanded(
-                child: supplierAsync.when(
-                  loading: () => Center(
-                    child: Padding(
-                      padding: context.pagePadding,
-                      child: const CircularProgressIndicator(
-                        color: AppTheme.primary,
+            ],
+          ),
+        ),
+        body: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: context.contentMaxWidth),
+            child: Column(
+              children: [
+                // ── Top Bar ───────────────────────────────────────────
+                _SupplierListTopBar(
+                  searchController: _searchController,
+                  searchQuery: _searchQuery,
+                  activeOnly: _activeOnly,
+                  isTableView: _isTableView,
+                  onSearchChanged: (v) => setState(() {
+                    _searchQuery = v;
+                    _currentPage = 1;
+                  }),
+                  onSearchCleared: () {
+                    _searchController.clear();
+                    setState(() {
+                      _searchQuery = '';
+                      _currentPage = 1;
+                    });
+                  },
+                  onToggleActive: () => setState(() {
+                    _activeOnly = !_activeOnly;
+                    _currentPage = 1;
+                  }),
+                  onToggleView: () =>
+                      setState(() => _isTableView = !_isTableView),
+                  onRefresh: () =>
+                      ref.read(supplierListProvider.notifier).refresh(),
+                  onAdd: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const SupplierFormPage(),
+                      ),
+                    );
+                    if (context.mounted) {
+                      ref.read(supplierListProvider.notifier).refresh();
+                    }
+                  },
+                ),
+                // ── Content ──────────────────────────────────────────
+                Expanded(
+                  child: supplierAsync.when(
+                    loading: () => Center(
+                      child: Padding(
+                        padding: context.pagePadding,
+                        child: const CircularProgressIndicator(
+                          color: AppTheme.primary,
+                        ),
                       ),
                     ),
-                  ),
-                  error: (e, _) => _buildError(e),
-                  data: (suppliers) {
-                    final filtered = suppliers.where((s) {
-                      if (_activeOnly && !s.isActive) return false;
-                      if (_searchQuery.isEmpty) return true;
-                      final q = _searchQuery.toLowerCase();
-                      return s.supplierName.toLowerCase().contains(q) ||
-                          s.supplierCode.toLowerCase().contains(q) ||
-                          (s.phone?.toLowerCase().contains(q) ?? false) ||
-                          (s.contactPerson?.toLowerCase().contains(q) ?? false);
-                    }).toList();
+                    error: (e, _) => _buildError(e),
+                    data: (suppliers) {
+                      final filtered = suppliers.where((s) {
+                        if (_activeOnly && !s.isActive) return false;
+                        if (_searchQuery.isEmpty) return true;
+                        final q = _searchQuery.toLowerCase();
+                        return s.supplierName.toLowerCase().contains(q) ||
+                            s.supplierCode.toLowerCase().contains(q) ||
+                            (s.phone?.toLowerCase().contains(q) ?? false) ||
+                            (s.contactPerson?.toLowerCase().contains(q) ??
+                                false);
+                      }).toList();
 
-                    // ── Sort ──────────────────────────────────────
-                    filtered.sort((a, b) {
-                      int cmp;
-                      switch (_sortColumn) {
-                        case 'name':
-                          cmp = a.supplierName.compareTo(b.supplierName);
-                        case 'code':
-                          cmp = a.supplierCode.compareTo(b.supplierCode);
-                        case 'phone':
-                          cmp = (a.phone ?? '').compareTo(b.phone ?? '');
-                        case 'contact':
-                          cmp = (a.contactPerson ?? '').compareTo(
-                            b.contactPerson ?? '',
-                          );
-                        case 'credit':
-                          cmp = a.creditTerm.compareTo(b.creditTerm);
-                        case 'limit':
-                          cmp = a.creditLimit.compareTo(b.creditLimit);
-                        case 'status':
-                          cmp = (b.isActive ? 1 : 0).compareTo(
-                            a.isActive ? 1 : 0,
-                          );
-                        default:
-                          cmp = 0;
-                      }
-                      return _sortAsc ? cmp : -cmp;
-                    });
+                      // ── Sort ──────────────────────────────────────
+                      filtered.sort((a, b) {
+                        int cmp;
+                        switch (_sortColumn) {
+                          case 'name':
+                            cmp = a.supplierName.compareTo(b.supplierName);
+                          case 'code':
+                            cmp = a.supplierCode.compareTo(b.supplierCode);
+                          case 'phone':
+                            cmp = (a.phone ?? '').compareTo(b.phone ?? '');
+                          case 'contact':
+                            cmp = (a.contactPerson ?? '').compareTo(
+                              b.contactPerson ?? '',
+                            );
+                          case 'credit':
+                            cmp = a.creditTerm.compareTo(b.creditTerm);
+                          case 'limit':
+                            cmp = a.creditLimit.compareTo(b.creditLimit);
+                          case 'status':
+                            cmp = (b.isActive ? 1 : 0).compareTo(
+                              a.isActive ? 1 : 0,
+                            );
+                          default:
+                            cmp = 0;
+                        }
+                        return _sortAsc ? cmp : -cmp;
+                      });
 
-                    if (filtered.isEmpty) return _buildEmpty();
+                      if (filtered.isEmpty) return _buildEmpty();
 
-                    // Pagination
-                    final totalPages = (filtered.length / pageSize).ceil();
-                    final safePage = _currentPage.clamp(1, totalPages);
-                    final start = (safePage - 1) * pageSize;
-                    final end = (start + pageSize).clamp(0, filtered.length);
-                    final pageItems = filtered.sublist(start, end);
+                      // Pagination
+                      final totalPages = (filtered.length / pageSize).ceil();
+                      final safePage = _currentPage.clamp(1, totalPages);
+                      final start = (safePage - 1) * pageSize;
+                      final end = (start + pageSize).clamp(0, filtered.length);
+                      final pageItems = filtered.sublist(start, end);
 
-                    // ── Card View ────────────────────────────────
-                    if (!_isTableView) {
-                      return Column(
-                        children: [
-                          Expanded(child: _buildCardView(pageItems)),
-                          PaginationBar(
-                            currentPage: safePage,
-                            totalItems: filtered.length,
-                            pageSize: pageSize,
-                            onPageChanged: (p) =>
-                                setState(() => _currentPage = p),
-                            trailing: PdfReportButton(
-                              emptyMessage: 'ไม่มีข้อมูลซัพพลายเออร์',
-                              title: 'รายงานซัพพลายเออร์',
-                              filename: () =>
-                                  PdfFilename.generate('supplier_report'),
-                              buildPdf: () => SupplierPdfBuilder.build(
-                                List<SupplierModel>.from(filtered),
+                      // ── Card View ────────────────────────────────
+                      if (!_isTableView) {
+                        return Column(
+                          children: [
+                            Expanded(child: _buildCardView(pageItems)),
+                            PaginationBar(
+                              currentPage: safePage,
+                              totalItems: filtered.length,
+                              pageSize: pageSize,
+                              onPageChanged: (p) =>
+                                  setState(() => _currentPage = p),
+                              trailing: PdfReportButton(
+                                emptyMessage: 'ไม่มีข้อมูลซัพพลายเออร์',
+                                title: 'รายงานซัพพลายเออร์',
+                                filename: () =>
+                                    PdfFilename.generate('supplier_report'),
+                                buildPdf: () => SupplierPdfBuilder.build(
+                                  List<SupplierModel>.from(filtered),
+                                ),
+                                hasData: filtered.isNotEmpty,
                               ),
-                              hasData: filtered.isNotEmpty,
                             ),
-                          ),
-                        ],
-                      );
-                    }
+                          ],
+                        );
+                      }
 
-                    // ── Table View ───────────────────────────────
-                    final screenW = MediaQuery.of(context).size.width - 32;
-                    if (!_userResized) _autoFitColWidths(filtered, screenW);
+                      // ── Table View ───────────────────────────────
+                      final screenW = MediaQuery.of(context).size.width - 32;
+                      if (!_userResized) _autoFitColWidths(filtered, screenW);
 
-                    final totalW =
-                        40.0 +
-                        16.0 +
-                        _colWidths.fold(0.0, (s, w) => s + w) +
-                        28.0 +
-                        32.0;
-                    final tableW = totalW > screenW ? totalW : screenW;
+                      final totalW =
+                          40.0 +
+                          16.0 +
+                          _colWidths.fold(0.0, (s, w) => s + w) +
+                          28.0 +
+                          32.0;
+                      final tableW = totalW > screenW ? totalW : screenW;
 
-                    return Stack(
-                      children: [
-                        Container(
-                          margin: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppTheme.border),
-                          ),
-                          child: Column(
-                            children: [
-                              Expanded(
-                                child: Scrollbar(
-                                  controller: _hScroll,
-                                  thumbVisibility: true,
-                                  trackVisibility: true,
-                                  child: SingleChildScrollView(
+                      return Stack(
+                        children: [
+                          Container(
+                            margin: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppTheme.border),
+                            ),
+                            child: Column(
+                              children: [
+                                Expanded(
+                                  child: Scrollbar(
                                     controller: _hScroll,
-                                    scrollDirection: Axis.horizontal,
-                                    child: SizedBox(
-                                      width: tableW,
-                                      child: Column(
-                                        children: [
-                                          _SupplierTableHeader(
-                                            colWidths: _colWidths,
-                                            colMinW: _colMinW,
-                                            colMaxW: _colMaxW,
-                                            sortColumn: _sortColumn,
-                                            sortAsc: _sortAsc,
-                                            onSort: (col) => setState(() {
-                                              if (_sortColumn == col) {
-                                                _sortAsc = !_sortAsc;
-                                              } else {
-                                                _sortColumn = col;
-                                                _sortAsc = true;
-                                              }
-                                              _currentPage = 1;
-                                            }),
-                                            onResize: (i, w) => setState(() {
-                                              _colWidths[i] = w;
-                                              _userResized = true;
-                                            }),
-                                            onReset: () => setState(() {
-                                              _colWidths.setAll(0, [
-                                                200,
-                                                100,
-                                                120,
-                                                140,
-                                                80,
-                                                110,
-                                                80,
-                                                100,
-                                              ]);
-                                              _userResized = false;
-                                            }),
-                                          ),
-                                          const Divider(
-                                            height: 1,
-                                            color: AppTheme.border,
-                                          ),
-                                          Expanded(
-                                            child: ListView.separated(
-                                              itemCount: pageItems.length,
-                                              separatorBuilder: (_, _) =>
-                                                  const Divider(
-                                                    height: 1,
-                                                    color: AppTheme.border,
-                                                  ),
-                                              itemBuilder: (_, i) {
-                                                final s = pageItems[i];
-                                                return _SupplierRow(
-                                                  supplier: s,
-                                                  colWidths: _colWidths,
-                                                  avatarColor: _avatarColor(
-                                                    s.supplierName,
-                                                  ),
-                                                  onEdit: () async {
-                                                    await Navigator.push(
-                                                      context,
-                                                      MaterialPageRoute(
-                                                        builder: (_) =>
-                                                            SupplierFormPage(
-                                                              supplier: s,
-                                                            ),
-                                                      ),
-                                                    );
-                                                    if (context.mounted) {
-                                                      ref
-                                                          .read(
-                                                            supplierListProvider
-                                                                .notifier,
-                                                          )
-                                                          .refresh();
-                                                    }
-                                                  },
-                                                  onDelete: () =>
-                                                      _confirmDelete(s),
-                                                );
-                                              },
+                                    thumbVisibility: true,
+                                    trackVisibility: true,
+                                    child: SingleChildScrollView(
+                                      controller: _hScroll,
+                                      scrollDirection: Axis.horizontal,
+                                      child: SizedBox(
+                                        width: tableW,
+                                        child: Column(
+                                          children: [
+                                            _SupplierTableHeader(
+                                              colWidths: _colWidths,
+                                              colMinW: _colMinW,
+                                              colMaxW: _colMaxW,
+                                              sortColumn: _sortColumn,
+                                              sortAsc: _sortAsc,
+                                              onSort: (col) => setState(() {
+                                                if (_sortColumn == col) {
+                                                  _sortAsc = !_sortAsc;
+                                                } else {
+                                                  _sortColumn = col;
+                                                  _sortAsc = true;
+                                                }
+                                                _currentPage = 1;
+                                              }),
+                                              onResize: (i, w) => setState(() {
+                                                _colWidths[i] = w;
+                                                _userResized = true;
+                                              }),
+                                              onReset: () => setState(() {
+                                                _colWidths.setAll(0, [
+                                                  200,
+                                                  100,
+                                                  120,
+                                                  140,
+                                                  80,
+                                                  110,
+                                                  80,
+                                                  100,
+                                                ]);
+                                                _userResized = false;
+                                              }),
                                             ),
-                                          ),
-                                        ],
+                                            const Divider(
+                                              height: 1,
+                                              color: AppTheme.border,
+                                            ),
+                                            Expanded(
+                                              child: ListView.separated(
+                                                itemCount: pageItems.length,
+                                                separatorBuilder: (_, _) =>
+                                                    const Divider(
+                                                      height: 1,
+                                                      color: AppTheme.border,
+                                                    ),
+                                                itemBuilder: (_, i) {
+                                                  final s = pageItems[i];
+                                                  return _SupplierRow(
+                                                    supplier: s,
+                                                    colWidths: _colWidths,
+                                                    avatarColor: _avatarColor(
+                                                      s.supplierName,
+                                                    ),
+                                                    onEdit: () async {
+                                                      await Navigator.push(
+                                                        context,
+                                                        MaterialPageRoute(
+                                                          builder: (_) =>
+                                                              SupplierFormPage(
+                                                                supplier: s,
+                                                              ),
+                                                        ),
+                                                      );
+                                                      if (context.mounted) {
+                                                        ref
+                                                            .read(
+                                                              supplierListProvider
+                                                                  .notifier,
+                                                            )
+                                                            .refresh();
+                                                      }
+                                                    },
+                                                    onDelete: () =>
+                                                        _confirmDelete(s),
+                                                  );
+                                                },
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ),
                                     ),
                                   ),
                                 ),
-                              ),
-                              PaginationBar(
-                                currentPage: safePage,
-                                totalItems: filtered.length,
-                                pageSize: pageSize,
-                                onPageChanged: (p) =>
-                                    setState(() => _currentPage = p),
-                                trailing: PdfReportButton(
-                                  emptyMessage: 'ไม่มีข้อมูลซัพพลายเออร์',
-                                  title: 'รายงานซัพพลายเออร์',
-                                  filename: () =>
-                                      PdfFilename.generate('supplier_report'),
-                                  buildPdf: () => SupplierPdfBuilder.build(
-                                    List<SupplierModel>.from(filtered),
+                                PaginationBar(
+                                  currentPage: safePage,
+                                  totalItems: filtered.length,
+                                  pageSize: pageSize,
+                                  onPageChanged: (p) =>
+                                      setState(() => _currentPage = p),
+                                  trailing: PdfReportButton(
+                                    emptyMessage: 'ไม่มีข้อมูลซัพพลายเออร์',
+                                    title: 'รายงานซัพพลายเออร์',
+                                    filename: () =>
+                                        PdfFilename.generate('supplier_report'),
+                                    buildPdf: () => SupplierPdfBuilder.build(
+                                      List<SupplierModel>.from(filtered),
+                                    ),
+                                    hasData: filtered.isNotEmpty,
                                   ),
-                                  hasData: filtered.isNotEmpty,
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
-                    );
-                  },
+                        ],
+                      );
+                    },
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -927,7 +934,7 @@ class _SupplierListTopBar extends StatelessWidget {
     required this.onAdd,
   });
 
-  static const _kBreak = 720.0;
+  static const _kBreak = 980.0;
 
   @override
   Widget build(BuildContext context) {

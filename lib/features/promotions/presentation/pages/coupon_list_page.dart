@@ -12,6 +12,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'coupon_pdf_report.dart';
 import 'package:pos_erp/shared/pdf/pdf_report_button.dart';
 import 'package:pos_erp/shared/pdf/pdf_export_service.dart';
+import 'package:pos_erp/shared/widgets/escape_pop_scope.dart';
 import 'package:pos_erp/shared/widgets/pagination_bar.dart';
 
 class CouponListPage extends ConsumerStatefulWidget {
@@ -23,9 +24,9 @@ class CouponListPage extends ConsumerStatefulWidget {
 
 class _CouponListPageState extends ConsumerState<CouponListPage> {
   final _searchController = TextEditingController();
-  String    _filter = 'ALL'; // ALL, VALID, USED, EXPIRED
-  String    _searchQuery = '';
-  bool      _groupByPromotion = false;
+  String _filter = 'ALL'; // ALL, VALID, USED, EXPIRED
+  String _searchQuery = '';
+  bool _groupByPromotion = false;
   DateTime? _expiresFrom;
   DateTime? _expiresTo;
   Timer? _debounce;
@@ -37,11 +38,15 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
   final Set<String> _collapsedGroups = {};
   CouponPaperSize _batchPaperSize = CouponPaperSize.a6;
 
-  void _enterSelectionMode() =>
-      setState(() { _selectionMode = true; _selectedIds.clear(); });
+  void _enterSelectionMode() => setState(() {
+    _selectionMode = true;
+    _selectedIds.clear();
+  });
 
-  void _exitSelectionMode() =>
-      setState(() { _selectionMode = false; _selectedIds.clear(); });
+  void _exitSelectionMode() => setState(() {
+    _selectionMode = false;
+    _selectedIds.clear();
+  });
 
   void _toggleSelect(String id) => setState(() {
     if (_selectedIds.contains(id)) {
@@ -72,10 +77,12 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('เกิดข้อผิดพลาด: $e'),
-          backgroundColor: AppTheme.errorColor,
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('เกิดข้อผิดพลาด: $e'),
+            backgroundColor: AppTheme.errorColor,
+          ),
+        );
       }
     }
   }
@@ -94,10 +101,12 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('เกิดข้อผิดพลาด: $e'),
-          backgroundColor: AppTheme.errorColor,
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('เกิดข้อผิดพลาด: $e'),
+            backgroundColor: AppTheme.errorColor,
+          ),
+        );
       }
     }
   }
@@ -117,11 +126,13 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
       _expiresTo != null;
 
   void _applyAllFilters() {
-    ref.read(couponListProvider.notifier).applyFilter(
+    ref
+        .read(couponListProvider.notifier)
+        .applyFilter(
           status: _filter,
           search: _searchQuery,
           expiresFrom: _expiresFrom?.toIso8601String() ?? '',
-          expiresTo:   _expiresTo?.toIso8601String()   ?? '',
+          expiresTo: _expiresTo?.toIso8601String() ?? '',
         );
   }
 
@@ -131,10 +142,7 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
       _selectedIds.clear();
     });
     _debounce?.cancel();
-    _debounce = Timer(
-      const Duration(milliseconds: 400),
-      _applyAllFilters,
-    );
+    _debounce = Timer(const Duration(milliseconds: 400), _applyAllFilters);
   }
 
   void _onFilterChanged(String v) {
@@ -148,13 +156,15 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
   void _clearFilters() {
     _searchController.clear();
     setState(() {
-      _searchQuery  = '';
-      _filter       = 'ALL';
-      _expiresFrom  = null;
-      _expiresTo    = null;
+      _searchQuery = '';
+      _filter = 'ALL';
+      _expiresFrom = null;
+      _expiresTo = null;
       _selectedIds.clear();
     });
-    ref.read(couponListProvider.notifier).applyFilter(status: 'ALL', search: '');
+    ref
+        .read(couponListProvider.notifier)
+        .applyFilter(status: 'ALL', search: '');
   }
 
   Future<void> _pickExpiresFrom() async {
@@ -196,7 +206,7 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
     final next = !_groupByPromotion;
     setState(() {
       _groupByPromotion = next;
-      _selectionMode    = false;
+      _selectionMode = false;
       _selectedIds.clear();
     });
     if (next) {
@@ -213,143 +223,168 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
-      body: Column(
-        children: [
-          // ── Top Bar ───────────────────────────────────────────
-          _TopBar(
-            searchController: _searchController,
-            searchQuery: _searchQuery,
-            hasFilter: _hasFilter,
-            onSearchChanged: _onSearchChanged,
-            onSearchCleared: () {
-              _searchController.clear();
-              _onSearchChanged('');
-            },
-            onRefresh: () => ref.read(couponListProvider.notifier).refresh(),
-            onClearFilter: _hasFilter ? _clearFilters : null,
-          ),
+      body: EscapePopScope(
+        child: Column(
+          children: [
+            // ── Top Bar ───────────────────────────────────────────
+            _TopBar(
+              searchController: _searchController,
+              searchQuery: _searchQuery,
+              hasFilter: _hasFilter,
+              onSearchChanged: _onSearchChanged,
+              onSearchCleared: () {
+                _searchController.clear();
+                _onSearchChanged('');
+              },
+              onRefresh: () => ref.read(couponListProvider.notifier).refresh(),
+              onClearFilter: _hasFilter ? _clearFilters : null,
+            ),
 
-          // ── Filter Bar ────────────────────────────────────────
-          _FilterBar(
-            filter: _filter,
-            onFilterChanged: _onFilterChanged,
-            groupByPromotion: _groupByPromotion,
-            onGroupToggle: _toggleGroupMode,
-            expiresFrom: _expiresFrom,
-            expiresTo: _expiresTo,
-            onPickExpiresFrom: _pickExpiresFrom,
-            onPickExpiresTo: _pickExpiresTo,
-            onClearExpiryDates: (_expiresFrom != null || _expiresTo != null)
-                ? () {
-                    setState(() {
-                      _expiresFrom = null;
-                      _expiresTo   = null;
-                      _selectedIds.clear();
-                    });
-                    _applyAllFilters();
+            // ── Filter Bar ────────────────────────────────────────
+            _FilterBar(
+              filter: _filter,
+              onFilterChanged: _onFilterChanged,
+              groupByPromotion: _groupByPromotion,
+              onGroupToggle: _toggleGroupMode,
+              expiresFrom: _expiresFrom,
+              expiresTo: _expiresTo,
+              onPickExpiresFrom: _pickExpiresFrom,
+              onPickExpiresTo: _pickExpiresTo,
+              onClearExpiryDates: (_expiresFrom != null || _expiresTo != null)
+                  ? () {
+                      setState(() {
+                        _expiresFrom = null;
+                        _expiresTo = null;
+                        _selectedIds.clear();
+                      });
+                      _applyAllFilters();
+                    }
+                  : null,
+            ),
+
+            // ── Body ──────────────────────────────────────────────
+            Expanded(
+              child: couponsAsync.when(
+                loading: () => const Center(
+                  child: CircularProgressIndicator(color: AppTheme.primary),
+                ),
+                error: (e, _) => _buildError(e),
+                data: (pageState) {
+                  if (pageState.items.isEmpty) {
+                    return _buildEmpty(pageState.total == 0, promotionsAsync);
                   }
-                : null,
-          ),
 
-          // ── Body ──────────────────────────────────────────────
-          Expanded(
-            child: couponsAsync.when(
-              loading: () => const Center(
-                child: CircularProgressIndicator(color: AppTheme.primary),
-              ),
-              error: (e, _) => _buildError(e),
-              data: (pageState) {
-                if (pageState.items.isEmpty) {
-                  return _buildEmpty(pageState.total == 0, promotionsAsync);
-                }
+                  final items = pageState.items;
 
-                final items = pageState.items;
+                  if (_groupByPromotion) {
+                    return _buildGroupedView(
+                      items,
+                      pageState.summary,
+                      promotionsAsync,
+                    );
+                  }
 
-                if (_groupByPromotion) {
-                  return _buildGroupedView(items, pageState.summary, promotionsAsync);
-                }
-
-                return Column(
-                  children: [
-                    Expanded(
-                      child: Container(
-                        margin: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppTheme.border),
-                        ),
-                        child: Column(
-                          children: [
-                            _SummaryBar(summary: pageState.summary),
-                            const Divider(height: 1, color: AppTheme.border),
-                            Expanded(
-                              child: ListView.separated(
-                                itemCount: items.length,
-                                separatorBuilder: (_, _) =>
-                                    const Divider(height: 1, color: AppTheme.border),
-                                itemBuilder: (ctx, i) => _CouponRow(
-                                  coupon: items[i],
-                                  dateFmt: _dateFmt,
-                                  selectionMode: _selectionMode,
-                                  isSelected: _selectedIds.contains(items[i].couponCode),
-                                  onTap: _selectionMode
-                                      ? () => _toggleSelect(items[i].couponCode)
-                                      : () => _showDetailDialog(context, items[i]),
-                                  onCopy: () {
-                                    Clipboard.setData(
-                                        ClipboardData(text: items[i].couponCode));
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
+                  return Column(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          margin: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppTheme.border),
+                          ),
+                          child: Column(
+                            children: [
+                              _SummaryBar(summary: pageState.summary),
+                              const Divider(height: 1, color: AppTheme.border),
+                              Expanded(
+                                child: ListView.separated(
+                                  itemCount: items.length,
+                                  separatorBuilder: (_, _) => const Divider(
+                                    height: 1,
+                                    color: AppTheme.border,
+                                  ),
+                                  itemBuilder: (ctx, i) => _CouponRow(
+                                    coupon: items[i],
+                                    dateFmt: _dateFmt,
+                                    selectionMode: _selectionMode,
+                                    isSelected: _selectedIds.contains(
+                                      items[i].couponCode,
+                                    ),
+                                    onTap: _selectionMode
+                                        ? () =>
+                                              _toggleSelect(items[i].couponCode)
+                                        : () => _showDetailDialog(
+                                            context,
+                                            items[i],
+                                          ),
+                                    onCopy: () {
+                                      Clipboard.setData(
+                                        ClipboardData(
+                                          text: items[i].couponCode,
+                                        ),
+                                      );
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
                                           content: Text(
-                                              'คัดลอก ${items[i].couponCode} แล้ว')),
-                                    );
-                                  },
-                                  onPrint: () => _showPrintDialog(context, items[i]),
+                                            'คัดลอก ${items[i].couponCode} แล้ว',
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    onPrint: () =>
+                                        _showPrintDialog(context, items[i]),
+                                  ),
                                 ),
                               ),
-                            ),
-                            // ── Footer: pagination + action buttons ──
-                            if (!_selectionMode)
-                              PaginationBar(
-                                currentPage: pageState.page,
-                                totalItems: pageState.total,
-                                pageSize: pageState.limit,
-                                onPageChanged: (p) => ref
-                                    .read(couponListProvider.notifier)
-                                    .goToPage(p),
-                                trailing: _buildActionButtons(items, promotionsAsync),
-                              ),
-                          ],
+                              // ── Footer: pagination + action buttons ──
+                              if (!_selectionMode)
+                                PaginationBar(
+                                  currentPage: pageState.page,
+                                  totalItems: pageState.total,
+                                  pageSize: pageState.limit,
+                                  onPageChanged: (p) => ref
+                                      .read(couponListProvider.notifier)
+                                      .goToPage(p),
+                                  trailing: _buildActionButtons(
+                                    items,
+                                    promotionsAsync,
+                                  ),
+                                ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                    // ── Selection bar (แสดงเมื่อ selection mode) ──
-                    if (_selectionMode)
-                      _SelectionBar(
-                        selectedCount: _selectedIds.length,
-                        totalCount: items.length,
-                        allSelected: _selectedIds.length == items.length,
-                        paperSize: _batchPaperSize,
-                        onPaperSizeChanged: (s) =>
-                            setState(() => _batchPaperSize = s),
-                        onSelectAll: () => _selectAll(items),
-                        onDeselectAll: () =>
-                            setState(() => _selectedIds.clear()),
-                        onPrint: _selectedIds.isEmpty
-                            ? null
-                            : () => _printSelected(items),
-                        onShare: _selectedIds.isEmpty
-                            ? null
-                            : () => _shareSelected(items),
-                        onCancel: _exitSelectionMode,
-                      ),
-                  ],
-                );
-              },
+                      // ── Selection bar (แสดงเมื่อ selection mode) ──
+                      if (_selectionMode)
+                        _SelectionBar(
+                          selectedCount: _selectedIds.length,
+                          totalCount: items.length,
+                          allSelected: _selectedIds.length == items.length,
+                          paperSize: _batchPaperSize,
+                          onPaperSizeChanged: (s) =>
+                              setState(() => _batchPaperSize = s),
+                          onSelectAll: () => _selectAll(items),
+                          onDeselectAll: () =>
+                              setState(() => _selectedIds.clear()),
+                          onPrint: _selectedIds.isEmpty
+                              ? null
+                              : () => _printSelected(items),
+                          onShare: _selectedIds.isEmpty
+                              ? null
+                              : () => _shareSelected(items),
+                          onCancel: _exitSelectionMode,
+                        ),
+                    ],
+                  );
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -361,13 +396,13 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
     AsyncValue<List<PromotionModel>> promotionsAsync,
   ) {
     // Group by promotionId — preserve order (first-seen)
-    final groupOrder  = <String>[];
-    final groupMap    = <String, List<CouponModel>>{};
-    final groupNames  = <String, String>{};
+    final groupOrder = <String>[];
+    final groupMap = <String, List<CouponModel>>{};
+    final groupNames = <String, String>{};
     for (final c in items) {
       if (!groupMap.containsKey(c.promotionId)) {
         groupOrder.add(c.promotionId);
-        groupMap[c.promotionId]   = [];
+        groupMap[c.promotionId] = [];
         groupNames[c.promotionId] = c.promotionName ?? c.promotionId;
       }
       groupMap[c.promotionId]!.add(c);
@@ -376,163 +411,210 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
     // Build flat list: [header, row, row, …, header, row, …]
     final slivers = <Widget>[];
     for (final promoId in groupOrder) {
-      final coupons   = groupMap[promoId]!;
+      final coupons = groupMap[promoId]!;
       final promoName = groupNames[promoId]!;
-      final valid   = coupons.where((c) => !c.isUsed && !c.isExpired).length;
-      final used    = coupons.where((c) => c.isUsed).length;
+      final valid = coupons.where((c) => !c.isUsed && !c.isExpired).length;
+      final used = coupons.where((c) => c.isUsed).length;
       final expired = coupons.where((c) => !c.isUsed && c.isExpired).length;
 
       final isCollapsed = _collapsedGroups.contains(promoId);
 
       // Section header
-      slivers.add(SliverToBoxAdapter(
-        child: InkWell(
-          onTap: () => setState(() {
-            if (isCollapsed) {
-              _collapsedGroups.remove(promoId);
-            } else {
-              _collapsedGroups.add(promoId);
-            }
-          }),
-          borderRadius: BorderRadius.vertical(
-            top: const Radius.circular(10),
-            bottom: isCollapsed ? const Radius.circular(10) : Radius.zero,
-          ),
-          child: Container(
-            margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: AppTheme.primaryColor.withValues(alpha: 0.07),
-              borderRadius: BorderRadius.vertical(
-                top: const Radius.circular(10),
-                bottom: isCollapsed ? const Radius.circular(10) : Radius.zero,
-              ),
-              border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.18)),
+      slivers.add(
+        SliverToBoxAdapter(
+          child: InkWell(
+            onTap: () => setState(() {
+              if (isCollapsed) {
+                _collapsedGroups.remove(promoId);
+              } else {
+                _collapsedGroups.add(promoId);
+              }
+            }),
+            borderRadius: BorderRadius.vertical(
+              top: const Radius.circular(10),
+              bottom: isCollapsed ? const Radius.circular(10) : Radius.zero,
             ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryColor.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(6),
+            child: Container(
+              margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryColor.withValues(alpha: 0.07),
+                borderRadius: BorderRadius.vertical(
+                  top: const Radius.circular(10),
+                  bottom: isCollapsed ? const Radius.circular(10) : Radius.zero,
+                ),
+                border: Border.all(
+                  color: AppTheme.primaryColor.withValues(alpha: 0.18),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Icon(
+                      Icons.local_offer,
+                      size: 15,
+                      color: AppTheme.primaryColor,
+                    ),
                   ),
-                  child: const Icon(Icons.local_offer,
-                      size: 15, color: AppTheme.primaryColor),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(promoName,
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      promoName,
                       style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.primaryColor)),
-                ),
-                // Mini stats
-                _MiniStat(count: coupons.length, label: 'ทั้งหมด',
-                    color: AppTheme.textSub),
-                const SizedBox(width: 8),
-                if (valid > 0)
-                  _MiniStat(count: valid, label: 'ใช้ได้',
-                      color: AppTheme.successColor),
-                if (used > 0) ...[
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.primaryColor,
+                      ),
+                    ),
+                  ),
+                  // Mini stats
+                  _MiniStat(
+                    count: coupons.length,
+                    label: 'ทั้งหมด',
+                    color: AppTheme.textSub,
+                  ),
                   const SizedBox(width: 8),
-                  _MiniStat(count: used, label: 'ใช้แล้ว',
-                      color: AppTheme.textSub),
-                ],
-                if (expired > 0) ...[
+                  if (valid > 0)
+                    _MiniStat(
+                      count: valid,
+                      label: 'ใช้ได้',
+                      color: AppTheme.successColor,
+                    ),
+                  if (used > 0) ...[
+                    const SizedBox(width: 8),
+                    _MiniStat(
+                      count: used,
+                      label: 'ใช้แล้ว',
+                      color: AppTheme.textSub,
+                    ),
+                  ],
+                  if (expired > 0) ...[
+                    const SizedBox(width: 8),
+                    _MiniStat(
+                      count: expired,
+                      label: 'หมดอายุ',
+                      color: AppTheme.errorColor,
+                    ),
+                  ],
                   const SizedBox(width: 8),
-                  _MiniStat(count: expired, label: 'หมดอายุ',
-                      color: AppTheme.errorColor),
+                  AnimatedRotation(
+                    turns: isCollapsed ? -0.25 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    child: const Icon(
+                      Icons.expand_more,
+                      size: 18,
+                      color: AppTheme.primaryColor,
+                    ),
+                  ),
                 ],
-                const SizedBox(width: 8),
-                AnimatedRotation(
-                  turns: isCollapsed ? -0.25 : 0,
-                  duration: const Duration(milliseconds: 200),
-                  child: const Icon(Icons.expand_more,
-                      size: 18, color: AppTheme.primaryColor),
-                ),
-              ],
+              ),
             ),
           ),
         ),
-      ));
+      );
 
       // Coupon rows (hidden when collapsed)
       if (!isCollapsed) {
-        slivers.add(SliverToBoxAdapter(
-          child: Container(
-            margin: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(10)),
-              border: Border(
-                left:   BorderSide(color: AppTheme.primaryColor.withValues(alpha: 0.18)),
-                right:  BorderSide(color: AppTheme.primaryColor.withValues(alpha: 0.18)),
-                bottom: BorderSide(color: AppTheme.primaryColor.withValues(alpha: 0.18)),
+        slivers.add(
+          SliverToBoxAdapter(
+            child: Container(
+              margin: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(10),
+                ),
+                border: Border(
+                  left: BorderSide(
+                    color: AppTheme.primaryColor.withValues(alpha: 0.18),
+                  ),
+                  right: BorderSide(
+                    color: AppTheme.primaryColor.withValues(alpha: 0.18),
+                  ),
+                  bottom: BorderSide(
+                    color: AppTheme.primaryColor.withValues(alpha: 0.18),
+                  ),
+                ),
               ),
-            ),
-            child: ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: coupons.length,
-              separatorBuilder: (_, _) =>
-                  const Divider(height: 1, color: AppTheme.border),
-              itemBuilder: (ctx, i) => _CouponRow(
-                coupon: coupons[i],
-                dateFmt: _dateFmt,
-                onTap: () => _showDetailDialog(context, coupons[i]),
-                onCopy: () {
-                  Clipboard.setData(ClipboardData(text: coupons[i].couponCode));
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                      content: Text('คัดลอก ${coupons[i].couponCode} แล้ว')));
-                },
-                onPrint: () => _showPrintDialog(context, coupons[i]),
+              child: ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: coupons.length,
+                separatorBuilder: (_, _) =>
+                    const Divider(height: 1, color: AppTheme.border),
+                itemBuilder: (ctx, i) => _CouponRow(
+                  coupon: coupons[i],
+                  dateFmt: _dateFmt,
+                  onTap: () => _showDetailDialog(context, coupons[i]),
+                  onCopy: () {
+                    Clipboard.setData(
+                      ClipboardData(text: coupons[i].couponCode),
+                    );
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('คัดลอก ${coupons[i].couponCode} แล้ว'),
+                      ),
+                    );
+                  },
+                  onPrint: () => _showPrintDialog(context, coupons[i]),
+                ),
               ),
             ),
           ),
-        ));
+        );
       }
     }
 
     // Footer with create button
-    slivers.add(SliverToBoxAdapter(
-      child: Container(
-        margin: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: AppTheme.headerBg,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: AppTheme.border),
-        ),
-        child: Row(
-          children: [
-            _Chip(
+    slivers.add(
+      SliverToBoxAdapter(
+        child: Container(
+          margin: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: AppTheme.headerBg,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppTheme.border),
+          ),
+          child: Row(
+            children: [
+              _Chip(
                 icon: Icons.confirmation_number,
                 label: '${summary['total'] ?? 0} ทั้งหมด',
-                color: AppTheme.info),
-            const SizedBox(width: 12),
-            _Chip(
+                color: AppTheme.info,
+              ),
+              const SizedBox(width: 12),
+              _Chip(
                 icon: Icons.check_circle_outline,
                 label: '${summary['valid'] ?? 0} ใช้ได้',
-                color: AppTheme.successColor),
-            const Spacer(),
-            _CompactBtn(
-              icon: Icons.add,
-              label: 'สร้างคูปอง',
-              color: Colors.white,
-              bgColor: AppTheme.primaryColor,
-              onTap: () => _showGenerateDialog(promotionsAsync),
-            ),
-          ],
+                color: AppTheme.successColor,
+              ),
+              const Spacer(),
+              _CompactBtn(
+                icon: Icons.add,
+                label: 'สร้างคูปอง',
+                color: Colors.white,
+                bgColor: AppTheme.primaryColor,
+                onTap: () => _showGenerateDialog(promotionsAsync),
+              ),
+            ],
+          ),
         ),
       ),
-    ));
+    );
 
     return CustomScrollView(slivers: slivers);
   }
 
-  Widget _buildEmpty(bool noData, AsyncValue<List<PromotionModel>> promotionsAsync) {
+  Widget _buildEmpty(
+    bool noData,
+    AsyncValue<List<PromotionModel>> promotionsAsync,
+  ) {
     return Column(
       children: [
         Expanded(
@@ -540,8 +622,11 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.confirmation_number_outlined,
-                    size: 80, color: Colors.grey.withValues(alpha: 0.4)),
+                Icon(
+                  Icons.confirmation_number_outlined,
+                  size: 80,
+                  color: Colors.grey.withValues(alpha: 0.4),
+                ),
                 const SizedBox(height: 16),
                 Text(
                   noData ? 'ยังไม่มีคูปอง' : 'ไม่พบคูปองที่ตรงกับเงื่อนไข',
@@ -605,14 +690,18 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
   }
 
   // ── Generate Dialog ────────────────────────────────────────────
-  void _showGenerateDialog(AsyncValue<List<PromotionModel>> promotionsAsync) async {
-    final promotions = (promotionsAsync.hasValue ? promotionsAsync.value! : <PromotionModel>[])
-        .where((p) => p.isActive && !p.isExpired)
-        .toList();
+  void _showGenerateDialog(
+    AsyncValue<List<PromotionModel>> promotionsAsync,
+  ) async {
+    final promotions =
+        (promotionsAsync.hasValue ? promotionsAsync.value! : <PromotionModel>[])
+            .where((p) => p.isActive && !p.isExpired)
+            .toList();
 
     if (promotions.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('กรุณาสร้างโปรโมชั่นก่อน')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('กรุณาสร้างโปรโมชั่นก่อน')));
       return;
     }
 
@@ -633,12 +722,17 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
                   color: AppTheme.infoContainer,
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: const Icon(Icons.confirmation_number,
-                    color: AppTheme.infoColor, size: 18),
+                child: const Icon(
+                  Icons.confirmation_number,
+                  color: AppTheme.infoColor,
+                  size: 18,
+                ),
               ),
               const SizedBox(width: 10),
-              const Text('สร้างคูปอง',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+              const Text(
+                'สร้างคูปอง',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
             ],
           ),
           content: SizedBox(
@@ -654,11 +748,15 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
                     initialValue: selectedPromoId,
                     decoration: _dialogInputDeco(),
                     items: promotions
-                        .map((p) => DropdownMenuItem(
-                              value: p.promotionId,
-                              child: Text(p.promotionName,
-                                  overflow: TextOverflow.ellipsis),
-                            ))
+                        .map(
+                          (p) => DropdownMenuItem(
+                            value: p.promotionId,
+                            child: Text(
+                              p.promotionName,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        )
                         .toList(),
                     onChanged: (v) => setStateDialog(() => selectedPromoId = v),
                   ),
@@ -674,12 +772,17 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
                   Wrap(
                     spacing: 8,
                     children: [1, 5, 10, 20, 50]
-                        .map((n) => ActionChip(
-                              label: Text('$n',
-                                  style: const TextStyle(fontSize: 12)),
-                              onPressed: () => setStateDialog(
-                                  () => countCtrl.text = n.toString()),
-                            ))
+                        .map(
+                          (n) => ActionChip(
+                            label: Text(
+                              '$n',
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                            onPressed: () => setStateDialog(
+                              () => countCtrl.text = n.toString(),
+                            ),
+                          ),
+                        )
                         .toList(),
                   ),
                   const SizedBox(height: 12),
@@ -687,7 +790,9 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
                   const SizedBox(height: 6),
                   TextField(
                     controller: customCodeCtrl,
-                    decoration: _dialogInputDeco(hint: 'เว้นว่าง = สุ่มอัตโนมัติ'),
+                    decoration: _dialogInputDeco(
+                      hint: 'เว้นว่าง = สุ่มอัตโนมัติ',
+                    ),
                     textCapitalization: TextCapitalization.characters,
                   ),
                   const SizedBox(height: 12),
@@ -697,11 +802,14 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
                     onTap: () async {
                       final picked = await showDatePicker(
                         context: ctx,
-                        initialDate: DateTime.now().add(const Duration(days: 30)),
+                        initialDate: DateTime.now().add(
+                          const Duration(days: 30),
+                        ),
                         firstDate: DateTime.now(),
                         lastDate: DateTime(2030),
                       );
-                      if (picked != null) setStateDialog(() => expiresAt = picked);
+                      if (picked != null)
+                        setStateDialog(() => expiresAt = picked);
                     },
                     borderRadius: BorderRadius.circular(8),
                     child: InputDecorator(
@@ -714,13 +822,17 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
                                   ? DateFormat('dd/MM/yyyy').format(expiresAt!)
                                   : 'ไม่จำกัด',
                               style: TextStyle(
-                                  color: expiresAt != null
-                                      ? null
-                                      : AppTheme.textSub),
+                                color: expiresAt != null
+                                    ? null
+                                    : AppTheme.textSub,
+                              ),
                             ),
                           ),
-                          const Icon(Icons.calendar_today,
-                              size: 16, color: AppTheme.textSub),
+                          const Icon(
+                            Icons.calendar_today,
+                            size: 16,
+                            color: AppTheme.textSub,
+                          ),
                         ],
                       ),
                     ),
@@ -819,9 +931,14 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
     );
   }
 
-  Widget _dialogLabel(String text) => Text(text,
-      style: const TextStyle(
-          fontSize: 13, fontWeight: FontWeight.w500, color: AppTheme.textSub));
+  Widget _dialogLabel(String text) => Text(
+    text,
+    style: const TextStyle(
+      fontSize: 13,
+      fontWeight: FontWeight.w500,
+      color: AppTheme.textSub,
+    ),
+  );
 
   InputDecoration _dialogInputDeco({String? hint, String? suffix}) =>
       InputDecoration(
@@ -829,16 +946,21 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
         hintStyle: const TextStyle(color: AppTheme.textSub),
         suffixText: suffix,
         border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: AppTheme.border)),
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: AppTheme.border),
+        ),
         enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: AppTheme.border)),
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: AppTheme.border),
+        ),
         focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: AppTheme.primary, width: 1.5)),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 12,
+        ),
       );
 }
 
@@ -873,7 +995,9 @@ class _TopBar extends StatelessWidget {
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: isWide ? _buildWide(context, canPop) : _buildNarrow(context, canPop),
+      child: isWide
+          ? _buildWide(context, canPop)
+          : _buildNarrow(context, canPop),
     );
   }
 
@@ -886,11 +1010,14 @@ class _TopBar extends StatelessWidget {
         ],
         _PageIcon(),
         const SizedBox(width: 10),
-        const Text('จัดการคูปอง',
-            style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF1A1A1A))),
+        const Text(
+          'จัดการคูปอง',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF1A1A1A),
+          ),
+        ),
         const Spacer(),
         ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 260),
@@ -922,11 +1049,14 @@ class _TopBar extends StatelessWidget {
             ],
             _PageIcon(),
             const SizedBox(width: 8),
-            const Text('จัดการคูปอง',
-                style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1A1A1A))),
+            const Text(
+              'จัดการคูปอง',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1A1A1A),
+              ),
+            ),
             const Spacer(),
             if (hasFilter && onClearFilter != null)
               _ClearFilterBtn(onTap: onClearFilter!),
@@ -973,10 +1103,10 @@ class _FilterBar extends StatelessWidget {
   });
 
   static const _items = [
-    ('ALL',     'ทั้งหมด',  null),
-    ('VALID',   'ใช้ได้',   AppTheme.successColor),
-    ('USED',    'ใช้แล้ว',  AppTheme.textSub),
-    ('EXPIRED', 'หมดอายุ',  AppTheme.errorColor),
+    ('ALL', 'ทั้งหมด', null),
+    ('VALID', 'ใช้ได้', AppTheme.successColor),
+    ('USED', 'ใช้แล้ว', AppTheme.textSub),
+    ('EXPIRED', 'หมดอายุ', AppTheme.errorColor),
   ];
 
   static final _dateFmt = DateFormat('dd/MM/yy', 'th_TH');
@@ -1005,19 +1135,22 @@ class _FilterBar extends StatelessWidget {
                       return Padding(
                         padding: const EdgeInsets.only(right: 8),
                         child: FilterChip(
-                          label: Text(label,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: selected ? color : AppTheme.textSub,
-                                fontWeight: selected
-                                    ? FontWeight.w600
-                                    : FontWeight.normal,
-                              )),
+                          label: Text(
+                            label,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: selected ? color : AppTheme.textSub,
+                              fontWeight: selected
+                                  ? FontWeight.w600
+                                  : FontWeight.normal,
+                            ),
+                          ),
                           selected: selected,
                           selectedColor: color.withValues(alpha: 0.12),
                           checkmarkColor: color,
                           side: BorderSide(
-                              color: selected ? color : AppTheme.border),
+                            color: selected ? color : AppTheme.border,
+                          ),
                           backgroundColor: const Color(0xFFF5F5F5),
                           onSelected: (_) => onFilterChanged(value),
                         ),
@@ -1037,7 +1170,9 @@ class _FilterBar extends StatelessWidget {
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 6),
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: groupByPromotion
                           ? AppTheme.primaryColor
@@ -1052,20 +1187,24 @@ class _FilterBar extends StatelessWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.folder_copy_outlined,
-                            size: 14,
+                        Icon(
+                          Icons.folder_copy_outlined,
+                          size: 14,
+                          color: groupByPromotion
+                              ? Colors.white
+                              : AppTheme.textSub,
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          'จัดกลุ่ม',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
                             color: groupByPromotion
                                 ? Colors.white
-                                : AppTheme.textSub),
-                        const SizedBox(width: 5),
-                        Text('จัดกลุ่ม',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: groupByPromotion
-                                  ? Colors.white
-                                  : AppTheme.textSub,
-                            )),
+                                : AppTheme.textSub,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -1077,22 +1216,20 @@ class _FilterBar extends StatelessWidget {
           const SizedBox(height: 8),
           Row(
             children: [
-              Icon(Icons.event_outlined,
-                  size: 14,
-                  color: hasExpiry
-                      ? AppTheme.primaryColor
-                      : AppTheme.textSub),
+              Icon(
+                Icons.event_outlined,
+                size: 14,
+                color: hasExpiry ? AppTheme.primaryColor : AppTheme.textSub,
+              ),
               const SizedBox(width: 6),
-              Text('หมดอายุ:',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: hasExpiry
-                        ? AppTheme.primaryColor
-                        : AppTheme.textSub,
-                    fontWeight: hasExpiry
-                        ? FontWeight.w600
-                        : FontWeight.normal,
-                  )),
+              Text(
+                'หมดอายุ:',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: hasExpiry ? AppTheme.primaryColor : AppTheme.textSub,
+                  fontWeight: hasExpiry ? FontWeight.w600 : FontWeight.normal,
+                ),
+              ),
               const SizedBox(width: 8),
               _DatePickerButton(
                 label: expiresFrom != null
@@ -1103,14 +1240,13 @@ class _FilterBar extends StatelessWidget {
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 6),
-                child: Text('→',
-                    style: TextStyle(
-                        fontSize: 12, color: AppTheme.textSub)),
+                child: Text(
+                  '→',
+                  style: TextStyle(fontSize: 12, color: AppTheme.textSub),
+                ),
               ),
               _DatePickerButton(
-                label: expiresTo != null
-                    ? _dateFmt.format(expiresTo!)
-                    : 'ถึง',
+                label: expiresTo != null ? _dateFmt.format(expiresTo!) : 'ถึง',
                 active: expiresTo != null,
                 onTap: onPickExpiresTo,
               ),
@@ -1119,8 +1255,11 @@ class _FilterBar extends StatelessWidget {
                 InkWell(
                   onTap: onClearExpiryDates,
                   borderRadius: BorderRadius.circular(4),
-                  child: const Icon(Icons.close,
-                      size: 16, color: AppTheme.textSub),
+                  child: const Icon(
+                    Icons.close,
+                    size: 16,
+                    color: AppTheme.textSub,
+                  ),
                 ),
               ],
             ],
@@ -1187,16 +1326,28 @@ class _SummaryBar extends StatelessWidget {
         spacing: 12,
         runSpacing: 6,
         children: [
-          _Chip(icon: Icons.confirmation_number,
-              label: '${summary['total']} ทั้งหมด', color: AppTheme.info),
-          _Chip(icon: Icons.check_circle_outline,
-              label: '${summary['valid']} ใช้ได้', color: AppTheme.successColor),
+          _Chip(
+            icon: Icons.confirmation_number,
+            label: '${summary['total']} ทั้งหมด',
+            color: AppTheme.info,
+          ),
+          _Chip(
+            icon: Icons.check_circle_outline,
+            label: '${summary['valid']} ใช้ได้',
+            color: AppTheme.successColor,
+          ),
           if ((summary['used'] ?? 0) > 0)
-            _Chip(icon: Icons.block, label: '${summary['used']} ใช้แล้ว',
-                color: AppTheme.textSub),
+            _Chip(
+              icon: Icons.block,
+              label: '${summary['used']} ใช้แล้ว',
+              color: AppTheme.textSub,
+            ),
           if ((summary['expired'] ?? 0) > 0)
-            _Chip(icon: Icons.cancel_outlined,
-                label: '${summary['expired']} หมดอายุ', color: AppTheme.errorColor),
+            _Chip(
+              icon: Icons.cancel_outlined,
+              label: '${summary['expired']} หมดอายุ',
+              color: AppTheme.errorColor,
+            ),
         ],
       ),
     );
@@ -1262,15 +1413,20 @@ class _Chip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(width: 4),
-          Text(label,
-              style: TextStyle(
-                  fontSize: 12, fontWeight: FontWeight.w600, color: color)),
-        ],
-      );
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Icon(icon, size: 14, color: color),
+      const SizedBox(width: 4),
+      Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+      ),
+    ],
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -1297,11 +1453,19 @@ class _CouponRow extends StatelessWidget {
 
   static ({Color color, String label, IconData icon}) _status(CouponModel c) {
     if (c.isUsed) {
-      return (color: AppTheme.textSub, label: 'ใช้แล้ว', icon: Icons.check_circle);
+      return (
+        color: AppTheme.textSub,
+        label: 'ใช้แล้ว',
+        icon: Icons.check_circle,
+      );
     } else if (c.isExpired) {
       return (color: AppTheme.errorColor, label: 'หมดอายุ', icon: Icons.cancel);
     } else {
-      return (color: AppTheme.successColor, label: 'ใช้ได้', icon: Icons.confirmation_number);
+      return (
+        color: AppTheme.successColor,
+        label: 'ใช้ได้',
+        icon: Icons.confirmation_number,
+      );
     }
   }
 
@@ -1312,123 +1476,150 @@ class _CouponRow extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          // Icon / Checkbox
-          if (selectionMode)
-            SizedBox(
-              width: 42,
-              height: 42,
-              child: Checkbox(
-                value: isSelected,
-                onChanged: (_) => onTap?.call(),
-                activeColor: AppTheme.primaryColor,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(4)),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            // Icon / Checkbox
+            if (selectionMode)
+              SizedBox(
+                width: 42,
+                height: 42,
+                child: Checkbox(
+                  value: isSelected,
+                  onChanged: (_) => onTap?.call(),
+                  activeColor: AppTheme.primaryColor,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              )
+            else
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: st.color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(st.icon, color: st.color, size: 20),
               ),
-            )
-          else
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: st.color.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(st.icon, color: st.color, size: 20),
-            ),
-          const SizedBox(width: 12),
+            const SizedBox(width: 12),
 
-          // Content
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      coupon.couponCode,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 15,
-                        fontFamily: 'monospace',
-                        letterSpacing: 1.2,
-                        decoration: coupon.isUsed ? TextDecoration.lineThrough : null,
-                        color: coupon.isUsed
-                            ? AppTheme.textSub
-                            : const Color(0xFF1A1A1A),
+            // Content
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        coupon.couponCode,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                          fontFamily: 'monospace',
+                          letterSpacing: 1.2,
+                          decoration: coupon.isUsed
+                              ? TextDecoration.lineThrough
+                              : null,
+                          color: coupon.isUsed
+                              ? AppTheme.textSub
+                              : const Color(0xFF1A1A1A),
+                        ),
                       ),
-                    ),
-                    if (!selectionMode) ...[
-                      if (!coupon.isUsed && !coupon.isExpired) ...[
+                      if (!selectionMode) ...[
+                        if (!coupon.isUsed && !coupon.isExpired) ...[
+                          const SizedBox(width: 6),
+                          InkWell(
+                            onTap: onCopy,
+                            borderRadius: BorderRadius.circular(4),
+                            child: const Padding(
+                              padding: EdgeInsets.all(2),
+                              child: Icon(
+                                Icons.copy,
+                                size: 14,
+                                color: AppTheme.textSub,
+                              ),
+                            ),
+                          ),
+                        ],
                         const SizedBox(width: 6),
                         InkWell(
-                          onTap: onCopy,
+                          onTap: onPrint,
                           borderRadius: BorderRadius.circular(4),
                           child: const Padding(
                             padding: EdgeInsets.all(2),
-                            child: Icon(Icons.copy, size: 14, color: AppTheme.textSub),
+                            child: Icon(
+                              Icons.qr_code,
+                              size: 14,
+                              color: AppTheme.infoColor,
+                            ),
                           ),
                         ),
                       ],
-                      const SizedBox(width: 6),
-                      InkWell(
-                        onTap: onPrint,
-                        borderRadius: BorderRadius.circular(4),
-                        child: const Padding(
-                          padding: EdgeInsets.all(2),
-                          child: Icon(Icons.qr_code, size: 14, color: AppTheme.infoColor),
-                        ),
-                      ),
                     ],
+                  ),
+                  if (coupon.promotionName != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      coupon.promotionName!,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textSub,
+                      ),
+                    ),
                   ],
-                ),
-                if (coupon.promotionName != null) ...[
-                  const SizedBox(height: 2),
-                  Text(coupon.promotionName!,
+                  if (coupon.expiresAt != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      'หมดอายุ: ${dateFmt.format(coupon.expiresAt!)}',
                       style: const TextStyle(
-                          fontSize: 12, color: AppTheme.textSub)),
-                ],
-                if (coupon.expiresAt != null) ...[
-                  const SizedBox(height: 2),
-                  Text('หมดอายุ: ${dateFmt.format(coupon.expiresAt!)}',
-                      style: const TextStyle(
-                          fontSize: 11, color: AppTheme.textSub)),
-                ],
-                if (coupon.isUsed && coupon.usedAt != null) ...[
-                  const SizedBox(height: 2),
-                  Text('ใช้เมื่อ: ${dateFmt.format(coupon.usedAt!)}',
-                      style: const TextStyle(
-                          fontSize: 11, color: AppTheme.textSub)),
-                ],
-              ],
-            ),
-          ),
-
-          // Status badge
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: st.color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(st.icon, size: 12, color: st.color),
-                const SizedBox(width: 4),
-                Text(st.label,
-                    style: TextStyle(
                         fontSize: 11,
-                        color: st.color,
-                        fontWeight: FontWeight.w600)),
-              ],
+                        color: AppTheme.textSub,
+                      ),
+                    ),
+                  ],
+                  if (coupon.isUsed && coupon.usedAt != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      'ใช้เมื่อ: ${dateFmt.format(coupon.usedAt!)}',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppTheme.textSub,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
-          ),
-        ],
+
+            // Status badge
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: st.color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(st.icon, size: 12, color: st.color),
+                  const SizedBox(width: 4),
+                  Text(
+                    st.label,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: st.color,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
-    ));
+    );
   }
 }
 
@@ -1442,9 +1633,19 @@ class _CouponDetailDialog extends StatelessWidget {
   const _CouponDetailDialog({required this.coupon, required this.dateFmt});
 
   static ({Color color, IconData icon, String label}) _status(CouponModel c) {
-    if (c.isUsed) return (color: AppTheme.textSub, icon: Icons.check_circle, label: 'ใช้แล้ว');
-    if (c.isExpired) return (color: AppTheme.errorColor, icon: Icons.cancel, label: 'หมดอายุ');
-    return (color: AppTheme.successColor, icon: Icons.confirmation_number, label: 'ใช้ได้');
+    if (c.isUsed)
+      return (
+        color: AppTheme.textSub,
+        icon: Icons.check_circle,
+        label: 'ใช้แล้ว',
+      );
+    if (c.isExpired)
+      return (color: AppTheme.errorColor, icon: Icons.cancel, label: 'หมดอายุ');
+    return (
+      color: AppTheme.successColor,
+      icon: Icons.confirmation_number,
+      label: 'ใช้ได้',
+    );
   }
 
   @override
@@ -1454,8 +1655,8 @@ class _CouponDetailDialog extends StatelessWidget {
     final usedByLabel = coupon.usedBy == null || coupon.usedBy!.isEmpty
         ? '-'
         : coupon.usedBy == 'WALK_IN'
-            ? 'ลูกค้าทั่วไป'
-            : coupon.usedBy!;
+        ? 'ลูกค้าทั่วไป'
+        : coupon.usedBy!;
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -1476,13 +1677,21 @@ class _CouponDetailDialog extends StatelessWidget {
                       color: AppTheme.infoContainer,
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(Icons.confirmation_number,
-                        color: AppTheme.infoColor, size: 18),
+                    child: const Icon(
+                      Icons.confirmation_number,
+                      color: AppTheme.infoColor,
+                      size: 18,
+                    ),
                   ),
                   const SizedBox(width: 10),
                   const Expanded(
-                    child: Text('รายละเอียดคูปอง',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    child: Text(
+                      'รายละเอียดคูปอง',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                   IconButton(
                     onPressed: () => Navigator.pop(context),
@@ -1496,12 +1705,18 @@ class _CouponDetailDialog extends StatelessWidget {
 
               // ── Code + Status ────────────────────────────────
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF5F5F5),
+                  color: isDark
+                      ? const Color(0xFF2A2A2A)
+                      : const Color(0xFFF5F5F5),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
-                      color: isDark ? const Color(0xFF444444) : AppTheme.border),
+                    color: isDark ? const Color(0xFF444444) : AppTheme.border,
+                  ),
                 ),
                 child: Row(
                   children: [
@@ -1518,22 +1733,30 @@ class _CouponDetailDialog extends StatelessWidget {
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: st.color.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: st.color.withValues(alpha: 0.3)),
+                        border: Border.all(
+                          color: st.color.withValues(alpha: 0.3),
+                        ),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(st.icon, size: 12, color: st.color),
                           const SizedBox(width: 4),
-                          Text(st.label,
-                              style: TextStyle(
-                                  fontSize: 11,
-                                  color: st.color,
-                                  fontWeight: FontWeight.w600)),
+                          Text(
+                            st.label,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: st.color,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -1569,23 +1792,33 @@ class _CouponDetailDialog extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF5F5F5),
+                    color: isDark
+                        ? const Color(0xFF2A2A2A)
+                        : const Color(0xFFF5F5F5),
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
-                        color: isDark ? const Color(0xFF444444) : AppTheme.border),
+                      color: isDark ? const Color(0xFF444444) : AppTheme.border,
+                    ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Row(
                         children: [
-                          Icon(Icons.person_outline, size: 14, color: AppTheme.textSub),
+                          Icon(
+                            Icons.person_outline,
+                            size: 14,
+                            color: AppTheme.textSub,
+                          ),
                           SizedBox(width: 6),
-                          Text('ข้อมูลการใช้งาน',
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppTheme.textSub)),
+                          Text(
+                            'ข้อมูลการใช้งาน',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.textSub,
+                            ),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 8),
@@ -1636,15 +1869,20 @@ class _DetailRow extends StatelessWidget {
           const SizedBox(width: 8),
           SizedBox(
             width: 80,
-            child: Text(label,
-                style: const TextStyle(fontSize: 12, color: AppTheme.textSub)),
+            child: Text(
+              label,
+              style: const TextStyle(fontSize: 12, color: AppTheme.textSub),
+            ),
           ),
           Expanded(
-            child: Text(value,
-                style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: valueColor ?? textColor)),
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: valueColor ?? textColor,
+              ),
+            ),
           ),
         ],
       ),
@@ -1670,10 +1908,8 @@ class _CouponPrintDialogState extends State<_CouponPrintDialog> {
   bool _sharing = false;
   CouponPaperSize _paperSize = CouponPaperSize.a6;
 
-  Future<pw.Document> _buildPdf() => CouponCardPdfBuilder.build(
-        widget.coupon,
-        paperSize: _paperSize,
-      );
+  Future<pw.Document> _buildPdf() =>
+      CouponCardPdfBuilder.build(widget.coupon, paperSize: _paperSize);
 
   String get _filename =>
       PdfFilename.generate('coupon_${widget.coupon.couponCode}');
@@ -1690,8 +1926,10 @@ class _CouponPrintDialogState extends State<_CouponPrintDialog> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('เกิดข้อผิดพลาด: $e'),
-              backgroundColor: AppTheme.errorColor),
+          SnackBar(
+            content: Text('เกิดข้อผิดพลาด: $e'),
+            backgroundColor: AppTheme.errorColor,
+          ),
         );
       }
     } finally {
@@ -1710,8 +1948,10 @@ class _CouponPrintDialogState extends State<_CouponPrintDialog> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('เกิดข้อผิดพลาด: $e'),
-              backgroundColor: AppTheme.errorColor),
+          SnackBar(
+            content: Text('เกิดข้อผิดพลาด: $e'),
+            backgroundColor: AppTheme.errorColor,
+          ),
         );
       }
     } finally {
@@ -1726,8 +1966,8 @@ class _CouponPrintDialogState extends State<_CouponPrintDialog> {
     final st = coupon.isUsed
         ? (color: AppTheme.textSub, label: 'ใช้แล้ว')
         : coupon.isExpired
-            ? (color: AppTheme.errorColor, label: 'หมดอายุ')
-            : (color: AppTheme.successColor, label: 'ใช้ได้');
+        ? (color: AppTheme.errorColor, label: 'หมดอายุ')
+        : (color: AppTheme.successColor, label: 'ใช้ได้');
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -1747,14 +1987,21 @@ class _CouponPrintDialogState extends State<_CouponPrintDialog> {
                       color: AppTheme.infoContainer,
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(Icons.confirmation_number,
-                        color: AppTheme.infoColor, size: 18),
+                    child: const Icon(
+                      Icons.confirmation_number,
+                      color: AppTheme.infoColor,
+                      size: 18,
+                    ),
                   ),
                   const SizedBox(width: 10),
                   const Expanded(
-                    child: Text('คูปองส่วนลด',
-                        style: TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.bold)),
+                    child: Text(
+                      'คูปองส่วนลด',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                   IconButton(
                     onPressed: () => Navigator.pop(context),
@@ -1786,7 +2033,9 @@ class _CouponPrintDialogState extends State<_CouponPrintDialog> {
               // ── Code ─────────────────────────────────────────
               Container(
                 padding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 10),
+                  horizontal: 16,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF5F5F5),
                   borderRadius: BorderRadius.circular(8),
@@ -1808,18 +2057,22 @@ class _CouponPrintDialogState extends State<_CouponPrintDialog> {
                     InkWell(
                       onTap: () {
                         Clipboard.setData(
-                            ClipboardData(text: coupon.couponCode));
+                          ClipboardData(text: coupon.couponCode),
+                        );
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                              content:
-                                  Text('คัดลอก ${coupon.couponCode} แล้ว')),
+                            content: Text('คัดลอก ${coupon.couponCode} แล้ว'),
+                          ),
                         );
                       },
                       borderRadius: BorderRadius.circular(4),
                       child: const Padding(
                         padding: EdgeInsets.all(4),
-                        child: Icon(Icons.copy,
-                            size: 16, color: AppTheme.infoColor),
+                        child: Icon(
+                          Icons.copy,
+                          size: 16,
+                          color: AppTheme.infoColor,
+                        ),
                       ),
                     ),
                   ],
@@ -1830,9 +2083,10 @@ class _CouponPrintDialogState extends State<_CouponPrintDialog> {
               // ── Info ─────────────────────────────────────────
               if (coupon.promotionName != null)
                 _InfoRow(
-                    icon: Icons.local_offer,
-                    text: coupon.promotionName!,
-                    color: AppTheme.primaryColor),
+                  icon: Icons.local_offer,
+                  text: coupon.promotionName!,
+                  color: AppTheme.primaryColor,
+                ),
               if (coupon.expiresAt != null) ...[
                 const SizedBox(height: 4),
                 _InfoRow(
@@ -1848,8 +2102,10 @@ class _CouponPrintDialogState extends State<_CouponPrintDialog> {
               // ── Paper size selector ───────────────────────────
               Row(
                 children: [
-                  const Text('ขนาดกระดาษ',
-                      style: TextStyle(fontSize: 12, color: AppTheme.textSub)),
+                  const Text(
+                    'ขนาดกระดาษ',
+                    style: TextStyle(fontSize: 12, color: AppTheme.textSub),
+                  ),
                   const Spacer(),
                   SegmentedButton<CouponPaperSize>(
                     segments: const [
@@ -1879,19 +2135,21 @@ class _CouponPrintDialogState extends State<_CouponPrintDialog> {
               // ── Status badge ──────────────────────────────────
               Container(
                 padding: const EdgeInsets.symmetric(
-                    horizontal: 14, vertical: 6),
+                  horizontal: 14,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: st.color.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                      color: st.color.withValues(alpha: 0.3)),
+                  border: Border.all(color: st.color.withValues(alpha: 0.3)),
                 ),
                 child: Text(
                   st.label,
                   style: TextStyle(
-                      color: st.color,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13),
+                    color: st.color,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -1909,17 +2167,23 @@ class _CouponPrintDialogState extends State<_CouponPrintDialog> {
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10)),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
                       icon: _printing
                           ? const SizedBox(
-                              width: 14, height: 14,
+                              width: 14,
+                              height: 14,
                               child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.white),
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
                             )
                           : const Icon(Icons.picture_as_pdf_outlined, size: 17),
-                      label: Text(_printing ? 'กำลังเตรียม...' : 'แสดง PDF',
-                          style: const TextStyle(fontSize: 13)),
+                      label: Text(
+                        _printing ? 'กำลังเตรียม...' : 'แสดง PDF',
+                        style: const TextStyle(fontSize: 13),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -1932,17 +2196,23 @@ class _CouponPrintDialogState extends State<_CouponPrintDialog> {
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10)),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
                       icon: _sharing
                           ? const SizedBox(
-                              width: 14, height: 14,
+                              width: 14,
+                              height: 14,
                               child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.white),
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
                             )
                           : const Icon(Icons.share_outlined, size: 17),
-                      label: Text(_sharing ? 'กำลังแชร์...' : 'แชร์ PDF',
-                          style: const TextStyle(fontSize: 13)),
+                      label: Text(
+                        _sharing ? 'กำลังแชร์...' : 'แชร์ PDF',
+                        style: const TextStyle(fontSize: 13),
+                      ),
                     ),
                   ),
                 ],
@@ -2004,9 +2274,10 @@ class _SelectionBar extends StatelessWidget {
           Text(
             'เลือก $selectedCount / $totalCount',
             style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: AppTheme.primaryColor),
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.primaryColor,
+            ),
           ),
           const SizedBox(width: 12),
           // Select all / deselect all toggle
@@ -2016,10 +2287,13 @@ class _SelectionBar extends StatelessWidget {
               allSelected ? Icons.deselect : Icons.select_all,
               size: 16,
             ),
-            label: Text(allSelected ? 'ยกเลิกทั้งหมด' : 'เลือกทั้งหมด',
-                style: const TextStyle(fontSize: 12)),
+            label: Text(
+              allSelected ? 'ยกเลิกทั้งหมด' : 'เลือกทั้งหมด',
+              style: const TextStyle(fontSize: 12),
+            ),
             style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 8)),
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+            ),
           ),
           const Spacer(),
           // Paper size toggle
@@ -2047,8 +2321,10 @@ class _SelectionBar extends StatelessWidget {
           // Cancel
           TextButton(
             onPressed: onCancel,
-            child: const Text('ยกเลิก',
-                style: TextStyle(fontSize: 13, color: AppTheme.textSub)),
+            child: const Text(
+              'ยกเลิก',
+              style: TextStyle(fontSize: 13, color: AppTheme.textSub),
+            ),
           ),
           const SizedBox(width: 8),
           // Preview/Print button
@@ -2057,10 +2333,10 @@ class _SelectionBar extends StatelessWidget {
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primaryColor,
               foregroundColor: Colors.white,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             icon: const Icon(Icons.picture_as_pdf_outlined, size: 16),
             label: Text(
@@ -2075,10 +2351,10 @@ class _SelectionBar extends StatelessWidget {
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.teal,
               foregroundColor: Colors.white,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             icon: const Icon(Icons.share_outlined, size: 16),
             label: Text(
@@ -2096,22 +2372,23 @@ class _InfoRow extends StatelessWidget {
   final IconData icon;
   final String text;
   final Color color;
-  const _InfoRow(
-      {required this.icon, required this.text, required this.color});
+  const _InfoRow({required this.icon, required this.text, required this.color});
 
   @override
   Widget build(BuildContext context) => Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(text,
-                style: TextStyle(fontSize: 12, color: color),
-                textAlign: TextAlign.center),
-          ),
-        ],
-      );
+    mainAxisAlignment: MainAxisAlignment.center,
+    children: [
+      Icon(icon, size: 14, color: color),
+      const SizedBox(width: 6),
+      Flexible(
+        child: Text(
+          text,
+          style: TextStyle(fontSize: 12, color: color),
+          textAlign: TextAlign.center,
+        ),
+      ),
+    ],
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -2120,14 +2397,17 @@ class _InfoRow extends StatelessWidget {
 class _PageIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(7),
-        decoration: BoxDecoration(
-          color: AppTheme.infoContainer,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: const Icon(Icons.confirmation_number_outlined,
-            color: AppTheme.infoColor, size: 18),
-      );
+    padding: const EdgeInsets.all(7),
+    decoration: BoxDecoration(
+      color: AppTheme.infoContainer,
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child: const Icon(
+      Icons.confirmation_number_outlined,
+      color: AppTheme.infoColor,
+      size: 18,
+    ),
+  );
 }
 
 class _SearchField extends StatelessWidget {
@@ -2145,37 +2425,39 @@ class _SearchField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SizedBox(
-        height: 38,
-        child: TextField(
-          controller: controller,
-          style: const TextStyle(fontSize: 13, color: Color(0xFF1A1A1A)),
-          decoration: InputDecoration(
-            hintText: 'ค้นหาโค้ดคูปอง...',
-            hintStyle: const TextStyle(fontSize: 13, color: AppTheme.textSub),
-            prefixIcon: const Icon(Icons.search, size: 17, color: AppTheme.textSub),
-            suffixIcon: query.isNotEmpty
-                ? IconButton(
-                    icon: const Icon(Icons.clear, size: 15),
-                    onPressed: onCleared,
-                  )
-                : null,
-            contentPadding: EdgeInsets.zero,
-            border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: AppTheme.border)),
-            enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: AppTheme.border)),
-            focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide:
-                    const BorderSide(color: AppTheme.primary, width: 1.5)),
-            filled: true,
-            fillColor: Colors.white,
-          ),
-          onChanged: onChanged,
+    height: 38,
+    child: TextField(
+      controller: controller,
+      style: const TextStyle(fontSize: 13, color: Color(0xFF1A1A1A)),
+      decoration: InputDecoration(
+        hintText: 'ค้นหาโค้ดคูปอง...',
+        hintStyle: const TextStyle(fontSize: 13, color: AppTheme.textSub),
+        prefixIcon: const Icon(Icons.search, size: 17, color: AppTheme.textSub),
+        suffixIcon: query.isNotEmpty
+            ? IconButton(
+                icon: const Icon(Icons.clear, size: 15),
+                onPressed: onCleared,
+              )
+            : null,
+        contentPadding: EdgeInsets.zero,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: AppTheme.border),
         ),
-      );
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: AppTheme.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
+        ),
+        filled: true,
+        fillColor: Colors.white,
+      ),
+      onChanged: onChanged,
+    ),
+  );
 }
 
 class _RefreshBtn extends StatelessWidget {
@@ -2184,21 +2466,21 @@ class _RefreshBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Tooltip(
-        message: 'รีเฟรช',
-        child: InkWell(
-          onTap: onTap,
+    message: 'รีเฟรช',
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.all(7),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF5F5F5),
           borderRadius: BorderRadius.circular(8),
-          child: Container(
-            padding: const EdgeInsets.all(7),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF5F5F5),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppTheme.border),
-            ),
-            child: const Icon(Icons.refresh, size: 17, color: AppTheme.textSub),
-          ),
+          border: Border.all(color: AppTheme.border),
         ),
-      );
+        child: const Icon(Icons.refresh, size: 17, color: AppTheme.textSub),
+      ),
+    ),
+  );
 }
 
 class _ClearFilterBtn extends StatelessWidget {
@@ -2207,53 +2489,59 @@ class _ClearFilterBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Tooltip(
-        message: 'ล้างตัวกรองทั้งหมด',
-        child: InkWell(
-          onTap: onTap,
+    message: 'ล้างตัวกรองทั้งหมด',
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        decoration: BoxDecoration(
+          color: AppTheme.errorContainer,
           borderRadius: BorderRadius.circular(8),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-            decoration: BoxDecoration(
-              color: AppTheme.errorContainer,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFEF9A9A)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.filter_alt_off, size: 15, color: AppTheme.error),
-                const SizedBox(width: 5),
-                const Text('ล้างตัวกรอง',
-                    style: TextStyle(
-                        fontSize: 12,
-                        color: AppTheme.error,
-                        fontWeight: FontWeight.w500)),
-              ],
-            ),
-          ),
+          border: Border.all(color: const Color(0xFFEF9A9A)),
         ),
-      );
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.filter_alt_off, size: 15, color: AppTheme.error),
+            const SizedBox(width: 5),
+            const Text(
+              'ล้างตัวกรอง',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppTheme.error,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 class _MiniStat extends StatelessWidget {
   final int count;
   final String label;
   final Color color;
-  const _MiniStat({required this.count, required this.label, required this.color});
+  const _MiniStat({
+    required this.count,
+    required this.label,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Text(
-          '$count $label',
-          style: TextStyle(
-              fontSize: 11, fontWeight: FontWeight.w600, color: color),
-        ),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.1),
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Text(
+      '$count $label',
+      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color),
+    ),
+  );
 }
 
 class _BackBtn extends StatelessWidget {
@@ -2262,17 +2550,16 @@ class _BackBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => InkWell(
-        onTap: onTap,
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(8),
+    child: Container(
+      padding: const EdgeInsets.all(7),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F5F5),
         borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.all(7),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF5F5F5),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppTheme.border),
-          ),
-          child: const Icon(Icons.arrow_back,
-              size: 17, color: AppTheme.textSub),
-        ),
-      );
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: const Icon(Icons.arrow_back, size: 17, color: AppTheme.textSub),
+    ),
+  );
 }

@@ -9,6 +9,7 @@ import '../../../../core/client/api_client.dart';
 import '../../../../shared/pdf/pdf_report_button.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/responsive_utils.dart';
+import '../../../../shared/widgets/escape_pop_scope.dart';
 import '../../data/models/sales_summary_model.dart';
 import 'reports_pdf_report.dart';
 import 'sales_chart_page.dart';
@@ -57,6 +58,8 @@ final purchaseSummaryProvider = FutureProvider<Map<String, dynamic>>((
   if (res.statusCode == 200) return res.data['data'] as Map<String, dynamic>;
   return {};
 });
+
+enum _ReportsAppBarAction { salesChart, exportCsv, exportPdf }
 
 final topSuppliersProvider = FutureProvider<List<Map<String, dynamic>>>((
   ref,
@@ -312,73 +315,123 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppTheme.surfaceColorOf(context),
-      appBar: AppBar(
-        automaticallyImplyLeading: !context.hasPermanentSidebar,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('รายงาน'),
-            Text(
-              'ภาพรวมธุรกิจและการวิเคราะห์',
-              style: TextStyle(
-                fontSize: 11,
-                color: Colors.white.withValues(alpha: 0.65),
-                fontWeight: FontWeight.normal,
+    final canPop = Navigator.of(context).canPop();
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final isCompactDesktop = context.isDesktopOrWider && screenWidth < 1180;
+    final isTightDesktop = context.isDesktopOrWider && screenWidth < 1080;
+
+    return EscapePopScope(
+      child: Scaffold(
+        backgroundColor: AppTheme.surfaceColorOf(context),
+        appBar: AppBar(
+          automaticallyImplyLeading: canPop,
+          title: isCompactDesktop
+              ? const Text('รายงาน')
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('รายงาน'),
+                    Text(
+                      'ภาพรวมธุรกิจและการวิเคราะห์',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.white.withValues(alpha: 0.65),
+                        fontWeight: FontWeight.normal,
+                      ),
+                    ),
+                  ],
+                ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              tooltip: 'รีเฟรชข้อมูล',
+              onPressed: _refreshAll,
+            ),
+            if (!isCompactDesktop) ...[
+              IconButton(
+                icon: const Icon(Icons.bar_chart),
+                tooltip: 'กราฟยอดขาย',
+                onPressed: () => _openSalesChart(context),
               ),
-            ),
+              IconButton(
+                icon: const Icon(Icons.file_download),
+                tooltip: 'Export CSV',
+                onPressed: () => _exportReport(context),
+              ),
+              _buildPdfAction(),
+            ] else
+              PopupMenuButton<_ReportsAppBarAction>(
+                tooltip: 'การทำงานเพิ่มเติม',
+                iconSize: isTightDesktop ? 20 : 22,
+                onSelected: (action) => _handleAppBarAction(context, action),
+                itemBuilder: (context) => const [
+                  PopupMenuItem(
+                    value: _ReportsAppBarAction.salesChart,
+                    child: ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.bar_chart),
+                      title: Text('กราฟยอดขาย'),
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: _ReportsAppBarAction.exportCsv,
+                    child: ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.file_download),
+                      title: Text('Export CSV'),
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: _ReportsAppBarAction.exportPdf,
+                    child: ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.picture_as_pdf_outlined),
+                      title: Text('Export PDF'),
+                    ),
+                  ),
+                ],
+              ),
           ],
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.bar_chart),
-            tooltip: 'กราฟยอดขาย',
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const SalesChartPage()),
+          bottom: TabBar(
+            controller: _tabController,
+            isScrollable: true,
+            tabAlignment: TabAlignment.start,
+            labelStyle: TextStyle(
+              fontSize: context.isMobile
+                  ? 12
+                  : isTightDesktop
+                  ? 12
+                  : 13,
+              fontWeight: FontWeight.w600,
             ),
+            unselectedLabelStyle: TextStyle(
+              fontSize: context.isMobile
+                  ? 12
+                  : isTightDesktop
+                  ? 12
+                  : 13,
+              fontWeight: FontWeight.w500,
+            ),
+            tabs: const [
+              Tab(icon: Icon(Icons.shopping_cart), text: 'การขาย'),
+              Tab(icon: Icon(Icons.shopping_bag), text: 'การซื้อ'),
+              Tab(icon: Icon(Icons.warehouse), text: 'สต๊อก'),
+              Tab(icon: Icon(Icons.account_balance), text: 'การเงิน'),
+            ],
           ),
-          IconButton(
-            icon: const Icon(Icons.file_download),
-            tooltip: 'Export CSV',
-            onPressed: () => _exportReport(context),
-          ),
-          _buildPdfAction(),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: 'รีเฟรชข้อมูล',
-            onPressed: _refreshAll,
-          ),
-        ],
-        bottom: TabBar(
+        ),
+        body: TabBarView(
           controller: _tabController,
-          isScrollable: true,
-          tabAlignment: TabAlignment.start,
-          labelStyle: TextStyle(
-            fontSize: context.isMobile ? 12 : 13,
-            fontWeight: FontWeight.w600,
-          ),
-          unselectedLabelStyle: TextStyle(
-            fontSize: context.isMobile ? 12 : 13,
-            fontWeight: FontWeight.w500,
-          ),
-          tabs: const [
-            Tab(icon: Icon(Icons.shopping_cart), text: 'การขาย'),
-            Tab(icon: Icon(Icons.shopping_bag), text: 'การซื้อ'),
-            Tab(icon: Icon(Icons.warehouse), text: 'สต๊อก'),
-            Tab(icon: Icon(Icons.account_balance), text: 'การเงิน'),
+          children: [
+            _tabShell(context, _buildSalesTab()),
+            _tabShell(context, _buildPurchaseTab()),
+            _tabShell(context, _buildInventoryTab()),
+            _tabShell(context, _buildFinancialTab()),
           ],
         ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _tabShell(context, _buildSalesTab()),
-          _tabShell(context, _buildPurchaseTab()),
-          _tabShell(context, _buildInventoryTab()),
-          _tabShell(context, _buildFinancialTab()),
-        ],
       ),
     );
   }
@@ -403,6 +456,60 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
         buildPdf: _buildCurrentTabPdf,
         hasData: true,
       ),
+    );
+  }
+
+  void _openSalesChart(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const SalesChartPage()),
+    );
+  }
+
+  void _handleAppBarAction(BuildContext context, _ReportsAppBarAction action) {
+    switch (action) {
+      case _ReportsAppBarAction.salesChart:
+        _openSalesChart(context);
+        break;
+      case _ReportsAppBarAction.exportCsv:
+        _exportReport(context);
+        break;
+      case _ReportsAppBarAction.exportPdf:
+        _showPdfExportSheet(context);
+        break;
+    }
+  }
+
+  void _showPdfExportSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'ส่งออกรายงาน',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'เลือกส่งออกรายงานของแท็บปัจจุบันเป็น PDF',
+                  style: TextStyle(fontSize: 13, color: Color(0xFF666666)),
+                ),
+                const SizedBox(height: 16),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: _buildPdfAction(),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -526,42 +633,60 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
   }
 
   Widget _buildSalesSummaryCards(SalesSummaryModel s) {
-    final cols = context.isDesktopOrWider ? 4 : 2;
-    final aspectRatio = context.isMobile ? 2.2 : 2.6;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final cols = width >= 1360
+            ? 4
+            : width >= 1152
+            ? 3
+            : 2;
+        final aspectRatio = width >= 1360
+            ? 2.6
+            : width >= 1152
+            ? 2.25
+            : 1.8;
+        final spacing = width < 1080
+            ? 10.0
+            : width < 1280
+            ? 12.0
+            : 14.0;
 
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: cols,
-      childAspectRatio: aspectRatio,
-      crossAxisSpacing: context.isMobile ? 10 : 14,
-      mainAxisSpacing: context.isMobile ? 10 : 14,
-      children: [
-        _summaryCard(
-          'ยอดขายรวม',
-          '฿${_fmt.format(s.totalSales)}',
-          Icons.attach_money,
-          Colors.green,
-        ),
-        _summaryCard(
-          'จำนวนออเดอร์',
-          _fmtInt.format(s.totalOrders),
-          Icons.shopping_cart,
-          Colors.blue,
-        ),
-        _summaryCard(
-          'เฉลี่ย/ออเดอร์',
-          '฿${_fmt.format(s.avgOrderValue)}',
-          Icons.analytics,
-          Colors.orange,
-        ),
-        _summaryCard(
-          'ส่วนลดรวม',
-          '฿${_fmt.format(s.totalDiscount)}',
-          Icons.discount,
-          Colors.red,
-        ),
-      ],
+        return GridView.count(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisCount: cols,
+          childAspectRatio: aspectRatio,
+          crossAxisSpacing: context.isMobile ? 10 : spacing,
+          mainAxisSpacing: context.isMobile ? 10 : spacing,
+          children: [
+            _summaryCard(
+              'ยอดขายรวม',
+              '฿${_fmt.format(s.totalSales)}',
+              Icons.attach_money,
+              Colors.green,
+            ),
+            _summaryCard(
+              'จำนวนออเดอร์',
+              _fmtInt.format(s.totalOrders),
+              Icons.shopping_cart,
+              Colors.blue,
+            ),
+            _summaryCard(
+              'เฉลี่ย/ออเดอร์',
+              '฿${_fmt.format(s.avgOrderValue)}',
+              Icons.analytics,
+              Colors.orange,
+            ),
+            _summaryCard(
+              'ส่วนลดรวม',
+              '฿${_fmt.format(s.totalDiscount)}',
+              Icons.discount,
+              Colors.red,
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -633,36 +758,54 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
 
   Widget _buildPurchaseSummaryCards(Map<String, dynamic> data) {
     if (data.isEmpty) return _emptyWidget('ยังไม่มีข้อมูล');
-    final cols = context.isDesktopOrWider ? 3 : 2;
-    final aspectRatio = context.isMobile ? 2.2 : 2.6;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final cols = width >= 1280
+            ? 3
+            : width >= 1024
+            ? 2
+            : 1;
+        final aspectRatio = width >= 1280
+            ? 2.6
+            : width >= 1024
+            ? 2.05
+            : 2.8;
+        final spacing = width < 1080
+            ? 10.0
+            : width < 1280
+            ? 12.0
+            : 14.0;
 
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: cols,
-      childAspectRatio: aspectRatio,
-      crossAxisSpacing: context.isMobile ? 10 : 14,
-      mainAxisSpacing: context.isMobile ? 10 : 14,
-      children: [
-        _summaryCard(
-          'ใบสั่งซื้อทั้งหมด',
-          _fmtInt.format(data['total_po'] ?? 0),
-          Icons.receipt,
-          Colors.red,
-        ),
-        _summaryCard(
-          'มูลค่าสั่งซื้อรวม',
-          '฿${_fmt.format((data['total_po_amount'] ?? 0.0) as num)}',
-          Icons.payments,
-          Colors.orange,
-        ),
-        _summaryCard(
-          'ใบรับสินค้า',
-          _fmtInt.format(data['total_gr'] ?? 0),
-          Icons.inventory_2,
-          Colors.blue,
-        ),
-      ],
+        return GridView.count(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisCount: cols,
+          childAspectRatio: aspectRatio,
+          crossAxisSpacing: context.isMobile ? 10 : spacing,
+          mainAxisSpacing: context.isMobile ? 10 : spacing,
+          children: [
+            _summaryCard(
+              'ใบสั่งซื้อทั้งหมด',
+              _fmtInt.format(data['total_po'] ?? 0),
+              Icons.receipt,
+              Colors.red,
+            ),
+            _summaryCard(
+              'มูลค่าสั่งซื้อรวม',
+              '฿${_fmt.format((data['total_po_amount'] ?? 0.0) as num)}',
+              Icons.payments,
+              Colors.orange,
+            ),
+            _summaryCard(
+              'ใบรับสินค้า',
+              _fmtInt.format(data['total_gr'] ?? 0),
+              Icons.inventory_2,
+              Colors.blue,
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -1034,29 +1177,153 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
     bool bold = false,
     bool isNegative = false,
   }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: bold ? FontWeight.bold : FontWeight.normal,
-              color: Theme.of(context).colorScheme.onSurface,
-            ),
-          ),
-          Text(
-            '${isNegative ? '-' : ''}฿${_fmt.format(value.abs())}',
-            style: TextStyle(
-              color: color,
-              fontWeight: bold ? FontWeight.bold : FontWeight.normal,
-              fontSize: bold ? 15 : 13,
-            ),
-          ),
-        ],
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final stacked = constraints.maxWidth < 360;
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: stacked
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Text(
+                        '${isNegative ? '-' : ''}฿${_fmt.format(value.abs())}',
+                        style: TextStyle(
+                          color: color,
+                          fontWeight: bold
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                          fontSize: bold ? 15 : 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              : Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: bold
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      '${isNegative ? '-' : ''}฿${_fmt.format(value.abs())}',
+                      style: TextStyle(
+                        color: color,
+                        fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+                        fontSize: bold ? 15 : 13,
+                      ),
+                    ),
+                  ],
+                ),
+        );
+      },
+    );
+  }
+
+  Widget _agingBreakdownRow(String label, double amount, Color color) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final stacked = constraints.maxWidth < 360;
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 3),
+          child: stacked
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            color: color,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            label,
+                            style: _cardTitleStyle(fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Text(
+                        '฿${_fmt.format(amount)}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: color,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              : Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(
+                              color: color,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              label,
+                              style: _cardTitleStyle(fontSize: 12),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      '฿${_fmt.format(amount)}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: color,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+        );
+      },
     );
   }
 
@@ -1175,36 +1442,7 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
               children: [
                 ...bucketOrder.where((b) => buckets.containsKey(b)).map((b) {
                   final color = _agingBucketColor(b);
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 3),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              width: 10,
-                              height: 10,
-                              decoration: BoxDecoration(
-                                color: color,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(b, style: _cardTitleStyle(fontSize: 12)),
-                          ],
-                        ),
-                        Text(
-                          '฿${_fmt.format(buckets[b]!)}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: color,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
+                  return _agingBreakdownRow(b, buckets[b]!, color);
                 }),
                 const Divider(),
                 Row(
@@ -1243,69 +1481,117 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
           final amountColor = _agingBucketColor(bucket);
 
           return _dataCard(
-            child: Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: context.isMobile ? 12 : 14,
-                vertical: context.isMobile ? 10 : 12,
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          name,
-                          style: _cardTitleStyle(),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${item['invoice_no'] ?? ''} | $bucket',
-                          style: _cardSubtitleStyle(),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final stacked = constraints.maxWidth < 420;
+
+                return Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: context.isMobile ? 12 : 14,
+                    vertical: context.isMobile ? 10 : 12,
                   ),
-                  const SizedBox(width: 12),
-                  ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minWidth: context.isMobile ? 84 : 96,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          '฿${_fmt.format(outstanding)}',
-                          textAlign: TextAlign.right,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: amountColor,
-                          ),
-                        ),
-                        if (overdue > 0) ...[
-                          const SizedBox(height: 4),
-                          const Text(
-                            'เลยกำหนด',
-                            textAlign: TextAlign.right,
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: AppTheme.errorColor,
+                  child: stacked
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              name,
+                              style: _cardTitleStyle(),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${item['invoice_no'] ?? ''} | $bucket',
+                              style: _cardSubtitleStyle(),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    '฿${_fmt.format(outstanding)}',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: amountColor,
+                                    ),
+                                  ),
+                                ),
+                                if (overdue > 0)
+                                  const Text(
+                                    'เลยกำหนด',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: AppTheme.errorColor,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ],
+                        )
+                      : Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    name,
+                                    style: _cardTitleStyle(),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${item['invoice_no'] ?? ''} | $bucket',
+                                    style: _cardSubtitleStyle(),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            ConstrainedBox(
+                              constraints: BoxConstraints(
+                                minWidth: context.isMobile ? 84 : 96,
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    '฿${_fmt.format(outstanding)}',
+                                    textAlign: TextAlign.right,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: amountColor,
+                                    ),
+                                  ),
+                                  if (overdue > 0) ...[
+                                    const SizedBox(height: 4),
+                                    const Text(
+                                      'เลยกำหนด',
+                                      textAlign: TextAlign.right,
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: AppTheme.errorColor,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                );
+              },
             ),
           );
         }),
@@ -1343,25 +1629,42 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
 
   // ── Shared Widgets ─────────────────────────────────────────────────────────
   Widget _sectionTitle(String title, IconData icon, Color color) {
+    final width = MediaQuery.sizeOf(context).width;
+    final isTightDesktop = context.isDesktopOrWider && width < 1080;
+    final isMediumDesktop =
+        context.isDesktopOrWider && width >= 1080 && width < 1280;
+    final iconBoxSize = isTightDesktop
+        ? 30.0
+        : isMediumDesktop
+        ? 32.0
+        : 34.0;
+    final iconSize = isTightDesktop
+        ? 16.0
+        : isMediumDesktop
+        ? 17.0
+        : 18.0;
+    final titleFontSize = isTightDesktop ? 14.0 : 15.0;
+    final bottomSpacing = isTightDesktop ? 10.0 : 12.0;
+
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: EdgeInsets.only(bottom: bottomSpacing),
       child: Row(
         children: [
           Container(
-            width: 34,
-            height: 34,
+            width: iconBoxSize,
+            height: iconBoxSize,
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, color: color, size: 18),
+            child: Icon(icon, color: color, size: iconSize),
           ),
-          const SizedBox(width: 10),
+          SizedBox(width: isTightDesktop ? 8 : 10),
           Expanded(
             child: Text(
               title,
               style: TextStyle(
-                fontSize: 15,
+                fontSize: titleFontSize,
                 fontWeight: FontWeight.w700,
                 color: Theme.of(context).colorScheme.onSurface,
               ),
@@ -1373,52 +1676,114 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
   }
 
   Widget _summaryCard(String title, String value, IconData icon, Color color) {
-    final iconBoxSize = context.isMobile ? 38.0 : 42.0;
-    final valueFontSize = context.isMobile ? 14.0 : 18.0;
+    final width = MediaQuery.sizeOf(context).width;
+    final isTightDesktop = context.isDesktopOrWider && width < 1080;
+    final isMediumDesktop =
+        context.isDesktopOrWider && width >= 1080 && width < 1280;
+    final iconBoxSize = context.isMobile
+        ? 38.0
+        : isTightDesktop
+        ? 36.0
+        : isMediumDesktop
+        ? 40.0
+        : 42.0;
+    final valueFontSize = context.isMobile
+        ? 14.0
+        : isTightDesktop
+        ? 15.0
+        : isMediumDesktop
+        ? 16.5
+        : 18.0;
 
     return _panelCard(
-      child: Padding(
-        padding: context.cardPadding,
-        child: Row(
-          children: [
-            Container(
-              width: iconBoxSize,
-              height: iconBoxSize,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.14),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, size: 20, color: color),
-            ),
-            SizedBox(width: context.isMobile ? 10 : 12),
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    value,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: valueFontSize,
-                      fontWeight: FontWeight.w700,
-                      color: color,
-                      height: 1,
-                    ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final stacked = constraints.maxWidth < 220;
+
+          return Padding(
+            padding: context.cardPadding,
+            child: stacked
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: iconBoxSize,
+                        height: iconBoxSize,
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.14),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(icon, size: 20, color: color),
+                      ),
+                      SizedBox(height: isTightDesktop ? 8 : 10),
+                      Text(
+                        value,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: valueFontSize,
+                          fontWeight: FontWeight.w700,
+                          color: color,
+                          height: 1,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: _cardSubtitleStyle(),
+                      ),
+                    ],
+                  )
+                : Row(
+                    children: [
+                      Container(
+                        width: iconBoxSize,
+                        height: iconBoxSize,
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.14),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(icon, size: 20, color: color),
+                      ),
+                      SizedBox(
+                        width: context.isMobile
+                            ? 10
+                            : isTightDesktop
+                            ? 10
+                            : 12,
+                      ),
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              value,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: valueFontSize,
+                                fontWeight: FontWeight.w700,
+                                color: color,
+                                height: 1,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: _cardSubtitleStyle(),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: _cardSubtitleStyle(),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -1439,28 +1804,47 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
     ];
 
     return _dataCard(
-      child: ListTile(
-        dense: context.isMobile,
-        leading: CircleAvatar(
-          backgroundColor: rankColors[(rank - 1).clamp(0, 4)],
-          child: Text(
-            '$rank',
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final stacked = constraints.maxWidth < 420;
+          final width = MediaQuery.sizeOf(context).width;
+          final isTightDesktop = context.isDesktopOrWider && width < 1080;
+
+          return ListTile(
+            dense: context.isMobile || isTightDesktop,
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: isTightDesktop ? 12 : 16,
+              vertical: isTightDesktop ? 2 : 4,
             ),
-          ),
-        ),
-        title: Text(title, style: _cardTitleStyle()),
-        subtitle: Text(subtitle, style: _cardSubtitleStyle()),
-        trailing: Text(
-          trailing,
-          style: TextStyle(
-            fontSize: context.isMobile ? 13 : 14,
-            fontWeight: FontWeight.bold,
-            color: trailingColor,
-          ),
-        ),
+            leading: CircleAvatar(
+              radius: isTightDesktop ? 18 : 20,
+              backgroundColor: rankColors[(rank - 1).clamp(0, 4)],
+              child: Text(
+                '$rank',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            title: Text(title, style: _cardTitleStyle()),
+            subtitle: Text(
+              stacked ? '$subtitle\n$trailing' : subtitle,
+              style: _cardSubtitleStyle(),
+            ),
+            trailing: stacked
+                ? null
+                : Text(
+                    trailing,
+                    style: TextStyle(
+                      fontSize: context.isMobile ? 13 : 14,
+                      fontWeight: FontWeight.bold,
+                      color: trailingColor,
+                    ),
+                  ),
+            isThreeLine: stacked,
+          );
+        },
       ),
     );
   }
@@ -1608,19 +1992,31 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
   }
 
   TextStyle _cardTitleStyle({double fontSize = 13}) {
+    final width = MediaQuery.sizeOf(context).width;
+    final isTightDesktop = context.isDesktopOrWider && width < 1080;
     return TextStyle(
-      fontSize: fontSize,
+      fontSize: isTightDesktop ? fontSize - 0.5 : fontSize,
       fontWeight: FontWeight.w600,
       color: Theme.of(context).colorScheme.onSurface,
     );
   }
 
   TextStyle _cardSubtitleStyle() {
-    return TextStyle(fontSize: 11, color: AppTheme.subtextColorOf(context));
+    final width = MediaQuery.sizeOf(context).width;
+    final isTightDesktop = context.isDesktopOrWider && width < 1080;
+    return TextStyle(
+      fontSize: isTightDesktop ? 10.5 : 11,
+      color: AppTheme.subtextColorOf(context),
+    );
   }
 
   TextStyle _metaTextStyle() {
-    return TextStyle(fontSize: 11, color: AppTheme.subtextColorOf(context));
+    final width = MediaQuery.sizeOf(context).width;
+    final isTightDesktop = context.isDesktopOrWider && width < 1080;
+    return TextStyle(
+      fontSize: isTightDesktop ? 10.5 : 11,
+      color: AppTheme.subtextColorOf(context),
+    );
   }
 
   String _formatQty(num value) {

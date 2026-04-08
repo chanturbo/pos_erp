@@ -17,6 +17,7 @@ import '../../../inventory/data/models/stock_balance_model.dart';
 import '../../../inventory/presentation/providers/stock_provider.dart';
 import 'stock_movement_history_page.dart';
 import '../../../../shared/services/mobile_scanner_service.dart'; // ✅ Phase 5
+import '../../../../shared/widgets/escape_pop_scope.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/responsive_utils.dart';
 
@@ -47,139 +48,141 @@ class StockAdjustmentPage extends StatelessWidget {
           ],
         ),
       ),
-      body: Align(
-        alignment: Alignment.topCenter,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: context.contentMaxWidth),
-          child: SingleChildScrollView(
-            padding: context.pagePadding,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Card(
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(color: AppTheme.borderColorOf(context)),
+      body: EscapePopScope(
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: context.contentMaxWidth),
+            child: SingleChildScrollView(
+              padding: context.pagePadding,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Card(
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(color: AppTheme.borderColorOf(context)),
+                    ),
+                    child: Padding(
+                      padding: context.cardPadding,
+                      child: const Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.info_outline,
+                            color: AppTheme.primaryColor,
+                            size: 18,
+                          ),
+                          SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'เลือกประเภทการปรับปรุงสต๊อกที่ต้องการ ทุกการเปลี่ยนแปลงจะบันทึกประวัติไว้ในระบบ',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: AppTheme.primaryColor,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                  child: Padding(
-                    padding: context.cardPadding,
-                    child: const Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          Icons.info_outline,
-                          color: AppTheme.primaryColor,
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: AppTheme.primary.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(
+                          Icons.inventory_2_outlined,
+                          color: AppTheme.primary,
                           size: 18,
                         ),
-                        SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            'เลือกประเภทการปรับปรุงสต๊อกที่ต้องการ ทุกการเปลี่ยนแปลงจะบันทึกประวัติไว้ในระบบ',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: AppTheme.primaryColor,
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        'เลือกประเภทการปรับสต๊อก',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Card(
+                    elevation: 0,
+                    color: Theme.of(context).cardColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(color: AppTheme.borderColorOf(context)),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: GridView.count(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        crossAxisCount: context.isMobile ? 1 : 2,
+                        crossAxisSpacing: 10,
+                        mainAxisSpacing: 10,
+                        childAspectRatio: context.isMobile ? 3.2 : 2.8,
+                        children: [
+                          _MenuCard(
+                            icon: Icons.tune,
+                            label: 'ปรับสต๊อก (เพิ่ม/ลด)',
+                            color: AppTheme.primaryColor,
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const AdjustStockSubPage(),
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                          _MenuCard(
+                            icon: Icons.fact_check_outlined,
+                            label: 'ตรวจนับสต๊อก',
+                            color: AppTheme.warningColor,
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const StockTakeSubPage(),
+                              ),
+                            ),
+                          ),
+                          _MenuCard(
+                            icon: Icons.swap_horiz,
+                            label: 'โอนย้ายสต๊อก',
+                            color: AppTheme.tealColor,
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const StockTransferSubPage(),
+                              ),
+                            ),
+                          ),
+                          _MenuCard(
+                            icon: Icons.analytics_outlined,
+                            label: 'รายงานผลต่าง',
+                            color: AppTheme.purpleColor,
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const VarianceReportPage(),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  children: [
-                    Container(
-                      width: 34,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        color: AppTheme.primary.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(
-                        Icons.inventory_2_outlined,
-                        color: AppTheme.primary,
-                        size: 18,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      'เลือกประเภทการปรับสต๊อก',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Card(
-                  elevation: 0,
-                  color: Theme.of(context).cardColor,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(color: AppTheme.borderColorOf(context)),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: GridView.count(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      crossAxisCount: context.isMobile ? 1 : 2,
-                      crossAxisSpacing: 10,
-                      mainAxisSpacing: 10,
-                      childAspectRatio: context.isMobile ? 3.2 : 2.8,
-                      children: [
-                        _MenuCard(
-                          icon: Icons.tune,
-                          label: 'ปรับสต๊อก (เพิ่ม/ลด)',
-                          color: AppTheme.primaryColor,
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const AdjustStockSubPage(),
-                            ),
-                          ),
-                        ),
-                        _MenuCard(
-                          icon: Icons.fact_check_outlined,
-                          label: 'ตรวจนับสต๊อก',
-                          color: AppTheme.warningColor,
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const StockTakeSubPage(),
-                            ),
-                          ),
-                        ),
-                        _MenuCard(
-                          icon: Icons.swap_horiz,
-                          label: 'โอนย้ายสต๊อก',
-                          color: AppTheme.tealColor,
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const StockTransferSubPage(),
-                            ),
-                          ),
-                        ),
-                        _MenuCard(
-                          icon: Icons.analytics_outlined,
-                          label: 'รายงานผลต่าง',
-                          color: AppTheme.purpleColor,
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const VarianceReportPage(),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -275,335 +278,346 @@ class _AdjustStockSubPageState extends ConsumerState<AdjustStockSubPage> {
           ],
         ),
       ),
-      body: Align(
-        alignment: Alignment.topCenter,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: context.contentMaxWidth),
-          child: Column(
-            children: [
-              Padding(
-                padding: context.pagePadding,
-                child: Card(
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(color: AppTheme.borderColorOf(context)),
-                  ),
-                  child: Padding(
-                    padding: context.cardPadding,
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final wide = constraints.maxWidth >= 760;
-                        final searchField = ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 320),
-                          child: SizedBox(
-                            height: 38,
-                            child: TextField(
-                              controller: _searchController,
-                              style: const TextStyle(fontSize: 13),
-                              decoration: InputDecoration(
-                                hintText: 'ค้นหาชื่อ / รหัสสินค้า...',
-                                hintStyle: const TextStyle(
-                                  fontSize: 13,
-                                  color: Color(0xFF8A8A8A),
-                                ),
-                                prefixIcon: const Icon(
-                                  Icons.search,
-                                  size: 17,
-                                  color: Color(0xFF8A8A8A),
-                                ),
-                                suffixIcon: _searchQuery.isNotEmpty
-                                    ? IconButton(
-                                        icon: const Icon(Icons.clear, size: 15),
-                                        onPressed: () {
-                                          _searchController.clear();
-                                          setState(() => _searchQuery = '');
-                                        },
-                                      )
-                                    : ScannerButton(
-                                        onScanned: (value) {
-                                          _searchController.text = value;
-                                          setState(() => _searchQuery = value);
-                                        },
-                                      ),
-                                contentPadding: EdgeInsets.zero,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                  borderSide: const BorderSide(
-                                    color: Color(0xFFE0E0E0),
+      body: EscapePopScope(
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: context.contentMaxWidth),
+            child: Column(
+              children: [
+                Padding(
+                  padding: context.pagePadding,
+                  child: Card(
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(color: AppTheme.borderColorOf(context)),
+                    ),
+                    child: Padding(
+                      padding: context.cardPadding,
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final wide = constraints.maxWidth >= 980;
+                          final searchField = ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 320),
+                            child: SizedBox(
+                              height: 38,
+                              child: TextField(
+                                controller: _searchController,
+                                style: const TextStyle(fontSize: 13),
+                                decoration: InputDecoration(
+                                  hintText: 'ค้นหาชื่อ / รหัสสินค้า...',
+                                  hintStyle: const TextStyle(
+                                    fontSize: 13,
+                                    color: Color(0xFF8A8A8A),
                                   ),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                  borderSide: const BorderSide(
-                                    color: Color(0xFFE0E0E0),
-                                  ),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                  borderSide: const BorderSide(
-                                    color: AppTheme.primary,
-                                    width: 1.5,
-                                  ),
-                                ),
-                                filled: true,
-                                fillColor: Colors.white,
-                              ),
-                              onChanged: (v) =>
-                                  setState(() => _searchQuery = v),
-                            ),
-                          ),
-                        );
-
-                        final headerBlock = Row(
-                          children: [
-                            Container(
-                              width: 34,
-                              height: 34,
-                              decoration: BoxDecoration(
-                                color: AppTheme.primary.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Icon(
-                                Icons.tune,
-                                color: AppTheme.primary,
-                                size: 18,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'ค้นหาและเลือกสินค้า',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w700,
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onSurface,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 3),
-                                  Text(
-                                    'ค้นหาจากชื่อสินค้า รหัสสินค้า หรือสแกนบาร์โค้ด',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: AppTheme.subtextColorOf(context),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        );
-
-                        final actions = Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            searchField,
-                            Tooltip(
-                              message: 'รีเฟรช',
-                              child: InkWell(
-                                onTap: () => ref
-                                    .read(stockBalanceProvider.notifier)
-                                    .refresh(),
-                                borderRadius: BorderRadius.circular(8),
-                                child: Container(
-                                  padding: const EdgeInsets.all(7),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFF5F5F5),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: AppTheme.border),
-                                  ),
-                                  child: const Icon(
-                                    Icons.refresh,
+                                  prefixIcon: const Icon(
+                                    Icons.search,
                                     size: 17,
                                     color: Color(0xFF8A8A8A),
                                   ),
+                                  suffixIcon: _searchQuery.isNotEmpty
+                                      ? IconButton(
+                                          icon: const Icon(
+                                            Icons.clear,
+                                            size: 15,
+                                          ),
+                                          onPressed: () {
+                                            _searchController.clear();
+                                            setState(() => _searchQuery = '');
+                                          },
+                                        )
+                                      : ScannerButton(
+                                          onScanned: (value) {
+                                            _searchController.text = value;
+                                            setState(
+                                              () => _searchQuery = value,
+                                            );
+                                          },
+                                        ),
+                                  contentPadding: EdgeInsets.zero,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: const BorderSide(
+                                      color: Color(0xFFE0E0E0),
+                                    ),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: const BorderSide(
+                                      color: Color(0xFFE0E0E0),
+                                    ),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: const BorderSide(
+                                      color: AppTheme.primary,
+                                      width: 1.5,
+                                    ),
+                                  ),
+                                  filled: true,
+                                  fillColor: Colors.white,
                                 ),
+                                onChanged: (v) =>
+                                    setState(() => _searchQuery = v),
                               ),
                             ),
-                          ],
-                        );
-
-                        if (wide) {
-                          return Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(child: headerBlock),
-                              const SizedBox(width: 16),
-                              actions,
-                            ],
                           );
-                        }
 
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            headerBlock,
-                            const SizedBox(height: 12),
-                            actions,
-                          ],
-                        );
-                      },
-                    ),
-                  ),
-                ),
-              ),
-              Expanded(
-                child: stockAsync.when(
-                  loading: () =>
-                      const Center(child: CircularProgressIndicator()),
-                  error: (e, _) => Center(child: Text('เกิดข้อผิดพลาด: $e')),
-                  data: (stocks) {
-                    final filtered = _filter(stocks);
-                    return LayoutBuilder(
-                      builder: (context, constraints) {
-                        final isWide = constraints.maxWidth >= 920;
-
-                        final listPanel = Card(
-                          elevation: 0,
-                          margin: EdgeInsets.zero,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            side: BorderSide(
-                              color: AppTheme.borderColorOf(context),
-                            ),
-                          ),
-                          child: Column(
+                          final headerBlock = Row(
                             children: [
                               Container(
-                                padding: const EdgeInsets.fromLTRB(
-                                  12,
-                                  10,
-                                  12,
-                                  10,
+                                width: 34,
+                                height: 34,
+                                decoration: BoxDecoration(
+                                  color: AppTheme.primary.withValues(
+                                    alpha: 0.12,
+                                  ),
+                                  borderRadius: BorderRadius.circular(10),
                                 ),
-                                child: Wrap(
-                                  spacing: 8,
-                                  runSpacing: 8,
+                                child: const Icon(
+                                  Icons.tune,
+                                  color: AppTheme.primary,
+                                  size: 18,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    _AdjSummaryChip(
-                                      'ทั้งหมด',
-                                      stocks.length,
-                                      AppTheme.navy,
+                                    Text(
+                                      'ค้นหาและเลือกสินค้า',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onSurface,
+                                      ),
                                     ),
-                                    _AdjSummaryChip(
-                                      'กรองแล้ว',
-                                      filtered.length,
-                                      AppTheme.primaryDark,
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      'ค้นหาจากชื่อสินค้า รหัสสินค้า หรือสแกนบาร์โค้ด',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: AppTheme.subtextColorOf(context),
+                                      ),
                                     ),
                                   ],
                                 ),
                               ),
-                              Divider(
-                                height: 1,
-                                color: AppTheme.borderColorOf(context),
-                              ),
-                              Expanded(
-                                child: filtered.isEmpty
-                                    ? Center(
-                                        child: Column(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            Icon(
-                                              Icons.search_off_outlined,
-                                              size: 56,
-                                              color: Colors.grey[300],
-                                            ),
-                                            const SizedBox(height: 10),
-                                            Text(
-                                              _searchQuery.isEmpty
-                                                  ? 'ไม่มีข้อมูลสต๊อก'
-                                                  : 'ไม่พบสินค้า "$_searchQuery"',
-                                              style: TextStyle(
-                                                color: Colors.grey[500],
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      )
-                                    : ListView.separated(
-                                        padding: const EdgeInsets.all(8),
-                                        itemCount: filtered.length,
-                                        separatorBuilder: (_, _) =>
-                                            const SizedBox(height: 6),
-                                        itemBuilder: (context, index) {
-                                          final stock = filtered[index];
-                                          final isSelected =
-                                              _selectedStock?.productId ==
-                                                  stock.productId &&
-                                              _selectedStock?.warehouseId ==
-                                                  stock.warehouseId;
-                                          return _AdjStockItemCard(
-                                            stock: stock,
-                                            isSelected: isSelected,
-                                            onTap: () => setState(() {
-                                              _selectedStock = stock;
-                                              _qtyController.clear();
-                                            }),
-                                          );
-                                        },
+                            ],
+                          );
+
+                          final actions = Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              searchField,
+                              Tooltip(
+                                message: 'รีเฟรช',
+                                child: InkWell(
+                                  onTap: () => ref
+                                      .read(stockBalanceProvider.notifier)
+                                      .refresh(),
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(7),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF5F5F5),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: AppTheme.border,
                                       ),
+                                    ),
+                                    child: const Icon(
+                                      Icons.refresh,
+                                      size: 17,
+                                      color: Color(0xFF8A8A8A),
+                                    ),
+                                  ),
+                                ),
                               ),
                             ],
-                          ),
-                        );
+                          );
 
-                        final formPanel = Card(
-                          elevation: 0,
-                          margin: EdgeInsets.zero,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            side: BorderSide(
-                              color: AppTheme.borderColorOf(context),
+                          if (wide) {
+                            return Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(child: headerBlock),
+                                const SizedBox(width: 16),
+                                actions,
+                              ],
+                            );
+                          }
+
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              headerBlock,
+                              const SizedBox(height: 12),
+                              actions,
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: stockAsync.when(
+                    loading: () =>
+                        const Center(child: CircularProgressIndicator()),
+                    error: (e, _) => Center(child: Text('เกิดข้อผิดพลาด: $e')),
+                    data: (stocks) {
+                      final filtered = _filter(stocks);
+                      return LayoutBuilder(
+                        builder: (context, constraints) {
+                          final isWide = constraints.maxWidth >= 1120;
+
+                          final listPanel = Card(
+                            elevation: 0,
+                            margin: EdgeInsets.zero,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: BorderSide(
+                                color: AppTheme.borderColorOf(context),
+                              ),
                             ),
-                          ),
-                          child: _selectedStock == null
-                              ? _buildEmptyState()
-                              : _buildAdjustForm(),
-                        );
+                            child: Column(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    12,
+                                    10,
+                                    12,
+                                    10,
+                                  ),
+                                  child: Wrap(
+                                    spacing: 8,
+                                    runSpacing: 8,
+                                    children: [
+                                      _AdjSummaryChip(
+                                        'ทั้งหมด',
+                                        stocks.length,
+                                        AppTheme.navy,
+                                      ),
+                                      _AdjSummaryChip(
+                                        'กรองแล้ว',
+                                        filtered.length,
+                                        AppTheme.primaryDark,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Divider(
+                                  height: 1,
+                                  color: AppTheme.borderColorOf(context),
+                                ),
+                                Expanded(
+                                  child: filtered.isEmpty
+                                      ? Center(
+                                          child: Column(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              Icon(
+                                                Icons.search_off_outlined,
+                                                size: 56,
+                                                color: Colors.grey[300],
+                                              ),
+                                              const SizedBox(height: 10),
+                                              Text(
+                                                _searchQuery.isEmpty
+                                                    ? 'ไม่มีข้อมูลสต๊อก'
+                                                    : 'ไม่พบสินค้า "$_searchQuery"',
+                                                style: TextStyle(
+                                                  color: Colors.grey[500],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        )
+                                      : ListView.separated(
+                                          padding: const EdgeInsets.all(8),
+                                          itemCount: filtered.length,
+                                          separatorBuilder: (_, _) =>
+                                              const SizedBox(height: 6),
+                                          itemBuilder: (context, index) {
+                                            final stock = filtered[index];
+                                            final isSelected =
+                                                _selectedStock?.productId ==
+                                                    stock.productId &&
+                                                _selectedStock?.warehouseId ==
+                                                    stock.warehouseId;
+                                            return _AdjStockItemCard(
+                                              stock: stock,
+                                              isSelected: isSelected,
+                                              onTap: () => setState(() {
+                                                _selectedStock = stock;
+                                                _qtyController.clear();
+                                              }),
+                                            );
+                                          },
+                                        ),
+                                ),
+                              ],
+                            ),
+                          );
 
-                        final contentPadding = EdgeInsets.fromLTRB(
-                          context.pagePadding.left,
-                          0,
-                          context.pagePadding.right,
-                          context.pagePadding.bottom,
-                        );
+                          final formPanel = Card(
+                            elevation: 0,
+                            margin: EdgeInsets.zero,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: BorderSide(
+                                color: AppTheme.borderColorOf(context),
+                              ),
+                            ),
+                            child: _selectedStock == null
+                                ? _buildEmptyState()
+                                : _buildAdjustForm(),
+                          );
 
-                        if (isWide) {
+                          final contentPadding = EdgeInsets.fromLTRB(
+                            context.pagePadding.left,
+                            0,
+                            context.pagePadding.right,
+                            context.pagePadding.bottom,
+                          );
+
+                          if (isWide) {
+                            return Padding(
+                              padding: contentPadding,
+                              child: Row(
+                                children: [
+                                  SizedBox(width: 340, child: listPanel),
+                                  const SizedBox(width: 12),
+                                  Expanded(child: formPanel),
+                                ],
+                              ),
+                            );
+                          }
+
                           return Padding(
                             padding: contentPadding,
-                            child: Row(
+                            child: Column(
                               children: [
-                                SizedBox(width: 360, child: listPanel),
-                                const SizedBox(width: 12),
+                                SizedBox(height: 320, child: listPanel),
+                                const SizedBox(height: 12),
                                 Expanded(child: formPanel),
                               ],
                             ),
                           );
-                        }
-
-                        return Padding(
-                          padding: contentPadding,
-                          child: Column(
-                            children: [
-                              SizedBox(height: 280, child: listPanel),
-                              const SizedBox(height: 12),
-                              Expanded(child: formPanel),
-                            ],
-                          ),
-                        );
-                      },
-                    );
-                  },
+                        },
+                      );
+                    },
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -677,47 +691,13 @@ class _AdjustStockSubPageState extends ConsumerState<AdjustStockSubPage> {
               ),
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primaryColor,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(
-                        Icons.inventory_2,
-                        color: Colors.white,
-                        size: 28,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            stock.productName,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF1A1A1A),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'รหัส: ${stock.productCode}  •  คลัง: ${stock.warehouseName}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: AppTheme.textSub,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    // สต๊อกปัจจุบัน
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final stacked = constraints.maxWidth < 560;
+                    final stockBadge = Column(
+                      crossAxisAlignment: stacked
+                          ? CrossAxisAlignment.start
+                          : CrossAxisAlignment.end,
                       children: [
                         const Text(
                           'สต๊อกปัจจุบัน',
@@ -742,8 +722,101 @@ class _AdjustStockSubPageState extends ConsumerState<AdjustStockSubPage> {
                           ),
                         ),
                       ],
-                    ),
-                  ],
+                    );
+
+                    if (stacked) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.primaryColor,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Icon(
+                                  Icons.inventory_2,
+                                  color: Colors.white,
+                                  size: 28,
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      stock.productName,
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF1A1A1A),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'รหัส: ${stock.productCode}  •  คลัง: ${stock.warehouseName}',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: AppTheme.textSub,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          stockBadge,
+                        ],
+                      );
+                    }
+
+                    return Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primaryColor,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(
+                            Icons.inventory_2,
+                            color: Colors.white,
+                            size: 28,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                stock.productName,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF1A1A1A),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'รหัส: ${stock.productCode}  •  คลัง: ${stock.warehouseName}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: AppTheme.textSub,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        stockBadge,
+                      ],
+                    );
+                  },
                 ),
               ),
             ),
@@ -755,7 +828,9 @@ class _AdjustStockSubPageState extends ConsumerState<AdjustStockSubPage> {
               style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
               children: [
                 _AdjustTypeButton(
                   label: 'เพิ่มสต๊อก',
@@ -764,7 +839,6 @@ class _AdjustStockSubPageState extends ConsumerState<AdjustStockSubPage> {
                   isSelected: _adjustType == 'INCREASE',
                   onTap: () => setState(() => _adjustType = 'INCREASE'),
                 ),
-                const SizedBox(width: 8),
                 _AdjustTypeButton(
                   label: 'ลดสต๊อก',
                   icon: Icons.remove_circle,
@@ -772,7 +846,6 @@ class _AdjustStockSubPageState extends ConsumerState<AdjustStockSubPage> {
                   isSelected: _adjustType == 'DECREASE',
                   onTap: () => setState(() => _adjustType = 'DECREASE'),
                 ),
-                const SizedBox(width: 8),
                 _AdjustTypeButton(
                   label: 'กำหนดยอด',
                   icon: Icons.edit,
@@ -837,8 +910,11 @@ class _AdjustStockSubPageState extends ConsumerState<AdjustStockSubPage> {
                     color: _difference >= 0 ? AppTheme.success : AppTheme.error,
                   ),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                child: Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  alignment: WrapAlignment.spaceAround,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     _PreviewItem(
                       label: 'ปัจจุบัน',
@@ -917,53 +993,67 @@ class _AdjustStockSubPageState extends ConsumerState<AdjustStockSubPage> {
             const SizedBox(height: 32),
 
             // ── ปุ่ม ───────────────────────────────────────
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _isLoading
-                        ? null
-                        : () {
-                            setState(() {
-                              _selectedStock = null;
-                              _qtyController.clear();
-                              _referenceController.clear();
-                              _remarkController.clear();
-                            });
-                          },
-                    icon: const Icon(Icons.clear),
-                    label: const Text('ล้างค่า'),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  flex: 2,
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryColor,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    onPressed: _isLoading ? null : _handleSubmit,
-                    icon: _isLoading
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Icon(Icons.save),
-                    label: Text(
-                      _isLoading ? 'กำลังบันทึก...' : 'บันทึกการปรับสต๊อก',
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final stacked = constraints.maxWidth < 560;
+                final clearButton = OutlinedButton.icon(
+                  onPressed: _isLoading
+                      ? null
+                      : () {
+                          setState(() {
+                            _selectedStock = null;
+                            _qtyController.clear();
+                            _referenceController.clear();
+                            _remarkController.clear();
+                          });
+                        },
+                  icon: const Icon(Icons.clear),
+                  label: const Text('ล้างค่า'),
+                );
+                final saveButton = ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-                ),
-              ],
+                  onPressed: _isLoading ? null : _handleSubmit,
+                  icon: _isLoading
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.save),
+                  label: Text(
+                    _isLoading ? 'กำลังบันทึก...' : 'บันทึกการปรับสต๊อก',
+                  ),
+                );
+
+                if (stacked) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      saveButton,
+                      const SizedBox(height: 10),
+                      clearButton,
+                    ],
+                  );
+                }
+
+                return Row(
+                  children: [
+                    Expanded(child: clearButton),
+                    const SizedBox(width: 16),
+                    Expanded(flex: 2, child: saveButton),
+                  ],
+                );
+              },
             ),
           ],
         ),
@@ -1369,174 +1459,179 @@ class _StockTakeSubPageState extends ConsumerState<StockTakeSubPage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
-      body: Column(
-        children: [
-          // ── Top Bar ─────────────────────────────────────────────
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              children: [
-                if (canPop) ...[
-                  InkWell(
-                    onTap: () => Navigator.of(context).pop(),
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      padding: const EdgeInsets.all(7),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF5F5F5),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppTheme.border),
+      body: EscapePopScope(
+        child: Column(
+          children: [
+            // ── Top Bar ─────────────────────────────────────────────
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  if (canPop) ...[
+                    InkWell(
+                      onTap: () => Navigator.of(context).pop(),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.all(7),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF5F5F5),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppTheme.border),
+                        ),
+                        child: const Icon(
+                          Icons.arrow_back_ios_new,
+                          size: 15,
+                          color: Color(0xFF8A8A8A),
+                        ),
                       ),
-                      child: const Icon(
-                        Icons.arrow_back_ios_new,
-                        size: 15,
-                        color: Color(0xFF8A8A8A),
-                      ),
+                    ),
+                    const SizedBox(width: 10),
+                  ],
+                  Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: AppTheme.warningContainer,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.fact_check_outlined,
+                      color: AppTheme.warningColor,
+                      size: 18,
                     ),
                   ),
                   const SizedBox(width: 10),
-                ],
-                Container(
-                  padding: const EdgeInsets.all(7),
-                  decoration: BoxDecoration(
-                    color: AppTheme.warningContainer,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.fact_check_outlined,
-                    color: AppTheme.warningColor,
-                    size: 18,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                const Expanded(
-                  child: Text(
-                    'ตรวจนับสต๊อก',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1A1A1A),
+                  const Expanded(
+                    child: Text(
+                      'ตรวจนับสต๊อก',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1A1A1A),
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-                // Filter toggle
-                Tooltip(
-                  message: _showVarianceOnly ? 'แสดงทั้งหมด' : 'เฉพาะมีผลต่าง',
-                  child: InkWell(
-                    onTap: () =>
-                        setState(() => _showVarianceOnly = !_showVarianceOnly),
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      padding: const EdgeInsets.all(7),
-                      decoration: BoxDecoration(
-                        color: _showVarianceOnly
-                            ? AppTheme.warningColor.withValues(alpha: 0.1)
-                            : const Color(0xFFF5F5F5),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
+                  // Filter toggle
+                  Tooltip(
+                    message: _showVarianceOnly
+                        ? 'แสดงทั้งหมด'
+                        : 'เฉพาะมีผลต่าง',
+                    child: InkWell(
+                      onTap: () => setState(
+                        () => _showVarianceOnly = !_showVarianceOnly,
+                      ),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.all(7),
+                        decoration: BoxDecoration(
+                          color: _showVarianceOnly
+                              ? AppTheme.warningColor.withValues(alpha: 0.1)
+                              : const Color(0xFFF5F5F5),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: _showVarianceOnly
+                                ? AppTheme.warningColor
+                                : AppTheme.border,
+                          ),
+                        ),
+                        child: Icon(
+                          _showVarianceOnly
+                              ? Icons.filter_alt
+                              : Icons.filter_alt_outlined,
+                          size: 17,
                           color: _showVarianceOnly
                               ? AppTheme.warningColor
-                              : AppTheme.border,
+                              : const Color(0xFF8A8A8A),
                         ),
                       ),
-                      child: Icon(
-                        _showVarianceOnly
-                            ? Icons.filter_alt
-                            : Icons.filter_alt_outlined,
-                        size: 17,
-                        color: _showVarianceOnly
-                            ? AppTheme.warningColor
-                            : const Color(0xFF8A8A8A),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  // Refresh
+                  Tooltip(
+                    message: 'โหลดใหม่',
+                    child: InkWell(
+                      onTap: () {
+                        _clearItems();
+                        ref.read(stockBalanceProvider.notifier).refresh();
+                      },
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.all(7),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF5F5F5),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppTheme.border),
+                        ),
+                        child: const Icon(
+                          Icons.refresh,
+                          size: 17,
+                          color: Color(0xFF8A8A8A),
+                        ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 6),
-                // Refresh
-                Tooltip(
-                  message: 'โหลดใหม่',
-                  child: InkWell(
-                    onTap: () {
-                      _clearItems();
-                      ref.read(stockBalanceProvider.notifier).refresh();
-                    },
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      padding: const EdgeInsets.all(7),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF5F5F5),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppTheme.border),
-                      ),
-                      child: const Icon(
-                        Icons.refresh,
-                        size: 17,
-                        color: Color(0xFF8A8A8A),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          const Divider(height: 1),
+            const Divider(height: 1),
 
-          // ── Body ────────────────────────────────────────────────
-          Expanded(
-            child: stockAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('เกิดข้อผิดพลาด: $e')),
-              data: (stocks) {
-                _initItems(stocks);
+            // ── Body ────────────────────────────────────────────────
+            Expanded(
+              child: stockAsync.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, _) => Center(child: Text('เกิดข้อผิดพลาด: $e')),
+                data: (stocks) {
+                  _initItems(stocks);
 
-                final filtered = _takeItems.where((item) {
-                  if (_showVarianceOnly && !item.hasVariance) return false;
-                  if (_searchQuery.isEmpty) return true;
-                  return item.stock.productName.toLowerCase().contains(
-                        _searchQuery.toLowerCase(),
-                      ) ||
-                      item.stock.productCode.toLowerCase().contains(
-                        _searchQuery.toLowerCase(),
-                      );
-                }).toList();
+                  final filtered = _takeItems.where((item) {
+                    if (_showVarianceOnly && !item.hasVariance) return false;
+                    if (_searchQuery.isEmpty) return true;
+                    return item.stock.productName.toLowerCase().contains(
+                          _searchQuery.toLowerCase(),
+                        ) ||
+                        item.stock.productCode.toLowerCase().contains(
+                          _searchQuery.toLowerCase(),
+                        );
+                  }).toList();
 
-                return Column(
-                  children: [
-                    // ── Toolbar ────────────────────────────
-                    _buildToolbar(stocks),
+                  return Column(
+                    children: [
+                      // ── Toolbar ────────────────────────────
+                      _buildToolbar(stocks),
 
-                    // ── Summary Bar ────────────────────────
-                    if (_isInitialized) _buildSummaryBar(),
+                      // ── Summary Bar ────────────────────────
+                      if (_isInitialized) _buildSummaryBar(),
 
-                    // ── รายการสินค้า ───────────────────────
-                    Expanded(
-                      child: _takeItems.isEmpty
-                          ? _buildEmptyState()
-                          : filtered.isEmpty
-                          ? const Center(
-                              child: Text(
-                                'ไม่พบสินค้าที่ตรงกัน',
-                                style: TextStyle(color: Color(0xFF8A8A8A)),
+                      // ── รายการสินค้า ───────────────────────
+                      Expanded(
+                        child: _takeItems.isEmpty
+                            ? _buildEmptyState()
+                            : filtered.isEmpty
+                            ? const Center(
+                                child: Text(
+                                  'ไม่พบสินค้าที่ตรงกัน',
+                                  style: TextStyle(color: Color(0xFF8A8A8A)),
+                                ),
+                              )
+                            : ListView.builder(
+                                padding: const EdgeInsets.all(12),
+                                itemCount: filtered.length,
+                                itemBuilder: (context, index) =>
+                                    _buildItemRow(filtered[index]),
                               ),
-                            )
-                          : ListView.builder(
-                              padding: const EdgeInsets.all(12),
-                              itemCount: filtered.length,
-                              itemBuilder: (context, index) =>
-                                  _buildItemRow(filtered[index]),
-                            ),
-                    ),
+                      ),
 
-                    // ── Bottom Bar ─────────────────────────
-                    if (_takeItems.isNotEmpty) _buildBottomBar(),
-                  ],
-                );
-              },
+                      // ── Bottom Bar ─────────────────────────
+                      if (_takeItems.isNotEmpty) _buildBottomBar(),
+                    ],
+                  );
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1546,20 +1641,11 @@ class _StockTakeSubPageState extends ConsumerState<StockTakeSubPage> {
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-      child: Row(
-        children: [
-          // Label
-          const Text(
-            'คลัง:',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF1A1A1A),
-            ),
-          ),
-          const SizedBox(width: 8),
-          // Dropdown คลัง
-          Builder(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final stacked = constraints.maxWidth < 760;
+
+          final warehousePicker = Builder(
             builder: (ctx) {
               final cs = Theme.of(ctx).colorScheme;
               final bgColor = cs.surface;
@@ -1602,65 +1688,104 @@ class _StockTakeSubPageState extends ConsumerState<StockTakeSubPage> {
                 ),
               );
             },
-          ),
-          const SizedBox(width: 12),
-          // Search
-          Expanded(
-            child: SizedBox(
-              height: 38,
-              child: TextField(
-                controller: _searchController,
-                style: const TextStyle(fontSize: 13),
-                decoration: InputDecoration(
-                  hintText: 'ค้นหาชื่อ / รหัสสินค้า...',
-                  hintStyle: const TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF8A8A8A),
-                  ),
-                  prefixIcon: const Icon(
-                    Icons.search,
-                    size: 17,
-                    color: Color(0xFF8A8A8A),
-                  ),
-                  suffixIcon: _searchQuery.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear, size: 15),
-                          onPressed: () {
-                            _searchController.clear();
-                            setState(() => _searchQuery = '');
-                          },
-                        )
-                      : ScannerButton(
-                          useSheet: true,
-                          onScanned: (value) {
-                            _searchController.text = value;
-                            setState(() => _searchQuery = value);
-                          },
-                        ),
-                  contentPadding: EdgeInsets.zero,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(
-                      color: AppTheme.primary,
-                      width: 1.5,
-                    ),
-                  ),
-                  filled: true,
-                  fillColor: Colors.white,
+          );
+
+          final searchField = SizedBox(
+            height: 38,
+            child: TextField(
+              controller: _searchController,
+              style: const TextStyle(fontSize: 13),
+              decoration: InputDecoration(
+                hintText: 'ค้นหาชื่อ / รหัสสินค้า...',
+                hintStyle: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF8A8A8A),
                 ),
-                onChanged: (v) => setState(() => _searchQuery = v),
+                prefixIcon: const Icon(
+                  Icons.search,
+                  size: 17,
+                  color: Color(0xFF8A8A8A),
+                ),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, size: 15),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() => _searchQuery = '');
+                        },
+                      )
+                    : ScannerButton(
+                        useSheet: true,
+                        onScanned: (value) {
+                          _searchController.text = value;
+                          setState(() => _searchQuery = value);
+                        },
+                      ),
+                contentPadding: EdgeInsets.zero,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(
+                    color: AppTheme.primary,
+                    width: 1.5,
+                  ),
+                ),
+                filled: true,
+                fillColor: Colors.white,
               ),
+              onChanged: (v) => setState(() => _searchQuery = v),
             ),
-          ),
-        ],
+          );
+
+          if (stacked) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'คลัง:',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1A1A1A),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    warehousePicker,
+                  ],
+                ),
+                const SizedBox(height: 10),
+                searchField,
+              ],
+            );
+          }
+
+          return Row(
+            children: [
+              const Text(
+                'คลัง:',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF1A1A1A),
+                ),
+              ),
+              const SizedBox(width: 8),
+              warehousePicker,
+              const SizedBox(width: 12),
+              Expanded(child: searchField),
+            ],
+          );
+        },
       ),
     );
   }
@@ -1670,7 +1795,10 @@ class _StockTakeSubPageState extends ConsumerState<StockTakeSubPage> {
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-      child: Row(
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        alignment: WrapAlignment.spaceBetween,
         children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -1690,19 +1818,16 @@ class _StockTakeSubPageState extends ConsumerState<StockTakeSubPage> {
               ),
             ),
           ),
-          const Spacer(),
           _SummaryChip(
             label: 'ตรงกัน',
             count: _matchCount,
             color: AppTheme.successColor,
           ),
-          const SizedBox(width: 8),
           _SummaryChip(
             label: 'เกิน',
             count: _increaseCount,
             color: AppTheme.infoColor,
           ),
-          const SizedBox(width: 8),
           _SummaryChip(
             label: 'ขาด',
             count: _decreaseCount,
@@ -2212,248 +2337,251 @@ class _StockTransferSubPageState extends ConsumerState<StockTransferSubPage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
-      body: Column(
-        children: [
-          // ── Top Bar ───────────────────────────────────────���─────
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              children: [
-                if (canPop) ...[
-                  InkWell(
-                    onTap: () => Navigator.of(context).pop(),
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      padding: const EdgeInsets.all(7),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF5F5F5),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppTheme.border),
+      body: EscapePopScope(
+        child: Column(
+          children: [
+            // ── Top Bar ───────────────────────────────────────���─────
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  if (canPop) ...[
+                    InkWell(
+                      onTap: () => Navigator.of(context).pop(),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.all(7),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF5F5F5),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppTheme.border),
+                        ),
+                        child: const Icon(
+                          Icons.arrow_back_ios_new,
+                          size: 15,
+                          color: Color(0xFF8A8A8A),
+                        ),
                       ),
-                      child: const Icon(
-                        Icons.arrow_back_ios_new,
-                        size: 15,
-                        color: Color(0xFF8A8A8A),
-                      ),
+                    ),
+                    const SizedBox(width: 10),
+                  ],
+                  Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: AppTheme.tealColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.swap_horiz,
+                      color: AppTheme.tealColor,
+                      size: 18,
                     ),
                   ),
                   const SizedBox(width: 10),
-                ],
-                Container(
-                  padding: const EdgeInsets.all(7),
-                  decoration: BoxDecoration(
-                    color: AppTheme.tealColor.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(8),
+                  const Text(
+                    'โอนย้ายสต๊อก',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1A1A1A),
+                    ),
                   ),
-                  child: const Icon(
-                    Icons.swap_horiz,
-                    color: AppTheme.tealColor,
-                    size: 18,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                const Text(
-                  'โอนย้ายสต๊อก',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1A1A1A),
-                  ),
-                ),
-                const Spacer(),
-                // Search field
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 260),
-                  child: SizedBox(
-                    height: 38,
-                    child: TextField(
-                      controller: _searchController,
-                      style: const TextStyle(fontSize: 13),
-                      decoration: InputDecoration(
-                        hintText: 'ค้นหาชื่อ / รหัสสินค้า...',
-                        hintStyle: const TextStyle(
-                          fontSize: 13,
-                          color: Color(0xFF8A8A8A),
+                  const Spacer(),
+                  // Search field
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 260),
+                    child: SizedBox(
+                      height: 38,
+                      child: TextField(
+                        controller: _searchController,
+                        style: const TextStyle(fontSize: 13),
+                        decoration: InputDecoration(
+                          hintText: 'ค้นหาชื่อ / รหัสสินค้า...',
+                          hintStyle: const TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF8A8A8A),
+                          ),
+                          prefixIcon: const Icon(
+                            Icons.search,
+                            size: 17,
+                            color: Color(0xFF8A8A8A),
+                          ),
+                          suffixIcon: _searchQuery.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear, size: 15),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    setState(() => _searchQuery = '');
+                                  },
+                                )
+                              : ScannerButton(
+                                  useSheet: true,
+                                  onScanned: (value) {
+                                    _searchController.text = value;
+                                    setState(() => _searchQuery = value);
+                                  },
+                                ),
+                          contentPadding: EdgeInsets.zero,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(
+                              color: Color(0xFFE0E0E0),
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(
+                              color: Color(0xFFE0E0E0),
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(
+                              color: AppTheme.tealColor,
+                              width: 1.5,
+                            ),
+                          ),
+                          filled: true,
+                          fillColor: Colors.white,
                         ),
-                        prefixIcon: const Icon(
-                          Icons.search,
+                        onChanged: (v) => setState(() => _searchQuery = v),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Refresh
+                  Tooltip(
+                    message: 'รีเฟรช',
+                    child: InkWell(
+                      onTap: () =>
+                          ref.read(stockBalanceProvider.notifier).refresh(),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.all(7),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF5F5F5),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppTheme.border),
+                        ),
+                        child: const Icon(
+                          Icons.refresh,
                           size: 17,
                           color: Color(0xFF8A8A8A),
                         ),
-                        suffixIcon: _searchQuery.isNotEmpty
-                            ? IconButton(
-                                icon: const Icon(Icons.clear, size: 15),
-                                onPressed: () {
-                                  _searchController.clear();
-                                  setState(() => _searchQuery = '');
-                                },
-                              )
-                            : ScannerButton(
-                                useSheet: true,
-                                onScanned: (value) {
-                                  _searchController.text = value;
-                                  setState(() => _searchQuery = value);
-                                },
-                              ),
-                        contentPadding: EdgeInsets.zero,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFE0E0E0),
-                          ),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFE0E0E0),
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(
-                            color: AppTheme.tealColor,
-                            width: 1.5,
-                          ),
-                        ),
-                        filled: true,
-                        fillColor: Colors.white,
-                      ),
-                      onChanged: (v) => setState(() => _searchQuery = v),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                // Refresh
-                Tooltip(
-                  message: 'รีเฟรช',
-                  child: InkWell(
-                    onTap: () =>
-                        ref.read(stockBalanceProvider.notifier).refresh(),
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      padding: const EdgeInsets.all(7),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF5F5F5),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppTheme.border),
-                      ),
-                      child: const Icon(
-                        Icons.refresh,
-                        size: 17,
-                        color: Color(0xFF8A8A8A),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          const Divider(height: 1),
+            const Divider(height: 1),
 
-          // ── Body ────────────────────────────────────────────────
-          Expanded(
-            child: stockAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('เกิดข้อผิดพลาด: $e')),
-              data: (stocks) {
-                final fromStocks = stocks
-                    .where(
-                      (s) => s.warehouseId == _fromWarehouseId && s.balance > 0,
-                    )
-                    .toList();
+            // ── Body ────────────────────────────────────────────────
+            Expanded(
+              child: stockAsync.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, _) => Center(child: Text('เกิดข้อผิดพลาด: $e')),
+                data: (stocks) {
+                  final fromStocks = stocks
+                      .where(
+                        (s) =>
+                            s.warehouseId == _fromWarehouseId && s.balance > 0,
+                      )
+                      .toList();
 
-                final filtered = _searchQuery.isEmpty
-                    ? fromStocks
-                    : fromStocks
-                          .where(
-                            (s) =>
-                                s.productName.toLowerCase().contains(
-                                  _searchQuery.toLowerCase(),
-                                ) ||
-                                s.productCode.toLowerCase().contains(
-                                  _searchQuery.toLowerCase(),
-                                ),
-                          )
-                          .toList();
-
-                return Row(
-                  children: [
-                    // ── ซ้าย: เลือกสินค้า ───────────────────────
-                    SizedBox(
-                      width: 380,
-                      child: Column(
-                        children: [
-                          // Warehouse selector (header ขาว)
-                          _buildWarehouseSelector(stocks),
-                          const Divider(height: 1),
-
-                          // รายการสินค้า
-                          Expanded(
-                            child: filtered.isEmpty
-                                ? Center(
-                                    child: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          _searchQuery.isEmpty
-                                              ? Icons.inventory_2_outlined
-                                              : Icons.search_off_outlined,
-                                          size: 56,
-                                          color: Colors.grey[300],
-                                        ),
-                                        const SizedBox(height: 10),
-                                        Text(
-                                          _searchQuery.isEmpty
-                                              ? 'ไม่มีสินค้าในคลังนี้'
-                                              : 'ไม่พบสินค้า "$_searchQuery"',
-                                          style: TextStyle(
-                                            color: Colors.grey[500],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  )
-                                : ListView.separated(
-                                    padding: const EdgeInsets.all(8),
-                                    itemCount: filtered.length,
-                                    separatorBuilder: (_, _) =>
-                                        const SizedBox(height: 6),
-                                    itemBuilder: (context, index) {
-                                      final stock = filtered[index];
-                                      final isSelected =
-                                          _selectedStock?.productId ==
-                                          stock.productId;
-                                      return _TransferItemCard(
-                                        stock: stock,
-                                        isSelected: isSelected,
-                                        onTap: () => setState(() {
-                                          _selectedStock = stock;
-                                          _qtyController.clear();
-                                        }),
-                                      );
-                                    },
+                  final filtered = _searchQuery.isEmpty
+                      ? fromStocks
+                      : fromStocks
+                            .where(
+                              (s) =>
+                                  s.productName.toLowerCase().contains(
+                                    _searchQuery.toLowerCase(),
+                                  ) ||
+                                  s.productCode.toLowerCase().contains(
+                                    _searchQuery.toLowerCase(),
                                   ),
-                          ),
-                        ],
+                            )
+                            .toList();
+
+                  return Row(
+                    children: [
+                      // ── ซ้าย: เลือกสินค้า ───────────────────────
+                      SizedBox(
+                        width: 380,
+                        child: Column(
+                          children: [
+                            // Warehouse selector (header ขาว)
+                            _buildWarehouseSelector(stocks),
+                            const Divider(height: 1),
+
+                            // รายการสินค้า
+                            Expanded(
+                              child: filtered.isEmpty
+                                  ? Center(
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            _searchQuery.isEmpty
+                                                ? Icons.inventory_2_outlined
+                                                : Icons.search_off_outlined,
+                                            size: 56,
+                                            color: Colors.grey[300],
+                                          ),
+                                          const SizedBox(height: 10),
+                                          Text(
+                                            _searchQuery.isEmpty
+                                                ? 'ไม่มีสินค้าในคลังนี้'
+                                                : 'ไม่พบสินค้า "$_searchQuery"',
+                                            style: TextStyle(
+                                              color: Colors.grey[500],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    )
+                                  : ListView.separated(
+                                      padding: const EdgeInsets.all(8),
+                                      itemCount: filtered.length,
+                                      separatorBuilder: (_, _) =>
+                                          const SizedBox(height: 6),
+                                      itemBuilder: (context, index) {
+                                        final stock = filtered[index];
+                                        final isSelected =
+                                            _selectedStock?.productId ==
+                                            stock.productId;
+                                        return _TransferItemCard(
+                                          stock: stock,
+                                          isSelected: isSelected,
+                                          onTap: () => setState(() {
+                                            _selectedStock = stock;
+                                            _qtyController.clear();
+                                          }),
+                                        );
+                                      },
+                                    ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
 
-                    const VerticalDivider(width: 1),
+                      const VerticalDivider(width: 1),
 
-                    // ── ขวา: Form โอนย้าย ───────────────────────
-                    Expanded(
-                      child: _selectedStock == null
-                          ? _buildEmptyState()
-                          : _buildTransferForm(),
-                    ),
-                  ],
-                );
-              },
+                      // ── ขวา: Form โอนย้าย ───────────────────────
+                      Expanded(
+                        child: _selectedStock == null
+                            ? _buildEmptyState()
+                            : _buildTransferForm(),
+                      ),
+                    ],
+                  );
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -3327,185 +3455,189 @@ class _VarianceReportPageState extends ConsumerState<VarianceReportPage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
-      body: Column(
-        children: [
-          // ── Top Bar ────────────────────────────────────────────
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              children: [
-                if (canPop) ...[
-                  InkWell(
-                    onTap: () => Navigator.of(context).pop(),
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      padding: const EdgeInsets.all(7),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF5F5F5),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppTheme.border),
+      body: EscapePopScope(
+        child: Column(
+          children: [
+            // ── Top Bar ────────────────────────────────────────────
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  if (canPop) ...[
+                    InkWell(
+                      onTap: () => Navigator.of(context).pop(),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.all(7),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF5F5F5),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppTheme.border),
+                        ),
+                        child: const Icon(
+                          Icons.arrow_back_ios_new,
+                          size: 15,
+                          color: Color(0xFF8A8A8A),
+                        ),
                       ),
-                      child: const Icon(
-                        Icons.arrow_back_ios_new,
-                        size: 15,
-                        color: Color(0xFF8A8A8A),
-                      ),
+                    ),
+                    const SizedBox(width: 10),
+                  ],
+                  Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: AppTheme.purpleColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.analytics_outlined,
+                      color: AppTheme.purpleColor,
+                      size: 18,
                     ),
                   ),
                   const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text(
+                      'รายงานผลต่าง',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1A1A1A),
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Tooltip(
+                    message: 'รีเฟรช',
+                    child: InkWell(
+                      onTap: () {
+                        ref.invalidate(movementHistoryProvider);
+                        ref.read(stockBalanceProvider.notifier).refresh();
+                      },
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.all(7),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF5F5F5),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppTheme.border),
+                        ),
+                        child: const Icon(
+                          Icons.refresh,
+                          size: 17,
+                          color: Color(0xFF8A8A8A),
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
-                Container(
-                  padding: const EdgeInsets.all(7),
-                  decoration: BoxDecoration(
-                    color: AppTheme.purpleColor.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.analytics_outlined,
-                    color: AppTheme.purpleColor,
-                    size: 18,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                const Expanded(
-                  child: Text(
-                    'รายงานผลต่าง',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1A1A1A),
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                Tooltip(
-                  message: 'รีเฟรช',
-                  child: InkWell(
-                    onTap: () {
-                      ref.invalidate(movementHistoryProvider);
-                      ref.read(stockBalanceProvider.notifier).refresh();
-                    },
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      padding: const EdgeInsets.all(7),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF5F5F5),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppTheme.border),
-                      ),
-                      child: const Icon(
-                        Icons.refresh,
-                        size: 17,
-                        color: Color(0xFF8A8A8A),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 1),
-
-          // ── Body ────────────────────────────────────────────────
-          Expanded(
-            child: movementsAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('เกิดข้อผิดพลาด: $e')),
-              data: (movements) => stockAsync.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => Center(child: Text('เกิดข้อผิดพลาด: $e')),
-                data: (stocks) {
-                  // สร้าง lookup map: productId → stock info
-                  final stockMap = <String, StockBalanceModel>{};
-                  for (final s in stocks) {
-                    stockMap['${s.productId}_${s.warehouseId}'] = s;
-                  }
-
-                  // กรองเฉพาะ ADJUST movements
-                  final adjustMovements = movements
-                      .where((m) => m.movementType == 'ADJUST')
-                      .toList();
-
-                  // สร้าง VarianceItems
-                  final items = adjustMovements.map((m) {
-                    final key = '${m.productId}_${m.warehouseId}';
-                    final stock = stockMap[key];
-                    return _VarianceItem(
-                      productId: m.productId,
-                      productCode: stock?.productCode ?? m.productId,
-                      productName: stock?.productName ?? 'ไม่ทราบชื่อสินค้า',
-                      warehouseId: m.warehouseId,
-                      warehouseName:
-                          stock?.warehouseName ?? _warehouseName(m.warehouseId),
-                      baseUnit: stock?.baseUnit ?? '',
-                      before: m.quantity < 0
-                          ? (stock?.balance ?? 0) - m.quantity
-                          : (stock?.balance ?? 0) - m.quantity,
-                      after: stock?.balance ?? 0,
-                      variance: m.quantity,
-                      date: m.movementDate,
-                      referenceNo: m.referenceNo,
-                      remark: m.remark,
-                    );
-                  }).toList();
-
-                  // Apply filters
-                  final filtered = items.where((item) {
-                    // warehouse filter
-                    if (_filterWarehouse != 'ALL' &&
-                        item.warehouseId != _filterWarehouse) {
-                      return false;
-                    }
-
-                    // type filter
-                    if (_filterType == 'INCREASE' && item.variance <= 0) {
-                      return false;
-                    }
-
-                    if (_filterType == 'DECREASE' && item.variance >= 0) {
-                      return false;
-                    }
-
-                    // date filter
-                    if (_dateRange != null) {
-                      final d = item.date;
-
-                      if (d.isBefore(_dateRange!.start) ||
-                          d.isAfter(
-                            _dateRange!.end.add(const Duration(days: 1)),
-                          )) {
-                        return false;
-                      }
-                    }
-
-                    return true;
-                  }).toList();
-
-                  // Sort by date desc
-                  filtered.sort((a, b) => b.date.compareTo(a.date));
-
-                  return Column(
-                    children: [
-                      // ── Filter Bar ────────────────────────────
-                      _buildFilterBar(),
-
-                      // ── Summary Cards ─────────────────────────
-                      _buildSummaryCards(filtered),
-
-                      // ── Table ─────────────────────────────────
-                      Expanded(
-                        child: filtered.isEmpty
-                            ? _buildEmptyState(adjustMovements.isEmpty)
-                            : _buildTable(filtered),
-                      ),
-                    ],
-                  );
-                },
               ),
             ),
-          ),
-        ],
+            const Divider(height: 1),
+
+            // ── Body ────────────────────────────────────────────────
+            Expanded(
+              child: movementsAsync.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, _) => Center(child: Text('เกิดข้อผิดพลาด: $e')),
+                data: (movements) => stockAsync.when(
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (e, _) => Center(child: Text('เกิดข้อผิดพลาด: $e')),
+                  data: (stocks) {
+                    // สร้าง lookup map: productId → stock info
+                    final stockMap = <String, StockBalanceModel>{};
+                    for (final s in stocks) {
+                      stockMap['${s.productId}_${s.warehouseId}'] = s;
+                    }
+
+                    // กรองเฉพาะ ADJUST movements
+                    final adjustMovements = movements
+                        .where((m) => m.movementType == 'ADJUST')
+                        .toList();
+
+                    // สร้าง VarianceItems
+                    final items = adjustMovements.map((m) {
+                      final key = '${m.productId}_${m.warehouseId}';
+                      final stock = stockMap[key];
+                      return _VarianceItem(
+                        productId: m.productId,
+                        productCode: stock?.productCode ?? m.productId,
+                        productName: stock?.productName ?? 'ไม่ทราบชื่อสินค้า',
+                        warehouseId: m.warehouseId,
+                        warehouseName:
+                            stock?.warehouseName ??
+                            _warehouseName(m.warehouseId),
+                        baseUnit: stock?.baseUnit ?? '',
+                        before: m.quantity < 0
+                            ? (stock?.balance ?? 0) - m.quantity
+                            : (stock?.balance ?? 0) - m.quantity,
+                        after: stock?.balance ?? 0,
+                        variance: m.quantity,
+                        date: m.movementDate,
+                        referenceNo: m.referenceNo,
+                        remark: m.remark,
+                      );
+                    }).toList();
+
+                    // Apply filters
+                    final filtered = items.where((item) {
+                      // warehouse filter
+                      if (_filterWarehouse != 'ALL' &&
+                          item.warehouseId != _filterWarehouse) {
+                        return false;
+                      }
+
+                      // type filter
+                      if (_filterType == 'INCREASE' && item.variance <= 0) {
+                        return false;
+                      }
+
+                      if (_filterType == 'DECREASE' && item.variance >= 0) {
+                        return false;
+                      }
+
+                      // date filter
+                      if (_dateRange != null) {
+                        final d = item.date;
+
+                        if (d.isBefore(_dateRange!.start) ||
+                            d.isAfter(
+                              _dateRange!.end.add(const Duration(days: 1)),
+                            )) {
+                          return false;
+                        }
+                      }
+
+                      return true;
+                    }).toList();
+
+                    // Sort by date desc
+                    filtered.sort((a, b) => b.date.compareTo(a.date));
+
+                    return Column(
+                      children: [
+                        // ── Filter Bar ────────────────────────────
+                        _buildFilterBar(),
+
+                        // ── Summary Cards ─────────────────────────
+                        _buildSummaryCards(filtered),
+
+                        // ── Table ─────────────────────────────────
+                        Expanded(
+                          child: filtered.isEmpty
+                              ? _buildEmptyState(adjustMovements.isEmpty)
+                              : _buildTable(filtered),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -3515,119 +3647,135 @@ class _VarianceReportPageState extends ConsumerState<VarianceReportPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       color: Colors.white,
-      child: Row(
+      child: Wrap(
+        spacing: 12,
+        runSpacing: 10,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          // ประเภท
-          const Text(
-            'ประเภท:',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF1A1A1A),
-            ),
-          ),
-          const SizedBox(width: 8),
-          _FilterChip(
-            label: 'ทั้งหมด',
-            selected: _filterType == 'ALL',
-            color: AppTheme.purpleColor,
-            onTap: () => setState(() => _filterType = 'ALL'),
-          ),
-          const SizedBox(width: 4),
-          _FilterChip(
-            label: '↑ เกิน',
-            selected: _filterType == 'INCREASE',
-            color: AppTheme.infoColor,
-            onTap: () => setState(() => _filterType = 'INCREASE'),
-          ),
-          const SizedBox(width: 4),
-          _FilterChip(
-            label: '↓ ขาด',
-            selected: _filterType == 'DECREASE',
-            color: AppTheme.errorColor,
-            onTap: () => setState(() => _filterType = 'DECREASE'),
-          ),
-          const SizedBox(width: 16),
-
-          // คลัง
-          const Text(
-            'คลัง:',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF1A1A1A),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Builder(
-            builder: (ctx) {
-              final cs = Theme.of(ctx).colorScheme;
-              return Container(
-                height: 34,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                decoration: BoxDecoration(
-                  color: cs.surface,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: cs.outline.withValues(alpha: 0.4)),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              const Text(
+                'ประเภท:',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF1A1A1A),
                 ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: _filterWarehouse,
-                    isDense: true,
-                    dropdownColor: cs.surface,
-                    style: TextStyle(fontSize: 13, color: cs.onSurface),
-                    iconEnabledColor: cs.onSurface.withValues(alpha: 0.6),
-                    items: _warehouses
-                        .map(
-                          (w) => DropdownMenuItem(
-                            value: w['id'],
-                            child: Text(
-                              w['name']!,
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: cs.onSurface,
-                              ),
-                            ),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (v) =>
-                        setState(() => _filterWarehouse = v ?? 'ALL'),
-                  ),
-                ),
-              );
-            },
-          ),
-          const SizedBox(width: 16),
-
-          // ช่วงวันที่
-          OutlinedButton.icon(
-            onPressed: _pickDateRange,
-            icon: const Icon(Icons.calendar_today, size: 16),
-            label: Text(
-              _dateRange == null
-                  ? 'ทุกวัน'
-                  : '${_formatDate(_dateRange!.start)} – ${_formatDate(_dateRange!.end)}',
-              style: const TextStyle(fontSize: 12),
-            ),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              side: BorderSide(
-                color: AppTheme.purpleColor.withValues(alpha: 0.5),
               ),
-              foregroundColor: AppTheme.purpleColor,
-            ),
+              _FilterChip(
+                label: 'ทั้งหมด',
+                selected: _filterType == 'ALL',
+                color: AppTheme.purpleColor,
+                onTap: () => setState(() => _filterType = 'ALL'),
+              ),
+              _FilterChip(
+                label: '↑ เกิน',
+                selected: _filterType == 'INCREASE',
+                color: AppTheme.infoColor,
+                onTap: () => setState(() => _filterType = 'INCREASE'),
+              ),
+              _FilterChip(
+                label: '↓ ขาด',
+                selected: _filterType == 'DECREASE',
+                color: AppTheme.errorColor,
+                onTap: () => setState(() => _filterType = 'DECREASE'),
+              ),
+            ],
           ),
-          if (_dateRange != null) ...[
-            const SizedBox(width: 4),
-            IconButton(
-              icon: const Icon(Icons.close, size: 16),
-              onPressed: () => setState(() => _dateRange = null),
-              tooltip: 'ล้างวันที่',
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-            ),
-          ],
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              const Text(
+                'คลัง:',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF1A1A1A),
+                ),
+              ),
+              Builder(
+                builder: (ctx) {
+                  final cs = Theme.of(ctx).colorScheme;
+                  return Container(
+                    height: 34,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    decoration: BoxDecoration(
+                      color: cs.surface,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: cs.outline.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: _filterWarehouse,
+                        isDense: true,
+                        dropdownColor: cs.surface,
+                        style: TextStyle(fontSize: 13, color: cs.onSurface),
+                        iconEnabledColor: cs.onSurface.withValues(alpha: 0.6),
+                        items: _warehouses
+                            .map(
+                              (w) => DropdownMenuItem(
+                                value: w['id'],
+                                child: Text(
+                                  w['name']!,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: cs.onSurface,
+                                  ),
+                                ),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (v) =>
+                            setState(() => _filterWarehouse = v ?? 'ALL'),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+          Wrap(
+            spacing: 4,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              OutlinedButton.icon(
+                onPressed: _pickDateRange,
+                icon: const Icon(Icons.calendar_today, size: 16),
+                label: Text(
+                  _dateRange == null
+                      ? 'ทุกวัน'
+                      : '${_formatDate(_dateRange!.start)} – ${_formatDate(_dateRange!.end)}',
+                  style: const TextStyle(fontSize: 12),
+                ),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  side: BorderSide(
+                    color: AppTheme.purpleColor.withValues(alpha: 0.5),
+                  ),
+                  foregroundColor: AppTheme.purpleColor,
+                ),
+              ),
+              if (_dateRange != null)
+                IconButton(
+                  icon: const Icon(Icons.close, size: 16),
+                  onPressed: () => setState(() => _dateRange = null),
+                  tooltip: 'ล้างวันที่',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+            ],
+          ),
         ],
       ),
     );
@@ -3643,49 +3791,174 @@ class _VarianceReportPageState extends ConsumerState<VarianceReportPage> {
       (sum, i) => sum + i.variance.abs(),
     );
 
-    return Padding(
-      padding: const EdgeInsets.all(12),
-      child: Row(
-        children: [
-          _SummaryStatCard(
-            label: 'รายการทั้งหมด',
-            value: '${items.length}',
-            unit: 'รายการ',
-            icon: Icons.list_alt,
-            color: Colors.teal,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth >= 1100
+            ? 3
+            : constraints.maxWidth >= 720
+            ? 2
+            : 1;
+        const spacing = 10.0;
+        final cardWidth = columns == 1
+            ? constraints.maxWidth
+            : (constraints.maxWidth - ((columns - 1) * spacing)) / columns;
+
+        return Padding(
+          padding: const EdgeInsets.all(12),
+          child: Wrap(
+            spacing: spacing,
+            runSpacing: spacing,
+            children: [
+              SizedBox(
+                width: cardWidth,
+                child: _SummaryStatCard(
+                  label: 'รายการทั้งหมด',
+                  value: '${items.length}',
+                  unit: 'รายการ',
+                  icon: Icons.list_alt,
+                  color: Colors.teal,
+                ),
+              ),
+              SizedBox(
+                width: cardWidth,
+                child: _SummaryStatCard(
+                  label: 'สต๊อกเกิน',
+                  value: '+${totalIncrease.toStringAsFixed(0)}',
+                  unit: '(${increaseItems.length} รายการ)',
+                  icon: Icons.arrow_upward,
+                  color: Colors.blue,
+                ),
+              ),
+              SizedBox(
+                width: cardWidth,
+                child: _SummaryStatCard(
+                  label: 'สต๊อกขาด',
+                  value: '-${totalDecrease.toStringAsFixed(0)}',
+                  unit: '(${decreaseItems.length} รายการ)',
+                  icon: Icons.arrow_downward,
+                  color: Colors.red,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 10),
-          _SummaryStatCard(
-            label: 'สต๊อกเกิน',
-            value: '+${totalIncrease.toStringAsFixed(0)}',
-            unit: '(${increaseItems.length} รายการ)',
-            icon: Icons.arrow_upward,
-            color: Colors.blue,
-          ),
-          const SizedBox(width: 10),
-          _SummaryStatCard(
-            label: 'สต๊อกขาด',
-            value: '-${totalDecrease.toStringAsFixed(0)}',
-            unit: '(${decreaseItems.length} รายการ)',
-            icon: Icons.arrow_downward,
-            color: Colors.red,
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
   // ── Table ──────────────────────────────────────────────────────
   Widget _buildTable(List<_VarianceItem> items) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-      child: Column(
-        children: [
-          // Header
-          _buildTableHeader(),
-          // Rows
-          ...items.map((item) => _buildTableRow(item)),
-        ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final useCompactCards = constraints.maxWidth < 1080;
+
+        if (useCompactCards) {
+          return ListView.separated(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            itemCount: items.length,
+            separatorBuilder: (_, _) => const SizedBox(height: 8),
+            itemBuilder: (_, index) => _buildVarianceCard(items[index]),
+          );
+        }
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+          child: Column(
+            children: [
+              _buildTableHeader(),
+              ...items.map((item) => _buildTableRow(item)),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildVarianceCard(_VarianceItem item) {
+    final isIncrease = item.variance > 0;
+    final varColor = isIncrease ? AppTheme.infoColor : AppTheme.errorColor;
+    final rowBg = isIncrease ? AppTheme.infoContainer : AppTheme.errorContainer;
+
+    return Card(
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      color: rowBg,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: BorderSide(color: varColor.withValues(alpha: 0.2)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.productName,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF1A1A1A),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        item.productCode,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF8A8A8A),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isIncrease ? Icons.arrow_upward : Icons.arrow_downward,
+                      color: varColor,
+                      size: 14,
+                    ),
+                    const SizedBox(width: 2),
+                    Text(
+                      '${isIncrease ? '+' : ''}${item.variance.toStringAsFixed(0)} ${item.baseUnit}',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: varColor,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 12,
+              runSpacing: 8,
+              children: [
+                _buildVarianceMeta('คลัง', item.warehouseName),
+                _buildVarianceMeta('เลขที่อ้างอิง', item.referenceNo ?? '-'),
+                _buildVarianceMeta('วันที่', _formatDateTime(item.date)),
+              ],
+            ),
+            if ((item.remark ?? '').trim().isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                item.remark!,
+                style: const TextStyle(fontSize: 12, color: Color(0xFF8A8A8A)),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -3871,6 +4144,24 @@ class _VarianceReportPageState extends ConsumerState<VarianceReportPage> {
               style: TextStyle(fontSize: 13, color: Color(0xFF8A8A8A)),
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVarianceMeta(String label, String value) {
+    return RichText(
+      text: TextSpan(
+        style: const TextStyle(fontSize: 12, color: Color(0xFF8A8A8A)),
+        children: [
+          TextSpan(
+            text: '$label: ',
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          TextSpan(
+            text: value,
+            style: const TextStyle(color: Color(0xFF1A1A1A)),
+          ),
         ],
       ),
     );

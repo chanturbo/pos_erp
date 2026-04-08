@@ -4,6 +4,7 @@ import 'package:pos_erp/features/customers/data/models/customer_model.dart';
 import '../../../../shared/pdf/pdf_report_button.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
 import 'package:pos_erp/shared/utils/responsive_utils.dart';
+import 'package:pos_erp/shared/widgets/escape_pop_scope.dart';
 import 'package:pos_erp/shared/widgets/pagination_bar.dart';
 import 'package:pos_erp/features/settings/presentation/pages/settings_page.dart';
 import '../providers/customer_provider.dart';
@@ -68,326 +69,337 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
   Widget build(BuildContext context) {
     final customerAsync = ref.watch(customerListProvider);
     final pageSize = ref.watch(settingsProvider).listPageSize;
+    final canPop = Navigator.of(context).canPop();
 
-    return Scaffold(
-      backgroundColor: AppTheme.surfaceColorOf(context),
-      appBar: AppBar(
-        automaticallyImplyLeading: !context.hasPermanentSidebar,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('รายการลูกค้า'),
-            Text(
-              'ค้นหา จัดการ และติดตามข้อมูลลูกค้าในระบบ',
-              style: TextStyle(
-                fontSize: 11,
-                color: Colors.white.withValues(alpha: 0.65),
-                fontWeight: FontWeight.normal,
-              ),
-            ),
-          ],
-        ),
-      ),
-      body: Align(
-        alignment: Alignment.topCenter,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: context.contentMaxWidth),
-          child: Column(
+    return EscapePopScope(
+      child: Scaffold(
+        backgroundColor: AppTheme.surfaceColorOf(context),
+        appBar: AppBar(
+          automaticallyImplyLeading: canPop,
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── Top Bar (Responsive) ───────────────────────────────
-              _CustomerListTopBar(
-                searchController: _searchController,
-                searchQuery: _searchQuery,
-                showMembersOnly: _showMembersOnly,
-                isTableView: _isTableView,
-                onSearchChanged: (v) => setState(() {
-                  _searchQuery = v;
-                  _currentPage = 1;
-                }),
-                onSearchCleared: () {
-                  _searchController.clear();
-                  setState(() {
-                    _searchQuery = '';
-                    _currentPage = 1;
-                  });
-                },
-                onToggleMember: () => setState(() {
-                  _showMembersOnly = !_showMembersOnly;
-                  _currentPage = 1;
-                }),
-                onToggleView: () =>
-                    setState(() => _isTableView = !_isTableView),
-                onRefresh: () =>
-                    ref.read(customerListProvider.notifier).refresh(),
-                onAdd: () async {
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const CustomerFormPage()),
-                  );
-                  // ✅ refresh หลังเพิ่มลูกค้าใหม่
-                  if (context.mounted) {
-                    ref.read(customerListProvider.notifier).refresh();
-                  }
-                },
+              const Text('รายการลูกค้า'),
+              Text(
+                'ค้นหา จัดการ และติดตามข้อมูลลูกค้าในระบบ',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.white.withValues(alpha: 0.65),
+                  fontWeight: FontWeight.normal,
+                ),
               ),
+            ],
+          ),
+        ),
+        body: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: context.contentMaxWidth),
+            child: Column(
+              children: [
+                // ── Top Bar (Responsive) ───────────────────────────────
+                _CustomerListTopBar(
+                  searchController: _searchController,
+                  searchQuery: _searchQuery,
+                  showMembersOnly: _showMembersOnly,
+                  isTableView: _isTableView,
+                  onSearchChanged: (v) => setState(() {
+                    _searchQuery = v;
+                    _currentPage = 1;
+                  }),
+                  onSearchCleared: () {
+                    _searchController.clear();
+                    setState(() {
+                      _searchQuery = '';
+                      _currentPage = 1;
+                    });
+                  },
+                  onToggleMember: () => setState(() {
+                    _showMembersOnly = !_showMembersOnly;
+                    _currentPage = 1;
+                  }),
+                  onToggleView: () =>
+                      setState(() => _isTableView = !_isTableView),
+                  onRefresh: () =>
+                      ref.read(customerListProvider.notifier).refresh(),
+                  onAdd: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const CustomerFormPage(),
+                      ),
+                    );
+                    // ✅ refresh หลังเพิ่มลูกค้าใหม่
+                    if (context.mounted) {
+                      ref.read(customerListProvider.notifier).refresh();
+                    }
+                  },
+                ),
 
-              // ── Table ──────────────────────────────────────────────
-              Expanded(
-                child: customerAsync.when(
-                  loading: () => Center(
-                    child: Padding(
-                      padding: context.pagePadding,
-                      child: const CircularProgressIndicator(
-                        color: AppTheme.primary,
+                // ── Table ──────────────────────────────────────────────
+                Expanded(
+                  child: customerAsync.when(
+                    loading: () => Center(
+                      child: Padding(
+                        padding: context.pagePadding,
+                        child: const CircularProgressIndicator(
+                          color: AppTheme.primary,
+                        ),
                       ),
                     ),
-                  ),
-                  error: (e, _) => _buildError(e),
-                  data: (customers) {
-                    final filtered = customers.where((c) {
-                      if (_showMembersOnly &&
-                          (c.memberNo == null || c.memberNo!.isEmpty)) {
-                        return false;
-                      }
-                      if (_searchQuery.isEmpty) return true;
-                      final q = _searchQuery.toLowerCase();
-                      return c.customerName.toLowerCase().contains(q) ||
-                          c.customerCode.toLowerCase().contains(q) ||
-                          (c.phone?.toLowerCase().contains(q) ?? false) ||
-                          (c.memberNo?.toLowerCase().contains(q) ?? false);
-                    }).toList();
+                    error: (e, _) => _buildError(e),
+                    data: (customers) {
+                      final filtered = customers.where((c) {
+                        if (_showMembersOnly &&
+                            (c.memberNo == null || c.memberNo!.isEmpty)) {
+                          return false;
+                        }
+                        if (_searchQuery.isEmpty) return true;
+                        final q = _searchQuery.toLowerCase();
+                        return c.customerName.toLowerCase().contains(q) ||
+                            c.customerCode.toLowerCase().contains(q) ||
+                            (c.phone?.toLowerCase().contains(q) ?? false) ||
+                            (c.memberNo?.toLowerCase().contains(q) ?? false);
+                      }).toList();
 
-                    // ── Sort ────────────────────────────────────────
-                    filtered.sort((a, b) {
-                      int cmp;
-                      switch (_sortColumn) {
-                        case 'name':
-                          cmp = a.customerName.compareTo(b.customerName);
-                        case 'code':
-                          cmp = a.customerCode.compareTo(b.customerCode);
-                        case 'phone':
-                          cmp = (a.phone ?? '').compareTo(b.phone ?? '');
-                        case 'memberNo':
-                          cmp = (a.memberNo ?? '').compareTo(b.memberNo ?? '');
-                        case 'points':
-                          cmp = a.points.compareTo(b.points);
-                        case 'creditLimit':
-                          cmp = a.creditLimit.compareTo(b.creditLimit);
-                        case 'status':
-                          cmp = (b.isActive ? 1 : 0).compareTo(
-                            a.isActive ? 1 : 0,
-                          );
-                        default:
-                          cmp = 0;
-                      }
-                      return _sortAsc ? cmp : -cmp;
-                    });
+                      // ── Sort ────────────────────────────────────────
+                      filtered.sort((a, b) {
+                        int cmp;
+                        switch (_sortColumn) {
+                          case 'name':
+                            cmp = a.customerName.compareTo(b.customerName);
+                          case 'code':
+                            cmp = a.customerCode.compareTo(b.customerCode);
+                          case 'phone':
+                            cmp = (a.phone ?? '').compareTo(b.phone ?? '');
+                          case 'memberNo':
+                            cmp = (a.memberNo ?? '').compareTo(
+                              b.memberNo ?? '',
+                            );
+                          case 'points':
+                            cmp = a.points.compareTo(b.points);
+                          case 'creditLimit':
+                            cmp = a.creditLimit.compareTo(b.creditLimit);
+                          case 'status':
+                            cmp = (b.isActive ? 1 : 0).compareTo(
+                              a.isActive ? 1 : 0,
+                            );
+                          default:
+                            cmp = 0;
+                        }
+                        return _sortAsc ? cmp : -cmp;
+                      });
 
-                    if (filtered.isEmpty) return _buildEmpty();
+                      if (filtered.isEmpty) return _buildEmpty();
 
-                    // Pagination
-                    final totalPages = (filtered.length / pageSize).ceil();
-                    final safePage = _currentPage.clamp(1, totalPages);
-                    final pageStart = (safePage - 1) * pageSize;
-                    final pageEnd = (pageStart + pageSize).clamp(
-                      0,
-                      filtered.length,
-                    );
-                    final pageItems = filtered.sublist(pageStart, pageEnd);
-
-                    // ✅ Card View เมื่อ user เลือก
-                    if (!_isTableView) {
-                      return Column(
-                        children: [
-                          Expanded(
-                            child: _buildCustomerCardView(context, pageItems),
-                          ),
-                          PaginationBar(
-                            currentPage: safePage,
-                            totalItems: filtered.length,
-                            pageSize: pageSize,
-                            onPageChanged: (p) =>
-                                setState(() => _currentPage = p),
-                          ),
-                        ],
+                      // Pagination
+                      final totalPages = (filtered.length / pageSize).ceil();
+                      final safePage = _currentPage.clamp(1, totalPages);
+                      final pageStart = (safePage - 1) * pageSize;
+                      final pageEnd = (pageStart + pageSize).clamp(
+                        0,
+                        filtered.length,
                       );
-                    }
+                      final pageItems = filtered.sublist(pageStart, pageEnd);
 
-                    // ✅ Auto-fit colWidths ตามเนื้อหา (เฉพาะครั้งแรก / ยังไม่ resize)
-                    final screenW = MediaQuery.of(context).size.width - 32;
-                    if (!_userResized) _autoFitColWidths(filtered, screenW);
+                      // ✅ Card View เมื่อ user เลือก
+                      if (!_isTableView) {
+                        return Column(
+                          children: [
+                            Expanded(
+                              child: _buildCustomerCardView(context, pageItems),
+                            ),
+                            PaginationBar(
+                              currentPage: safePage,
+                              totalItems: filtered.length,
+                              pageSize: pageSize,
+                              onPageChanged: (p) =>
+                                  setState(() => _currentPage = p),
+                            ),
+                          ],
+                        );
+                      }
 
-                    final totalW =
-                        40.0 +
-                        16.0 +
-                        _colWidths.fold(0.0, (s, w) => s + w) +
-                        28.0 +
-                        32.0;
-                    final tableW = totalW > screenW ? totalW : screenW;
+                      // ✅ Auto-fit colWidths ตามเนื้อหา (เฉพาะครั้งแรก / ยังไม่ resize)
+                      final screenW = MediaQuery.of(context).size.width - 32;
+                      if (!_userResized) _autoFitColWidths(filtered, screenW);
 
-                    return Stack(
-                      children: [
-                        Container(
-                          margin: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppTheme.border),
-                          ),
-                          // ✅ แนวตั้ง scroll ด้านนอก, แนวนอน scroll ด้านใน
-                          child: Column(
-                            children: [
-                              // ── Header + Rows scroll แนวนอนพร้อมกัน ──────
-                              Expanded(
-                                child: Scrollbar(
-                                  controller: _hScroll,
-                                  thumbVisibility: true,
-                                  trackVisibility: true,
-                                  child: SingleChildScrollView(
+                      final totalW =
+                          40.0 +
+                          16.0 +
+                          _colWidths.fold(0.0, (s, w) => s + w) +
+                          28.0 +
+                          32.0;
+                      final tableW = totalW > screenW ? totalW : screenW;
+
+                      return Stack(
+                        children: [
+                          Container(
+                            margin: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppTheme.border),
+                            ),
+                            // ✅ แนวตั้ง scroll ด้านนอก, แนวนอน scroll ด้านใน
+                            child: Column(
+                              children: [
+                                // ── Header + Rows scroll แนวนอนพร้อมกัน ──────
+                                Expanded(
+                                  child: Scrollbar(
                                     controller: _hScroll,
-                                    scrollDirection: Axis.horizontal,
-                                    child: SizedBox(
-                                      width: tableW,
-                                      child: Column(
-                                        children: [
-                                          // Header (resizable + sortable)
-                                          _ResizableTableHeader(
-                                            colWidths: _colWidths,
-                                            colMinW: _colMinW,
-                                            colMaxW: _colMaxW,
-                                            sortColumn: _sortColumn,
-                                            sortAsc: _sortAsc,
-                                            onSort: (col) => setState(() {
-                                              if (_sortColumn == col) {
-                                                _sortAsc = !_sortAsc;
-                                              } else {
-                                                _sortColumn = col;
-                                                _sortAsc = true;
-                                              }
-                                              _currentPage = 1;
-                                            }),
-                                            onResize: (i, w) => setState(() {
-                                              _colWidths[i] = w;
-                                              _userResized = true;
-                                            }),
-                                            onReset: () => setState(() {
-                                              _colWidths.setAll(0, [
-                                                200,
-                                                110,
-                                                120,
-                                                120,
-                                                80,
-                                                110,
-                                                80,
-                                                100,
-                                              ]);
-                                              _userResized = false;
-                                            }),
-                                          ),
-                                          const Divider(
-                                            height: 1,
-                                            color: AppTheme.border,
-                                          ),
-                                          // Rows — ใช้ shrinkWrap ภายใน Column ที่รู้ขนาดแล้ว
-                                          Expanded(
-                                            child: ListView.separated(
-                                              itemCount: pageItems.length,
-                                              separatorBuilder: (_, _) =>
-                                                  const Divider(
-                                                    height: 1,
-                                                    color: AppTheme.border,
-                                                  ),
-                                              itemBuilder: (context, i) {
-                                                final c = pageItems[i];
-                                                final isMember =
-                                                    c.memberNo != null &&
-                                                    c.memberNo!.isNotEmpty;
-                                                final isSystem =
-                                                    c.customerId == 'WALK_IN';
-                                                return _CustomerRow(
-                                                  customer: c,
-                                                  isMember: isMember,
-                                                  isSystem: isSystem,
-                                                  colWidths: _colWidths,
-                                                  avatarColor: isSystem
-                                                      ? const Color(0xFF546E7A)
-                                                      : _avatarColor(
-                                                          c.customerName,
-                                                        ),
-                                                  // ✅ กดเพื่อดูรายละเอียด
-                                                  onTap: () => Navigator.push(
-                                                    context,
-                                                    MaterialPageRoute(
-                                                      builder: (_) =>
-                                                          CustomerDetailPage(
-                                                            customer: c,
-                                                          ),
-                                                    ),
-                                                  ),
-                                                  onEdit: isSystem
-                                                      ? null
-                                                      : () async {
-                                                          await Navigator.push(
-                                                            context,
-                                                            MaterialPageRoute(
-                                                              builder: (_) =>
-                                                                  CustomerFormPage(
-                                                                    customer: c,
-                                                                  ),
-                                                            ),
-                                                          );
-                                                          // ✅ refresh หลังแก้ไข
-                                                          if (context.mounted) {
-                                                            ref
-                                                                .read(
-                                                                  customerListProvider
-                                                                      .notifier,
-                                                                )
-                                                                .refresh();
-                                                          }
-                                                        },
-                                                  onDelete: isSystem
-                                                      ? null
-                                                      : () => _confirmDelete(
-                                                          c.customerId,
-                                                          c.customerName,
-                                                        ),
-                                                );
-                                              },
+                                    thumbVisibility: true,
+                                    trackVisibility: true,
+                                    child: SingleChildScrollView(
+                                      controller: _hScroll,
+                                      scrollDirection: Axis.horizontal,
+                                      child: SizedBox(
+                                        width: tableW,
+                                        child: Column(
+                                          children: [
+                                            // Header (resizable + sortable)
+                                            _ResizableTableHeader(
+                                              colWidths: _colWidths,
+                                              colMinW: _colMinW,
+                                              colMaxW: _colMaxW,
+                                              sortColumn: _sortColumn,
+                                              sortAsc: _sortAsc,
+                                              onSort: (col) => setState(() {
+                                                if (_sortColumn == col) {
+                                                  _sortAsc = !_sortAsc;
+                                                } else {
+                                                  _sortColumn = col;
+                                                  _sortAsc = true;
+                                                }
+                                                _currentPage = 1;
+                                              }),
+                                              onResize: (i, w) => setState(() {
+                                                _colWidths[i] = w;
+                                                _userResized = true;
+                                              }),
+                                              onReset: () => setState(() {
+                                                _colWidths.setAll(0, [
+                                                  200,
+                                                  110,
+                                                  120,
+                                                  120,
+                                                  80,
+                                                  110,
+                                                  80,
+                                                  100,
+                                                ]);
+                                                _userResized = false;
+                                              }),
                                             ),
-                                          ),
-                                        ],
+                                            const Divider(
+                                              height: 1,
+                                              color: AppTheme.border,
+                                            ),
+                                            // Rows — ใช้ shrinkWrap ภายใน Column ที่รู้ขนาดแล้ว
+                                            Expanded(
+                                              child: ListView.separated(
+                                                itemCount: pageItems.length,
+                                                separatorBuilder: (_, _) =>
+                                                    const Divider(
+                                                      height: 1,
+                                                      color: AppTheme.border,
+                                                    ),
+                                                itemBuilder: (context, i) {
+                                                  final c = pageItems[i];
+                                                  final isMember =
+                                                      c.memberNo != null &&
+                                                      c.memberNo!.isNotEmpty;
+                                                  final isSystem =
+                                                      c.customerId == 'WALK_IN';
+                                                  return _CustomerRow(
+                                                    customer: c,
+                                                    isMember: isMember,
+                                                    isSystem: isSystem,
+                                                    colWidths: _colWidths,
+                                                    avatarColor: isSystem
+                                                        ? const Color(
+                                                            0xFF546E7A,
+                                                          )
+                                                        : _avatarColor(
+                                                            c.customerName,
+                                                          ),
+                                                    // ✅ กดเพื่อดูรายละเอียด
+                                                    onTap: () => Navigator.push(
+                                                      context,
+                                                      MaterialPageRoute(
+                                                        builder: (_) =>
+                                                            CustomerDetailPage(
+                                                              customer: c,
+                                                            ),
+                                                      ),
+                                                    ),
+                                                    onEdit: isSystem
+                                                        ? null
+                                                        : () async {
+                                                            await Navigator.push(
+                                                              context,
+                                                              MaterialPageRoute(
+                                                                builder: (_) =>
+                                                                    CustomerFormPage(
+                                                                      customer:
+                                                                          c,
+                                                                    ),
+                                                              ),
+                                                            );
+                                                            // ✅ refresh หลังแก้ไข
+                                                            if (context
+                                                                .mounted) {
+                                                              ref
+                                                                  .read(
+                                                                    customerListProvider
+                                                                        .notifier,
+                                                                  )
+                                                                  .refresh();
+                                                            }
+                                                          },
+                                                    onDelete: isSystem
+                                                        ? null
+                                                        : () => _confirmDelete(
+                                                            c.customerId,
+                                                            c.customerName,
+                                                          ),
+                                                  );
+                                                },
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ),
                                     ),
                                   ),
                                 ),
-                              ),
-                              // ── Footer / Pagination ───────────────────
-                              PaginationBar(
-                                currentPage: safePage,
-                                totalItems: filtered.length,
-                                pageSize: pageSize,
-                                onPageChanged: (p) =>
-                                    setState(() => _currentPage = p),
-                                trailing: PdfReportButton(
-                                  emptyMessage: 'ไม่มีข้อมูลลูกค้า',
-                                  title: 'รายงานลูกค้า',
-                                  filename: () =>
-                                      PdfFilename.generate('customer_report'),
-                                  buildPdf: () =>
-                                      CustomerPdfBuilder.build(filtered),
-                                  hasData: filtered.isNotEmpty,
+                                // ── Footer / Pagination ───────────────────
+                                PaginationBar(
+                                  currentPage: safePage,
+                                  totalItems: filtered.length,
+                                  pageSize: pageSize,
+                                  onPageChanged: (p) =>
+                                      setState(() => _currentPage = p),
+                                  trailing: PdfReportButton(
+                                    emptyMessage: 'ไม่มีข้อมูลลูกค้า',
+                                    title: 'รายงานลูกค้า',
+                                    filename: () =>
+                                        PdfFilename.generate('customer_report'),
+                                    buildPdf: () =>
+                                        CustomerPdfBuilder.build(filtered),
+                                    hasData: filtered.isNotEmpty,
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ), // Container
-                      ],
-                    ); // Stack
-                  },
+                              ],
+                            ),
+                          ), // Container
+                        ],
+                      ); // Stack
+                    },
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -1504,8 +1516,8 @@ class _CustomerListTopBar extends StatelessWidget {
     required this.onAdd,
   });
 
-  // breakpoint: จอกว้าง >= 720 → 1 แถว, < 720 → 2 แถว
-  static const _kBreak = 720.0;
+  // breakpoint: desktop เล็กยังควรแตก 2 แถวเพื่อไม่ให้ toolbar แน่นเกินไป
+  static const _kBreak = 980.0;
 
   @override
   Widget build(BuildContext context) {
