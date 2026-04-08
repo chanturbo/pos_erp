@@ -1,6 +1,7 @@
 // ignore_for_file: avoid_print
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:dio/dio.dart';
@@ -20,6 +21,7 @@ class SyncStatusPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(posContextBootstrapProvider);
     final syncAsync = ref.watch(syncStatusProvider);
+    final historyAsync = ref.watch(syncBatchHistoryProvider);
 
     return Scaffold(
       backgroundColor: AppTheme.surfaceColorOf(context),
@@ -54,7 +56,7 @@ class SyncStatusPage extends ConsumerWidget {
           child: syncAsync.when(
             loading: () => _loadingWidget(context),
             error: (e, _) => _errorWidget(context, '$e'),
-            data: (sync) => _buildContent(context, ref, sync),
+            data: (sync) => _buildContent(context, ref, sync, historyAsync),
           ),
         ),
       ),
@@ -65,9 +67,12 @@ class SyncStatusPage extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     SyncStatusModel sync,
+    AsyncValue<List<SyncBatchHistoryModel>> historyAsync,
   ) {
     final fmt = DateFormat('dd/MM/yyyy HH:mm:ss');
-
+    final timeRange = ref.watch(syncBatchTimeRangeProvider);
+    final searchQuery = ref.watch(syncBatchSearchProvider);
+    final issuesOnly = ref.watch(syncBatchIssuesOnlyProvider);
     return SingleChildScrollView(
       padding: context.pagePadding,
       child: Column(
@@ -246,6 +251,17 @@ class SyncStatusPage extends ConsumerWidget {
           ),
           const SizedBox(height: 8),
           _buildActionPanel(context, ref, sync),
+          if (sync.hasBatchMetrics) ...[
+            const SizedBox(height: 16),
+            _sectionTitle(
+              context,
+              'ผล Sync ล่าสุด',
+              Icons.analytics_outlined,
+              AppTheme.infoColor,
+            ),
+            const SizedBox(height: 8),
+            _buildBatchMetricsPanel(context, sync),
+          ],
           if (sync.hasPending || sync.hasFailed) ...[
             const SizedBox(height: 16),
             _sectionTitle(
@@ -257,6 +273,38 @@ class SyncStatusPage extends ConsumerWidget {
             const SizedBox(height: 8),
             _buildQueuePanel(context, sync),
           ],
+          const SizedBox(height: 16),
+          _sectionTitle(
+            context,
+            'แนวโน้มย้อนหลัง',
+            Icons.timeline_rounded,
+            AppTheme.primary,
+          ),
+          const SizedBox(height: 8),
+          _buildHistoryPanel(
+            context,
+            ref,
+            historyAsync,
+            timeRange,
+            searchQuery,
+            issuesOnly,
+          ),
+          const SizedBox(height: 16),
+          _sectionTitle(
+            context,
+            'Debug / Export',
+            Icons.bug_report_outlined,
+            Colors.deepOrange,
+          ),
+          const SizedBox(height: 8),
+          _buildDebugPanel(
+            context,
+            ref,
+            historyAsync,
+            timeRange,
+            searchQuery,
+            issuesOnly,
+          ),
           SizedBox(height: context.isMobile ? 24 : 32),
         ],
       ),
@@ -576,6 +624,428 @@ class SyncStatusPage extends ConsumerWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildBatchMetricsPanel(BuildContext context, SyncStatusModel sync) {
+    return _panelCard(
+      context,
+      child: Padding(
+        padding: context.cardPadding,
+        child: Column(
+          children: [
+            _queueRow(
+              context,
+              icon: Icons.list_alt_rounded,
+              color: AppTheme.infoColor,
+              label: 'Batch ล่าสุด',
+              value:
+                  '${sync.lastBatchAppliedItems}/${sync.lastBatchTotalItems} รายการ',
+            ),
+            _queueRow(
+              context,
+              icon: Icons.repeat_rounded,
+              color: sync.lastBatchReplayedItems > 0
+                  ? Colors.orange
+                  : AppTheme.successColor,
+              label: 'Replay ใน batch',
+              value:
+                  '${sync.lastBatchReplayedItems} รายการ / ${sync.lastBatchPassesUsed} รอบ',
+            ),
+            _queueRow(
+              context,
+              icon: sync.lastBatchPendingItems > 0
+                  ? Icons.warning_amber_rounded
+                  : Icons.check_circle_outline_rounded,
+              color: sync.lastBatchPendingItems > 0
+                  ? AppTheme.errorColor
+                  : AppTheme.successColor,
+              label: 'ค้างหลังจบ batch',
+              value: '${sync.lastBatchPendingItems} รายการ',
+            ),
+            Divider(color: AppTheme.borderColorOf(context), height: 20),
+            Text(
+              sync.lastBatchReplayedItems > 0
+                  ? 'มีการ replay ภายใน batch ล่าสุดเพื่อแก้ dependency order อัตโนมัติ'
+                  : 'batch ล่าสุด apply ได้ตามลำดับตั้งแต่รอบแรก',
+              textAlign: TextAlign.center,
+              style: _cardSubtitleStyle(context),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHistoryPanel(
+    BuildContext context,
+    WidgetRef ref,
+    AsyncValue<List<SyncBatchHistoryModel>> historyAsync,
+    SyncBatchTimeRange timeRange,
+    String searchQuery,
+    bool issuesOnly,
+  ) {
+    final fmt = DateFormat('dd/MM HH:mm');
+
+    return _panelCard(
+      context,
+      child: Padding(
+        padding: context.cardPadding,
+        child: historyAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Text(
+            'โหลดประวัติ batch ไม่สำเร็จ: $e',
+            style: _cardSubtitleStyle(context),
+          ),
+          data: (history) {
+            final filtered = _filterHistory(
+              history,
+              timeRange: timeRange,
+              searchQuery: searchQuery,
+              issuesOnly: issuesOnly,
+            );
+            if (filtered.isEmpty) {
+              return Text(
+                'ไม่พบประวัติ SYNC_BATCH ในช่วงเวลาที่เลือก',
+                style: _cardSubtitleStyle(context),
+              );
+            }
+
+            final recent = filtered.take(10).toList();
+            final children = <Widget>[
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: SyncBatchTimeRange.values
+                      .map(
+                        (range) => ChoiceChip(
+                          label: Text(_timeRangeLabel(range)),
+                          selected: timeRange == range,
+                          onSelected: (_) => ref
+                              .read(syncBatchTimeRangeProvider.notifier)
+                              .state = range,
+                        ),
+                      )
+                      .toList(),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Column(
+                  children: [
+                    TextFormField(
+                      initialValue: searchQuery,
+                      decoration: const InputDecoration(
+                        hintText: 'ค้นหา batchId หรือ deviceName',
+                        prefixIcon: Icon(Icons.search_rounded),
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      onChanged: (value) =>
+                          ref.read(syncBatchSearchProvider.notifier).state = value,
+                    ),
+                    const SizedBox(height: 8),
+                    SwitchListTile.adaptive(
+                      contentPadding: EdgeInsets.zero,
+                      value: issuesOnly,
+                      onChanged: (value) => ref
+                          .read(syncBatchIssuesOnlyProvider.notifier)
+                          .state = value,
+                      title: const Text('แสดงเฉพาะ batch ที่มีปัญหา'),
+                      subtitle:
+                          const Text('โฟกัสเฉพาะ replay > 0 หรือ pending > 0'),
+                    ),
+                  ],
+                ),
+              ),
+              ...recent.map<Widget>((entry) {
+                final color = entry.hasPending
+                    ? AppTheme.errorColor
+                    : (entry.hasReplay
+                        ? Colors.orange
+                        : AppTheme.successColor);
+                return InkWell(
+                  borderRadius: BorderRadius.circular(10),
+                  onTap: () => _showBatchDetails(context, entry),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Row(
+                      children: [
+                        Icon(Icons.fiber_manual_record, size: 10, color: color),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            '${fmt.format(entry.createdAt)}  ${entry.appliedItems}/${entry.totalItems} รายการ',
+                            style: _cardTitleStyle(context, fontSize: 12),
+                          ),
+                        ),
+                        Text(
+                          'Replay ${entry.replayedItems} | ค้าง ${entry.pendingItems}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: color,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Icon(
+                          Icons.open_in_new_rounded,
+                          size: 16,
+                          color: Colors.grey,
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+            ];
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: children,
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDebugPanel(
+    BuildContext context,
+    WidgetRef ref,
+    AsyncValue<List<SyncBatchHistoryModel>> historyAsync,
+    SyncBatchTimeRange timeRange,
+    String searchQuery,
+    bool issuesOnly,
+  ) {
+    return _panelCard(
+      context,
+      child: Padding(
+        padding: context.cardPadding,
+        child: historyAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Text(
+            'โหลดข้อมูล debug ไม่สำเร็จ: $e',
+            style: _cardSubtitleStyle(context),
+          ),
+          data: (history) {
+            final filtered = _filterHistory(
+              history,
+              timeRange: timeRange,
+              searchQuery: searchQuery,
+              issuesOnly: issuesOnly,
+            );
+            if (filtered.isEmpty) {
+              return Text(
+                'ยังไม่มีข้อมูลสำหรับวิเคราะห์ในช่วงเวลานี้',
+                style: _cardSubtitleStyle(context),
+              );
+            }
+
+            final replayHeavy = [...filtered]
+              ..sort((a, b) => b.replayedItems.compareTo(a.replayedItems));
+            final pendingHeavy = [...filtered]
+              ..sort((a, b) => b.pendingItems.compareTo(a.pendingItems));
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _queueRow(
+                  context,
+                  icon: Icons.repeat_rounded,
+                  color: Colors.orange,
+                  label: 'Replay สูงสุด',
+                  value:
+                      '${replayHeavy.first.replayedItems} รายการ (${replayHeavy.first.batchId})',
+                ),
+                _queueRow(
+                  context,
+                  icon: Icons.warning_amber_rounded,
+                  color: AppTheme.errorColor,
+                  label: 'Pending สูงสุด',
+                  value:
+                      '${pendingHeavy.first.pendingItems} รายการ (${pendingHeavy.first.batchId})',
+                ),
+                Divider(color: AppTheme.borderColorOf(context), height: 20),
+                Text(
+                  'Batch ที่ควรดูเพิ่ม',
+                  style: _cardTitleStyle(context, fontSize: 12),
+                ),
+                const SizedBox(height: 8),
+                ...filtered
+                    .where((e) => e.hasReplay || e.hasPending)
+                    .take(5)
+                    .map(
+                      (entry) => ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        title: Text(
+                          entry.batchId,
+                          style: _cardTitleStyle(context, fontSize: 12),
+                        ),
+                        subtitle: Text(
+                          'Replay ${entry.replayedItems} | Pending ${entry.pendingItems} | Passes ${entry.passesUsed}',
+                          style: _cardSubtitleStyle(context),
+                        ),
+                        trailing: const Icon(Icons.chevron_right_rounded),
+                        onTap: () => _showBatchDetails(context, entry),
+                      ),
+                    ),
+                Divider(color: AppTheme.borderColorOf(context), height: 20),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _exportDebugReport(context, filtered),
+                    icon: const Icon(Icons.download_rounded),
+                    label: const Text('คัดลอก Debug Report'),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'ใช้รายงานนี้เพื่อตรวจ batch ที่ replay/pending สูงผิดปกติ และชี้เป้าปัญหา dependency ของ schema',
+                  style: _cardSubtitleStyle(context),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<void> _exportDebugReport(
+    BuildContext context,
+    List<SyncBatchHistoryModel> history,
+  ) async {
+    final buffer = StringBuffer()
+      ..writeln('SYNC_BATCH DEBUG REPORT')
+      ..writeln('Generated: ${DateTime.now().toIso8601String()}')
+      ..writeln('');
+
+    for (final entry in history.take(20)) {
+      buffer.writeln(
+        '${entry.createdAt.toIso8601String()} | '
+        'batch=${entry.batchId} | '
+        'applied=${entry.appliedItems}/${entry.totalItems} | '
+        'replayed=${entry.replayedItems} | '
+        'passes=${entry.passesUsed} | '
+        'pending=${entry.pendingItems} | '
+        'mode=${entry.appMode ?? '-'} | '
+        'device=${entry.deviceName ?? '-'}',
+      );
+    }
+
+    await Clipboard.setData(ClipboardData(text: buffer.toString()));
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('คัดลอก Debug Report แล้ว')),
+      );
+    }
+  }
+
+  List<SyncBatchHistoryModel> _filterHistory(
+    List<SyncBatchHistoryModel> history,
+    {
+    required SyncBatchTimeRange timeRange,
+    required String searchQuery,
+    required bool issuesOnly,
+  }) {
+    var filtered = history;
+
+    filtered = _filterHistoryByRange(filtered, timeRange);
+
+    final normalizedQuery = searchQuery.trim().toLowerCase();
+    if (normalizedQuery.isNotEmpty) {
+      filtered = filtered.where((entry) {
+        final batchId = entry.batchId.toLowerCase();
+        final deviceName = (entry.deviceName ?? '').toLowerCase();
+        return batchId.contains(normalizedQuery) ||
+            deviceName.contains(normalizedQuery);
+      }).toList();
+    }
+
+    if (issuesOnly) {
+      filtered = filtered.where((entry) => entry.hasReplay || entry.hasPending).toList();
+    }
+
+    return filtered;
+  }
+
+  List<SyncBatchHistoryModel> _filterHistoryByRange(
+    List<SyncBatchHistoryModel> history,
+    SyncBatchTimeRange range,
+  ) {
+    if (range == SyncBatchTimeRange.all) return history;
+
+    final now = DateTime.now();
+    final threshold = switch (range) {
+      SyncBatchTimeRange.lastHour => now.subtract(const Duration(hours: 1)),
+      SyncBatchTimeRange.last24Hours => now.subtract(const Duration(hours: 24)),
+      SyncBatchTimeRange.last7Days => now.subtract(const Duration(days: 7)),
+      SyncBatchTimeRange.all => DateTime.fromMillisecondsSinceEpoch(0),
+    };
+
+    return history.where((entry) => entry.createdAt.isAfter(threshold)).toList();
+  }
+
+  String _timeRangeLabel(SyncBatchTimeRange range) {
+    return switch (range) {
+      SyncBatchTimeRange.lastHour => '1 ชม.',
+      SyncBatchTimeRange.last24Hours => '24 ชม.',
+      SyncBatchTimeRange.last7Days => '7 วัน',
+      SyncBatchTimeRange.all => 'ทั้งหมด',
+    };
+  }
+
+  Future<void> _showBatchDetails(
+    BuildContext context,
+    SyncBatchHistoryModel entry,
+  ) async {
+    final payloadLines = entry.payload.entries
+        .map((e) => '${e.key}: ${e.value}')
+        .join('\n');
+
+    await showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text('Batch ${entry.batchId}'),
+        content: SizedBox(
+          width: 520,
+          child: SingleChildScrollView(
+            child: SelectableText(
+              'created_at: ${entry.createdAt.toIso8601String()}\n'
+              'applied: ${entry.appliedItems}/${entry.totalItems}\n'
+              'replayed: ${entry.replayedItems}\n'
+              'passes: ${entry.passesUsed}\n'
+              'pending: ${entry.pendingItems}\n'
+              'mode: ${entry.appMode ?? '-'}\n'
+              'device: ${entry.deviceName ?? '-'}\n\n'
+              'payload\n'
+              '$payloadLines',
+              style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              await Clipboard.setData(
+                ClipboardData(
+                  text:
+                      'batch=${entry.batchId}\ncreated_at=${entry.createdAt.toIso8601String()}\n$payloadLines',
+                ),
+              );
+              if (context.mounted) Navigator.of(context).pop();
+            },
+            child: const Text('คัดลอก'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('ปิด'),
+          ),
+        ],
       ),
     );
   }

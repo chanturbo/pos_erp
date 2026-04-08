@@ -134,6 +134,11 @@ class SyncStatusModel {
   final String? serverBaseUrl;
   final String? masterName;
   final String? deviceName;
+  final int lastBatchTotalItems;
+  final int lastBatchAppliedItems;
+  final int lastBatchReplayedItems;
+  final int lastBatchPassesUsed;
+  final int lastBatchPendingItems;
 
   SyncStatusModel({
     this.pendingCount = 0,
@@ -144,8 +149,66 @@ class SyncStatusModel {
     this.serverBaseUrl,
     this.masterName,
     this.deviceName,
+    this.lastBatchTotalItems = 0,
+    this.lastBatchAppliedItems = 0,
+    this.lastBatchReplayedItems = 0,
+    this.lastBatchPassesUsed = 0,
+    this.lastBatchPendingItems = 0,
   });
 
   bool get hasPending => pendingCount > 0;
   bool get hasFailed => failedCount > 0;
+  bool get hasBatchMetrics => lastBatchTotalItems > 0 || lastBatchPassesUsed > 0;
+}
+
+class SyncBatchHistoryModel {
+  final String batchId;
+  final DateTime createdAt;
+  final int totalItems;
+  final int appliedItems;
+  final int replayedItems;
+  final int passesUsed;
+  final int pendingItems;
+  final String? appMode;
+  final String? deviceName;
+  final Map<String, dynamic> payload;
+
+  const SyncBatchHistoryModel({
+    required this.batchId,
+    required this.createdAt,
+    required this.totalItems,
+    required this.appliedItems,
+    required this.replayedItems,
+    required this.passesUsed,
+    required this.pendingItems,
+    this.appMode,
+    this.deviceName,
+    this.payload = const {},
+  });
+
+  factory SyncBatchHistoryModel.fromMap(Map<String, dynamic> map) {
+    return SyncBatchHistoryModel(
+      batchId: map['batch_id'] as String? ?? '-',
+      createdAt: DateTime.tryParse(map['created_at'] as String? ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0),
+      totalItems: map['total_items'] as int? ?? 0,
+      appliedItems: map['applied_items'] as int? ?? 0,
+      replayedItems: map['replayed_items'] as int? ?? 0,
+      passesUsed: map['passes_used'] as int? ?? 0,
+      pendingItems: map['pending_items'] as int? ?? 0,
+      appMode: map['app_mode'] as String?,
+      deviceName: map['device_name'] as String?,
+      payload: Map<String, dynamic>.from(map['payload'] as Map? ?? const {}),
+    );
+  }
+
+  bool get hasReplay => replayedItems > 0;
+  bool get hasPending => pendingItems > 0;
+}
+
+enum SyncBatchTimeRange {
+  lastHour,
+  last24Hours,
+  last7Days,
+  all,
 }

@@ -3,9 +3,11 @@
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../../core/services/pending_sales_queue_service.dart';
+import '../../../../core/services/offline_sync_service.dart';
 import '../../data/models/branch_model.dart';
 import '../../../../core/client/api_client.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -269,9 +271,31 @@ final syncStatusProvider = StreamProvider<SyncStatusModel>((ref) async* {
   }
 });
 
+final syncBatchHistoryProvider =
+    StreamProvider<List<SyncBatchHistoryModel>>((ref) async* {
+  final authState = ref.watch(authProvider);
+  if (authState.isRestoring || !authState.isAuthenticated) {
+    yield const [];
+    return;
+  }
+
+  while (true) {
+    yield await _loadSyncBatchHistory(ref);
+    await Future.delayed(const Duration(seconds: 3));
+  }
+});
+
+final syncBatchTimeRangeProvider =
+    StateProvider<SyncBatchTimeRange>((ref) => SyncBatchTimeRange.last24Hours);
+
+final syncBatchSearchProvider = StateProvider<String>((ref) => '');
+
+final syncBatchIssuesOnlyProvider = StateProvider<bool>((ref) => false);
+
 Future<SyncStatusModel> _loadSyncStatus(Ref ref) async {
   final localQueued =
       await ref.read(pendingSalesQueueServiceProvider).pendingCount();
+  final batchMetrics = ref.read(offlineSyncServiceProvider).lastBatchMetrics;
 
   if (AppModeConfig.isStandalone) {
     return SyncStatusModel(
@@ -281,6 +305,11 @@ Future<SyncStatusModel> _loadSyncStatus(Ref ref) async {
       appMode: 'standalone',
       serverBaseUrl: AppConfig.resolveApiBaseUrl(),
       deviceName: AppModeConfig.deviceName,
+      lastBatchTotalItems: batchMetrics?.totalItems ?? 0,
+      lastBatchAppliedItems: batchMetrics?.appliedItems ?? 0,
+      lastBatchReplayedItems: batchMetrics?.replayedItems ?? 0,
+      lastBatchPassesUsed: batchMetrics?.passesUsed ?? 0,
+      lastBatchPendingItems: batchMetrics?.pendingItems ?? 0,
     );
   }
 
@@ -300,6 +329,11 @@ Future<SyncStatusModel> _loadSyncStatus(Ref ref) async {
         serverBaseUrl: AppConfig.resolveApiBaseUrl(),
         masterName: AppModeConfig.masterName,
         deviceName: AppModeConfig.deviceName,
+        lastBatchTotalItems: batchMetrics?.totalItems ?? 0,
+        lastBatchAppliedItems: batchMetrics?.appliedItems ?? 0,
+        lastBatchReplayedItems: batchMetrics?.replayedItems ?? 0,
+        lastBatchPassesUsed: batchMetrics?.passesUsed ?? 0,
+        lastBatchPendingItems: batchMetrics?.pendingItems ?? 0,
       );
     }
   } catch (_) {}
@@ -310,7 +344,24 @@ Future<SyncStatusModel> _loadSyncStatus(Ref ref) async {
     serverBaseUrl: AppConfig.resolveApiBaseUrl(),
     masterName: AppModeConfig.masterName,
     deviceName: AppModeConfig.deviceName,
+    lastBatchTotalItems: batchMetrics?.totalItems ?? 0,
+    lastBatchAppliedItems: batchMetrics?.appliedItems ?? 0,
+    lastBatchReplayedItems: batchMetrics?.replayedItems ?? 0,
+    lastBatchPassesUsed: batchMetrics?.passesUsed ?? 0,
+    lastBatchPendingItems: batchMetrics?.pendingItems ?? 0,
   );
+}
+
+Future<List<SyncBatchHistoryModel>> _loadSyncBatchHistory(Ref ref) async {
+  try {
+    final rows = await ref
+        .read(offlineSyncServiceProvider)
+        .loadRecentBatchMetrics(limit: 20);
+    return rows.map(SyncBatchHistoryModel.fromMap).toList();
+  } catch (e) {
+    print('❌ Error loading sync batch history: $e');
+    return const [];
+  }
 }
 
 class ConnectionStatusModel {

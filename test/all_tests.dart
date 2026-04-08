@@ -11,9 +11,13 @@ import 'models/ap_invoice_model_test.dart' as ap_invoice_model;
 import 'utils/crypto_utils_test.dart'      as crypto_utils;
 import 'utils/responsive_utils_test.dart'  as responsive_utils;
 
+// Core Services
+import 'core/services/offline_sync_service_test.dart' as offline_sync_service;
+
 void main() {
   product_model.main();
   ap_invoice_model.main();
   crypto_utils.main();
   responsive_utils.main();
+  offline_sync_service.main();
 }

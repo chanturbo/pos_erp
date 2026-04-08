@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../branches/presentation/providers/branch_provider.dart';
 import '../../data/models/stock_balance_model.dart';
 import '../providers/stock_provider.dart';
 
@@ -20,12 +21,6 @@ class _StockTransferDialogState extends ConsumerState<StockTransferDialog> {
   String? _toWarehouseId;
   bool _isLoading = false;
 
-  // TODO: ควรดึงจาก API
-  final List<Map<String, String>> warehouses = [
-    {'id': 'WH001', 'name': 'คลังสาขาหลัก'},
-    {'id': 'WH002', 'name': 'คลังสาขาสยาม'},
-  ];
-
   @override
   void dispose() {
     _quantityController.dispose();
@@ -35,9 +30,13 @@ class _StockTransferDialogState extends ConsumerState<StockTransferDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final availableWarehouses = warehouses
-        .where((w) => w['id'] != widget.stock.warehouseId)
-        .toList();
+    final warehousesAsync = ref.watch(warehouseListProvider);
+    final availableWarehouses = warehousesAsync.maybeWhen(
+      data: (warehouses) => warehouses
+          .where((w) => w.warehouseId != widget.stock.warehouseId)
+          .toList(),
+      orElse: () => const [],
+    );
 
     return Dialog(
       child: Container(
@@ -119,24 +118,49 @@ class _StockTransferDialogState extends ConsumerState<StockTransferDialog> {
                 ),
                 // ✅ เปลี่ยนจาก value เป็น initialValue
                 initialValue: _toWarehouseId,
-                items: availableWarehouses.map((w) {
-                  return DropdownMenuItem(
-                    value: w['id'],
-                    child: Text(w['name']!),
+                items: availableWarehouses.map<DropdownMenuItem<String>>((w) {
+                  return DropdownMenuItem<String>(
+                    value: w.warehouseId,
+                    child: Text(w.warehouseName),
                   );
                 }).toList(),
-                onChanged: (value) {
+                onChanged: warehousesAsync.isLoading
+                    ? null
+                    : (value) {
                   setState(() {
                     _toWarehouseId = value;
                   });
                 },
                 validator: (value) {
+                  if (warehousesAsync.hasError) {
+                    return 'โหลดข้อมูลคลังไม่สำเร็จ';
+                  }
+                  if (warehousesAsync.isLoading) {
+                    return 'กำลังโหลดข้อมูลคลัง';
+                  }
+                  if (availableWarehouses.isEmpty) {
+                    return 'ไม่พบคลังปลายทาง';
+                  }
                   if (value == null) {
                     return 'กรุณาเลือกคลังปลายทาง';
                   }
                   return null;
                 },
               ),
+              if (warehousesAsync.isLoading) ...[
+                const SizedBox(height: 8),
+                const Text(
+                  'กำลังโหลดรายการคลัง...',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ],
+              if (warehousesAsync.hasError) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'โหลดรายการคลังไม่สำเร็จ: ${warehousesAsync.error}',
+                  style: const TextStyle(fontSize: 12, color: Colors.red),
+                ),
+              ],
               const SizedBox(height: 16),
 
               // Quantity
