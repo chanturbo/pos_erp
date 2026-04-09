@@ -338,14 +338,15 @@ class CartNotifier extends Notifier<CartState> {
 
     if (index >= 0) {
       final item = items[index];
-      if (item.quantity > 1) {
+      if (item.quantity <= 1) {
+        // ถ้าเหลือ 1 แล้วลดอีก → ลบออกจากตะกร้า
+        items.removeAt(index);
+      } else {
         final newQuantity = item.quantity - 1;
         final newAmount = newQuantity * item.unitPrice;
-
         items[index] = item.copyWith(quantity: newQuantity, amount: newAmount);
-
-        state = state.copyWith(items: items);
       }
+      state = state.copyWith(items: items);
     }
   }
 

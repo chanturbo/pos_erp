@@ -313,8 +313,9 @@ class _PromotionFormPageState extends ConsumerState<PromotionFormPage> {
               validator: (v) {
                 if (v == null || v.isEmpty) return 'กรุณากรอกค่า';
                 final n = double.tryParse(v);
-                if (n == null || n <= 0 || n > 100)
+                if (n == null || n <= 0 || n > 100) {
                   return 'ต้องอยู่ระหว่าง 1-100';
+                }
                 return null;
               },
             ),

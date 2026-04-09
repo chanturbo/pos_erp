@@ -75,7 +75,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final density = _CartPanelDensity.fromWidth(constraints.maxWidth);
+        final density = _CartPanelDensity.fromConstraints(constraints);
 
         return Container(
           decoration: const BoxDecoration(
@@ -163,6 +163,9 @@ class _CartPanelDensity {
   final double rowFontSize;
   final double metaFontSize;
   final double amountFontSize;
+  /// true เมื่อ CartPanel ถูก constrain ด้านความสูง < 300px
+  /// → ย่อ summary padding + ซ่อน item count strip
+  final bool compactHeight;
 
   const _CartPanelDensity({
     required this.compact,
@@ -176,11 +179,16 @@ class _CartPanelDensity {
     required this.rowFontSize,
     required this.metaFontSize,
     required this.amountFontSize,
+    this.compactHeight = false,
   });
 
-  factory _CartPanelDensity.fromWidth(double width) {
+  factory _CartPanelDensity.fromConstraints(BoxConstraints constraints) {
+    final width = constraints.maxWidth;
+    final height = constraints.maxHeight;
+    final compactHeight = height.isFinite && height < 300;
+
     if (width < 340) {
-      return const _CartPanelDensity(
+      return _CartPanelDensity(
         compact: true,
         stackedRows: true,
         controlWidth: 120,
@@ -192,11 +200,12 @@ class _CartPanelDensity {
         rowFontSize: 11,
         metaFontSize: 10,
         amountFontSize: 12,
+        compactHeight: compactHeight,
       );
     }
 
     if (width < 420) {
-      return const _CartPanelDensity(
+      return _CartPanelDensity(
         compact: true,
         stackedRows: false,
         controlWidth: 80,
@@ -208,10 +217,11 @@ class _CartPanelDensity {
         rowFontSize: 11,
         metaFontSize: 9,
         amountFontSize: 11,
+        compactHeight: compactHeight,
       );
     }
 
-    return const _CartPanelDensity(
+    return _CartPanelDensity(
       compact: false,
       stackedRows: false,
       controlWidth: 92,
@@ -223,6 +233,7 @@ class _CartPanelDensity {
       rowFontSize: 12,
       metaFontSize: 10,
       amountFontSize: 12,
+      compactHeight: compactHeight,
     );
   }
 }
@@ -1146,7 +1157,12 @@ class _CartSummary extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+            padding: EdgeInsets.fromLTRB(
+              12,
+              density.compactHeight ? 6 : 10,
+              12,
+              0,
+            ),
             child: Column(
               children: [
                 _SummaryRow(
@@ -1165,7 +1181,9 @@ class _CartSummary extends StatelessWidget {
                 ],
 
                 Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  padding: EdgeInsets.symmetric(
+                    vertical: density.compactHeight ? 4 : 6,
+                  ),
                   child: Divider(height: 1, color: dividerColor),
                 ),
 
@@ -1235,8 +1253,8 @@ class _CartSummary extends StatelessWidget {
             ),
           ),
 
-          // Item count strip
-          if (cartState.itemCount > 0)
+          // Item count strip — ซ่อนเมื่อพื้นที่จำกัด
+          if (cartState.itemCount > 0 && !density.compactHeight)
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
               child: Container(
@@ -1270,10 +1288,10 @@ class _CartSummary extends StatelessWidget {
 
           // ปุ่มชำระเงิน
           Padding(
-            padding: const EdgeInsets.all(10),
+            padding: EdgeInsets.all(density.compactHeight ? 6 : 10),
             child: SizedBox(
               width: double.infinity,
-              height: context.isMobile ? 44 : 48,
+              height: density.compactHeight ? 38 : (context.isMobile ? 44 : 48),
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: cartState.items.isEmpty

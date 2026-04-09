@@ -172,8 +172,9 @@ class _PromotionListPageState extends ConsumerState<PromotionListPage> {
                       ? <PromotionModel>[]
                       : filtered.sublist(pageStart, pageEnd);
 
-                  if (filtered.isEmpty)
+                  if (filtered.isEmpty) {
                     return _buildEmpty(promotions.isEmpty, openCoupon);
+                  }
 
                   return Container(
                     margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),

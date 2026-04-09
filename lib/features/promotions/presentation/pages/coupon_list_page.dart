@@ -808,8 +808,9 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
                         firstDate: DateTime.now(),
                         lastDate: DateTime(2030),
                       );
-                      if (picked != null)
+                      if (picked != null) {
                         setStateDialog(() => expiresAt = picked);
+                      }
                     },
                     borderRadius: BorderRadius.circular(8),
                     child: InputDecorator(
@@ -1633,14 +1634,16 @@ class _CouponDetailDialog extends StatelessWidget {
   const _CouponDetailDialog({required this.coupon, required this.dateFmt});
 
   static ({Color color, IconData icon, String label}) _status(CouponModel c) {
-    if (c.isUsed)
+    if (c.isUsed) {
       return (
         color: AppTheme.textSub,
         icon: Icons.check_circle,
         label: 'ใช้แล้ว',
       );
-    if (c.isExpired)
+    }
+    if (c.isExpired) {
       return (color: AppTheme.errorColor, icon: Icons.cancel, label: 'หมดอายุ');
+    }
     return (
       color: AppTheme.successColor,
       icon: Icons.confirmation_number,
