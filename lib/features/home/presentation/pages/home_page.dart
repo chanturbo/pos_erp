@@ -226,8 +226,9 @@ class _HomePageState extends ConsumerState<HomePage> {
     final user      = ref.watch(authProvider).user;
     final syncAsync = ref.watch(syncStatusProvider);
     final connectionAsync = ref.watch(connectionStatusProvider);
-    final roleId    = user?.roleId?.toUpperCase();
-    final permNotifier = ref.watch(rolePermissionsProvider.notifier);
+    final roleId = user?.roleId?.toUpperCase();
+    // watch provider (ไม่ใช่ notifier) เพื่อ rebuild เมื่อ async data โหลดเสร็จ
+    final permData = ref.watch(rolePermissionsProvider).value;
 
     // คำนวณ indices ที่ user มีสิทธิ์เห็น
     final visibleIndices = <int>{};
@@ -235,9 +236,12 @@ class _HomePageState extends ConsumerState<HomePage> {
     for (final section in _sections) {
       for (final item in section.items) {
         final key = item.permissionKey;
-        if (key == null || permNotifier.hasPermission(roleId, key)) {
-          visibleIndices.add(idx);
-        }
+        final canSee = key == null ||
+            roleId == null ||
+            roleId == 'ADMIN' ||
+            (permData?[roleId] ?? defaultRolePermissions[roleId] ?? [])
+                .contains(key);
+        if (canSee) visibleIndices.add(idx);
         idx++;
       }
     }
