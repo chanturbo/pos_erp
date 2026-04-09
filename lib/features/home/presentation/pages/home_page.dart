@@ -27,6 +27,7 @@ import '../../../reports/presentation/pages/reports_page.dart';
 import '../../../../core/shortcuts/keyboard_shortcuts.dart';
 import '../../../settings/presentation/pages/settings_page.dart';
 import '../../../settings/presentation/pages/role_permission_page.dart';
+import '../../../users/presentation/pages/user_list_page.dart';
 import '../../../../shared/permissions/app_permissions.dart';
 
 // ─────────────────────────────────────────────────────────────────
@@ -137,6 +138,7 @@ class _HomePageState extends ConsumerState<HomePage> {
           _MenuItem(icon: Icons.sync_alt,             title: 'การเชื่อมต่อ/ซิงก์', page: const SyncStatusPage(),     permissionKey: AppPermission.sync),
           _MenuItem(icon: Icons.settings,             title: 'ตั้งค่า',              page: const SettingsPage(),       permissionKey: AppPermission.settings),
           _MenuItem(icon: Icons.admin_panel_settings, title: 'จัดการสิทธิ์',        page: const RolePermissionPage(), permissionKey: AppPermission.rolePermissions),
+          _MenuItem(icon: Icons.manage_accounts,      title: 'จัดการผู้ใช้งาน',    page: const UserListPage(),       permissionKey: AppPermission.userManagement),
         ]),
       ];
 

@@ -24,6 +24,7 @@ import 'routes/supplier_routes.dart';
 import 'routes/ap_invoice_routes.dart';
 import 'routes/ap_payment_routes.dart';
 import 'routes/branch_routes.dart'; // 🆕 Week 7
+import 'routes/user_routes.dart';
 import 'middleware/auth_middleware.dart';
 
 class ApiServer {
@@ -108,6 +109,10 @@ class ApiServer {
       // Promotion & Coupon routes ✅ Day 41-45
       router.mount('/api/promotions', PromotionRoutes(db).router.call);
       print('   ✅ /api/promotions');
+
+      // User Management routes
+      router.mount('/api/users', UserRoutes(db).router.call);
+      print('   ✅ /api/users');
 
       // Branch, Warehouse & Sync routes ✅ Week 7
       router.mount('/api/branches', BranchRoutes(db).router.call);

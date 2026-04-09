@@ -29,6 +29,7 @@ class AppPermission {
   static const sync           = 'sync';
   static const settings       = 'settings';
   static const rolePermissions = 'role_permissions';
+  static const userManagement = 'user_management';
 
   static const all = [
     dashboard, pos, salesHistory, promotions,
@@ -36,7 +37,7 @@ class AppPermission {
     customers, suppliers,
     purchaseOrder, goodsReceipt, purchaseReturn,
     apInvoice, apPayment, arInvoice, arReceipt,
-    reports, branch, sync, settings, rolePermissions,
+    reports, branch, sync, settings, rolePermissions, userManagement,
   ];
 }
 
@@ -63,6 +64,7 @@ const appPermissionLabels = <String, String>{
   AppPermission.sync:           'การเชื่อมต่อ/ซิงก์',
   AppPermission.settings:       'ตั้งค่าระบบ',
   AppPermission.rolePermissions: 'จัดการสิทธิ์การใช้งาน',
+  AppPermission.userManagement:  'จัดการผู้ใช้งาน',
 };
 
 /// กลุ่มของ permissions สำหรับแสดงผลในหน้าจัดการสิทธิ์
@@ -105,6 +107,7 @@ const appPermissionGroups = [
     AppPermission.sync,
     AppPermission.settings,
     AppPermission.rolePermissions,
+    AppPermission.userManagement,
   ]),
 ];
 
@@ -152,6 +155,7 @@ const defaultRolePermissions = <String, List<String>>{
     AppPermission.branch,
     AppPermission.sync,
     AppPermission.settings,
+    AppPermission.userManagement,
   ],
   'CASHIER': [
     AppPermission.pos,
