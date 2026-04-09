@@ -41,6 +41,7 @@ class _RolePermissionPageState extends ConsumerState<RolePermissionPage>
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
+      backgroundColor: AppTheme.surfaceColorOf(context),
       appBar: AppBar(
         leading: buildMobileHomeLeading(context),
         title: const Text('จัดการสิทธิ์การใช้งาน'),
@@ -309,7 +310,7 @@ class _RolePermissionTab extends StatelessWidget {
         Container(
           margin: const EdgeInsets.symmetric(horizontal: 16),
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1E1E2E) : Colors.white,
+            color: isDark ? AppTheme.darkCard : Colors.white,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: AppTheme.borderColorOf(context),

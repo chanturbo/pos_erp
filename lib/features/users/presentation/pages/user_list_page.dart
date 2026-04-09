@@ -58,6 +58,7 @@ class _UserListPageState extends ConsumerState<UserListPage> {
     final canCreate = isAdmin || roleUpper == 'MANAGER';
 
     return Scaffold(
+      backgroundColor: AppTheme.surfaceColorOf(context),
       appBar: AppBar(
         leading: buildMobileHomeLeading(context),
         title: const Text('จัดการผู้ใช้งาน'),
@@ -327,7 +328,7 @@ class _UserCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(color: AppTheme.borderColorOf(context)),
       ),
-      color: isDark ? const Color(0xFF1E1E2E) : Colors.white,
+      color: isDark ? AppTheme.darkCard : Colors.white,
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Row(

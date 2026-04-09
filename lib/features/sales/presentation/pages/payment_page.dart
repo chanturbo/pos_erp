@@ -634,45 +634,65 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                         amount: cartState.total,
                       )
                     else
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.orange[50],
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.orange.shade200),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.warning_amber_rounded,
-                              color: Colors.orange[700],
-                              size: 24,
-                            ),
-                            const SizedBox(width: 12),
-                            const Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'ยังไม่ได้ตั้งค่าเลข PromptPay',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                  SizedBox(height: 4),
-                                  Text(
-                                    'ไปที่ ตั้งค่า → ข้อมูลบริษัท → เลข PromptPay',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: Colors.black54,
-                                    ),
-                                  ),
-                                ],
+                      Builder(
+                        builder: (context) {
+                          final isDark =
+                              Theme.of(context).brightness == Brightness.dark;
+                          return Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? const Color(0xFF2A1F00)
+                                  : Colors.orange[50],
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: isDark
+                                    ? Colors.orange.withValues(alpha: 0.4)
+                                    : Colors.orange.shade200,
                               ),
                             ),
-                          ],
-                        ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.warning_amber_rounded,
+                                  color: isDark
+                                      ? Colors.orange[300]
+                                      : Colors.orange[700],
+                                  size: 24,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'ยังไม่ได้ตั้งค่าเลข PromptPay',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13,
+                                          color: isDark
+                                              ? Colors.white
+                                              : Colors.black87,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'ไปที่ ตั้งค่า → ข้อมูลบริษัท → เลข PromptPay',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: isDark
+                                              ? Colors.white54
+                                              : Colors.black54,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
                       ),
                     const SizedBox(height: 16),
                   ],
@@ -680,23 +700,44 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                   // ── บัตร ───────────────────────────────────────────
                   if (_paymentType == 'CARD') ...[
                     const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.blue[50],
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.blue.shade200),
-                      ),
-                      child: const Row(
-                        children: [
-                          Icon(Icons.credit_card, color: Colors.blue, size: 24),
-                          SizedBox(width: 12),
-                          Text(
-                            'รูดบัตรที่เครื่อง EDC แล้วกดยืนยัน',
-                            style: TextStyle(fontSize: 13),
+                    Builder(
+                      builder: (context) {
+                        final isDark =
+                            Theme.of(context).brightness == Brightness.dark;
+                        return Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? const Color(0xFF0D2137)
+                                : Colors.blue[50],
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isDark
+                                  ? const Color(0xFF1565C0).withValues(alpha: 0.5)
+                                  : Colors.blue.shade200,
+                            ),
                           ),
-                        ],
-                      ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.credit_card,
+                                color: isDark
+                                    ? const Color(0xFF90CAF9)
+                                    : Colors.blue,
+                                size: 24,
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                'รูดบัตรที่เครื่อง EDC แล้วกดยืนยัน',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: isDark ? Colors.white : Colors.black87,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
                     ),
                     const SizedBox(height: 16),
                   ],
