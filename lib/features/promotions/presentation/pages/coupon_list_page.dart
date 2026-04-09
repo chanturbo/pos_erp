@@ -8,12 +8,15 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../providers/promotion_provider.dart';
 import '../../data/models/promotion_model.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
+import 'package:pos_erp/shared/utils/responsive_utils.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'coupon_pdf_report.dart';
 import 'package:pos_erp/shared/pdf/pdf_report_button.dart';
 import 'package:pos_erp/shared/pdf/pdf_export_service.dart';
+import 'package:pos_erp/shared/widgets/app_dialogs.dart';
 import 'package:pos_erp/shared/widgets/escape_pop_scope.dart';
 import 'package:pos_erp/shared/widgets/pagination_bar.dart';
+import 'package:pos_erp/shared/widgets/mobile_home_button.dart';
 
 class CouponListPage extends ConsumerStatefulWidget {
   const CouponListPage({super.key});
@@ -713,27 +716,12 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
     await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setStateDialog) => AlertDialog(
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: AppTheme.infoContainer,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: const Icon(
-                  Icons.confirmation_number,
-                  color: AppTheme.infoColor,
-                  size: 18,
-                ),
-              ),
-              const SizedBox(width: 10),
-              const Text(
-                'สร้างคูปอง',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-              ),
-            ],
+        builder: (ctx, setStateDialog) => AppDialog(
+          title: buildAppDialogTitle(
+            ctx,
+            title: 'สร้างคูปอง',
+            icon: Icons.confirmation_number,
+            iconColor: AppTheme.infoColor,
           ),
           content: SizedBox(
             width: 400,
@@ -2552,17 +2540,19 @@ class _BackBtn extends StatelessWidget {
   const _BackBtn({required this.onTap});
 
   @override
-  Widget build(BuildContext context) => InkWell(
-    onTap: onTap,
-    borderRadius: BorderRadius.circular(8),
-    child: Container(
-      padding: const EdgeInsets.all(7),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF5F5F5),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppTheme.border),
-      ),
-      child: const Icon(Icons.arrow_back, size: 17, color: AppTheme.textSub),
-    ),
-  );
+  Widget build(BuildContext context) => context.isMobile
+      ? buildMobileHomeCompactButton(context)
+      : InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF5F5F5),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppTheme.border),
+            ),
+            child: const Icon(Icons.arrow_back, size: 17, color: AppTheme.textSub),
+          ),
+        );
 }

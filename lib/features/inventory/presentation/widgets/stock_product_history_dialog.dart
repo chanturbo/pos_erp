@@ -5,6 +5,7 @@ import '../../../../core/client/api_client.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/pdf/pdf_report_button.dart';
 import '../../../../shared/widgets/pagination_bar.dart';
+import '../../../../shared/widgets/mobile_home_button.dart';
 import '../../../settings/presentation/pages/settings_page.dart';
 import '../../data/models/stock_balance_model.dart';
 import '../pages/stock_product_history_pdf_report.dart';
@@ -255,11 +256,7 @@ class _StockProductHistoryDialogState
                     ),
                   ),
                   const SizedBox(width: 8),
-                  IconButton(
-                    icon: const Icon(Icons.close, size: 18),
-                    onPressed: () => Navigator.pop(context),
-                    tooltip: 'ปิด',
-                  ),
+                  buildMobileCloseCompactButton(context),
                 ],
               ),
             ),

@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
+import 'package:pos_erp/shared/utils/responsive_utils.dart';
+import 'package:pos_erp/shared/widgets/app_dialogs.dart';
 import 'package:pos_erp/shared/widgets/escape_pop_scope.dart';
+import 'package:pos_erp/shared/widgets/mobile_home_button.dart';
 import '../../data/models/purchase_order_model.dart';
 import '../../data/models/purchase_order_item_model.dart';
 import '../providers/purchase_provider.dart';
@@ -899,18 +902,20 @@ class _POFormTitleBar extends StatelessWidget {
       child: Row(
         children: [
           if (canPop) ...[
-            InkWell(
-              onTap: () => Navigator.pop(context),
-              borderRadius: BorderRadius.circular(6),
-              child: Padding(
-                padding: const EdgeInsets.all(4),
-                child: Icon(
-                  Icons.arrow_back,
-                  size: 20,
-                  color: isDark ? Colors.white70 : AppTheme.textSub,
-                ),
-              ),
-            ),
+            context.isMobile
+                ? buildMobileHomeCompactButton(context, isDark: isDark)
+                : InkWell(
+                    onTap: () => Navigator.pop(context),
+                    borderRadius: BorderRadius.circular(6),
+                    child: Padding(
+                      padding: const EdgeInsets.all(4),
+                      child: Icon(
+                        Icons.arrow_back,
+                        size: 20,
+                        color: isDark ? Colors.white70 : AppTheme.textSub,
+                      ),
+                    ),
+                  ),
             const SizedBox(width: 10),
           ],
           Container(
@@ -1345,33 +1350,21 @@ class _ProductSelectionDialogState
                 (p.barcode?.toLowerCase().contains(q) ?? false);
           }).toList();
 
-    return AlertDialog(
+    return AppDialog(
       backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       title: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(7),
-            decoration: BoxDecoration(
-              color: AppTheme.info.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(
-              Icons.inventory_2_outlined,
-              size: 18,
-              color: AppTheme.info,
+          Expanded(
+            child: buildAppDialogTitle(
+              context,
+              title: 'เลือกสินค้า',
+              icon: Icons.inventory_2_outlined,
+              iconColor: AppTheme.info,
+              showClose: false,
             ),
           ),
-          const SizedBox(width: 10),
-          Text(
-            'เลือกสินค้า',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: isDark ? Colors.white : const Color(0xFF1A1A1A),
-            ),
-          ),
-          const Spacer(),
+          const SizedBox(width: 8),
           ScannerButton(
             tooltip: 'สแกนบาร์โค้ดสินค้า',
             useSheet: true,

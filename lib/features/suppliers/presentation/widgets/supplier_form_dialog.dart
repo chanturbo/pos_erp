@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pos_erp/shared/widgets/mobile_home_button.dart';
 import '../../data/models/supplier_model.dart';
 import '../providers/supplier_provider.dart';
 
@@ -99,10 +100,7 @@ class _SupplierFormDialogState extends ConsumerState<SupplierFormDialog> {
                       ),
                     ),
                     const Spacer(),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.pop(context),
-                    ),
+                    buildMobileCloseCompactButton(context),
                   ],
                 ),
                 const Divider(height: 32),

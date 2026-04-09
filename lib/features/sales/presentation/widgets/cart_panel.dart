@@ -25,11 +25,17 @@ const _info = AppTheme.infoColor;
 class CartPanel extends ConsumerStatefulWidget {
   final bool showScanRow;
   final bool autofocusScan;
+  final bool showCheckoutButton;
+  final bool showHoldButton;
+  final VoidCallback? onHold;
 
   const CartPanel({
     super.key,
     this.showScanRow = true,
     this.autofocusScan = true,
+    this.showCheckoutButton = true,
+    this.showHoldButton = false,
+    this.onHold,
   });
 
   @override
@@ -142,7 +148,13 @@ class _CartPanelState extends ConsumerState<CartPanel> {
               ),
 
               // ── Summary ──────────────────────────────────────────
-              _CartSummary(cartState: cartState, density: density),
+              _CartSummary(
+                cartState: cartState,
+                density: density,
+                showCheckoutButton: widget.showCheckoutButton,
+                showHoldButton: widget.showHoldButton,
+                onHold: widget.onHold,
+              ),
             ],
           ),
         );
@@ -163,6 +175,7 @@ class _CartPanelDensity {
   final double rowFontSize;
   final double metaFontSize;
   final double amountFontSize;
+
   /// true เมื่อ CartPanel ถูก constrain ด้านความสูง < 300px
   /// → ย่อ summary padding + ซ่อน item count strip
   final bool compactHeight;
@@ -408,12 +421,42 @@ class _ScanRowState extends ConsumerState<_ScanRow> {
           if (context.mounted) _notFound(context, result.value);
         });
       },
+      onScannedInSheet: (sheetContext, result) {
+        if (result.value.isEmpty) return;
+        _addByBarcode(context, result.value).catchError((_) {
+          if (sheetContext.mounted) {
+            _notFound(sheetContext, result.value, useSnackBar: true);
+          }
+        });
+      },
     );
   }
 
   // ── กรณีไม่พบสินค้า ──────────────────────────────────────────
-  void _notFound(BuildContext context, String barcode) {
+  void _notFound(
+    BuildContext context,
+    String barcode, {
+    bool useSnackBar = false,
+  }) {
     if (!context.mounted) return;
+    if (useSnackBar) {
+      final messenger = ScaffoldMessenger.maybeOf(context);
+      if (messenger != null) {
+        messenger
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text('ไม่พบสินค้า: $barcode'),
+              backgroundColor: AppTheme.errorColor,
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 2),
+              margin: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            ),
+          );
+        return;
+      }
+    }
+
     ref
         .read(cartToastProvider.notifier)
         .show(
@@ -1131,8 +1174,17 @@ class _EmptyCart extends StatelessWidget {
 class _CartSummary extends StatelessWidget {
   final CartState cartState;
   final _CartPanelDensity density;
+  final bool showCheckoutButton;
+  final bool showHoldButton;
+  final VoidCallback? onHold;
 
-  const _CartSummary({required this.cartState, required this.density});
+  const _CartSummary({
+    required this.cartState,
+    required this.density,
+    required this.showCheckoutButton,
+    required this.showHoldButton,
+    required this.onHold,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1286,51 +1338,105 @@ class _CartSummary extends StatelessWidget {
               ),
             ),
 
-          // ปุ่มชำระเงิน
-          Padding(
-            padding: EdgeInsets.all(density.compactHeight ? 6 : 10),
-            child: SizedBox(
-              width: double.infinity,
-              height: density.compactHeight ? 38 : (context.isMobile ? 44 : 48),
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: cartState.items.isEmpty
-                      ? disabledColor
-                      : _success,
-                  foregroundColor: Colors.white,
-                  disabledForegroundColor: isDark
-                      ? Colors.white30
-                      : Colors.grey[500],
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                onPressed: cartState.items.isEmpty
-                    ? null
-                    : () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const PaymentPage()),
-                      ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.payment, size: 18),
-                    const SizedBox(width: 8),
-                    Text(
-                      cartState.items.isEmpty
-                          ? 'ชำระเงิน'
-                          : 'ชำระเงิน  ฿${cartState.total.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
+          if (showCheckoutButton || showHoldButton)
+            Padding(
+              padding: EdgeInsets.all(density.compactHeight ? 6 : 10),
+              child: Row(
+                children: [
+                  if (showHoldButton) ...[
+                    Expanded(
+                      flex: 5,
+                      child: OutlinedButton(
+                        onPressed: cartState.items.isEmpty ? null : onHold,
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: Size(
+                            0,
+                            density.compactHeight
+                                ? 38
+                                : (context.isMobile ? 44 : 48),
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.pause_circle_outline_rounded,
+                                size: 17,
+                              ),
+                              SizedBox(width: 6),
+                              Text(
+                                'พักบิล',
+                                maxLines: 1,
+                                overflow: TextOverflow.fade,
+                                softWrap: false,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
+                    const SizedBox(width: 8),
                   ],
-                ),
+                  if (showCheckoutButton)
+                    Expanded(
+                      flex: showHoldButton ? 11 : 1,
+                      child: SizedBox(
+                        height: density.compactHeight
+                            ? 38
+                            : (context.isMobile ? 44 : 48),
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: cartState.items.isEmpty
+                                ? disabledColor
+                                : _success,
+                            foregroundColor: Colors.white,
+                            disabledForegroundColor: isDark
+                                ? Colors.white30
+                                : Colors.grey[500],
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          onPressed: cartState.items.isEmpty
+                              ? null
+                              : () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const PaymentPage(),
+                                  ),
+                                ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.payment, size: 18),
+                              const SizedBox(width: 8),
+                              Text(
+                                cartState.items.isEmpty
+                                    ? 'ชำระเงิน'
+                                    : 'ชำระเงิน  ฿${cartState.total.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
-          ),
         ],
       ),
     );

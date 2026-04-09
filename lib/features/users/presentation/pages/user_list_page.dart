@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/permissions/app_permissions.dart';
+import '../../../../shared/widgets/app_dialogs.dart';
+import '../../../../shared/widgets/mobile_home_button.dart';
 import '../../../../features/auth/presentation/providers/auth_provider.dart';
 import '../../../../features/branches/presentation/providers/branch_provider.dart';
 import '../../data/models/user_management_model.dart';
@@ -51,13 +53,16 @@ class _UserListPageState extends ConsumerState<UserListPage> {
   Widget build(BuildContext context) {
     final usersAsync = ref.watch(userListProvider);
     final currentUser = ref.watch(authProvider).user;
-    final isAdmin = currentUser?.roleId?.toUpperCase() == 'ADMIN';
+    final roleUpper = currentUser?.roleId?.toUpperCase() ?? '';
+    final isAdmin = roleUpper == 'ADMIN';
+    final canCreate = isAdmin || roleUpper == 'MANAGER';
 
     return Scaffold(
       appBar: AppBar(
+        leading: buildMobileHomeLeading(context),
         title: const Text('จัดการผู้ใช้งาน'),
         actions: [
-          if (isAdmin)
+          if (canCreate)
             FilledButton.icon(
               onPressed: () => _showUserForm(context, null),
               icon: const Icon(Icons.person_add_rounded, size: 16),
@@ -224,10 +229,9 @@ class _UserListPageState extends ConsumerState<UserListPage> {
 
   // ── Actions ───────────────────────────────────────────────────
   Future<void> _showUserForm(BuildContext context, UserManagementModel? user) async {
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => _UserFormDialog(user: user),
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => _UserFormPage(user: user)),
     );
   }
 
@@ -246,8 +250,13 @@ class _UserListPageState extends ConsumerState<UserListPage> {
     final messenger = ScaffoldMessenger.of(context);
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: Text('$action "${user.fullName}"?'),
+      builder: (_) => AppDialog(
+        title: buildAppDialogTitle(
+          context,
+          title: '$action "${user.fullName}"?',
+          icon: user.isActive ? Icons.person_off_outlined : Icons.person_add_alt_1,
+          iconColor: user.isActive ? AppTheme.errorColor : AppTheme.successColor,
+        ),
         content: Text(user.isActive
             ? 'ผู้ใช้จะไม่สามารถเข้าสู่ระบบได้จนกว่าจะเปิดใช้งานอีกครั้ง'
             : 'ผู้ใช้จะสามารถเข้าสู่ระบบได้อีกครั้ง'),
@@ -505,18 +514,18 @@ class _Chip extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// _UserFormDialog — เพิ่ม / แก้ไข
+// _UserFormPage — เพิ่ม / แก้ไข (full-page, matches product form style)
 // ─────────────────────────────────────────────────────────────────
-class _UserFormDialog extends ConsumerStatefulWidget {
+class _UserFormPage extends ConsumerStatefulWidget {
   final UserManagementModel? user; // null = สร้างใหม่
 
-  const _UserFormDialog({this.user});
+  const _UserFormPage({this.user});
 
   @override
-  ConsumerState<_UserFormDialog> createState() => _UserFormDialogState();
+  ConsumerState<_UserFormPage> createState() => _UserFormPageState();
 }
 
-class _UserFormDialogState extends ConsumerState<_UserFormDialog> {
+class _UserFormPageState extends ConsumerState<_UserFormPage> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _usernameCtrl;
   late final TextEditingController _passwordCtrl;
@@ -595,229 +604,507 @@ class _UserFormDialogState extends ConsumerState<_UserFormDialog> {
   Widget build(BuildContext context) {
     final branchesAsync = ref.watch(branchListProvider);
     final branches = branchesAsync.value ?? [];
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 480),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Title
-                Row(
-                  children: [
-                    Container(
-                      width: 4, height: 20,
-                      decoration: BoxDecoration(
-                        color: AppTheme.primaryColor,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      _isEdit ? 'แก้ไขข้อมูลผู้ใช้' : 'เพิ่มผู้ใช้งานใหม่',
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
+    return Scaffold(
+      backgroundColor: isDark ? AppTheme.darkBg : const Color(0xFFF5F5F5),
+      body: Column(
+        children: [
+          // ── Title Bar ─────────────────────────────────────────
+          _buildTitleBar(context, isDark),
 
-                // Scrollable content
-                ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxHeight: MediaQuery.of(context).size.height * 0.6,
-                  ),
-                  child: SingleChildScrollView(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // ชื่อ-นามสกุล
-                        _buildField(
-                          controller: _fullNameCtrl,
-                          label: 'ชื่อ-นามสกุล *',
-                          hint: 'เช่น สมชาย ใจดี',
-                          validator: (v) => (v?.trim().isEmpty ?? true) ? 'กรุณาระบุชื่อ' : null,
-                        ),
-                        const SizedBox(height: 14),
+          // ── Form Body ─────────────────────────────────────────
+          Expanded(
+            child: Form(
+              key: _formKey,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: LayoutBuilder(
+                  builder: (ctx, bc) {
+                    final isWide = bc.maxWidth >= 900;
+                    final card1 = _UserSectionCard(
+                      icon: Icons.person_outline,
+                      iconColor: AppTheme.primaryColor,
+                      title: 'ข้อมูลผู้ใช้',
+                      child: Column(
+                        children: [
+                          // ชื่อ-นามสกุล
+                          _UserFormField(
+                            controller: _fullNameCtrl,
+                            label: 'ชื่อ-นามสกุล',
+                            icon: Icons.badge_outlined,
+                            required: true,
+                            enabled: !_loading,
+                            validator: (v) => (v?.trim().isEmpty ?? true) ? 'กรุณาระบุชื่อ' : null,
+                          ),
+                          const SizedBox(height: 14),
 
-                        // Username (แก้ไขไม่ได้)
-                        _buildField(
-                          controller: _usernameCtrl,
-                          label: 'Username *',
-                          hint: 'เช่น cashier01',
-                          readOnly: _isEdit,
-                          validator: (v) {
-                            if (v?.trim().isEmpty ?? true) return 'กรุณาระบุ username';
-                            if ((v?.trim().length ?? 0) < 3) return 'username ต้องมีอย่างน้อย 3 ตัวอักษร';
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 14),
-
-                        // Password (เฉพาะสร้างใหม่)
-                        if (!_isEdit) ...[
-                          TextFormField(
-                            controller: _passwordCtrl,
-                            obscureText: _obscurePassword,
-                            decoration: InputDecoration(
-                              labelText: 'รหัสผ่าน *',
-                              hintText: 'อย่างน้อย 6 ตัวอักษร',
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: const BorderSide(color: AppTheme.primaryColor, width: 1.5),
-                              ),
-                              suffixIcon: IconButton(
-                                icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off, size: 18),
-                                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                              ),
-                            ),
+                          // Username
+                          _UserFormField(
+                            controller: _usernameCtrl,
+                            label: 'Username',
+                            icon: Icons.alternate_email,
+                            required: !_isEdit,
+                            readOnly: _isEdit,
+                            helperText: _isEdit ? 'ไม่สามารถเปลี่ยน username ได้' : 'อย่างน้อย 3 ตัวอักษร',
+                            enabled: !_loading,
                             validator: (v) {
-                              if (v?.trim().isEmpty ?? true) return 'กรุณาระบุรหัสผ่าน';
-                              if ((v?.trim().length ?? 0) < 6) return 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร';
+                              if (v?.trim().isEmpty ?? true) return 'กรุณาระบุ username';
+                              if ((v?.trim().length ?? 0) < 3) return 'username ต้องมีอย่างน้อย 3 ตัวอักษร';
                               return null;
                             },
                           ),
                           const SizedBox(height: 14),
+
+                          // Password (เฉพาะสร้างใหม่)
+                          if (!_isEdit) ...[
+                            _PasswordField(
+                              controller: _passwordCtrl,
+                              obscure: _obscurePassword,
+                              enabled: !_loading,
+                              onToggle: () => setState(() => _obscurePassword = !_obscurePassword),
+                              validator: (v) {
+                                if (v?.trim().isEmpty ?? true) return 'กรุณาระบุรหัสผ่าน';
+                                if ((v?.trim().length ?? 0) < 6) return 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร';
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 14),
+                          ],
+
+                          // Email
+                          _UserFormField(
+                            controller: _emailCtrl,
+                            label: 'อีเมล',
+                            icon: Icons.email_outlined,
+                            keyboardType: TextInputType.emailAddress,
+                            enabled: !_loading,
+                          ),
+                          const SizedBox(height: 14),
+
+                          // Phone
+                          _UserFormField(
+                            controller: _phoneCtrl,
+                            label: 'เบอร์โทรศัพท์',
+                            icon: Icons.phone_outlined,
+                            keyboardType: TextInputType.phone,
+                            enabled: !_loading,
+                          ),
                         ],
-
-                        // Role
-                        _buildDropdownLabel('บทบาท (Role)'),
-                        const SizedBox(height: 6),
-                        DropdownButtonFormField<String?>(
-                          value: _selectedRoleId,
-                          decoration: InputDecoration(
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: AppTheme.primaryColor, width: 1.5),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                          ),
-                          hint: const Text('เลือก Role'),
-                          items: [
-                            const DropdownMenuItem(value: null, child: Text('ไม่ระบุ')),
-                            ...appRoles.map((r) => DropdownMenuItem(
-                              value: r.roleId,
-                              child: Text(r.label),
-                            )),
-                          ],
-                          onChanged: (v) => setState(() => _selectedRoleId = v),
-                        ),
-                        const SizedBox(height: 14),
-
-                        // Branch
-                        _buildDropdownLabel('สาขา'),
-                        const SizedBox(height: 6),
-                        DropdownButtonFormField<String?>(
-                          value: _selectedBranchId,
-                          decoration: InputDecoration(
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: AppTheme.primaryColor, width: 1.5),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                          ),
-                          hint: const Text('เลือกสาขา'),
-                          items: [
-                            const DropdownMenuItem(value: null, child: Text('ไม่ระบุ')),
-                            ...branches.map((b) => DropdownMenuItem(
-                              value: b.branchId,
-                              child: Text(b.branchName),
-                            )),
-                          ],
-                          onChanged: (v) => setState(() => _selectedBranchId = v),
-                        ),
-                        const SizedBox(height: 14),
-
-                        // Email
-                        _buildField(
-                          controller: _emailCtrl,
-                          label: 'อีเมล',
-                          hint: 'user@example.com',
-                          keyboardType: TextInputType.emailAddress,
-                        ),
-                        const SizedBox(height: 14),
-
-                        // Phone
-                        _buildField(
-                          controller: _phoneCtrl,
-                          label: 'เบอร์โทรศัพท์',
-                          hint: '08x-xxx-xxxx',
-                          keyboardType: TextInputType.phone,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-
-                // Buttons
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(
-                      onPressed: _loading ? null : () => Navigator.pop(context),
-                      child: const Text('ยกเลิก'),
-                    ),
-                    const SizedBox(width: 12),
-                    FilledButton(
-                      onPressed: _loading ? null : _submit,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppTheme.primaryColor,
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                       ),
-                      child: _loading
-                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                          : Text(_isEdit ? 'บันทึก' : 'เพิ่มผู้ใช้'),
-                    ),
-                  ],
+                    );
+
+                    final card2 = _UserSectionCard(
+                      icon: Icons.admin_panel_settings_outlined,
+                      iconColor: AppTheme.infoColor,
+                      title: 'สิทธิ์และสาขา',
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Role
+                          _DropdownSection<String?>(
+                            label: 'บทบาท (Role)',
+                            icon: Icons.security_outlined,
+                            value: _selectedRoleId,
+                            hint: 'เลือก Role',
+                            enabled: !_loading,
+                            items: [
+                              const DropdownMenuItem(value: null, child: Text('ไม่ระบุ')),
+                              ...appRoles.map((r) => DropdownMenuItem(
+                                value: r.roleId,
+                                child: Text(r.label),
+                              )),
+                            ],
+                            onChanged: (v) => setState(() => _selectedRoleId = v),
+                          ),
+                          const SizedBox(height: 14),
+
+                          // Branch
+                          _DropdownSection<String?>(
+                            label: 'สาขา',
+                            icon: Icons.store_outlined,
+                            value: _selectedBranchId,
+                            hint: 'เลือกสาขา',
+                            enabled: !_loading,
+                            items: [
+                              const DropdownMenuItem(value: null, child: Text('ไม่ระบุ')),
+                              ...branches.map((b) => DropdownMenuItem(
+                                value: b.branchId,
+                                child: Text(b.branchName),
+                              )),
+                            ],
+                            onChanged: (v) => setState(() => _selectedBranchId = v),
+                          ),
+                        ],
+                      ),
+                    );
+
+                    if (isWide) {
+                      return Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(flex: 3, child: card1),
+                          const SizedBox(width: 16),
+                          Expanded(flex: 2, child: card2),
+                        ],
+                      );
+                    }
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        card1,
+                        const SizedBox(height: 16),
+                        card2,
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+
+          // ── Bottom Action Bar ─────────────────────────────────
+          Container(
+            color: isDark ? AppTheme.darkTopBar : Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                OutlinedButton(
+                  onPressed: _loading ? null : () => Navigator.pop(context),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    side: const BorderSide(color: AppTheme.border),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  child: const Text('ยกเลิก', style: TextStyle(color: AppTheme.textSub)),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton.icon(
+                  onPressed: _loading ? null : _submit,
+                  icon: _loading
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Icon(Icons.save_outlined, size: 18),
+                  label: Text(_isEdit ? 'บันทึก' : 'เพิ่มผู้ใช้', style: const TextStyle(fontSize: 14)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    elevation: 0,
+                  ),
                 ),
               ],
             ),
           ),
-        ),
+        ],
       ),
     );
   }
 
-  Widget _buildField({
-    required TextEditingController controller,
-    required String label,
-    String? hint,
-    bool readOnly = false,
-    TextInputType? keyboardType,
-    String? Function(String?)? validator,
-  }) {
+  Widget _buildTitleBar(BuildContext context, bool isDark) {
+    return Container(
+      color: isDark ? AppTheme.darkTopBar : Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      child: Row(
+        children: [
+          if (Navigator.of(context).canPop()) ...[
+            InkWell(
+              onTap: () => Navigator.pop(context),
+              borderRadius: BorderRadius.circular(6),
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: Icon(Icons.arrow_back, size: 20,
+                    color: isDark ? Colors.white70 : AppTheme.textSub),
+              ),
+            ),
+            const SizedBox(width: 10),
+          ],
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppTheme.primaryColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(Icons.manage_accounts_outlined,
+                color: AppTheme.primaryColor, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            _isEdit ? 'แก้ไขข้อมูลผู้ใช้' : 'เพิ่มผู้ใช้งานใหม่',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+            ),
+          ),
+          const Spacer(),
+          InkWell(
+            onTap: () => Navigator.pop(context),
+            borderRadius: BorderRadius.circular(6),
+            child: Padding(
+              padding: const EdgeInsets.all(4),
+              child: Icon(Icons.close, size: 20,
+                  color: isDark ? Colors.white54 : AppTheme.textSub),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// _UserSectionCard
+// ─────────────────────────────────────────────────────────────────
+class _UserSectionCard extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final Widget child;
+
+  const _UserSectionCard({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkCard : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: isDark ? Colors.white12 : AppTheme.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: isDark ? AppTheme.darkElement : AppTheme.headerBg,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(12),
+                topRight: Radius.circular(12),
+              ),
+              border: Border(
+                bottom: BorderSide(color: isDark ? Colors.white12 : AppTheme.border),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: iconColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Icon(icon, size: 15, color: iconColor),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  title,
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: iconColor),
+                ),
+              ],
+            ),
+          ),
+          Padding(padding: const EdgeInsets.all(16), child: child),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// _UserFormField
+// ─────────────────────────────────────────────────────────────────
+class _UserFormField extends StatelessWidget {
+  final TextEditingController controller;
+  final String label;
+  final IconData icon;
+  final bool required;
+  final bool enabled;
+  final bool readOnly;
+  final TextInputType? keyboardType;
+  final String? helperText;
+  final String? Function(String?)? validator;
+
+  const _UserFormField({
+    required this.controller,
+    required this.label,
+    required this.icon,
+    this.required = false,
+    this.enabled = true,
+    this.readOnly = false,
+    this.keyboardType,
+    this.helperText,
+    this.validator,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return TextFormField(
       controller: controller,
+      enabled: enabled,
       readOnly: readOnly,
       keyboardType: keyboardType,
+      style: TextStyle(fontSize: 13, color: isDark ? Colors.white : Colors.black87),
+      validator: validator,
       decoration: InputDecoration(
-        labelText: label,
-        hintText: hint,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        labelText: required ? '$label *' : label,
+        labelStyle: TextStyle(fontSize: 13, color: isDark ? Colors.white60 : AppTheme.textSub),
+        helperText: helperText,
+        helperStyle: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : AppTheme.textSub),
+        prefixIcon: Icon(icon, size: 17, color: isDark ? Colors.white54 : AppTheme.textSub),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: AppTheme.border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: AppTheme.border),
+        ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: const BorderSide(color: AppTheme.primaryColor, width: 1.5),
         ),
         filled: readOnly,
-        fillColor: readOnly ? Colors.grey.withValues(alpha: 0.08) : null,
+        fillColor: readOnly
+            ? (isDark ? Colors.white10 : Colors.grey.withValues(alpha: 0.08))
+            : (isDark ? AppTheme.darkElement : Colors.white),
       ),
-      validator: validator,
     );
   }
+}
 
-  Widget _buildDropdownLabel(String label) => Text(
-    label,
-    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
-  );
+// ─────────────────────────────────────────────────────────────────
+// _PasswordField
+// ─────────────────────────────────────────────────────────────────
+class _PasswordField extends StatelessWidget {
+  final TextEditingController controller;
+  final bool obscure;
+  final bool enabled;
+  final VoidCallback onToggle;
+  final String? Function(String?)? validator;
+
+  const _PasswordField({
+    required this.controller,
+    required this.obscure,
+    required this.enabled,
+    required this.onToggle,
+    this.validator,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return TextFormField(
+      controller: controller,
+      obscureText: obscure,
+      enabled: enabled,
+      style: TextStyle(fontSize: 13, color: isDark ? Colors.white : Colors.black87),
+      validator: validator,
+      decoration: InputDecoration(
+        labelText: 'รหัสผ่าน *',
+        labelStyle: TextStyle(fontSize: 13, color: isDark ? Colors.white60 : AppTheme.textSub),
+        helperText: 'อย่างน้อย 6 ตัวอักษร',
+        helperStyle: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : AppTheme.textSub),
+        prefixIcon: Icon(Icons.lock_outline, size: 17, color: isDark ? Colors.white54 : AppTheme.textSub),
+        suffixIcon: IconButton(
+          icon: Icon(obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+              size: 18, color: isDark ? Colors.white54 : AppTheme.textSub),
+          onPressed: onToggle,
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: AppTheme.border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: AppTheme.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: AppTheme.primaryColor, width: 1.5),
+        ),
+        filled: true,
+        fillColor: isDark ? AppTheme.darkElement : Colors.white,
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// _DropdownSection
+// ─────────────────────────────────────────────────────────────────
+class _DropdownSection<T> extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final T value;
+  final String hint;
+  final bool enabled;
+  final List<DropdownMenuItem<T>> items;
+  final ValueChanged<T?> onChanged;
+
+  const _DropdownSection({
+    required this.label,
+    required this.icon,
+    required this.value,
+    required this.hint,
+    required this.enabled,
+    required this.items,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 15, color: isDark ? Colors.white54 : AppTheme.textSub),
+            const SizedBox(width: 6),
+            Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500,
+                color: isDark ? Colors.white60 : AppTheme.textSub)),
+          ],
+        ),
+        const SizedBox(height: 6),
+        DropdownButtonFormField<T>(
+          initialValue: value,
+          decoration: InputDecoration(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: AppTheme.border),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: AppTheme.border),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: AppTheme.primaryColor, width: 1.5),
+            ),
+            filled: true,
+            fillColor: isDark ? AppTheme.darkElement : Colors.white,
+          ),
+          hint: Text(hint, style: const TextStyle(fontSize: 13)),
+          style: TextStyle(fontSize: 13, color: isDark ? Colors.white : Colors.black87),
+          items: items,
+          onChanged: enabled ? onChanged : null,
+        ),
+      ],
+    );
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -899,7 +1186,10 @@ class _ChangePasswordDialogState extends ConsumerState<_ChangePasswordDialog> {
                   Container(width: 4, height: 20,
                     decoration: BoxDecoration(color: AppTheme.primaryColor, borderRadius: BorderRadius.circular(2))),
                   const SizedBox(width: 10),
-                  const Text('เปลี่ยนรหัสผ่าน', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                  const Expanded(
+                    child: Text('เปลี่ยนรหัสผ่าน', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                  ),
+                  buildMobileCloseCompactButton(context),
                 ]),
                 const SizedBox(height: 6),
                 Text(

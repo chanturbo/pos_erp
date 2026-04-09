@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/widgets/mobile_home_button.dart';
 
 class DiscountDialog extends StatefulWidget {
   final double currentPercent;
@@ -58,7 +59,6 @@ class _DiscountDialogState extends State<DiscountDialog> {
     final isDark      = Theme.of(context).brightness == Brightness.dark;
     final bgColor     = isDark ? AppTheme.darkCard    : Colors.white;
     final textColor   = isDark ? Colors.white         : const Color(0xFF1A1A1A);
-    final subColor    = isDark ? Colors.white60        : AppTheme.subtextColor;
     final divColor    = isDark ? const Color(0xFF333333) : AppTheme.borderColor;
 
     return Dialog(
@@ -95,13 +95,9 @@ class _DiscountDialogState extends State<DiscountDialog> {
                     ),
                   ),
                   const Spacer(),
-                  InkWell(
-                    onTap: () => Navigator.pop(context),
-                    borderRadius: BorderRadius.circular(6),
-                    child: Padding(
-                      padding: const EdgeInsets.all(4),
-                      child: Icon(Icons.close, size: 18, color: subColor),
-                    ),
+                  buildMobileCloseCompactButton(
+                    context,
+                    isDark: isDark,
                   ),
                 ],
               ),

@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/responsive_utils.dart';
+import '../../../../shared/widgets/app_dialogs.dart';
 import '../../../../shared/widgets/escape_pop_scope.dart';
+import '../../../../shared/widgets/mobile_home_button.dart';
 import '../../data/models/branch_model.dart';
 import '../providers/branch_provider.dart';
 import 'branch_form_page.dart';
@@ -54,6 +56,7 @@ class _BranchListPageState extends ConsumerState<BranchListPage> {
       child: Scaffold(
         backgroundColor: AppTheme.surfaceColorOf(context),
         appBar: AppBar(
+          leading: buildMobileHomeLeading(context),
           automaticallyImplyLeading: canPop,
           title: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -876,8 +879,13 @@ class _BranchListPageState extends ConsumerState<BranchListPage> {
   void _confirmDelete(BuildContext context, BranchModel branch) {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('ยืนยันการลบ'),
+      builder: (ctx) => AppDialog(
+        title: buildAppDialogTitle(
+          ctx,
+          title: 'ยืนยันการลบ',
+          icon: Icons.delete_outline,
+          iconColor: AppTheme.errorColor,
+        ),
         content: Text('ต้องการลบสาขา "${branch.branchName}" ใช่หรือไม่?'),
         actions: [
           TextButton(

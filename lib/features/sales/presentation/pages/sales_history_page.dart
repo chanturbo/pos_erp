@@ -9,7 +9,9 @@ import 'order_details_page.dart';
 import 'sales_history_pdf_report.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
 import 'package:pos_erp/shared/pdf/pdf_report_button.dart';
+import 'package:pos_erp/shared/utils/responsive_utils.dart';
 import 'package:pos_erp/shared/widgets/pagination_bar.dart';
+import 'package:pos_erp/shared/widgets/mobile_home_button.dart';
 import 'package:pos_erp/features/settings/presentation/pages/settings_page.dart';
 
 // ─────────────────────────────────────────────────────────────────
@@ -1383,20 +1385,22 @@ class _BackBtn extends StatelessWidget {
   const _BackBtn({required this.onTap});
 
   @override
-  Widget build(BuildContext context) => InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.all(7),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF5F5F5),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppTheme.border),
+  Widget build(BuildContext context) => context.isMobile
+      ? buildMobileHomeCompactButton(context)
+      : InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF5F5F5),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppTheme.border),
+            ),
+            child: const Icon(Icons.arrow_back,
+                size: 17, color: AppTheme.textSub),
           ),
-          child: const Icon(Icons.arrow_back,
-              size: 17, color: AppTheme.textSub),
-        ),
-      );
+        );
 }
 
 class _PageIcon extends StatelessWidget {

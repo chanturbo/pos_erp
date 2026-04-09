@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
+import 'package:pos_erp/shared/utils/responsive_utils.dart';
+import 'package:pos_erp/shared/widgets/app_dialogs.dart';
 import 'package:pos_erp/shared/widgets/escape_pop_scope.dart';
+import 'package:pos_erp/shared/widgets/mobile_home_button.dart';
 
 import '../../../inventory/presentation/providers/stock_provider.dart';
 import '../../../products/data/models/product_model.dart';
@@ -979,33 +982,14 @@ class _GoodsReceiptFormPageState extends ConsumerState<GoodsReceiptFormPage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => AppDialog(
         backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(7),
-              decoration: BoxDecoration(
-                color: AppTheme.primaryDark.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(
-                Icons.edit_outlined,
-                size: 18,
-                color: AppTheme.primaryDark,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Text(
-              'สร้างใบรับสินค้าเอง',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white : const Color(0xFF1A1A1A),
-              ),
-            ),
-          ],
+        title: buildAppDialogTitle(
+          ctx,
+          title: 'สร้างใบรับสินค้าเอง',
+          icon: Icons.edit_outlined,
+          iconColor: AppTheme.primaryDark,
         ),
         content: Text(
           'คุณต้องการสร้างใบรับสินค้าโดยไม่อ้างอิง PO ใช่หรือไม่?\n\n'
@@ -1248,33 +1232,14 @@ class _GoodsReceiptFormPageState extends ConsumerState<GoodsReceiptFormPage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => AppDialog(
         backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(7),
-              decoration: BoxDecoration(
-                color: AppTheme.info.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(
-                Icons.help_outline,
-                size: 18,
-                color: AppTheme.info,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Text(
-              'คำแนะนำ',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white : const Color(0xFF1A1A1A),
-              ),
-            ),
-          ],
+        title: buildAppDialogTitle(
+          ctx,
+          title: 'คำแนะนำ',
+          icon: Icons.help_outline,
+          iconColor: AppTheme.info,
         ),
         content: SingleChildScrollView(
           child: Column(
@@ -1331,14 +1296,14 @@ class _GoodsReceiptFormPageState extends ConsumerState<GoodsReceiptFormPage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => AppDialog(
         backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text(
-          title,
-          style: TextStyle(
-            color: isDark ? Colors.white : const Color(0xFF1A1A1A),
-          ),
+        title: buildAppDialogTitle(
+          ctx,
+          title: title,
+          icon: Icons.info_outline,
+          iconColor: AppTheme.info,
         ),
         content: Text(
           message,
@@ -1380,18 +1345,20 @@ class _GRFormTitleBar extends StatelessWidget {
       child: Row(
         children: [
           if (canPop) ...[
-            InkWell(
-              onTap: () => Navigator.pop(context),
-              borderRadius: BorderRadius.circular(6),
-              child: Padding(
-                padding: const EdgeInsets.all(4),
-                child: Icon(
-                  Icons.arrow_back,
-                  size: 20,
-                  color: isDark ? Colors.white70 : AppTheme.textSub,
-                ),
-              ),
-            ),
+            context.isMobile
+                ? buildMobileHomeCompactButton(context, isDark: isDark)
+                : InkWell(
+                    onTap: () => Navigator.pop(context),
+                    borderRadius: BorderRadius.circular(6),
+                    child: Padding(
+                      padding: const EdgeInsets.all(4),
+                      child: Icon(
+                        Icons.arrow_back,
+                        size: 20,
+                        color: isDark ? Colors.white70 : AppTheme.textSub,
+                      ),
+                    ),
+                  ),
             const SizedBox(width: 10),
           ],
           Container(
@@ -1556,33 +1523,14 @@ class _POSelectionDialogState extends State<_POSelectionDialog> {
                 );
           }).toList();
 
-    return AlertDialog(
+    return AppDialog(
       backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      title: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(7),
-            decoration: BoxDecoration(
-              color: AppTheme.info.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(
-              Icons.receipt_long_outlined,
-              size: 18,
-              color: AppTheme.info,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Text(
-            'เลือก Purchase Order',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: isDark ? Colors.white : const Color(0xFF1A1A1A),
-            ),
-          ),
-        ],
+      title: buildAppDialogTitle(
+        context,
+        title: 'เลือก Purchase Order',
+        icon: Icons.receipt_long_outlined,
+        iconColor: AppTheme.info,
       ),
       content: SizedBox(
         width: 500,
@@ -1792,33 +1740,14 @@ class _SupplierSelectionDialogState extends State<_SupplierSelectionDialog> {
                 s.supplierCode.toLowerCase().contains(q);
           }).toList();
 
-    return AlertDialog(
+    return AppDialog(
       backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      title: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(7),
-            decoration: BoxDecoration(
-              color: AppTheme.primaryDark.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(
-              Icons.business_outlined,
-              size: 18,
-              color: AppTheme.primaryDark,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Text(
-            'เลือกซัพพลายเออร์',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: isDark ? Colors.white : const Color(0xFF1A1A1A),
-            ),
-          ),
-        ],
+      title: buildAppDialogTitle(
+        context,
+        title: 'เลือกซัพพลายเออร์',
+        icon: Icons.business_outlined,
+        iconColor: AppTheme.primaryDark,
       ),
       content: SizedBox(
         width: 420,
@@ -2033,33 +1962,21 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
                 (p.barcode?.toLowerCase().contains(q) ?? false);
           }).toList();
 
-    return AlertDialog(
+    return AppDialog(
       backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       title: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(7),
-            decoration: BoxDecoration(
-              color: AppTheme.success.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(
-              Icons.add_shopping_cart_outlined,
-              size: 18,
-              color: AppTheme.success,
+          Expanded(
+            child: buildAppDialogTitle(
+              context,
+              title: 'เพิ่มรายการสินค้า',
+              icon: Icons.add_shopping_cart_outlined,
+              iconColor: AppTheme.success,
+              showClose: false,
             ),
           ),
-          const SizedBox(width: 10),
-          Text(
-            'เพิ่มรายการสินค้า',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: isDark ? Colors.white : const Color(0xFF1A1A1A),
-            ),
-          ),
-          const Spacer(),
+          const SizedBox(width: 8),
           ScannerButton(
             tooltip: 'สแกนบาร์โค้ด',
             useSheet: true,
@@ -2480,33 +2397,14 @@ class _ItemEditDialogState extends State<_ItemEditDialog> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return AlertDialog(
+    return AppDialog(
       backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      title: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(7),
-            decoration: BoxDecoration(
-              color: AppTheme.info.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(
-              Icons.edit_outlined,
-              size: 18,
-              color: AppTheme.info,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Text(
-            'แก้ไขรายการ',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: isDark ? Colors.white : const Color(0xFF1A1A1A),
-            ),
-          ),
-        ],
+      title: buildAppDialogTitle(
+        context,
+        title: 'แก้ไขรายการ',
+        icon: Icons.edit_outlined,
+        iconColor: AppTheme.info,
       ),
       content: SizedBox(
         width: 450,

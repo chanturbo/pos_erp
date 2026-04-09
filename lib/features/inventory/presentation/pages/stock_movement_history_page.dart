@@ -5,6 +5,7 @@ import '../../../../core/client/api_client.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/responsive_utils.dart';
 import '../../../../shared/widgets/escape_pop_scope.dart';
+import '../../../../shared/widgets/mobile_home_button.dart';
 import '../../data/models/stock_movement_model.dart';
 
 // ── Color aliases ─────────────────────────────────────────────────
@@ -138,6 +139,7 @@ class _StockMovementHistoryPageState
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
+        leading: buildMobileHomeLeading(context),
         title: const Text('ประวัติการเคลื่อนไหวสต๊อก'),
         actions: [
           // Toggle view

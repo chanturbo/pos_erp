@@ -7,7 +7,9 @@ import '../../core/database/seed_data.dart';
 import '../../shared/theme/app_theme.dart';
 import '../../shared/utils/responsive_utils.dart';
 import '../../shared/widgets/async_state_widgets.dart';
+import '../../shared/widgets/app_dialogs.dart';
 import '../../shared/widgets/loading_overlay.dart';
+import '../../shared/widgets/mobile_home_button.dart';
 
 class TestPage extends ConsumerWidget {
   const TestPage({super.key});
@@ -17,6 +19,7 @@ class TestPage extends ConsumerWidget {
     return Scaffold(
       backgroundColor: AppTheme.surfaceColorOf(context),
       appBar: AppBar(
+        leading: buildMobileHomeLeading(context),
         automaticallyImplyLeading: Navigator.of(context).canPop(),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -423,8 +426,12 @@ class TestPage extends ConsumerWidget {
       if (context.mounted) {
         showDialog(
           context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Users'),
+          builder: (context) => AppDialog(
+            title: buildAppDialogTitle(
+              context,
+              title: 'Users',
+              icon: Icons.people_alt_outlined,
+            ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -456,8 +463,12 @@ class TestPage extends ConsumerWidget {
       if (context.mounted) {
         showDialog(
           context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Products'),
+          builder: (context) => AppDialog(
+            title: buildAppDialogTitle(
+              context,
+              title: 'Products',
+              icon: Icons.inventory_2_outlined,
+            ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -496,8 +507,12 @@ class TestPage extends ConsumerWidget {
       if (context.mounted) {
         showDialog(
           context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Customers'),
+          builder: (context) => AppDialog(
+            title: buildAppDialogTitle(
+              context,
+              title: 'Customers',
+              icon: Icons.person_search_outlined,
+            ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,

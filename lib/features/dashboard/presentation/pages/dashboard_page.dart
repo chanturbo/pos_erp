@@ -14,6 +14,7 @@ class DashboardPage extends ConsumerWidget {
   final VoidCallback? onGoToProducts;
   final VoidCallback? onGoToCustomers;
   final VoidCallback? onGoToSalesHistory;
+  final bool showBackButton;
 
   /// เปิดหน้ารายการขาย กรองเฉพาะวันนี้ (ใช้ตอนกด card ยอดขายวันนี้/ออเดอร์วันนี้)
   final VoidCallback? onGoToTodaySales;
@@ -25,18 +26,18 @@ class DashboardPage extends ConsumerWidget {
     this.onGoToCustomers,
     this.onGoToSalesHistory,
     this.onGoToTodaySales,
+    this.showBackButton = true,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dashboardAsync = ref.watch(dashboardProvider);
-    final canPop = Navigator.of(context).canPop();
 
     return EscapePopScope(
       child: Scaffold(
         backgroundColor: AppTheme.surfaceColor,
         appBar: AppBar(
-          automaticallyImplyLeading: canPop,
+          automaticallyImplyLeading: showBackButton,
           title: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -124,15 +125,14 @@ class _DashboardBody extends StatelessWidget {
       padding: padding,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final compactDesktop =
-              context.isDesktopOrWider && constraints.maxWidth < 1180;
-
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (context.isDesktopOrWider && !compactDesktop) ...[
-                _buildStatsGrid(context),
-                const SizedBox(height: 24),
+              // Stats cards อยู่บนสุดเสมอ
+              _buildStatsGrid(context),
+              SizedBox(height: context.isMobile ? 12 : 16),
+              if (context.isTabletOrWider) ...[
+                // Tablet + Desktop: เมนูด่วน + ภาพรวม แถวเดียวกัน (กว้างเท่ากัน)
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -144,33 +144,30 @@ class _DashboardBody extends StatelessWidget {
                         onGoToSalesHistory: onGoToSalesHistory,
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: _TodayCard(
                         stats: stats,
                         onOpenAllSales: () => _openAllSales(context),
-                        onOpenTodaySales: () => _openTodaySales(context),
                         onOpenMonthSales: () => _openMonthSales(context),
                       ),
                     ),
                   ],
                 ),
               ] else ...[
-                _TodayCard(
-                  stats: stats,
-                  onOpenAllSales: () => _openAllSales(context),
-                  onOpenTodaySales: () => _openTodaySales(context),
-                  onOpenMonthSales: () => _openMonthSales(context),
-                ),
-                SizedBox(height: context.isMobile ? 12 : 16),
+                // Mobile: เมนูด่วน + ภาพรวม เรียงซ้อนกัน
                 _QuickActionsCard(
                   onGoToPos: onGoToPos,
                   onGoToProducts: onGoToProducts,
                   onGoToCustomers: onGoToCustomers,
                   onGoToSalesHistory: onGoToSalesHistory,
                 ),
-                SizedBox(height: context.isMobile ? 12 : 16),
-                _buildStatsGrid(context),
+                const SizedBox(height: 12),
+                _TodayCard(
+                  stats: stats,
+                  onOpenAllSales: () => _openAllSales(context),
+                  onOpenMonthSales: () => _openMonthSales(context),
+                ),
               ],
             ],
           );
@@ -278,30 +275,37 @@ class _DashboardBody extends StatelessWidget {
       ),
     ];
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final width = constraints.maxWidth;
-        final cols = width >= 1320
-            ? 4
-            : width >= 900
-            ? 3
-            : 2;
-        final aspectRatio = width >= 1320
-            ? 2.0
-            : width >= 900
-            ? 1.75
-            : 1.6;
+    if (context.isTabletOrWider) {
+      // Tablet + Desktop: 4 cards แถวเดียว กว้างเท่ากัน
+      return Row(
+        children: [
+          for (int i = 0; i < cards.length; i++) ...[
+            if (i > 0) const SizedBox(width: 14),
+            Expanded(child: _StatCard(data: cards[i], compact: true)),
+          ],
+        ],
+      );
+    }
 
-        return GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: cols,
-          childAspectRatio: aspectRatio,
-          crossAxisSpacing: context.isMobile ? 10 : 14,
-          mainAxisSpacing: context.isMobile ? 10 : 14,
-          children: cards.map((c) => _StatCard(data: c)).toList(),
-        );
-      },
+    // Mobile: 2×2 grid
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(child: _StatCard(data: cards[0])),
+            const SizedBox(width: 10),
+            Expanded(child: _StatCard(data: cards[1])),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(child: _StatCard(data: cards[2])),
+            const SizedBox(width: 10),
+            Expanded(child: _StatCard(data: cards[3])),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -329,15 +333,16 @@ class _StatCardData {
 
 class _StatCard extends StatelessWidget {
   final _StatCardData data;
-  const _StatCard({required this.data});
+  final bool compact;
+  const _StatCard({required this.data, this.compact = false});
 
   @override
   Widget build(BuildContext context) {
-    // Icon size ตามหน้าจอ
-    final iconBoxSize = context.isMobile ? 40.0 : 46.0;
-    final iconSize = context.isMobile ? 20.0 : 22.0;
-    final valueFontSize = context.isMobile ? 20.0 : 24.0;
-    final labelFontSize = context.isMobile ? 11.0 : 12.0;
+    // Icon size ตามหน้าจอ (compact = tablet/desktop แถวเดียว 4 cards)
+    final iconBoxSize = (context.isMobile || compact) ? 38.0 : 46.0;
+    final iconSize = (context.isMobile || compact) ? 18.0 : 22.0;
+    final valueFontSize = (context.isMobile || compact) ? 18.0 : 24.0;
+    final labelFontSize = (context.isMobile || compact) ? 11.0 : 12.0;
 
     return Card(
       elevation: 0,
@@ -403,13 +408,11 @@ class _StatCard extends StatelessWidget {
 class _TodayCard extends StatelessWidget {
   final DashboardStats stats;
   final VoidCallback onOpenAllSales;
-  final VoidCallback onOpenTodaySales;
   final VoidCallback onOpenMonthSales;
 
   const _TodayCard({
     required this.stats,
     required this.onOpenAllSales,
-    required this.onOpenTodaySales,
     required this.onOpenMonthSales,
   });
 
@@ -438,8 +441,7 @@ class _TodayCard extends StatelessWidget {
             const Divider(height: 18, color: AppTheme.borderColor),
             _OverviewRow(
               label: 'ออเดอร์ทั้งหมด',
-              value:
-                  '${NumberFormat('#,##0').format(stats.totalOrders)} ออเดอร์',
+              value: '${NumberFormat('#,##0').format(stats.totalOrders)} ออเดอร์',
               color: AppTheme.infoColor,
               onTap: onOpenAllSales,
             ),
@@ -453,25 +455,9 @@ class _TodayCard extends StatelessWidget {
             const Divider(height: 18, color: AppTheme.borderColor),
             _OverviewRow(
               label: 'ออเดอร์เดือนนี้',
-              value:
-                  '${NumberFormat('#,##0').format(stats.monthOrders)} ออเดอร์',
+              value: '${NumberFormat('#,##0').format(stats.monthOrders)} ออเดอร์',
               color: AppTheme.warningColor,
               onTap: onOpenMonthSales,
-            ),
-            const Divider(height: 18, color: AppTheme.borderColor),
-            _OverviewRow(
-              label: 'ยอดขายวันนี้',
-              value: '฿${NumberFormat('#,##0.00').format(stats.todaySales)}',
-              color: AppTheme.primaryColor,
-              onTap: onOpenTodaySales,
-            ),
-            const Divider(height: 18, color: AppTheme.borderColor),
-            _OverviewRow(
-              label: 'ออเดอร์วันนี้',
-              value:
-                  '${NumberFormat('#,##0').format(stats.todayOrders)} ออเดอร์',
-              color: AppTheme.primaryColor,
-              onTap: onOpenTodaySales,
             ),
           ],
         ),
@@ -554,14 +540,24 @@ class _QuickActionsCard extends StatelessWidget {
           children: [
             _CardHeader(title: 'เมนูด่วน'),
             const SizedBox(height: 14),
-            GridView.count(
-              crossAxisCount: 2,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisSpacing: 10,
-              mainAxisSpacing: 10,
-              childAspectRatio: context.isMobile ? 2.4 : 2.8,
-              children: actions.map((a) => _QuickItemCard(action: a)).toList(),
+            Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(child: _QuickItemCard(action: actions[0])),
+                    const SizedBox(width: 10),
+                    Expanded(child: _QuickItemCard(action: actions[1])),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(child: _QuickItemCard(action: actions[2])),
+                    const SizedBox(width: 10),
+                    Expanded(child: _QuickItemCard(action: actions[3])),
+                  ],
+                ),
+              ],
             ),
           ],
         ),

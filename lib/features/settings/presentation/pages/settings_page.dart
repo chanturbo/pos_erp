@@ -28,6 +28,7 @@ class SettingsState {
   final String promptPayId;
   // ✅ POS View Mode
   final String posProductViewMode; // 'list' | 'grid'
+  final bool mobilePosAutoOpenCartOnTap;
   final int listPageSizeMobile;
   final int listPageSizeTablet;
   final int listPageSizeDesktop;
@@ -52,6 +53,7 @@ class SettingsState {
     this.pointValue = 1.0,
     this.promptPayId = '',
     this.posProductViewMode = 'list',
+    this.mobilePosAutoOpenCartOnTap = false,
     this.listPageSizeMobile = SettingsDefaults.listPageSizeMobile,
     this.listPageSizeTablet = SettingsDefaults.listPageSizeTablet,
     this.listPageSizeDesktop = SettingsDefaults.listPageSizeDesktop,
@@ -95,6 +97,7 @@ class SettingsState {
     double? pointValue,
     String? promptPayId,
     String? posProductViewMode,
+    bool? mobilePosAutoOpenCartOnTap,
     int? listPageSizeMobile,
     int? listPageSizeTablet,
     int? listPageSizeDesktop,
@@ -119,6 +122,8 @@ class SettingsState {
       pointValue: pointValue ?? this.pointValue,
       promptPayId: promptPayId ?? this.promptPayId,
       posProductViewMode: posProductViewMode ?? this.posProductViewMode,
+      mobilePosAutoOpenCartOnTap:
+          mobilePosAutoOpenCartOnTap ?? this.mobilePosAutoOpenCartOnTap,
       listPageSizeMobile: listPageSizeMobile ?? this.listPageSizeMobile,
       listPageSizeTablet: listPageSizeTablet ?? this.listPageSizeTablet,
       listPageSizeDesktop: listPageSizeDesktop ?? this.listPageSizeDesktop,
@@ -170,6 +175,9 @@ class SettingsNotifier extends Notifier<SettingsState> {
       promptPayId: prefs.getString('promptpay_id') ?? state.promptPayId,
       posProductViewMode:
           prefs.getString('pos_product_view_mode') ?? state.posProductViewMode,
+      mobilePosAutoOpenCartOnTap:
+          prefs.getBool('mobile_pos_auto_open_cart_on_tap') ??
+          state.mobilePosAutoOpenCartOnTap,
       listPageSizeMobile:
           prefs.getInt('list_page_size_mobile') ??
           legacyList ??
@@ -260,6 +268,12 @@ class SettingsNotifier extends Notifier<SettingsState> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('pos_product_view_mode', mode);
     state = state.copyWith(posProductViewMode: mode);
+  }
+
+  Future<void> updateMobilePosAutoOpenCartOnTap(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('mobile_pos_auto_open_cart_on_tap', enabled);
+    state = state.copyWith(mobilePosAutoOpenCartOnTap: enabled);
   }
 
   // ✅ List Page Size
@@ -931,6 +945,33 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ),
             ),
           ],
+        ),
+        const SizedBox(height: 16),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text(
+            'แตะสินค้าแล้วเปิดตะกร้าอัตโนมัติ',
+            style: TextStyle(
+              color: isDark ? Colors.white : Colors.black87,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          subtitle: Text(
+            'ปิดไว้จะเหมาะกับ POS มากกว่า เพราะแตะสินค้าได้ต่อเนื่องโดยไม่เด้งไปแท็บตะกร้าทุกครั้ง',
+            style: TextStyle(color: isDark ? Colors.white70 : AppTheme.textSub),
+          ),
+          secondary: const Icon(
+            Icons.shopping_cart_checkout_outlined,
+            color: AppTheme.primary,
+          ),
+          value: settings.mobilePosAutoOpenCartOnTap,
+          activeThumbColor: AppTheme.primary,
+          onChanged: (value) async {
+            await ref
+                .read(settingsProvider.notifier)
+                .updateMobilePosAutoOpenCartOnTap(value);
+            if (mounted) _showSuccess('บันทึกการตั้งค่าแล้ว');
+          },
         ),
       ],
     );

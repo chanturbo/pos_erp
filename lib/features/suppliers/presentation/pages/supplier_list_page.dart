@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/responsive_utils.dart';
+import '../../../../shared/widgets/app_dialogs.dart';
 import '../../../../shared/widgets/escape_pop_scope.dart';
+import '../../../../shared/widgets/mobile_home_button.dart';
 import '../../../../shared/widgets/pagination_bar.dart';
 import '../../../../shared/pdf/pdf_report_button.dart';
 import '../../../settings/presentation/pages/settings_page.dart';
@@ -70,6 +72,7 @@ class _SupplierListPageState extends ConsumerState<SupplierListPage> {
       child: Scaffold(
         backgroundColor: AppTheme.surfaceColorOf(context),
         appBar: AppBar(
+          leading: buildMobileHomeLeading(context),
           automaticallyImplyLeading: canPop,
           title: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -629,26 +632,12 @@ class _SupplierListPageState extends ConsumerState<SupplierListPage> {
   void _showSupplierDetails(SupplierModel s) {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        title: Row(
-          children: [
-            CircleAvatar(
-              radius: 16,
-              backgroundColor: _avatarColor(s.supplierName),
-              child: Text(
-                s.supplierName.substring(0, 1).toUpperCase(),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(s.supplierName, style: const TextStyle(fontSize: 16)),
-            ),
-          ],
+      builder: (_) => AppDialog(
+        title: buildAppDialogTitle(
+          context,
+          title: s.supplierName,
+          icon: Icons.local_shipping_outlined,
+          iconColor: AppTheme.primary,
         ),
         content: SingleChildScrollView(
           child: Column(
@@ -717,19 +706,12 @@ class _SupplierListPageState extends ConsumerState<SupplierListPage> {
 
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(
-              hasHistory ? Icons.archive_outlined : Icons.delete_outline,
-              color: hasHistory ? AppTheme.warningColor : AppTheme.error,
-              size: 20,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              hasHistory ? 'ปิดการใช้งานซัพพลายเออร์' : 'ลบซัพพลายเออร์ถาวร',
-            ),
-          ],
+      builder: (_) => AppDialog(
+        title: buildAppDialogTitle(
+          context,
+          title: hasHistory ? 'ปิดการใช้งานซัพพลายเออร์' : 'ลบซัพพลายเออร์ถาวร',
+          icon: hasHistory ? Icons.archive_outlined : Icons.delete_outline,
+          iconColor: hasHistory ? AppTheme.warningColor : AppTheme.error,
         ),
         content: hasHistory
             ? Text(

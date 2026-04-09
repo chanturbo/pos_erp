@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../providers/sales_provider.dart';
 import '../../data/models/sales_order_model.dart';
 import '../../../settings/presentation/pages/settings_page.dart';
+import '../../../../shared/widgets/mobile_home_button.dart';
 import '../../../../shared/widgets/thermal_receipt.dart';
 
 class OrderDetailsPage extends ConsumerStatefulWidget {
@@ -40,6 +41,7 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: buildMobileHomeLeading(context),
         title: const Text('รายละเอียดใบขาย'),
         actions: [
           if (_order != null)
@@ -744,6 +746,7 @@ class _OrderReceiptPage extends ConsumerWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFEEEEEE),
       appBar: AppBar(
+        leading: buildMobileHomeLeading(context),
         title: const Text('ใบเสร็จรับเงิน'),
       ),
       body: Center(
@@ -788,4 +791,3 @@ class _OrderReceiptPage extends ConsumerWidget {
     );
   }
 }
-

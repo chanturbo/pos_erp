@@ -20,6 +20,7 @@ import '../../../branches/presentation/providers/branch_provider.dart';
 import '../../../../core/config/app_mode.dart';
 import '../../../../core/services/pending_sales_queue_service.dart';
 import '../../../../shared/services/mobile_scanner_service.dart';
+import '../../../../shared/widgets/mobile_home_button.dart';
 import '../../../../shared/widgets/thermal_receipt.dart';
 
 class PaymentPage extends ConsumerStatefulWidget {
@@ -241,7 +242,10 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
     final hasPromptPay = PromptPayUtils.isValidPromptPayId(promptPayId);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('ชำระเงิน')),
+      appBar: AppBar(
+        leading: buildMobileHomeLeading(context),
+        title: const Text('ชำระเงิน'),
+      ),
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -1606,6 +1610,7 @@ class ReceiptPage extends ConsumerWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFEEEEEE),
       appBar: AppBar(
+        leading: buildMobileHomeLeading(context),
         automaticallyImplyLeading: false,
         title: const Text('ใบเสร็จรับเงิน'),
         actions: [

@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
+import 'package:pos_erp/shared/utils/responsive_utils.dart';
+import 'package:pos_erp/shared/widgets/app_dialogs.dart';
 import 'package:pos_erp/shared/widgets/pagination_bar.dart';
 import 'package:pos_erp/shared/widgets/escape_pop_scope.dart';
 import 'package:pos_erp/shared/pdf/pdf_report_button.dart';
+import 'package:pos_erp/shared/widgets/mobile_home_button.dart';
 import '../../../settings/presentation/pages/settings_page.dart';
 import '../providers/ap_invoice_provider.dart';
 import '../../data/models/ap_invoice_model.dart';
@@ -652,33 +655,14 @@ class _ApInvoiceListPageState extends ConsumerState<ApInvoiceListPage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => AppDialog(
         backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(7),
-              decoration: BoxDecoration(
-                color: AppTheme.error.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(
-                Icons.delete_outline,
-                size: 18,
-                color: AppTheme.error,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Text(
-              'ยืนยันการลบ',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white : const Color(0xFF1A1A1A),
-              ),
-            ),
-          ],
+        title: buildAppDialogTitle(
+          ctx,
+          title: 'ยืนยันการลบ',
+          icon: Icons.delete_outline,
+          iconColor: AppTheme.error,
         ),
         content: Text(
           'ต้องการลบใบแจ้งหนี้ ${invoice.invoiceNo} ออกจากระบบ?',
@@ -1142,25 +1126,27 @@ class _APBackBtn extends StatelessWidget {
   final bool isDark;
   const _APBackBtn({required this.isDark});
   @override
-  Widget build(BuildContext context) => InkWell(
-    onTap: () => Navigator.of(context).pop(),
-    borderRadius: BorderRadius.circular(8),
-    child: Container(
-      padding: const EdgeInsets.all(7),
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkElement : const Color(0xFFF5F5F5),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: isDark ? const Color(0xFF333333) : AppTheme.border,
-        ),
-      ),
-      child: Icon(
-        Icons.arrow_back_ios_new,
-        size: 15,
-        color: isDark ? const Color(0xFFAAAAAA) : const Color(0xFF8A8A8A),
-      ),
-    ),
-  );
+  Widget build(BuildContext context) => context.isMobile
+      ? buildMobileHomeCompactButton(context, isDark: isDark)
+      : InkWell(
+          onTap: () => Navigator.of(context).pop(),
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+              color: isDark ? AppTheme.darkElement : const Color(0xFFF5F5F5),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: isDark ? const Color(0xFF333333) : AppTheme.border,
+              ),
+            ),
+            child: Icon(
+              Icons.arrow_back_ios_new,
+              size: 15,
+              color: isDark ? const Color(0xFFAAAAAA) : const Color(0xFF8A8A8A),
+            ),
+          ),
+        );
 }
 
 class _APPageIcon extends StatelessWidget {

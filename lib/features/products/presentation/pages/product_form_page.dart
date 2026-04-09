@@ -10,6 +10,7 @@ import '../../data/models/product_model.dart';
 import '../../../../shared/services/mobile_scanner_service.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
 import '../../../../shared/utils/responsive_utils.dart';
+import '../../../../shared/widgets/mobile_home_button.dart';
 
 // ─────────────────────────────────────────────────────────────────
 // ProductFormPage
@@ -697,18 +698,20 @@ class _TitleBar extends StatelessWidget {
       child: Row(
         children: [
           if (isLarge && canPop) ...[
-            InkWell(
-              onTap: () => Navigator.pop(context),
-              borderRadius: BorderRadius.circular(6),
-              child: Padding(
-                padding: const EdgeInsets.all(4),
-                child: Icon(
-                  Icons.arrow_back,
-                  size: 20,
-                  color: isDark ? Colors.white70 : AppTheme.textSub,
-                ),
-              ),
-            ),
+            context.isMobile
+                ? buildMobileHomeCompactButton(context, isDark: isDark)
+                : InkWell(
+                    onTap: () => Navigator.pop(context),
+                    borderRadius: BorderRadius.circular(6),
+                    child: Padding(
+                      padding: const EdgeInsets.all(4),
+                      child: Icon(
+                        Icons.arrow_back,
+                        size: 20,
+                        color: isDark ? Colors.white70 : AppTheme.textSub,
+                      ),
+                    ),
+                  ),
             const SizedBox(width: 10),
           ],
           Container(

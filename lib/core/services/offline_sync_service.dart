@@ -1928,7 +1928,8 @@ class SyncBatchMetrics {
 
 // ── Sync Service Provider ──────────────────────────────────────────────────────
 final offlineSyncServiceProvider = Provider<OfflineSyncService>((ref) {
-  final svc = OfflineSyncService(ref);
+  final db = ref.read(appDatabaseProvider);
+  final svc = OfflineSyncService(ref, database: db);
   // cleanup on dispose
   ref.onDispose(() => svc.dispose());
   return svc;

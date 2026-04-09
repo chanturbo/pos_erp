@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../shared/widgets/mobile_home_button.dart';
 import '../providers/branch_provider.dart';
 import '../../data/models/branch_model.dart';
 
@@ -60,6 +61,7 @@ class _BranchFormPageState extends ConsumerState<BranchFormPage>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: buildMobileHomeLeading(context),
         title: Text(isEdit ? 'แก้ไขสาขา' : 'เพิ่มสาขา'),
         backgroundColor: Colors.indigo,
         foregroundColor: Colors.white,

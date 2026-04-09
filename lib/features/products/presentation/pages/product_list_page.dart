@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
+import 'package:pos_erp/shared/widgets/app_dialogs.dart';
 import 'package:pos_erp/shared/widgets/pagination_bar.dart';
 import '../providers/product_provider.dart';
 import '../../data/models/product_model.dart';
@@ -9,6 +10,8 @@ import 'product_form_page.dart';
 import 'product_group_management_page.dart';
 import 'product_pdf_report.dart'; // ✅ PDF report
 import '../../../../shared/pdf/pdf_report_button.dart';
+import '../../../../shared/utils/responsive_utils.dart';
+import '../../../../shared/widgets/mobile_home_button.dart';
 import '../../../../features/settings/presentation/pages/settings_page.dart';
 import '../../../../features/inventory/presentation/providers/stock_provider.dart';
 import '../../../../features/inventory/data/models/stock_balance_model.dart';
@@ -24,6 +27,7 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   bool _isTableView = true;
+  bool _initializedViewMode = false;
   bool _isActiveOnly = false; // filter เฉพาะสินค้าที่ใช้งาน
   bool _userResized =
       false; // ✅ ป้องกัน auto-adjust override ค่าที่ user ลากไว้
@@ -41,6 +45,14 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
 
   // ✅ ScrollControllers สำหรับแสดง scrollbar
   final _hScroll = ScrollController();
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_initializedViewMode) return;
+    _isTableView = !context.isMobile;
+    _initializedViewMode = true;
+  }
 
   @override
   void dispose() {
@@ -126,17 +138,12 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
 
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(
-              hasHistory ? Icons.archive_outlined : Icons.delete_outline,
-              color: hasHistory ? AppTheme.warningColor : AppTheme.error,
-              size: 20,
-            ),
-            const SizedBox(width: 8),
-            Text(hasHistory ? 'ปิดการใช้งานสินค้า' : 'ลบสินค้าถาวร'),
-          ],
+      builder: (_) => AppDialog(
+        title: buildAppDialogTitle(
+          context,
+          title: hasHistory ? 'ปิดการใช้งานสินค้า' : 'ลบสินค้าถาวร',
+          icon: hasHistory ? Icons.archive_outlined : Icons.delete_outline,
+          iconColor: hasHistory ? AppTheme.warningColor : AppTheme.error,
         ),
         content: hasHistory
             ? Text(
@@ -152,13 +159,13 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
             onPressed: () => Navigator.pop(context, false),
             child: const Text('ยกเลิก'),
           ),
-          ElevatedButton.icon(
+          FilledButton.icon(
             icon: Icon(
               hasHistory ? Icons.pause_circle_outline : Icons.delete_forever,
               size: 16,
             ),
             label: Text(hasHistory ? 'ปิดการใช้งาน' : 'ลบถาวร'),
-            style: ElevatedButton.styleFrom(
+            style: FilledButton.styleFrom(
               backgroundColor: hasHistory
                   ? AppTheme.warningColor
                   : AppTheme.error,
@@ -989,23 +996,25 @@ class _PBackBtn extends StatelessWidget {
   final VoidCallback onTap;
   const _PBackBtn({required this.onTap});
   @override
-  Widget build(BuildContext context) => InkWell(
-    onTap: onTap,
-    borderRadius: BorderRadius.circular(8),
-    child: Container(
-      padding: const EdgeInsets.all(7),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF5F5F5),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppTheme.border),
-      ),
-      child: const Icon(
-        Icons.arrow_back_ios_new,
-        size: 15,
-        color: Color(0xFF8A8A8A),
-      ),
-    ),
-  );
+  Widget build(BuildContext context) => context.isMobile
+      ? buildMobileHomeCompactButton(context)
+      : InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF5F5F5),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppTheme.border),
+            ),
+            child: const Icon(
+              Icons.arrow_back_ios_new,
+              size: 15,
+              color: Color(0xFF8A8A8A),
+            ),
+          ),
+        );
 }
 
 class _PPageIcon extends StatelessWidget {

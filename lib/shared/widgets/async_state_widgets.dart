@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pos_erp/shared/widgets/app_dialogs.dart';
 import '../utils/app_transitions.dart';
 
 // ─────────────────────────────────────────
@@ -306,30 +307,15 @@ Future<bool> showConfirmDialog(
   String cancelLabel = 'ยกเลิก',
   bool destructive = false,
 }) async {
-  final result = await showDialog<bool>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: Text(title),
-      content: Text(content),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx, false),
-          child: Text(cancelLabel),
-        ),
-        ElevatedButton(
-          onPressed: () => Navigator.pop(ctx, true),
-          style: destructive
-              ? ElevatedButton.styleFrom(
-                  backgroundColor: Theme.of(ctx).colorScheme.error,
-                  foregroundColor: Theme.of(ctx).colorScheme.onError,
-                )
-              : null,
-          child: Text(confirmLabel),
-        ),
-      ],
-    ),
+  final result = await showAppConfirmDialog(
+    context,
+    title: title,
+    content: content,
+    confirmLabel: confirmLabel,
+    cancelLabel: cancelLabel,
+    destructive: destructive,
   );
-  return result ?? false;
+  return result;
 }
 
 // ─────────────────────────────────────────

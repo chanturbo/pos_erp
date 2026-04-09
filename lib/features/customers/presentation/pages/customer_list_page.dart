@@ -4,7 +4,9 @@ import 'package:pos_erp/features/customers/data/models/customer_model.dart';
 import '../../../../shared/pdf/pdf_report_button.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
 import 'package:pos_erp/shared/utils/responsive_utils.dart';
+import 'package:pos_erp/shared/widgets/app_dialogs.dart';
 import 'package:pos_erp/shared/widgets/escape_pop_scope.dart';
+import 'package:pos_erp/shared/widgets/mobile_home_button.dart';
 import 'package:pos_erp/shared/widgets/pagination_bar.dart';
 import 'package:pos_erp/features/settings/presentation/pages/settings_page.dart';
 import '../providers/customer_provider.dart';
@@ -75,6 +77,7 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
       child: Scaffold(
         backgroundColor: AppTheme.surfaceColorOf(context),
         appBar: AppBar(
+          leading: buildMobileHomeLeading(context),
           automaticallyImplyLeading: canPop,
           title: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -750,17 +753,12 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
 
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(
-              hasHistory ? Icons.archive_outlined : Icons.delete_outline,
-              color: hasHistory ? AppTheme.warningColor : AppTheme.error,
-              size: 20,
-            ),
-            const SizedBox(width: 8),
-            Text(hasHistory ? 'ปิดการใช้งานลูกค้า' : 'ลบลูกค้าถาวร'),
-          ],
+      builder: (_) => AppDialog(
+        title: buildAppDialogTitle(
+          context,
+          title: hasHistory ? 'ปิดการใช้งานลูกค้า' : 'ลบลูกค้าถาวร',
+          icon: hasHistory ? Icons.archive_outlined : Icons.delete_outline,
+          iconColor: hasHistory ? AppTheme.warningColor : AppTheme.error,
         ),
         content: hasHistory
             ? Text(
@@ -776,13 +774,13 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
             onPressed: () => Navigator.pop(context, false),
             child: const Text('ยกเลิก'),
           ),
-          ElevatedButton.icon(
+          FilledButton.icon(
             icon: Icon(
               hasHistory ? Icons.pause_circle_outline : Icons.delete_forever,
               size: 16,
             ),
             label: Text(hasHistory ? 'ปิดการใช้งาน' : 'ลบถาวร'),
-            style: ElevatedButton.styleFrom(
+            style: FilledButton.styleFrom(
               backgroundColor: hasHistory
                   ? AppTheme.warningColor
                   : AppTheme.error,

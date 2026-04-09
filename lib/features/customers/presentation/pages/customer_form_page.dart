@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
+import 'package:pos_erp/shared/utils/responsive_utils.dart';
+import 'package:pos_erp/shared/widgets/mobile_home_button.dart';
 import '../../data/models/customer_model.dart';
 import '../providers/customer_provider.dart';
 
@@ -200,6 +202,10 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
             child: Row(
               children: [
+                if (context.isMobile) ...[
+                  buildMobileHomeCompactButton(context, isDark: isDark),
+                  const SizedBox(width: 10),
+                ],
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
@@ -222,7 +228,7 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
                   ),
                 ),
                 const Spacer(),
-                if (isDialog)
+                if (isDialog && !context.isMobile)
                   InkWell(
                     onTap: () => Navigator.pop(context),
                     borderRadius: BorderRadius.circular(6),

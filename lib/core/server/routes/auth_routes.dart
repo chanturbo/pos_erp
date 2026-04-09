@@ -58,6 +58,9 @@ class AuthRoutes {
           'user_id': result.user.userId,
           'username': result.user.username,
           'full_name': result.user.fullName,
+          'email': result.user.email,
+          'role_id': result.user.roleId,
+          'branch_id': result.user.branchId,
           'token': result.token,
         },
       }), headers: {

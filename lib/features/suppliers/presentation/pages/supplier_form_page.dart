@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/widgets/app_dialogs.dart';
+import '../../../../shared/widgets/mobile_home_button.dart';
 import '../../data/models/supplier_model.dart';
 import '../providers/supplier_provider.dart';
 
@@ -96,6 +99,7 @@ class _SupplierFormPageState extends ConsumerState<SupplierFormPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: buildMobileHomeLeading(context),
         title: Text(
           widget.supplier == null ? 'เพิ่มซัพพลายเออร์' : 'แก้ไขซัพพลายเออร์',
         ),
@@ -670,8 +674,13 @@ class _SupplierFormPageState extends ConsumerState<SupplierFormPage> {
   void _showHelp() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('คำแนะนำ'),
+      builder: (context) => AppDialog(
+        title: buildAppDialogTitle(
+          context,
+          title: 'คำแนะนำ',
+          icon: Icons.help_outline,
+          iconColor: AppTheme.infoColor,
+        ),
         content: const SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

@@ -11,6 +11,8 @@ import '../../../../core/services/master_discovery_service.dart';
 import '../../../../core/services/offline_sync_service.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/responsive_utils.dart';
+import '../../../../shared/widgets/app_dialogs.dart';
+import '../../../../shared/widgets/mobile_home_button.dart';
 import '../../data/models/branch_model.dart';
 import '../providers/branch_provider.dart';
 
@@ -26,6 +28,7 @@ class SyncStatusPage extends ConsumerWidget {
     return Scaffold(
       backgroundColor: AppTheme.surfaceColorOf(context),
       appBar: AppBar(
+        leading: buildMobileHomeLeading(context),
         automaticallyImplyLeading: Navigator.of(context).canPop(),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1009,8 +1012,13 @@ class SyncStatusPage extends ConsumerWidget {
 
     await showDialog<void>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: Text('Batch ${entry.batchId}'),
+      builder: (_) => AppDialog(
+        title: buildAppDialogTitle(
+          context,
+          title: 'Batch ${entry.batchId}',
+          icon: Icons.receipt_long_outlined,
+          iconColor: AppTheme.infoColor,
+        ),
         content: SizedBox(
           width: 520,
           child: SingleChildScrollView(
@@ -1444,8 +1452,12 @@ class SyncStatusPage extends ConsumerWidget {
 
     final nextName = await showDialog<String>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: Text(AppModeConfig.isMaster ? 'ตั้งชื่อ Master' : 'ตั้งชื่ออุปกรณ์'),
+      builder: (_) => AppDialog(
+        title: buildAppDialogTitle(
+          context,
+          title: AppModeConfig.isMaster ? 'ตั้งชื่อ Master' : 'ตั้งชื่ออุปกรณ์',
+          icon: Icons.edit_outlined,
+        ),
         content: TextField(
           controller: ctrl,
           autofocus: true,

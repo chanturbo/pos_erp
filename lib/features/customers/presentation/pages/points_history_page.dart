@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/client/api_client.dart';
+import '../../../../shared/widgets/mobile_home_button.dart';
 
 // ─────────────────────────────────────────────────────────────────
 // Model
@@ -98,6 +99,7 @@ class _PointsHistoryPageState extends ConsumerState<PointsHistoryPage> {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
+        leading: buildMobileHomeLeading(context),
         title: Text('ประวัติแต้ม · ${widget.customerName}'),
         actions: [
           IconButton(

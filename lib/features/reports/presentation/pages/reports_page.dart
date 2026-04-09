@@ -10,6 +10,7 @@ import '../../../../shared/pdf/pdf_report_button.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/responsive_utils.dart';
 import '../../../../shared/widgets/escape_pop_scope.dart';
+import '../../../../shared/widgets/mobile_home_button.dart';
 import '../../data/models/sales_summary_model.dart';
 import 'reports_pdf_report.dart';
 import 'sales_chart_page.dart';
@@ -324,6 +325,7 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
       child: Scaffold(
         backgroundColor: AppTheme.surfaceColorOf(context),
         appBar: AppBar(
+          leading: buildMobileHomeLeading(context),
           automaticallyImplyLeading: canPop,
           title: isCompactDesktop
               ? const Text('รายงาน')
@@ -636,12 +638,15 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
+        final isMobile = context.isMobile;
         final cols = width >= 1360
             ? 4
             : width >= 1152
             ? 3
             : 2;
-        final aspectRatio = width >= 1360
+        final aspectRatio = isMobile
+            ? 1.35
+            : width >= 1360
             ? 2.6
             : width >= 1152
             ? 2.25
@@ -1677,18 +1682,19 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
 
   Widget _summaryCard(String title, String value, IconData icon, Color color) {
     final width = MediaQuery.sizeOf(context).width;
+    final isMobile = context.isMobile;
     final isTightDesktop = context.isDesktopOrWider && width < 1080;
     final isMediumDesktop =
         context.isDesktopOrWider && width >= 1080 && width < 1280;
-    final iconBoxSize = context.isMobile
-        ? 38.0
+    final iconBoxSize = isMobile
+        ? 34.0
         : isTightDesktop
         ? 36.0
         : isMediumDesktop
         ? 40.0
         : 42.0;
-    final valueFontSize = context.isMobile
-        ? 14.0
+    final valueFontSize = isMobile
+        ? 13.0
         : isTightDesktop
         ? 15.0
         : isMediumDesktop
@@ -1701,9 +1707,10 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
           final stacked = constraints.maxWidth < 220;
 
           return Padding(
-            padding: context.cardPadding,
+            padding: EdgeInsets.all(isMobile ? 10 : context.cardPadding.left),
             child: stacked
                 ? Column(
+                    mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Container(
@@ -1713,9 +1720,9 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
                           color: color.withValues(alpha: 0.14),
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: Icon(icon, size: 20, color: color),
+                        child: Icon(icon, size: isMobile ? 18 : 20, color: color),
                       ),
-                      SizedBox(height: isTightDesktop ? 8 : 10),
+                      SizedBox(height: isMobile ? 8 : (isTightDesktop ? 8 : 10)),
                       Text(
                         value,
                         maxLines: 2,
@@ -1727,7 +1734,7 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
                           height: 1,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      SizedBox(height: isMobile ? 2 : 4),
                       Text(
                         title,
                         maxLines: 2,

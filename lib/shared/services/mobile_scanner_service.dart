@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/widgets/app_dialogs.dart';
+import '../../../../shared/widgets/mobile_home_button.dart';
 
 // ✅ FIX #3: ตรวจ platform จริง แทน bool get _isMobile => true
 // Mac = desktop → ใช้กล้องหน้า, ไม่มีกล้องหลัง
@@ -71,13 +74,18 @@ class MobileScannerService {
   static Future<void> openContinuous(
     BuildContext context, {
     required void Function(ScanResult result) onScanned,
+    FutureOr<void> Function(BuildContext sheetContext, ScanResult result)?
+        onScannedInSheet,
   }) async {
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black.withValues(alpha: 0.35),
-      builder: (_) => _ScannerSheet(onScanned: onScanned),
+      builder: (_) => _ScannerSheet(
+        onScanned: onScanned,
+        onScannedInSheet: onScannedInSheet,
+      ),
     );
   }
 
@@ -114,20 +122,11 @@ class _ManualInputDialogState extends State<_ManualInputDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Row(
-        children: [
-          Container(
-            width: 4,
-            height: 18,
-            decoration: BoxDecoration(
-              color: AppTheme.primaryColor,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(width: 10),
-          const Text('กรอกบาร์โค้ด / QR Code'),
-        ],
+    return AppDialog(
+      title: buildAppDialogTitle(
+        context,
+        title: 'กรอกบาร์โค้ด / QR Code',
+        icon: Icons.qr_code_scanner,
       ),
       content: TextField(
         controller: _ctrl,
@@ -174,7 +173,13 @@ class _ManualInputDialogState extends State<_ManualInputDialog> {
 // ─────────────────────────────────────────
 class _ScannerSheet extends StatefulWidget {
   final void Function(ScanResult) onScanned;
-  const _ScannerSheet({required this.onScanned});
+  final FutureOr<void> Function(BuildContext sheetContext, ScanResult result)?
+      onScannedInSheet;
+
+  const _ScannerSheet({
+    required this.onScanned,
+    this.onScannedInSheet,
+  });
 
   @override
   State<_ScannerSheet> createState() => _ScannerSheetState();
@@ -212,7 +217,12 @@ class _ScannerSheetState extends State<_ScannerSheet> {
 
   void _handleDetected(String value, ScanType type) {
     if (_cooldown || value.isEmpty) return;
-    widget.onScanned(ScanResult(value: value, type: type));
+    final result = ScanResult(value: value, type: type);
+    if (widget.onScannedInSheet != null) {
+      widget.onScannedInSheet!(context, result);
+    } else {
+      widget.onScanned(result);
+    }
     setState(() => _cooldown = true);
     Future.delayed(const Duration(milliseconds: 800), () {
       if (mounted) setState(() => _cooldown = false);
@@ -223,14 +233,19 @@ class _ScannerSheetState extends State<_ScannerSheet> {
   Widget build(BuildContext context) {
     final sheetH = MediaQuery.of(context).size.height * 0.55;
 
-    return Container(
-      height: sheetH,
-      decoration: const BoxDecoration(
-        color: Color(0xCC000000),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: Column(
-        children: [
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      resizeToAvoidBottomInset: false,
+      body: Align(
+        alignment: Alignment.bottomCenter,
+        child: Container(
+          height: sheetH,
+          decoration: const BoxDecoration(
+            color: Color(0xCC000000),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
           // ── Handle + Header ───────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 10, 8, 0),
@@ -291,9 +306,9 @@ class _ScannerSheetState extends State<_ScannerSheet> {
                         onPressed: () => _controller.switchCamera(),
                       ),
                     // Close
-                    IconButton(
-                      icon: const Icon(Icons.close,
-                          color: Colors.white70, size: 20),
+                    buildMobileCloseCompactButton(
+                      context,
+                      isDark: true,
                       onPressed: () => Navigator.pop(context),
                     ),
                   ],
@@ -347,7 +362,12 @@ class _ScannerSheetState extends State<_ScannerSheet> {
                             final result = await MobileScannerService
                                 ._showManualInputDialog(context);
                             if (result == null || !context.mounted) return;
-                            widget.onScanned(result);
+                            if (widget.onScannedInSheet != null) {
+                              await widget.onScannedInSheet!(context, result);
+                            } else {
+                              widget.onScanned(result);
+                            }
+                            if (!context.mounted) return;
                             Navigator.pop(context);
                           },
                         ),
@@ -381,18 +401,23 @@ class _ScannerSheetState extends State<_ScannerSheet> {
               onPressed: () async {
                 final result =
                     await MobileScannerService._showManualInputDialog(context);
-                if (result == null) return;
-                widget.onScanned(result);
-                if (context.mounted) {
-                  setState(() => _cooldown = true);
-                  Future.delayed(const Duration(milliseconds: 800), () {
-                    if (mounted) setState(() => _cooldown = false);
-                  });
+                if (result == null || !context.mounted) return;
+                if (widget.onScannedInSheet != null) {
+                  await widget.onScannedInSheet!(context, result);
+                } else {
+                  widget.onScanned(result);
                 }
+                if (!context.mounted) return;
+                setState(() => _cooldown = true);
+                Future.delayed(const Duration(milliseconds: 800), () {
+                  if (mounted) setState(() => _cooldown = false);
+                });
               },
             ),
           ),
-        ],
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -468,6 +493,12 @@ class _ScannerPageState extends State<_ScannerPage> {
       appBar: AppBar(
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
+        leading: buildMobileCloseCompactButton(
+          context,
+          isDark: true,
+          onPressed: () => Navigator.of(context).maybePop(),
+        ),
+        leadingWidth: 56,
         title: Text(
           widget.continuous
               ? 'สแกนต่อเนื่อง — กด ✕ เพื่อปิด'

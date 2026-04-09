@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
+import 'package:pos_erp/shared/utils/responsive_utils.dart';
+import 'package:pos_erp/shared/widgets/mobile_home_button.dart';
 import '../../../../core/client/api_client.dart';
 import '../../data/models/customer_model.dart';
 import 'customer_form_page.dart';
@@ -223,11 +225,13 @@ class _CustomerDetailPageState extends ConsumerState<CustomerDetailPage> {
       padding: const EdgeInsets.fromLTRB(8, 12, 16, 12),
       child: Row(
         children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back),
-            color: isDark ? Colors.white : AppTheme.navyColor,
-            onPressed: () => Navigator.pop(context),
-          ),
+          context.isMobile
+              ? buildMobileHomeCompactButton(context, isDark: isDark)
+              : IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  color: isDark ? Colors.white : AppTheme.navyColor,
+                  onPressed: () => Navigator.pop(context),
+                ),
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(

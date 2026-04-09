@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:pos_erp/shared/widgets/app_dialogs.dart';
+import 'package:pos_erp/shared/widgets/mobile_home_button.dart';
 import '../providers/cart_provider.dart';
 
 class HoldOrdersDialog extends ConsumerStatefulWidget {
@@ -24,8 +26,12 @@ class _HoldOrdersDialogState extends ConsumerState<HoldOrdersDialog> {
     final controller = TextEditingController(text: order.name);
     final result = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('แก้ชื่อบิลที่พัก'),
+      builder: (context) => AppDialog(
+        title: buildAppDialogTitle(
+          context,
+          title: 'แก้ชื่อบิลที่พัก',
+          icon: Icons.edit_note_rounded,
+        ),
         content: TextField(
           controller: controller,
           autofocus: true,
@@ -91,10 +97,7 @@ class _HoldOrdersDialogState extends ConsumerState<HoldOrdersDialog> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.pop(context),
-                ),
+                buildMobileCloseCompactButton(context),
               ],
             ),
             const Divider(),
@@ -205,8 +208,13 @@ class _HoldOrdersDialogState extends ConsumerState<HoldOrdersDialog> {
                                   onPressed: () async {
                                     final confirm = await showDialog<bool>(
                                       context: context,
-                                      builder: (context) => AlertDialog(
-                                        title: const Text('ยืนยันการลบ'),
+                                      builder: (context) => AppDialog(
+                                        title: buildAppDialogTitle(
+                                          context,
+                                          title: 'ยืนยันการลบ',
+                                          icon: Icons.delete_outline,
+                                          iconColor: Colors.red,
+                                        ),
                                         content: Text(
                                           'ต้องการลบบิล ${order.name} ใช่หรือไม่?',
                                         ),
@@ -216,10 +224,10 @@ class _HoldOrdersDialogState extends ConsumerState<HoldOrdersDialog> {
                                                 Navigator.pop(context, false),
                                             child: const Text('ยกเลิก'),
                                           ),
-                                          ElevatedButton(
+                                          FilledButton(
                                             onPressed: () =>
                                                 Navigator.pop(context, true),
-                                            style: ElevatedButton.styleFrom(
+                                            style: FilledButton.styleFrom(
                                               backgroundColor: Colors.red,
                                             ),
                                             child: const Text('ลบ'),

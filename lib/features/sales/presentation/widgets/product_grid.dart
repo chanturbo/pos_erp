@@ -387,17 +387,19 @@ class _GridView extends ConsumerWidget {
       builder: (context, constraints) {
         final panelWidth = constraints.maxWidth;
         int cols;
-        if (panelWidth < 560) {
+        if (panelWidth < 380) {
           cols = 2;
-        } else if (panelWidth < 860) {
+        } else if (panelWidth < 580) {
           cols = 3;
-        } else if (panelWidth < 1160) {
+        } else if (panelWidth < 820) {
           cols = 4;
-        } else {
+        } else if (panelWidth < 1080) {
           cols = 5;
+        } else {
+          cols = 6;
         }
 
-        final childAspectRatio = panelWidth < 700 ? 0.76 : 0.82;
+        const childAspectRatio = 0.82;
 
         return GridView.builder(
           padding: const EdgeInsets.all(12),

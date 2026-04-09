@@ -7,7 +7,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/client/api_client.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/utils/responsive_utils.dart';
 import '../../../../shared/widgets/escape_pop_scope.dart';
+import '../../../../shared/widgets/mobile_home_button.dart';
 
 // ─── Models ──────────────────────────────────────────────────────────────────
 class _PromoOrderUsage {
@@ -210,18 +212,20 @@ class _PromotionUsageReportPageState
       child: Row(
         children: [
           if (Navigator.of(context).canPop()) ...[
-            InkWell(
-              onTap: () => Navigator.pop(context),
-              borderRadius: BorderRadius.circular(6),
-              child: Padding(
-                padding: const EdgeInsets.all(4),
-                child: Icon(
-                  Icons.arrow_back,
-                  size: 20,
-                  color: isDark ? Colors.white70 : AppTheme.textSub,
-                ),
-              ),
-            ),
+            context.isMobile
+                ? buildMobileHomeCompactButton(context, isDark: isDark)
+                : InkWell(
+                    onTap: () => Navigator.pop(context),
+                    borderRadius: BorderRadius.circular(6),
+                    child: Padding(
+                      padding: const EdgeInsets.all(4),
+                      child: Icon(
+                        Icons.arrow_back,
+                        size: 20,
+                        color: isDark ? Colors.white70 : AppTheme.textSub,
+                      ),
+                    ),
+                  ),
             const SizedBox(width: 10),
           ],
           Container(

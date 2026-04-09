@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pos_erp/shared/widgets/mobile_home_button.dart';
 import '../providers/promotion_provider.dart';
 
 class CouponDialog extends ConsumerStatefulWidget {
@@ -49,10 +50,7 @@ class _CouponDialogState extends ConsumerState<CouponDialog> {
                             fontSize: 18,
                             fontWeight: FontWeight.bold)),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
+                  buildMobileCloseCompactButton(context),
                 ],
               ),
               const Divider(),

@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
+import 'package:pos_erp/shared/utils/responsive_utils.dart';
 import 'package:pos_erp/shared/widgets/escape_pop_scope.dart';
+import 'package:pos_erp/shared/widgets/mobile_home_button.dart';
 import '../../data/models/ap_invoice_model.dart';
 import '../../data/models/ap_invoice_item_model.dart';
 import '../providers/ap_invoice_provider.dart';
@@ -907,18 +909,20 @@ class _APFormTitleBar extends StatelessWidget {
       child: Row(
         children: [
           if (canPop) ...[
-            InkWell(
-              onTap: () => Navigator.pop(context),
-              borderRadius: BorderRadius.circular(6),
-              child: Padding(
-                padding: const EdgeInsets.all(4),
-                child: Icon(
-                  Icons.arrow_back,
-                  size: 20,
-                  color: isDark ? Colors.white70 : AppTheme.textSub,
-                ),
-              ),
-            ),
+            context.isMobile
+                ? buildMobileHomeCompactButton(context, isDark: isDark)
+                : InkWell(
+                    onTap: () => Navigator.pop(context),
+                    borderRadius: BorderRadius.circular(6),
+                    child: Padding(
+                      padding: const EdgeInsets.all(4),
+                      child: Icon(
+                        Icons.arrow_back,
+                        size: 20,
+                        color: isDark ? Colors.white70 : AppTheme.textSub,
+                      ),
+                    ),
+                  ),
             const SizedBox(width: 10),
           ],
           Container(

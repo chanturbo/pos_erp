@@ -18,6 +18,8 @@ import '../../../inventory/presentation/providers/stock_provider.dart';
 import 'stock_movement_history_page.dart';
 import '../../../../shared/services/mobile_scanner_service.dart'; // ✅ Phase 5
 import '../../../../shared/widgets/escape_pop_scope.dart';
+import '../../../../shared/widgets/app_dialogs.dart';
+import '../../../../shared/widgets/mobile_home_button.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/responsive_utils.dart';
 
@@ -32,6 +34,7 @@ class StockAdjustmentPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppTheme.surfaceColorOf(context),
       appBar: AppBar(
+        leading: buildMobileHomeLeading(context),
         automaticallyImplyLeading: Navigator.of(context).canPop(),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -262,6 +265,7 @@ class _AdjustStockSubPageState extends ConsumerState<AdjustStockSubPage> {
     return Scaffold(
       backgroundColor: AppTheme.surfaceColorOf(context),
       appBar: AppBar(
+        leading: buildMobileHomeLeading(context),
         automaticallyImplyLeading: Navigator.of(context).canPop(),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -301,20 +305,23 @@ class _AdjustStockSubPageState extends ConsumerState<AdjustStockSubPage> {
                           final searchField = ConstrainedBox(
                             constraints: const BoxConstraints(maxWidth: 320),
                             child: SizedBox(
-                              height: 38,
+                              height: 36,
                               child: TextField(
                                 controller: _searchController,
-                                style: const TextStyle(fontSize: 13),
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  color: Theme.of(context).colorScheme.onSurface,
+                                ),
                                 decoration: InputDecoration(
                                   hintText: 'ค้นหาชื่อ / รหัสสินค้า...',
-                                  hintStyle: const TextStyle(
-                                    fontSize: 13,
-                                    color: Color(0xFF8A8A8A),
+                                  hintStyle: TextStyle(
+                                    fontSize: 12,
+                                    color: AppTheme.subtextColorOf(context),
                                   ),
-                                  prefixIcon: const Icon(
+                                  prefixIcon: Icon(
                                     Icons.search,
                                     size: 17,
-                                    color: Color(0xFF8A8A8A),
+                                    color: AppTheme.subtextColorOf(context),
                                   ),
                                   suffixIcon: _searchQuery.isNotEmpty
                                       ? IconButton(
@@ -356,7 +363,7 @@ class _AdjustStockSubPageState extends ConsumerState<AdjustStockSubPage> {
                                     ),
                                   ),
                                   filled: true,
-                                  fillColor: Colors.white,
+                                  fillColor: Theme.of(context).cardColor,
                                 ),
                                 onChanged: (v) =>
                                     setState(() => _searchQuery = v),
@@ -423,18 +430,21 @@ class _AdjustStockSubPageState extends ConsumerState<AdjustStockSubPage> {
                                       .refresh(),
                                   borderRadius: BorderRadius.circular(8),
                                   child: Container(
-                                    padding: const EdgeInsets.all(7),
+                                    padding: const EdgeInsets.all(6),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFFF5F5F5),
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .surfaceContainerHighest
+                                          .withValues(alpha: 0.55),
                                       borderRadius: BorderRadius.circular(8),
                                       border: Border.all(
-                                        color: AppTheme.border,
+                                        color: AppTheme.borderColorOf(context),
                                       ),
                                     ),
-                                    child: const Icon(
+                                    child: Icon(
                                       Icons.refresh,
-                                      size: 17,
-                                      color: Color(0xFF8A8A8A),
+                                      size: 16,
+                                      color: AppTheme.subtextColorOf(context),
                                     ),
                                   ),
                                 ),
@@ -476,6 +486,7 @@ class _AdjustStockSubPageState extends ConsumerState<AdjustStockSubPage> {
                       return LayoutBuilder(
                         builder: (context, constraints) {
                           final isWide = constraints.maxWidth >= 1120;
+                          final useCardView = context.isMobile;
 
                           final listPanel = Card(
                             elevation: 0,
@@ -526,7 +537,10 @@ class _AdjustStockSubPageState extends ConsumerState<AdjustStockSubPage> {
                                               Icon(
                                                 Icons.search_off_outlined,
                                                 size: 56,
-                                                color: Colors.grey[300],
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .outline
+                                                    .withValues(alpha: 0.5),
                                               ),
                                               const SizedBox(height: 10),
                                               Text(
@@ -534,11 +548,48 @@ class _AdjustStockSubPageState extends ConsumerState<AdjustStockSubPage> {
                                                     ? 'ไม่มีข้อมูลสต๊อก'
                                                     : 'ไม่พบสินค้า "$_searchQuery"',
                                                 style: TextStyle(
-                                                  color: Colors.grey[500],
+                                                  color: AppTheme.subtextColorOf(
+                                                    context,
+                                                  ),
                                                 ),
                                               ),
                                             ],
                                           ),
+                                        )
+                                      : useCardView
+                                      ? GridView.builder(
+                                          padding: const EdgeInsets.all(8),
+                                          gridDelegate:
+                                              SliverGridDelegateWithFixedCrossAxisCount(
+                                                crossAxisCount:
+                                                    constraints.maxWidth < 420
+                                                    ? 1
+                                                    : 2,
+                                                mainAxisSpacing: 8,
+                                                crossAxisSpacing: 8,
+                                                childAspectRatio:
+                                                    constraints.maxWidth < 420
+                                                    ? 2.9
+                                                    : 1.15,
+                                              ),
+                                          itemCount: filtered.length,
+                                          itemBuilder: (context, index) {
+                                            final stock = filtered[index];
+                                            final isSelected =
+                                                _selectedStock?.productId ==
+                                                    stock.productId &&
+                                                _selectedStock?.warehouseId ==
+                                                    stock.warehouseId;
+                                            return _AdjStockItemCard(
+                                              stock: stock,
+                                              isSelected: isSelected,
+                                              compact: true,
+                                              onTap: () => setState(() {
+                                                _selectedStock = stock;
+                                                _qtyController.clear();
+                                              }),
+                                            );
+                                          },
                                         )
                                       : ListView.separated(
                                           padding: const EdgeInsets.all(8),
@@ -626,38 +677,46 @@ class _AdjustStockSubPageState extends ConsumerState<AdjustStockSubPage> {
 
   // ── Empty state ────────────────────────────────────────────
   Widget _buildEmptyState() {
+    final cs = Theme.of(context).colorScheme;
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: AppTheme.primaryContainer,
+                color: AppTheme.primaryContainer.withValues(
+                  alpha: Theme.of(context).brightness == Brightness.dark
+                      ? 0.28
+                      : 1,
+                ),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
                 Icons.touch_app,
-                size: 48,
+                size: 42,
                 color: AppTheme.primaryColor,
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'เลือกสินค้าที่ต้องการปรับสต๊อก',
               style: TextStyle(
-                fontSize: 16,
+                fontSize: 15,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF1A1A1A),
+                color: cs.onSurface,
               ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 6),
             Text(
               'เลือกรายการจากแผงด้านบนหรือด้านซ้าย',
-              style: TextStyle(fontSize: 13, color: Colors.grey[500]),
+              style: TextStyle(
+                fontSize: 12,
+                color: AppTheme.subtextColorOf(context),
+              ),
               textAlign: TextAlign.center,
             ),
           ],
@@ -1162,11 +1221,13 @@ class _AdjSummaryChip extends StatelessWidget {
 class _AdjStockItemCard extends StatelessWidget {
   final StockBalanceModel stock;
   final bool isSelected;
+  final bool compact;
   final VoidCallback onTap;
 
   const _AdjStockItemCard({
     required this.stock,
     required this.isSelected,
+    this.compact = false,
     required this.onTap,
   });
 
@@ -1181,26 +1242,142 @@ class _AdjStockItemCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = Theme.of(context).cardColor;
+    final borderColor = AppTheme.borderColorOf(context);
+    final textColor = Theme.of(context).colorScheme.onSurface;
+    final subText = AppTheme.subtextColorOf(context);
     final initial = stock.productName.isNotEmpty
         ? stock.productName.substring(0, 1).toUpperCase()
         : '?';
     final avatarColor =
         _avatarColors[stock.productName.codeUnitAt(0) % _avatarColors.length];
 
+    if (compact) {
+      return InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.all(9),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? AppTheme.primaryColor.withValues(alpha: 0.06)
+                : cardColor,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isSelected ? AppTheme.primaryColor : borderColor,
+              width: isSelected ? 1.5 : 1,
+            ),
+            boxShadow: isDark
+                ? const []
+                : [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.03),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 18,
+                    backgroundColor: isSelected
+                        ? AppTheme.primaryColor
+                        : avatarColor,
+                    child: Text(
+                      initial,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        stock.balance.toStringAsFixed(0),
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: stock.balance > 0
+                              ? AppTheme.success
+                              : AppTheme.error,
+                        ),
+                      ),
+                      Text(
+                        stock.baseUnit,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: AppTheme.textSub,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                stock.productName,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: isSelected
+                      ? AppTheme.primaryColor
+                      : textColor,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                stock.productCode,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 11, color: subText),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                stock.warehouseName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 11, color: subText),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
         decoration: BoxDecoration(
           color: isSelected
               ? AppTheme.primaryColor.withValues(alpha: 0.06)
-              : Colors.white,
+              : cardColor,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isSelected ? AppTheme.primaryColor : AppTheme.border,
+            color: isSelected ? AppTheme.primaryColor : borderColor,
             width: isSelected ? 1.5 : 1,
           ),
+          boxShadow: isDark
+              ? const []
+              : [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.03),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
         ),
         child: Row(
           children: [
@@ -1224,20 +1401,20 @@ class _AdjStockItemCard extends StatelessWidget {
                   Text(
                     stock.productName,
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: 12.5,
                       fontWeight: FontWeight.w600,
                       color: isSelected
                           ? AppTheme.primaryColor
-                          : const Color(0xFF1A1A1A),
+                          : textColor,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 2),
                   Text(
                     '${stock.productCode} • ${stock.warehouseName}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11,
-                      color: AppTheme.textSub,
+                      color: subText,
                     ),
                   ),
                 ],
@@ -1259,7 +1436,7 @@ class _AdjStockItemCard extends StatelessWidget {
                 ),
                 Text(
                   stock.baseUnit,
-                  style: const TextStyle(fontSize: 10, color: AppTheme.textSub),
+                  style: TextStyle(fontSize: 10, color: subText),
                 ),
               ],
             ),
@@ -1288,28 +1465,38 @@ class _AdjustTypeButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Expanded(
       child: GestureDetector(
         onTap: onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
-            color: isSelected ? color : Colors.grey[100],
+            color: isSelected
+                ? color
+                : (isDark
+                    ? Theme.of(context).colorScheme.surfaceContainerHighest
+                        .withValues(alpha: 0.28)
+                    : Colors.grey[100]),
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: isSelected ? color : Colors.grey[300]!,
+              color: isSelected
+                  ? color
+                  : (isDark
+                      ? AppTheme.borderColorOf(context)
+                      : Colors.grey[300]!),
               width: isSelected ? 2 : 1,
             ),
           ),
           child: Column(
             children: [
-              Icon(icon, color: isSelected ? Colors.white : color, size: 24),
+              Icon(icon, color: isSelected ? Colors.white : color, size: 20),
               const SizedBox(height: 4),
               Text(
                 label,
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 11.5,
                   fontWeight: FontWeight.bold,
                   color: isSelected ? Colors.white : color,
                 ),
@@ -1338,9 +1525,10 @@ class _PreviewItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final subText = AppTheme.subtextColorOf(context);
     return Column(
       children: [
-        Text(label, style: const TextStyle(fontSize: 11)),
+        Text(label, style: TextStyle(fontSize: 11, color: subText)),
         Text(
           value,
           style: TextStyle(
@@ -1349,7 +1537,7 @@ class _PreviewItem extends StatelessWidget {
             color: color,
           ),
         ),
-        Text(unit, style: const TextStyle(fontSize: 11)),
+        Text(unit, style: TextStyle(fontSize: 11, color: subText)),
       ],
     );
   }
@@ -2156,8 +2344,13 @@ class _StockTakeSubPageState extends ConsumerState<StockTakeSubPage> {
     // Dialog ยืนยัน
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('ยืนยันการปรับสต๊อก'),
+      builder: (context) => AppDialog(
+        title: buildAppDialogTitle(
+          context,
+          title: 'ยืนยันการปรับสต๊อก',
+          icon: Icons.tune_rounded,
+          iconColor: AppTheme.warningColor,
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -3037,8 +3230,13 @@ class _StockTransferSubPageState extends ConsumerState<StockTransferSubPage> {
     final qty = _transferQty;
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('ยืนยันการโอนย้าย'),
+      builder: (context) => AppDialog(
+        title: buildAppDialogTitle(
+          context,
+          title: 'ยืนยันการโอนย้าย',
+          icon: Icons.swap_horiz,
+          iconColor: AppTheme.tealColor,
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -3341,13 +3539,14 @@ class _MenuCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textColor = Theme.of(context).colorScheme.onSurface;
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(10),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
             color: color.withValues(alpha: 0.07),
             borderRadius: BorderRadius.circular(10),
@@ -3367,10 +3566,10 @@ class _MenuCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   label,
-                  style: const TextStyle(
-                    fontSize: 13,
+                  style: TextStyle(
+                    fontSize: 12.5,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF1A1A1A),
+                    color: textColor,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),

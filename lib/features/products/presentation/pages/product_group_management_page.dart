@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pos_erp/shared/widgets/app_dialogs.dart';
+import 'package:pos_erp/shared/widgets/mobile_home_button.dart';
 
 import '../../../../shared/theme/app_theme.dart';
 import '../providers/product_provider.dart';
@@ -66,8 +68,13 @@ class _ProductGroupManagementPageState
     final hasProducts = check['has_products'] == true;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('ลบหมวดสินค้า'),
+      builder: (_) => AppDialog(
+        title: buildAppDialogTitle(
+          context,
+          title: 'ลบหมวดสินค้า',
+          icon: Icons.delete_outline,
+          iconColor: AppTheme.errorColor,
+        ),
         content: Text(
           hasProducts
               ? 'หมวด "${group.groupName}" ยังถูกใช้อยู่ในสินค้า $productCount รายการ จึงยังลบไม่ได้'
@@ -111,6 +118,7 @@ class _ProductGroupManagementPageState
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
+        leading: buildMobileHomeLeading(context),
         title: const Text('จัดการหมวดสินค้า'),
         actions: [
           IconButton(

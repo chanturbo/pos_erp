@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/responsive_utils.dart';
+import '../../../../shared/widgets/app_dialogs.dart';
 import '../../../ap/presentation/pages/ap_payment_list_page.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../products/presentation/pages/product_list_page.dart';
@@ -37,8 +38,10 @@ class _MenuItem {
   final IconData icon;
   final String title;
   final Widget page;
+
   /// true = push เป็น full route (ไม่ swap ใน content area)
   final bool pushAsRoute;
+
   /// permission key — null หมายถึงแสดงเสมอ (เช่น Dashboard สำหรับ Admin)
   final String? permissionKey;
 
@@ -69,81 +72,187 @@ class HomePage extends ConsumerStatefulWidget {
 
 class _HomePageState extends ConsumerState<HomePage> {
   int _selectedIndex = 0;
+  bool _sidebarCollapsed = false; // สำหรับหน้าจอใหญ่ (>= 1280px)
+  bool _compactExpanded = false; // สำหรับหน้าจอ compact (< 1280px) user กดขยาย
   /// หน้า override สำหรับกรณีที่ต้องการแสดงหน้าพร้อม parameter พิเศษ
   /// (เช่น SalesHistoryPage กรองวันนี้) โดยยัง highlight เมนูที่ถูกต้อง
   Widget? _overridePage;
 
   List<_MenuSection> get _sections => [
-        _MenuSection('หลัก', [
+    _MenuSection('หลัก', [
           _MenuItem(
             icon: Icons.dashboard,
             title: 'แดชบอร์ด',
             permissionKey: AppPermission.dashboard,
             page: DashboardPage(
+              showBackButton: false,
               onGoToPos: () => context.hasPermanentSidebar
                   ? _selectItem(1)
                   : _push(context, const PosPage()),
-              onGoToSalesHistory: () => context.hasPermanentSidebar
-                  ? _selectItem(2)
-                  : _push(context, const SalesHistoryPage()),
-              onGoToProducts: () => context.hasPermanentSidebar
-                  ? _selectItem(4)
-                  : _push(context, const ProductListPage()),
-              onGoToCustomers: () => context.hasPermanentSidebar
-                  ? _selectItem(7)
-                  : _push(context, const CustomerListPage()),
-              onGoToTodaySales: () {
-                final today = DateTime.now();
-                _showOverridePage(
-                  SalesHistoryPage(
-                    initialDateFrom:
-                        DateTime(today.year, today.month, today.day),
-                    initialDateTo:
-                        DateTime(today.year, today.month, today.day),
-                  ),
-                  2, // highlight "รายการขาย"
-                );
-              },
-            ),
-          ),
-        ]),
-        _MenuSection('การขาย', [
-          _MenuItem(icon: Icons.shopping_cart, title: 'หน้าขาย (POS)',  page: const PosPage(), pushAsRoute: true, permissionKey: AppPermission.pos),
-          _MenuItem(icon: Icons.receipt_long,  title: 'รายการขาย',      page: const SalesHistoryPage(),     permissionKey: AppPermission.salesHistory),
-          _MenuItem(icon: Icons.local_offer,   title: 'โปรโมชั่น',      page: const PromotionListPage(),    permissionKey: AppPermission.promotions),
-        ]),
-        _MenuSection('คลังสินค้า', [
-          _MenuItem(icon: Icons.inventory,  title: 'สินค้า',      page: const ProductListPage(),    permissionKey: AppPermission.products),
-          _MenuItem(icon: Icons.warehouse,  title: 'สต๊อกสินค้า', page: const StockBalancePage(),   permissionKey: AppPermission.stock),
-          _MenuItem(icon: Icons.tune,       title: 'ปรับสต๊อก',   page: const StockAdjustmentPage(), permissionKey: AppPermission.stockAdjust),
-        ]),
-        _MenuSection('ผู้ติดต่อ', [
-          _MenuItem(icon: Icons.people,   title: 'ลูกค้า',       page: const CustomerListPage(), permissionKey: AppPermission.customers),
-          _MenuItem(icon: Icons.business, title: 'ซัพพลายเออร์', page: const SupplierListPage(), permissionKey: AppPermission.suppliers),
-        ]),
-        _MenuSection('จัดซื้อ', [
-          _MenuItem(icon: Icons.shopping_bag,     title: 'ซื้อสินค้า', page: const PurchaseOrderListPage(),  permissionKey: AppPermission.purchaseOrder),
-          _MenuItem(icon: Icons.inventory_2,       title: 'รับสินค้า',  page: const GoodsReceiptListPage(),   permissionKey: AppPermission.goodsReceipt),
-          _MenuItem(icon: Icons.assignment_return, title: 'คืนสินค้า',  page: const PurchaseReturnListPage(), permissionKey: AppPermission.purchaseReturn),
-        ]),
-        _MenuSection('บัญชี', [
-          _MenuItem(icon: Icons.receipt,      title: 'ใบแจ้งหนี้ AP(ซัพฯ)',  page: const ApInvoiceListPage(), permissionKey: AppPermission.apInvoice),
-          _MenuItem(icon: Icons.payments,     title: 'จ่ายเงิน AP',           page: const ApPaymentListPage(), permissionKey: AppPermission.apPayment),
-          _MenuItem(icon: Icons.request_page, title: 'ใบแจ้งหนี้ AR(ลูกค้า)', page: const ArInvoiceListPage(), permissionKey: AppPermission.arInvoice),
-          _MenuItem(icon: Icons.price_check,  title: 'รับเงิน AR',             page: const ArReceiptListPage(), permissionKey: AppPermission.arReceipt),
-        ]),
-        _MenuSection('ระบบ', [
-          _MenuItem(icon: Icons.assessment,           title: 'รายงาน',               page: const ReportsPage(),        permissionKey: AppPermission.reports),
-          _MenuItem(icon: Icons.store,                title: 'จัดการสาขา',           page: const BranchListPage(),     permissionKey: AppPermission.branch),
-          _MenuItem(icon: Icons.sync_alt,             title: 'การเชื่อมต่อ/ซิงก์', page: const SyncStatusPage(),     permissionKey: AppPermission.sync),
-          _MenuItem(icon: Icons.settings,             title: 'ตั้งค่า',              page: const SettingsPage(),       permissionKey: AppPermission.settings),
-          _MenuItem(icon: Icons.admin_panel_settings, title: 'จัดการสิทธิ์',        page: const RolePermissionPage(), permissionKey: AppPermission.rolePermissions),
-          _MenuItem(icon: Icons.manage_accounts,      title: 'จัดการผู้ใช้งาน',    page: const UserListPage(),       permissionKey: AppPermission.userManagement),
-        ]),
-      ];
+          onGoToSalesHistory: () => context.hasPermanentSidebar
+              ? _selectItem(2)
+              : _push(context, const SalesHistoryPage()),
+          onGoToProducts: () => context.hasPermanentSidebar
+              ? _selectItem(4)
+              : _push(context, const ProductListPage()),
+          onGoToCustomers: () => context.hasPermanentSidebar
+              ? _selectItem(7)
+              : _push(context, const CustomerListPage()),
+          onGoToTodaySales: () {
+            final today = DateTime.now();
+            _showOverridePage(
+              SalesHistoryPage(
+                initialDateFrom: DateTime(today.year, today.month, today.day),
+                initialDateTo: DateTime(today.year, today.month, today.day),
+              ),
+              2, // highlight "รายการขาย"
+            );
+          },
+        ),
+      ),
+    ]),
+    _MenuSection('การขาย', [
+      _MenuItem(
+        icon: Icons.shopping_cart,
+        title: 'หน้าขาย (POS)',
+        page: const PosPage(),
+        pushAsRoute: true,
+        permissionKey: AppPermission.pos,
+      ),
+      _MenuItem(
+        icon: Icons.receipt_long,
+        title: 'รายการขาย',
+        page: const SalesHistoryPage(),
+        permissionKey: AppPermission.salesHistory,
+      ),
+      _MenuItem(
+        icon: Icons.local_offer,
+        title: 'โปรโมชั่น',
+        page: const PromotionListPage(),
+        permissionKey: AppPermission.promotions,
+      ),
+    ]),
+    _MenuSection('คลังสินค้า', [
+      _MenuItem(
+        icon: Icons.inventory,
+        title: 'สินค้า',
+        page: const ProductListPage(),
+        permissionKey: AppPermission.products,
+      ),
+      _MenuItem(
+        icon: Icons.warehouse,
+        title: 'สต๊อกสินค้า',
+        page: const StockBalancePage(),
+        permissionKey: AppPermission.stock,
+      ),
+      _MenuItem(
+        icon: Icons.tune,
+        title: 'ปรับสต๊อก',
+        page: const StockAdjustmentPage(),
+        permissionKey: AppPermission.stockAdjust,
+      ),
+    ]),
+    _MenuSection('ผู้ติดต่อ', [
+      _MenuItem(
+        icon: Icons.people,
+        title: 'ลูกค้า',
+        page: const CustomerListPage(),
+        permissionKey: AppPermission.customers,
+      ),
+      _MenuItem(
+        icon: Icons.business,
+        title: 'ซัพพลายเออร์',
+        page: const SupplierListPage(),
+        permissionKey: AppPermission.suppliers,
+      ),
+    ]),
+    _MenuSection('จัดซื้อ', [
+      _MenuItem(
+        icon: Icons.shopping_bag,
+        title: 'ซื้อสินค้า',
+        page: const PurchaseOrderListPage(),
+        permissionKey: AppPermission.purchaseOrder,
+      ),
+      _MenuItem(
+        icon: Icons.inventory_2,
+        title: 'รับสินค้า',
+        page: const GoodsReceiptListPage(),
+        permissionKey: AppPermission.goodsReceipt,
+      ),
+      _MenuItem(
+        icon: Icons.assignment_return,
+        title: 'คืนสินค้า',
+        page: const PurchaseReturnListPage(),
+        permissionKey: AppPermission.purchaseReturn,
+      ),
+    ]),
+    _MenuSection('บัญชี', [
+      _MenuItem(
+        icon: Icons.receipt,
+        title: 'ใบแจ้งหนี้ AP(ซัพฯ)',
+        page: const ApInvoiceListPage(),
+        permissionKey: AppPermission.apInvoice,
+      ),
+      _MenuItem(
+        icon: Icons.payments,
+        title: 'จ่ายเงิน AP',
+        page: const ApPaymentListPage(),
+        permissionKey: AppPermission.apPayment,
+      ),
+      _MenuItem(
+        icon: Icons.request_page,
+        title: 'ใบแจ้งหนี้ AR(ลูกค้า)',
+        page: const ArInvoiceListPage(),
+        permissionKey: AppPermission.arInvoice,
+      ),
+      _MenuItem(
+        icon: Icons.price_check,
+        title: 'รับเงิน AR',
+        page: const ArReceiptListPage(),
+        permissionKey: AppPermission.arReceipt,
+      ),
+    ]),
+    _MenuSection('ระบบ', [
+      _MenuItem(
+        icon: Icons.assessment,
+        title: 'รายงาน',
+        page: const ReportsPage(),
+        permissionKey: AppPermission.reports,
+      ),
+      _MenuItem(
+        icon: Icons.store,
+        title: 'จัดการสาขา',
+        page: const BranchListPage(),
+        permissionKey: AppPermission.branch,
+      ),
+      _MenuItem(
+        icon: Icons.sync_alt,
+        title: 'การเชื่อมต่อ/ซิงก์',
+        page: const SyncStatusPage(),
+        permissionKey: AppPermission.sync,
+      ),
+      _MenuItem(
+        icon: Icons.settings,
+        title: 'ตั้งค่า',
+        page: const SettingsPage(),
+        permissionKey: AppPermission.settings,
+      ),
+      _MenuItem(
+        icon: Icons.admin_panel_settings,
+        title: 'จัดการสิทธิ์',
+        page: const RolePermissionPage(),
+        permissionKey: AppPermission.rolePermissions,
+      ),
+      _MenuItem(
+        icon: Icons.manage_accounts,
+        title: 'จัดการผู้ใช้งาน',
+        page: const UserListPage(),
+        permissionKey: AppPermission.userManagement,
+      ),
+    ]),
+  ];
 
-  List<_MenuItem> get _allItems =>
-      _sections.expand((s) => s.items).toList();
+  List<_MenuItem> get _allItems => _sections.expand((s) => s.items).toList();
 
   Widget get _currentPage => _overridePage ?? _allItems[_selectedIndex].page;
 
@@ -185,10 +294,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   void _push(BuildContext context, Widget page) =>
       Navigator.push(context, MaterialPageRoute(builder: (_) => page));
 
-  void _openShortcutPage({
-    required int index,
-    required Widget page,
-  }) {
+  void _openShortcutPage({required int index, required Widget page}) {
     if (context.hasPermanentSidebar) {
       _selectItem(index);
     } else {
@@ -199,15 +305,20 @@ class _HomePageState extends ConsumerState<HomePage> {
   Future<void> _handleLogout(BuildContext context) async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('ออกจากระบบ'),
+      builder: (_) => AppDialog(
+        title: buildAppDialogTitle(
+          context,
+          title: 'ออกจากระบบ',
+          icon: Icons.logout_rounded,
+          iconColor: Colors.orange,
+        ),
         content: const Text('คุณต้องการออกจากระบบใช่หรือไม่?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: const Text('ยกเลิก'),
           ),
-          ElevatedButton(
+          FilledButton(
             onPressed: () => Navigator.pop(context, true),
             child: const Text('ออกจากระบบ'),
           ),
@@ -225,7 +336,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   @override
   Widget build(BuildContext context) {
     ref.watch(posContextBootstrapProvider);
-    final user      = ref.watch(authProvider).user;
+    final user = ref.watch(authProvider).user;
     final syncAsync = ref.watch(syncStatusProvider);
     final connectionAsync = ref.watch(connectionStatusProvider);
     final roleId = user?.roleId?.toUpperCase();
@@ -238,7 +349,8 @@ class _HomePageState extends ConsumerState<HomePage> {
     for (final section in _sections) {
       for (final item in section.items) {
         final key = item.permissionKey;
-        final canSee = key == null ||
+        final canSee =
+            key == null ||
             roleId == null ||
             roleId == 'ADMIN' ||
             (permData?[roleId] ?? defaultRolePermissions[roleId] ?? [])
@@ -247,6 +359,12 @@ class _HomePageState extends ConsumerState<HomePage> {
         idx++;
       }
     }
+
+    // large (>=1280px): ตาม _sidebarCollapsed
+    // compact (<1280px): collapsed เสมอ ยกเว้น user กดขยายไว้
+    final effectiveCollapsed = context.isLarge
+        ? _sidebarCollapsed
+        : !_compactExpanded;
 
     // ── Sidebar Widget ─────────────────────────────────────────
     Widget sidebarWidget = _SidebarContent(
@@ -257,32 +375,32 @@ class _HomePageState extends ConsumerState<HomePage> {
       user: user,
       syncAsync: syncAsync,
       connectionAsync: connectionAsync,
+      isCollapsed: effectiveCollapsed,
       onItemSelected: _selectItem,
       onSyncTap: () => _push(context, const SyncStatusPage()),
       onTestTap: () => _push(context, const TestPage()),
       onLogout: () => _handleLogout(context),
+      onToggleCollapse: () => setState(() {
+        if (context.isLarge) {
+          _sidebarCollapsed = !_sidebarCollapsed;
+        } else {
+          _compactExpanded = !_compactExpanded;
+        }
+      }),
     );
 
     return KeyboardShortcuts(
-      onPosShortcut: () => _openShortcutPage(
-        index: 1,
-        page: const PosPage(),
-      ),
-      onProductShortcut: () => _openShortcutPage(
-        index: 4,
-        page: const ProductListPage(),
-      ),
-      onCustomerShortcut: () => _openShortcutPage(
-        index: 7,
-        page: const CustomerListPage(),
-      ),
-      onSalesHistoryShortcut: () => _openShortcutPage(
-        index: 2,
-        page: const SalesHistoryPage(),
-      ),
+      onPosShortcut: () => _openShortcutPage(index: 1, page: const PosPage()),
+      onProductShortcut: () =>
+          _openShortcutPage(index: 4, page: const ProductListPage()),
+      onCustomerShortcut: () =>
+          _openShortcutPage(index: 7, page: const CustomerListPage()),
+      onSalesHistoryShortcut: () =>
+          _openShortcutPage(index: 2, page: const SalesHistoryPage()),
       onDashboardShortcut: () => _openShortcutPage(
         index: 0,
         page: DashboardPage(
+          showBackButton: false,
           onGoToPos: () => context.hasPermanentSidebar
               ? _selectItem(1)
               : _push(context, const PosPage()),
@@ -307,21 +425,21 @@ class _HomePageState extends ConsumerState<HomePage> {
           },
         ),
       ),
-      onInventoryShortcut: () => _openShortcutPage(
-        index: 5,
-        page: const StockBalancePage(),
-      ),
-      onReportsShortcut: () => _openShortcutPage(
-        index: 16,
-        page: const ReportsPage(),
-      ),
+      onInventoryShortcut: () =>
+          _openShortcutPage(index: 5, page: const StockBalancePage()),
+      onReportsShortcut: () =>
+          _openShortcutPage(index: 16, page: const ReportsPage()),
       child: context.hasPermanentSidebar
           // ── Desktop/Wide: Permanent sidebar ────────────────
           ? Scaffold(
               body: Row(
                 children: [
-                  SizedBox(
-                    width: context.sidebarWidth,
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeInOut,
+                    width: effectiveCollapsed ? 56 : context.sidebarWidth,
+                    clipBehavior: Clip.none,
+                    decoration: const BoxDecoration(),
                     child: sidebarWidget,
                   ),
                   const VerticalDivider(width: 1, thickness: 1),
@@ -358,8 +476,10 @@ class _HomePageState extends ConsumerState<HomePage> {
       data: (value) => value,
       orElse: () => null,
     );
-    final sectionTitle =
-        _sections.expand((s) => s.items).toList()[_selectedIndex].title;
+    final sectionTitle = _sections
+        .expand((s) => s.items)
+        .toList()[_selectedIndex]
+        .title;
 
     return AppBar(
       // Hamburger menu icon สำหรับเปิด Drawer
@@ -391,8 +511,9 @@ class _HomePageState extends ConsumerState<HomePage> {
               children: [
                 Icon(
                   connection.isConnected ? Icons.wifi : Icons.wifi_off,
-                  color:
-                      connection.isConnected ? Colors.white70 : AppTheme.errorLight,
+                  color: connection.isConnected
+                      ? Colors.white70
+                      : AppTheme.errorLight,
                 ),
                 if (syncValue?.hasPending == true)
                   Positioned(
@@ -447,10 +568,12 @@ class _SidebarContent extends StatelessWidget {
   final dynamic user;
   final AsyncValue syncAsync;
   final AsyncValue connectionAsync;
+  final bool isCollapsed;
   final void Function(int) onItemSelected;
   final VoidCallback onSyncTap;
   final VoidCallback onTestTap;
   final VoidCallback onLogout;
+  final VoidCallback? onToggleCollapse;
 
   const _SidebarContent({
     required this.sections,
@@ -464,6 +587,8 @@ class _SidebarContent extends StatelessWidget {
     required this.onSyncTap,
     required this.onTestTap,
     required this.onLogout,
+    this.isCollapsed = false,
+    this.onToggleCollapse,
   });
 
   @override
@@ -475,18 +600,19 @@ class _SidebarContent extends StatelessWidget {
           // Status bar padding (mobile safe area)
           SizedBox(height: MediaQuery.of(context).padding.top),
 
-          // Brand
-          _SidebarBrand(),
+          // Brand + collapse button
+          _SidebarBrand(
+            isCollapsed: isCollapsed,
+            onToggleCollapse: onToggleCollapse,
+          ),
 
-          // User
-          _SidebarUser(user: user),
+          // User (ซ่อนเมื่อย่อ)
+          if (!isCollapsed) _SidebarUser(user: user),
 
           // Menu
           Expanded(
             child: SingleChildScrollView(
-              child: Column(
-                children: _buildMenuSections(),
-              ),
+              child: Column(children: _buildMenuSections()),
             ),
           ),
 
@@ -494,6 +620,7 @@ class _SidebarContent extends StatelessWidget {
           _SidebarBottom(
             syncAsync: syncAsync,
             connectionAsync: connectionAsync,
+            isCollapsed: isCollapsed,
             onSyncTap: onSyncTap,
             onTestTap: onTestTap,
             onLogout: onLogout,
@@ -508,7 +635,6 @@ class _SidebarContent extends StatelessWidget {
     int globalIndex = 0;
 
     for (final section in sections) {
-      // คำนวณ indices ที่มองเห็นได้ในส่วนนี้
       final sectionStartIndex = globalIndex;
       final sectionVisibleIndices = <int>[];
       for (int i = 0; i < section.items.length; i++) {
@@ -517,34 +643,42 @@ class _SidebarContent extends StatelessWidget {
         }
       }
 
-      // ข้าม section ทั้งหมดถ้าไม่มีรายการใดมองเห็นได้
       if (sectionVisibleIndices.isEmpty) {
         globalIndex += section.items.length;
         continue;
       }
 
-      widgets.add(
-        Padding(
-          padding: const EdgeInsets.fromLTRB(14, 14, 14, 4),
-          child: Text(
-            section.label.toUpperCase(),
-            style: const TextStyle(
-              fontSize: 9,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF8A9BC0),
-              letterSpacing: 1.2,
+      // Section label (ซ่อนเมื่อย่อ)
+      if (!isCollapsed) {
+        widgets.add(
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 4),
+            child: Text(
+              section.label.toUpperCase(),
+              style: const TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF8A9BC0),
+                letterSpacing: 1.2,
+              ),
             ),
           ),
-        ),
-      );
+        );
+      } else {
+        widgets.add(const SizedBox(height: 8));
+      }
+
       for (final item in section.items) {
         final idx = globalIndex;
         if (visibleIndices.contains(idx)) {
-          widgets.add(_SidebarItem(
-            item: item,
-            isActive: selectedIndex == idx,
-            onTap: () => onItemSelected(idx),
-          ));
+          widgets.add(
+            _SidebarItem(
+              item: item,
+              isActive: selectedIndex == idx,
+              isCollapsed: isCollapsed,
+              onTap: () => onItemSelected(idx),
+            ),
+          );
         }
         globalIndex++;
       }
@@ -557,58 +691,159 @@ class _SidebarContent extends StatelessWidget {
 // Brand
 // ─────────────────────────────────────────────────────────────────
 class _SidebarBrand extends StatelessWidget {
+  final bool isCollapsed;
+  final VoidCallback? onToggleCollapse;
+
+  const _SidebarBrand({this.isCollapsed = false, this.onToggleCollapse});
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 16, 14, 14),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: AppTheme.navyBorder)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: AppTheme.primaryColor,
-              borderRadius: BorderRadius.circular(8),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final useCollapsedLayout = isCollapsed || constraints.maxWidth < 140;
+
+        if (useCollapsedLayout) {
+          return Container(
+            height: 68,
+            decoration: const BoxDecoration(
+              border: Border(bottom: BorderSide(color: AppTheme.navyBorder)),
             ),
-            child: const Center(
-              child: Text(
-                'D',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 18,
+            child: Center(
+              child: SizedBox(
+                width: 44,
+                height: 44,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryColor,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Center(
+                          child: Text(
+                            'D',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 18,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (onToggleCollapse != null)
+                      Positioned(
+                        right: -2,
+                        bottom: -2,
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: onToggleCollapse,
+                            customBorder: const CircleBorder(),
+                            child: Ink(
+                              width: 20,
+                              height: 20,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF2A3F6F),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: AppTheme.navyBorder,
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: Icon(
+                                isCollapsed
+                                    ? Icons.chevron_right
+                                    : Icons.chevron_left,
+                                size: 12,
+                                color: const Color(0xFF8A9BC0),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ),
+          );
+        }
+
+        return Container(
+          padding: const EdgeInsets.fromLTRB(14, 16, 8, 14),
+          clipBehavior: Clip.hardEdge,
+          decoration: const BoxDecoration(
+            border: Border(bottom: BorderSide(color: AppTheme.navyBorder)),
           ),
-          const SizedBox(width: 10),
-          const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
             children: [
-              Text(
-                'DEE POS',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14,
-                  letterSpacing: 0.3,
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Center(
+                  child: Text(
+                    'D',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 18,
+                    ),
+                  ),
                 ),
               ),
-              Text(
-                'POINT OF SALE SYSTEM',
-                style: TextStyle(
-                  color: Color(0xFF8A9BC0),
-                  fontSize: 8,
-                  letterSpacing: 0.8,
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'DEE POS',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                    Text(
+                      'POINT OF SALE SYSTEM',
+                      style: TextStyle(
+                        color: Color(0xFF8A9BC0),
+                        fontSize: 8,
+                        letterSpacing: 0.8,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
               ),
+              if (onToggleCollapse != null)
+                IconButton(
+                  onPressed: onToggleCollapse,
+                  icon: const Icon(
+                    Icons.chevron_left,
+                    color: Color(0xFF8A9BC0),
+                    size: 18,
+                  ),
+                  tooltip: 'ย่อ sidebar',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 32,
+                    minHeight: 32,
+                  ),
+                ),
             ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -622,56 +857,94 @@ class _SidebarUser extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name    = user?.fullName ?? '';
+    final name = user?.fullName ?? '';
     final initial = name.isNotEmpty ? name[0] : '?';
-    final email   = user?.email ?? '';
+    final email = user?.email ?? '';
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: AppTheme.navyBorder)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: const BoxDecoration(
-              color: AppTheme.primaryColor,
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Text(
-                initial,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 120;
+
+        return Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: compact ? 0 : 14,
+            vertical: 10,
+          ),
+          clipBehavior: Clip.hardEdge,
+          decoration: const BoxDecoration(
+            border: Border(bottom: BorderSide(color: AppTheme.navyBorder)),
+          ),
+          child: compact
+              ? Center(
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: const BoxDecoration(
+                      color: AppTheme.primaryColor,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Text(
+                        initial,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ),
+                )
+              : Row(
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: const BoxDecoration(
+                        color: AppTheme.primaryColor,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: Text(
+                          initial,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 9),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            name,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          if (email.isNotEmpty)
+                            Text(
+                              email,
+                              style: const TextStyle(
+                                color: Color(0xFF8A9BC0),
+                                fontSize: 10,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 9),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(name,
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500),
-                    overflow: TextOverflow.ellipsis),
-                if (email.isNotEmpty)
-                  Text(email,
-                      style: const TextStyle(
-                          color: Color(0xFF8A9BC0), fontSize: 10),
-                      overflow: TextOverflow.ellipsis),
-              ],
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -682,57 +955,168 @@ class _SidebarUser extends StatelessWidget {
 class _SidebarItem extends StatelessWidget {
   final _MenuItem item;
   final bool isActive;
+  final bool isCollapsed;
   final VoidCallback onTap;
 
   const _SidebarItem({
     required this.item,
     required this.isActive,
     required this.onTap,
+    this.isCollapsed = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        decoration: BoxDecoration(
-          color: isActive
-              ? AppTheme.primaryColor.withValues(alpha: 0.15)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-          border: Border(
-            left: BorderSide(
-              color: isActive ? AppTheme.primaryColor : Colors.transparent,
-              width: 3,
+    final iconColor = isActive ? Colors.white : const Color(0xFF8A9BC0);
+    final child = Container(
+      margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+      decoration: BoxDecoration(
+        color: isActive
+            ? AppTheme.primaryColor.withValues(alpha: 0.15)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      clipBehavior: Clip.hardEdge,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // ตัดสินใจตามความกว้างจริง ณ ขณะนั้น (รวม animation)
+          final wide = constraints.maxWidth > 100;
+          return AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            padding: EdgeInsets.symmetric(
+              horizontal: wide ? 10 : 0,
+              vertical: 8,
+            ),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              border: wide
+                  ? Border(
+                      left: BorderSide(
+                        color: isActive
+                            ? AppTheme.primaryColor
+                            : Colors.transparent,
+                        width: 3,
+                      ),
+                    )
+                  : null,
+            ),
+            child: wide
+                ? Row(
+                    children: [
+                      Icon(item.icon, size: 16, color: iconColor),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          item.title,
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            color: iconColor,
+                            fontWeight: isActive
+                                ? FontWeight.w600
+                                : FontWeight.normal,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  )
+                : Center(child: Icon(item.icon, size: 18, color: iconColor)),
+          );
+        },
+      ),
+    );
+
+    if (isCollapsed) {
+      return _CollapsedSidebarHint(
+        label: item.title,
+        child: InkWell(onTap: onTap, child: child),
+      );
+    }
+    return InkWell(onTap: onTap, child: child);
+  }
+}
+
+class _CollapsedSidebarHint extends StatefulWidget {
+  final String label;
+  final Widget child;
+
+  const _CollapsedSidebarHint({required this.label, required this.child});
+
+  @override
+  State<_CollapsedSidebarHint> createState() => _CollapsedSidebarHintState();
+}
+
+class _CollapsedSidebarHintState extends State<_CollapsedSidebarHint> {
+  bool _showHint = false;
+
+  void _setHint(bool value) {
+    if (!mounted || _showHint == value) return;
+    setState(() => _showHint = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      tooltip: widget.label,
+      child: MouseRegion(
+        onEnter: (_) => _setHint(true),
+        onExit: (_) => _setHint(false),
+        child: FocusableActionDetector(
+          onShowFocusHighlight: _setHint,
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onLongPressStart: (_) => _setHint(true),
+            onLongPressEnd: (_) => _setHint(false),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                widget.child,
+                Positioned(
+                  left: 46,
+                  top: 6,
+                  child: IgnorePointer(
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 120),
+                      opacity: _showHint ? 1 : 0,
+                      child: AnimatedSlide(
+                        duration: const Duration(milliseconds: 120),
+                        offset: _showHint
+                            ? Offset.zero
+                            : const Offset(-0.08, 0),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF13213F),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: AppTheme.navyBorder),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x33000000),
+                                blurRadius: 12,
+                                offset: Offset(0, 6),
+                              ),
+                            ],
+                          ),
+                          child: Text(
+                            widget.label,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              item.icon,
-              size: 16,
-              color: isActive ? Colors.white : const Color(0xFF8A9BC0),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                item.title,
-                style: TextStyle(
-                  fontSize: 12.5,
-                  color:
-                      isActive ? Colors.white : const Color(0xFF8A9BC0),
-                  fontWeight: isActive
-                      ? FontWeight.w600
-                      : FontWeight.normal,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
         ),
       ),
     );
@@ -745,6 +1129,7 @@ class _SidebarItem extends StatelessWidget {
 class _SidebarBottom extends StatelessWidget {
   final AsyncValue syncAsync;
   final AsyncValue connectionAsync;
+  final bool isCollapsed;
   final VoidCallback onSyncTap;
   final VoidCallback onTestTap;
   final VoidCallback onLogout;
@@ -755,6 +1140,7 @@ class _SidebarBottom extends StatelessWidget {
     required this.onSyncTap,
     required this.onTestTap,
     required this.onLogout,
+    this.isCollapsed = false,
   });
 
   @override
@@ -764,19 +1150,107 @@ class _SidebarBottom extends StatelessWidget {
       orElse: () => null,
     );
 
+    if (isCollapsed) {
+      return Container(
+        decoration: const BoxDecoration(
+          border: Border(top: BorderSide(color: AppTheme.navyBorder)),
+        ),
+        padding: EdgeInsets.fromLTRB(
+          6,
+          6,
+          6,
+          MediaQuery.of(context).padding.bottom + 6,
+        ),
+        child: Column(
+          children: [
+            connectionAsync.when(
+              data: (connection) => _CollapsedSidebarHint(
+                label: connection.title,
+                child: IconButton(
+                  icon: Stack(
+                    children: [
+                      Icon(
+                        connection.isConnected ? Icons.wifi : Icons.wifi_off,
+                        size: 18,
+                        color: connection.isConnected
+                            ? AppTheme.successColor
+                            : AppTheme.errorColor,
+                      ),
+                      if (syncValue?.hasPending ?? false)
+                        Positioned(
+                          right: 0,
+                          top: 0,
+                          child: Container(
+                            width: 6,
+                            height: 6,
+                            decoration: const BoxDecoration(
+                              color: AppTheme.primaryColor,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  onPressed: onSyncTap,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 36,
+                    minHeight: 36,
+                  ),
+                ),
+              ),
+              loading: () => const SizedBox(height: 36),
+              error: (_, _) => const SizedBox(height: 36),
+            ),
+            _CollapsedSidebarHint(
+              label: 'ทดสอบระบบ',
+              child: IconButton(
+                icon: const Icon(
+                  Icons.science_outlined,
+                  size: 18,
+                  color: Color(0xFF8A9BC0),
+                ),
+                onPressed: onTestTap,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+              ),
+            ),
+            _CollapsedSidebarHint(
+              label: 'ออกจากระบบ',
+              child: IconButton(
+                icon: const Icon(
+                  Icons.logout,
+                  size: 18,
+                  color: AppTheme.errorLight,
+                ),
+                onPressed: onLogout,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
+      clipBehavior: Clip.hardEdge,
       decoration: const BoxDecoration(
         border: Border(top: BorderSide(color: AppTheme.navyBorder)),
       ),
       padding: EdgeInsets.fromLTRB(
-          8, 6, 8, MediaQuery.of(context).padding.bottom + 6),
+        8,
+        6,
+        8,
+        MediaQuery.of(context).padding.bottom + 6,
+      ),
       child: Column(
         children: [
           connectionAsync.when(
             data: (connection) => _BottomAction(
               icon: connection.isConnected ? Icons.wifi : Icons.wifi_off,
-              label: syncValue?.pendingCount != null &&
-                      syncValue!.pendingCount > 0
+              label:
+                  syncValue?.pendingCount != null && syncValue!.pendingCount > 0
                   ? '${connection.title} • รอส่ง ${syncValue.pendingCount} รายการ'
                   : connection.title,
               iconColor: connection.isConnected
@@ -832,40 +1306,42 @@ class _BottomAction extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(6),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-        child: Row(
-          children: [
-            Stack(
-              children: [
-                Icon(icon, size: 16, color: iconColor),
-                if (badge)
-                  Positioned(
-                    right: 0,
-                    top: 0,
-                    child: Container(
-                      width: 7,
-                      height: 7,
-                      decoration: const BoxDecoration(
-                        color: AppTheme.primaryColor,
-                        shape: BoxShape.circle,
+      child: ClipRect(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+          child: Row(
+            children: [
+              Stack(
+                children: [
+                  Icon(icon, size: 16, color: iconColor),
+                  if (badge)
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      child: Container(
+                        width: 7,
+                        height: 7,
+                        decoration: const BoxDecoration(
+                          color: AppTheme.primaryColor,
+                          shape: BoxShape.circle,
+                        ),
                       ),
                     ),
-                  ),
-              ],
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 11.5,
-                  color: Color(0xFF8A9BC0),
-                ),
-                overflow: TextOverflow.ellipsis,
+                ],
               ),
-            ),
-          ],
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    color: Color(0xFF8A9BC0),
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

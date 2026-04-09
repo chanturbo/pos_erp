@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
+import 'package:pos_erp/shared/utils/responsive_utils.dart';
+import 'package:pos_erp/shared/widgets/app_dialogs.dart';
 import 'package:pos_erp/shared/widgets/escape_pop_scope.dart';
+import 'package:pos_erp/shared/widgets/mobile_home_button.dart';
 import '../../data/models/ap_payment_model.dart';
 import '../../data/models/ap_payment_allocation_model.dart';
 import '../../data/models/ap_invoice_model.dart';
@@ -604,18 +607,16 @@ class _ApPaymentFormPageState extends ConsumerState<ApPaymentFormPage> {
                 final filtered = suppliers
                     .where((s) => s.supplierName.toLowerCase().contains(q))
                     .toList();
-                return AlertDialog(
+                return AppDialog(
                   backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  title: Text(
-                    'เลือกซัพพลายเออร์',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? Colors.white : const Color(0xFF1A1A1A),
-                    ),
+                  title: buildAppDialogTitle(
+                    ctx2,
+                    title: 'เลือกซัพพลายเออร์',
+                    icon: Icons.business_outlined,
+                    iconColor: AppTheme.primary,
                   ),
                   content: SizedBox(
                     width: 420,
@@ -839,29 +840,33 @@ class _PayFormTitleBar extends StatelessWidget {
       child: Row(
         children: [
           if (canPop) ...[
-            InkWell(
-              onTap: () => Navigator.of(context).pop(),
-              borderRadius: BorderRadius.circular(8),
-              child: Container(
-                padding: const EdgeInsets.all(7),
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? AppTheme.darkElement
-                      : const Color(0xFFF5F5F5),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: isDark ? const Color(0xFF333333) : AppTheme.border,
+            context.isMobile
+                ? buildMobileHomeCompactButton(context, isDark: isDark)
+                : InkWell(
+                    onTap: () => Navigator.of(context).pop(),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? AppTheme.darkElement
+                            : const Color(0xFFF5F5F5),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isDark
+                              ? const Color(0xFF333333)
+                              : AppTheme.border,
+                        ),
+                      ),
+                      child: Icon(
+                        Icons.arrow_back_ios_new,
+                        size: 15,
+                        color: isDark
+                            ? const Color(0xFFAAAAAA)
+                            : const Color(0xFF8A8A8A),
+                      ),
+                    ),
                   ),
-                ),
-                child: Icon(
-                  Icons.arrow_back_ios_new,
-                  size: 15,
-                  color: isDark
-                      ? const Color(0xFFAAAAAA)
-                      : const Color(0xFF8A8A8A),
-                ),
-              ),
-            ),
             const SizedBox(width: 12),
           ],
           Container(

@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:pdf/widgets.dart' as pw;
 import '../../../../core/client/api_client.dart';
 import '../../../../shared/pdf/pdf_report_button.dart';
+import '../../../../shared/widgets/mobile_home_button.dart';
 import '../../data/models/sales_summary_model.dart';
 import 'reports_pdf_report.dart';
 
@@ -158,6 +159,7 @@ class _SalesChartPageState extends ConsumerState<SalesChartPage> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: buildMobileHomeLeading(context),
         title: const Text('กราฟยอดขาย'),
         actions: [
           Padding(

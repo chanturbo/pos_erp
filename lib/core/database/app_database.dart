@@ -3,6 +3,7 @@
 import 'dart:io';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 
@@ -163,3 +164,9 @@ LazyDatabase _openConnection() {
     return NativeDatabase.createInBackground(file);
   });
 }
+
+/// Provider สำหรับ AppDatabase (singleton) — override ด้วย instance จริงใน main.dart
+final appDatabaseProvider = Provider<AppDatabase>((ref) {
+  throw UnimplementedError(
+      'appDatabaseProvider must be overridden with a real AppDatabase instance');
+});

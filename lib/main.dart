@@ -31,8 +31,12 @@ void main() async {
   await MasterDiscoveryService.instance.start();
 
   runApp(
-    const ProviderScope(
-      child: MyApp(),
+    ProviderScope(
+      overrides: [
+        if (_dbInstance != null)
+          appDatabaseProvider.overrideWithValue(_dbInstance!),
+      ],
+      child: const MyApp(),
     ),
   );
 }

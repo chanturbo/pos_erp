@@ -8,7 +8,10 @@ import 'package:intl/intl.dart';
 import '../providers/promotion_provider.dart';
 import '../../data/models/promotion_model.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
+import 'package:pos_erp/shared/utils/responsive_utils.dart';
+import 'package:pos_erp/shared/widgets/app_dialogs.dart';
 import 'package:pos_erp/shared/widgets/escape_pop_scope.dart';
+import 'package:pos_erp/shared/widgets/mobile_home_button.dart';
 import '../../../products/presentation/providers/product_provider.dart';
 import '../../../products/data/models/product_model.dart';
 
@@ -988,18 +991,20 @@ class _TitleBar extends StatelessWidget {
       child: Row(
         children: [
           if (canPop) ...[
-            InkWell(
-              onTap: () => Navigator.pop(context),
-              borderRadius: BorderRadius.circular(6),
-              child: Padding(
-                padding: const EdgeInsets.all(4),
-                child: Icon(
-                  Icons.arrow_back,
-                  size: 20,
-                  color: isDark ? Colors.white70 : AppTheme.textSub,
-                ),
-              ),
-            ),
+            context.isMobile
+                ? buildMobileHomeCompactButton(context, isDark: isDark)
+                : InkWell(
+                    onTap: () => Navigator.pop(context),
+                    borderRadius: BorderRadius.circular(6),
+                    child: Padding(
+                      padding: const EdgeInsets.all(4),
+                      child: Icon(
+                        Icons.arrow_back,
+                        size: 20,
+                        color: isDark ? Colors.white70 : AppTheme.textSub,
+                      ),
+                    ),
+                  ),
             const SizedBox(width: 10),
           ],
           Container(
@@ -1207,10 +1212,12 @@ class _ItemSelectorDialogState extends State<_ItemSelectorDialog> {
   @override
   Widget build(BuildContext context) {
     final filtered = _filtered;
-    return AlertDialog(
-      title: Text(
-        widget.title,
-        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+    return AppDialog(
+      title: buildAppDialogTitle(
+        context,
+        title: widget.title,
+        icon: Icons.checklist_rtl_outlined,
+        iconColor: AppTheme.primary,
       ),
       contentPadding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       content: SizedBox(

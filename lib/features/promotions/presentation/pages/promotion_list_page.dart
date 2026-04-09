@@ -7,8 +7,11 @@ import 'promotion_form_page.dart';
 import 'coupon_list_page.dart';
 import 'promotion_usage_report_page.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
+import 'package:pos_erp/shared/utils/responsive_utils.dart';
+import 'package:pos_erp/shared/widgets/app_dialogs.dart';
 import 'package:pos_erp/shared/widgets/escape_pop_scope.dart';
 import 'package:pos_erp/shared/widgets/pagination_bar.dart';
+import 'package:pos_erp/shared/widgets/mobile_home_button.dart';
 import 'package:pos_erp/features/settings/presentation/pages/settings_page.dart';
 
 class PromotionListPage extends ConsumerStatefulWidget {
@@ -344,8 +347,13 @@ class _PromotionListPageState extends ConsumerState<PromotionListPage> {
   void _confirmDelete(PromotionModel p) {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('ยืนยันการลบ'),
+      builder: (ctx) => AppDialog(
+        title: buildAppDialogTitle(
+          ctx,
+          title: 'ยืนยันการลบ',
+          icon: Icons.delete_outline,
+          iconColor: AppTheme.errorColor,
+        ),
         content: Text('ต้องการลบโปรโมชั่น "${p.promotionName}" ใช่หรือไม่?'),
         actions: [
           TextButton(
@@ -428,13 +436,12 @@ class _PromotionListPageState extends ConsumerState<PromotionListPage> {
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Row(
-          children: [
-            const Icon(Icons.block, color: AppTheme.errorColor, size: 20),
-            const SizedBox(width: 8),
-            const Text('ไม่สามารถลบได้'),
-          ],
+      builder: (ctx) => AppDialog(
+        title: buildAppDialogTitle(
+          ctx,
+          title: 'ไม่สามารถลบได้',
+          icon: Icons.block,
+          iconColor: AppTheme.errorColor,
         ),
         content: Text(
           'โปรโมชั่น "${p.promotionName}" ถูกใช้งานแล้วใน $detail\n\n'
@@ -474,17 +481,12 @@ class _PromotionListPageState extends ConsumerState<PromotionListPage> {
   void _showUnusedCouponsDialog(PromotionModel p, int couponCount) {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Row(
-          children: [
-            const Icon(
-              Icons.confirmation_number_outlined,
-              color: AppTheme.warningColor,
-              size: 20,
-            ),
-            const SizedBox(width: 8),
-            const Text('มีคูปองที่ยังไม่ได้ใช้'),
-          ],
+      builder: (ctx) => AppDialog(
+        title: buildAppDialogTitle(
+          ctx,
+          title: 'มีคูปองที่ยังไม่ได้ใช้',
+          icon: Icons.confirmation_number_outlined,
+          iconColor: AppTheme.warningColor,
         ),
         content: Text(
           'โปรโมชั่น "${p.promotionName}" มีคูปองที่ยังไม่ถูกใช้อีก $couponCount ใบ\n\n'
@@ -1272,17 +1274,19 @@ class _BackBtn extends StatelessWidget {
   const _BackBtn({required this.onTap});
 
   @override
-  Widget build(BuildContext context) => InkWell(
-    onTap: onTap,
-    borderRadius: BorderRadius.circular(8),
-    child: Container(
-      padding: const EdgeInsets.all(7),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF5F5F5),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppTheme.border),
-      ),
-      child: const Icon(Icons.arrow_back, size: 17, color: AppTheme.textSub),
-    ),
-  );
+  Widget build(BuildContext context) => context.isMobile
+      ? buildMobileHomeCompactButton(context)
+      : InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF5F5F5),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppTheme.border),
+            ),
+            child: const Icon(Icons.arrow_back, size: 17, color: AppTheme.textSub),
+          ),
+        );
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
+import 'package:pos_erp/shared/widgets/app_dialogs.dart';
 import 'package:pos_erp/shared/widgets/pagination_bar.dart';
 import 'package:pos_erp/shared/widgets/escape_pop_scope.dart';
 import 'package:pos_erp/shared/pdf/pdf_report_button.dart';
@@ -498,16 +499,14 @@ class _PurchaseReturnListPageState
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => AppDialog(
         backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text(
-          'ยืนยันการคืนสินค้า',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: isDark ? Colors.white : Colors.black87,
-          ),
+        title: buildAppDialogTitle(
+          ctx,
+          title: 'ยืนยันการคืนสินค้า',
+          icon: Icons.assignment_return_outlined,
+          iconColor: AppTheme.success,
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -589,16 +588,14 @@ class _PurchaseReturnListPageState
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => AppDialog(
         backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text(
-          'ลบใบคืนสินค้า',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: isDark ? Colors.white : Colors.black87,
-          ),
+        title: buildAppDialogTitle(
+          ctx,
+          title: 'ลบใบคืนสินค้า',
+          icon: Icons.delete_outline,
+          iconColor: AppTheme.error,
         ),
         content: Text(
           'ต้องการลบใบคืนสินค้า ${r.returnNo} ใช่หรือไม่?',

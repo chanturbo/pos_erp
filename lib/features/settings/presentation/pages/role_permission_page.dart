@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../shared/permissions/app_permissions.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/widgets/app_dialogs.dart';
+import '../../../../shared/widgets/mobile_home_button.dart';
 
 // ─────────────────────────────────────────────────────────────────
 // RolePermissionPage — จัดการสิทธิ์การเข้าถึงแต่ละหน้า/ฟีเจอร์
@@ -40,6 +42,7 @@ class _RolePermissionPageState extends ConsumerState<RolePermissionPage>
 
     return Scaffold(
       appBar: AppBar(
+        leading: buildMobileHomeLeading(context),
         title: const Text('จัดการสิทธิ์การใช้งาน'),
         bottom: TabBar(
           controller: _tabController,
@@ -98,8 +101,12 @@ class _RolePermissionPageState extends ConsumerState<RolePermissionPage>
   Future<void> _confirmReset(AppRoleInfo role) async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('คืนค่าเริ่มต้น'),
+      builder: (_) => AppDialog(
+        title: buildAppDialogTitle(
+          context,
+          title: 'คืนค่าเริ่มต้น',
+          icon: Icons.restore_rounded,
+        ),
         content: Text(
           'คืนสิทธิ์ของ "${role.label}" กลับเป็นค่าเริ่มต้นใช่หรือไม่?',
         ),

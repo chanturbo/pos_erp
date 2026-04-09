@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pos_erp/shared/widgets/mobile_home_button.dart';
 import '../../data/models/stock_balance_model.dart';
 import '../providers/stock_provider.dart';
 
@@ -85,10 +86,7 @@ class _StockInDialogState extends ConsumerState<StockInDialog> {
                       ],
                     ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
+                  buildMobileCloseCompactButton(context),
                 ],
               ),
               const Divider(height: 32),

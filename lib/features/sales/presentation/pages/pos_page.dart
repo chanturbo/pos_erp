@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../branches/presentation/pages/sync_status_page.dart';
+import '../../../branches/presentation/providers/branch_provider.dart';
 import '../../../products/presentation/providers/product_provider.dart';
 import '../../../products/data/models/product_model.dart'; // ✅ สำหรับ bottom sheet
 import '../../../customers/data/models/customer_model.dart';
@@ -14,6 +16,7 @@ import '../../../../shared/services/mobile_scanner_service.dart'; // ✅ Phase 5
 import '../../../../shared/widgets/barcode_listener.dart'; // ✅ USB Scanner
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/responsive_utils.dart'; // ✅ Responsive
+import '../../../../shared/widgets/app_dialogs.dart';
 import '../../../../shared/widgets/cart_toast.dart';
 import '../../../promotions/data/models/promotion_model.dart';
 import '../../../promotions/presentation/providers/promotion_provider.dart';
@@ -72,15 +75,20 @@ class _PosPageState extends ConsumerState<PosPage> {
   Future<void> _handleLogout() async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('ออกจากระบบ'),
+      builder: (_) => AppDialog(
+        title: buildAppDialogTitle(
+          context,
+          title: 'ออกจากระบบ',
+          icon: Icons.logout_rounded,
+          iconColor: Colors.orange,
+        ),
         content: const Text('คุณต้องการออกจากระบบใช่หรือไม่?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: const Text('ยกเลิก'),
           ),
-          ElevatedButton(
+          FilledButton(
             onPressed: () => Navigator.pop(context, true),
             child: const Text('ออกจากระบบ'),
           ),
@@ -93,6 +101,127 @@ class _PosPageState extends ConsumerState<PosPage> {
         Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
       }
     }
+  }
+
+  Future<void> _openConnectionSettings() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const SyncStatusPage()),
+    );
+  }
+
+  Future<void> _holdCurrentOrder() async {
+    final cartState = ref.read(cartProvider);
+    if (cartState.items.isEmpty) return;
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (_) => _HoldOrderNameDialog(),
+    );
+    if (result == null || result.isEmpty) return;
+
+    ref.read(cartProvider.notifier).hold(result);
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'พักบิล: $result',
+          overflow: TextOverflow.ellipsis,
+        ),
+        backgroundColor: AppTheme.primary,
+        behavior: SnackBarBehavior.floating,
+        width: 240,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      ),
+    );
+  }
+
+  void _showDesktopScanError(String value) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text('ไม่พบสินค้า: $value'),
+          backgroundColor: AppTheme.error,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(milliseconds: 1800),
+          width: 320,
+        ),
+      );
+  }
+
+  void _showDesktopScanSuccess(String productName) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('เพิ่ม $productName แล้ว'),
+        duration: const Duration(milliseconds: 900),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: AppTheme.success,
+        width: 300,
+      ),
+    );
+  }
+
+  bool _tryAddProductFromScan(String rawValue) {
+    final normalized = rawValue.trim().toLowerCase();
+    if (normalized.isEmpty) return false;
+
+    final products = ref.read(productListProvider).value ?? const <ProductModel>[];
+    ProductModel? matchedProduct;
+    for (final product in products) {
+      if ((product.barcode?.trim().toLowerCase() == normalized) ||
+          product.productCode.trim().toLowerCase() == normalized) {
+        matchedProduct = product;
+        break;
+      }
+    }
+
+    if (matchedProduct == null) {
+      _showDesktopScanError(rawValue);
+      return false;
+    }
+
+    final priceLevel = ref.read(cartProvider).customerPriceLevel;
+    final lookup = getPriceByLevel(matchedProduct, priceLevel);
+    if (lookup.isFallback && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '⚠ ราคา Lv.${lookup.requestedLevel} ยังไม่ได้ตั้งค่า — ใช้ราคาปกติ ฿${lookup.price.toStringAsFixed(2)}',
+          ),
+          backgroundColor: Colors.orange.shade700,
+          duration: const Duration(seconds: 3),
+          behavior: SnackBarBehavior.floating,
+          width: 380,
+        ),
+      );
+    }
+
+    ref.read(cartProvider.notifier).addItem(
+          productId: matchedProduct.productId,
+          productCode: matchedProduct.productCode,
+          productName: matchedProduct.productName,
+          unit: matchedProduct.baseUnit,
+          unitPrice: lookup.price,
+          groupId: matchedProduct.groupId,
+          priceLevel1: matchedProduct.priceLevel1,
+          priceLevel2: matchedProduct.priceLevel2,
+          priceLevel3: matchedProduct.priceLevel3,
+          priceLevel4: matchedProduct.priceLevel4,
+          priceLevel5: matchedProduct.priceLevel5,
+        );
+
+    _searchController.clear();
+    if (mounted) {
+      setState(() => _searchQuery = '');
+    }
+    if (!lookup.isFallback) {
+      _showDesktopScanSuccess(matchedProduct.productName);
+    }
+    return true;
   }
 
   // ── Filter products ───────────────────────────────────────────
@@ -135,6 +264,8 @@ class _PosPageState extends ConsumerState<PosPage> {
     final productAsync = ref.watch(productListProvider);
     final cartState = ref.watch(cartProvider);
     final holdOrdersState = ref.watch(holdOrdersProvider);
+    final selectedBranch = ref.watch(selectedBranchProvider);
+    final selectedWarehouse = ref.watch(selectedWarehouseProvider);
     final user = widget.isCashierMode ? ref.watch(authProvider).user : null;
 
     final hasCustomer =
@@ -142,8 +273,6 @@ class _PosPageState extends ConsumerState<PosPage> {
 
     // ── Responsive ───────────────────────────────────────────────
     final isMobile = context.isMobile;
-    final isTablet = context.isTablet;
-    final isCompactDesktop = !isTablet && context.screenWidth < 1280;
 
     if (isMobile) {
       return const MobileOrderPage();
@@ -154,6 +283,7 @@ class _PosPageState extends ConsumerState<PosPage> {
       // ✅ BarcodeListener ครอบทั้งหน้า
       child: BarcodeListener(
         onBarcodeScanned: (barcode) {
+          if (_tryAddProductFromScan(barcode)) return;
           _searchController.text = barcode;
           setState(() => _searchQuery = barcode);
         },
@@ -245,7 +375,7 @@ class _PosPageState extends ConsumerState<PosPage> {
               ),
             ],
             bottom: PreferredSize(
-              preferredSize: Size.fromHeight(isTablet ? 52 : 60),
+              preferredSize: const Size.fromHeight(56),
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
@@ -259,6 +389,72 @@ class _PosPageState extends ConsumerState<PosPage> {
                       cartState: cartState,
                       hasCustomer: hasCustomer,
                     ),
+                    if (selectedBranch != null && selectedWarehouse != null)
+                      InkWell(
+                        onTap: _openConnectionSettings,
+                        borderRadius: BorderRadius.circular(20),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 7,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppTheme.border.withValues(alpha: 0.25),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.storefront_outlined, size: 13),
+                              const SizedBox(width: 5),
+                              Text(
+                                selectedBranch.branchName,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    else
+                      InkWell(
+                        onTap: _openConnectionSettings,
+                        borderRadius: BorderRadius.circular(20),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 7,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: Colors.orange.withValues(alpha: 0.4),
+                            ),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.warning_amber_rounded,
+                                size: 13,
+                                color: Colors.orange,
+                              ),
+                              SizedBox(width: 5),
+                              Text(
+                                'ตั้งค่าสาขา',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.orange,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     if (cartState.itemCount > 0)
                       Container(
                         padding: const EdgeInsets.symmetric(
@@ -289,11 +485,7 @@ class _PosPageState extends ConsumerState<PosPage> {
           // Mobile (<768px): cart only
           body: Stack(
             children: [
-              isTablet
-                  ? _buildTabletBody(productAsync, cartState)
-                  : isCompactDesktop
-                      ? _buildCompactDesktopBody(productAsync, cartState)
-                      : _buildDesktopBody(productAsync, cartState),
+              _buildDesktopBody(productAsync, cartState),
               const CartToastOverlay(),
             ],
           ),
@@ -302,94 +494,7 @@ class _PosPageState extends ConsumerState<PosPage> {
     );
   }
 
-  Widget _buildTabletBody(
-    AsyncValue<List<ProductModel>> productAsync,
-    CartState cartState,
-  ) {
-    return Column(
-      children: [
-        _buildSearchToolbar(cartState, compact: true),
-        Expanded(
-          child: productAsync.when(
-            data: (products) {
-              final filtered = _filterProducts(products);
-              if (filtered.isEmpty) return _buildEmptyProducts();
-              return ProductGrid(products: filtered);
-            },
-            loading: () => const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 16),
-                  Text('กำลังโหลดสินค้า...'),
-                ],
-              ),
-            ),
-            error: (e, _) => _buildProductError(e),
-          ),
-        ),
-        const Divider(height: 1, color: AppTheme.border),
-        const SizedBox(
-          height: 340,
-          child: CartPanel(
-            showScanRow: true,
-            autofocusScan: false,
-          ),
-        ),
-      ],
-    );
-  }
-
   // ─────────────────────────────────────────────────────────────
-  // COMPACT DESKTOP BODY (>=1024 && <1280)
-  // โน้ตบุ๊ก/เดสก์ท็อปเล็ก ใช้แนวตั้งเพื่อลดความแน่นของ cart panel
-  // ─────────────────────────────────────────────────────────────
-  Widget _buildCompactDesktopBody(
-    AsyncValue<List<ProductModel>> productAsync,
-    CartState cartState,
-  ) {
-    return Column(
-      children: [
-        _buildSearchToolbar(cartState),
-        Expanded(
-          child: Column(
-            children: [
-              Expanded(
-                flex: 58,
-                child: productAsync.when(
-                  data: (products) {
-                    final filtered = _filterProducts(products);
-                    if (filtered.isEmpty) return _buildEmptyProducts();
-                    return ProductGrid(products: filtered);
-                  },
-                  loading: () => const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        CircularProgressIndicator(),
-                        SizedBox(height: 16),
-                        Text('กำลังโหลดสินค้า...'),
-                      ],
-                    ),
-                  ),
-                  error: (e, _) => _buildProductError(e),
-                ),
-              ),
-              const Divider(height: 1, color: AppTheme.border),
-              const Expanded(
-                flex: 42,
-                child: CartPanel(
-                  autofocusScan: false,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
   // ─────────────────────────────────────────────────────────────
   // TABLET / DESKTOP BODY (>=768px): Grid(60%) + Cart(40%)
   // ─────────────────────────────────────────────────────────────
@@ -436,9 +541,12 @@ class _PosPageState extends ConsumerState<PosPage> {
               ),
 
               // Cart Panel (40%)
-              const Expanded(
+              Expanded(
                 flex: 40,
-                child: CartPanel(),
+                child: CartPanel(
+                  showHoldButton: true,
+                  onHold: cartState.items.isEmpty ? null : _holdCurrentOrder,
+                ),
               ),
             ],
           ),
@@ -478,6 +586,7 @@ class _PosPageState extends ConsumerState<PosPage> {
                         tooltip: 'สแกนบาร์โค้ดสินค้า',
                         useSheet: true,
                         onScanned: (value) {
+                          if (_tryAddProductFromScan(value)) return;
                           _searchController.text = value;
                           setState(() => _searchQuery = value);
                         },
@@ -496,30 +605,28 @@ class _PosPageState extends ConsumerState<PosPage> {
                 ),
               ),
               onChanged: (v) => setState(() => _searchQuery = v),
+              onSubmitted: (value) {
+                if (_tryAddProductFromScan(value)) return;
+                if (mounted) {
+                  setState(() => _searchQuery = value);
+                }
+                if (_filterProducts(
+                  ref.read(productListProvider).value ?? const <ProductModel>[],
+                ).isEmpty) {
+                  _showDesktopScanError(value);
+                }
+              },
             ),
           );
 
           if (shouldStack) {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                searchField,
-                const SizedBox(height: 10),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: _HoldButton(cartState: cartState),
-                ),
-              ],
+              children: [searchField],
             );
           }
 
-          return Row(
-            children: [
-              Expanded(child: searchField),
-              const SizedBox(width: 12),
-              _HoldButton(cartState: cartState),
-            ],
-          );
+          return Row(children: [Expanded(child: searchField)]);
         },
       ),
     );
@@ -592,56 +699,6 @@ class _PosPageState extends ConsumerState<PosPage> {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// _HoldButton — แยก widget ใช้ทั้ง desktop และ compact toolbar
-// ─────────────────────────────────────────────────────────────────
-class _HoldButton extends ConsumerWidget {
-  final CartState cartState;
-  const _HoldButton({required this.cartState});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return ElevatedButton.icon(
-      onPressed: cartState.items.isEmpty
-          ? null
-          : () async {
-              final result = await showDialog<String>(
-                context: context,
-                builder: (_) => _HoldOrderNameDialog(),
-              );
-              if (result != null && result.isNotEmpty) {
-                ref.read(cartProvider.notifier).hold(result);
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'พักบิล: $result',
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      backgroundColor: AppTheme.primary,
-                      behavior: SnackBarBehavior.floating,
-                      width: 240,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                    ),
-                  );
-                }
-              }
-            },
-      icon: const Icon(Icons.bookmark_add_outlined, size: 16),
-      label: const Text('พักบิล'),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: AppTheme.primary,
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      ),
-    );
-  }
-}
-
 class _CustomerChip extends ConsumerWidget {
   final CartState cartState;
   final bool hasCustomer;
@@ -665,17 +722,12 @@ class _CustomerChip extends ConsumerWidget {
       if (!context.mounted) return;
       final confirm = await showDialog<bool>(
         context: context,
-        builder: (_) => AlertDialog(
-          title: const Row(
-            children: [
-              Icon(
-                Icons.sell_outlined,
-                color: AppTheme.warning,
-                size: 22,
-              ),
-              SizedBox(width: 8),
-              Text('อัพเดทราคาสินค้า?'),
-            ],
+        builder: (_) => AppDialog(
+          title: buildAppDialogTitle(
+            context,
+            title: 'อัพเดทราคาสินค้า?',
+            icon: Icons.sell_outlined,
+            iconColor: AppTheme.warning,
           ),
           content: Text(
             'ลูกค้า "${result.customerName}" ใช้ระดับราคา Level $newLevel '
@@ -686,11 +738,11 @@ class _CustomerChip extends ConsumerWidget {
               onPressed: () => Navigator.pop(context, false),
               child: const Text('คงราคาเดิม'),
             ),
-            ElevatedButton.icon(
+            FilledButton.icon(
               onPressed: () => Navigator.pop(context, true),
               icon: const Icon(Icons.price_change, size: 16),
               label: const Text('อัพเดทราคา'),
-              style: ElevatedButton.styleFrom(
+              style: FilledButton.styleFrom(
                 backgroundColor: AppTheme.primary,
                 foregroundColor: Colors.white,
               ),
@@ -720,17 +772,12 @@ class _CustomerChip extends ConsumerWidget {
     if (notifier.hasItemsWithDifferentLevel(1)) {
       final confirm = await showDialog<bool>(
         context: context,
-        builder: (_) => AlertDialog(
-          title: const Row(
-            children: [
-              Icon(
-                Icons.sell_outlined,
-                color: AppTheme.warning,
-                size: 22,
-              ),
-              SizedBox(width: 8),
-              Text('อัพเดทราคาสินค้า?'),
-            ],
+        builder: (_) => AppDialog(
+          title: buildAppDialogTitle(
+            context,
+            title: 'อัพเดทราคาสินค้า?',
+            icon: Icons.sell_outlined,
+            iconColor: AppTheme.warning,
           ),
           content: const Text(
             'เปลี่ยนเป็นลูกค้าทั่วไป (Level 1) '
@@ -741,11 +788,11 @@ class _CustomerChip extends ConsumerWidget {
               onPressed: () => Navigator.pop(context, false),
               child: const Text('คงราคาเดิม'),
             ),
-            ElevatedButton.icon(
+            FilledButton.icon(
               onPressed: () => Navigator.pop(context, true),
               icon: const Icon(Icons.price_change, size: 16),
               label: const Text('อัพเดทราคา'),
-              style: ElevatedButton.styleFrom(
+              style: FilledButton.styleFrom(
                 backgroundColor: AppTheme.primary,
                 foregroundColor: Colors.white,
               ),
@@ -859,20 +906,11 @@ class _HoldOrderNameDialogState extends State<_HoldOrderNameDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Row(
-        children: [
-          Container(
-            width: 4,
-            height: 18,
-            decoration: BoxDecoration(
-              color: AppTheme.primary,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(width: 10),
-          const Text('พักบิล'),
-        ],
+    return AppDialog(
+      title: buildAppDialogTitle(
+        context,
+        title: 'พักบิล',
+        icon: Icons.pause_circle_outline_rounded,
       ),
       content: TextField(
         controller: _controller,
@@ -891,8 +929,8 @@ class _HoldOrderNameDialogState extends State<_HoldOrderNameDialog> {
           onPressed: () => Navigator.pop(context),
           child: const Text('ยกเลิก'),
         ),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(
+        FilledButton(
+          style: FilledButton.styleFrom(
             backgroundColor: AppTheme.primary,
             foregroundColor: Colors.white,
             elevation: 0,

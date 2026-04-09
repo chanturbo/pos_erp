@@ -7,6 +7,7 @@ import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/pdf/pdf_report_button.dart';
 import '../../../../shared/utils/responsive_utils.dart';
 import '../../../../shared/widgets/escape_pop_scope.dart';
+import '../../../../shared/widgets/mobile_home_button.dart';
 import '../providers/stock_provider.dart';
 import '../widgets/stock_in_dialog.dart';
 import '../widgets/stock_out_dialog.dart';
@@ -35,13 +36,22 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   String _selectedWarehouse = 'WH001'; // ✅ เหมือนไฟล์เดิม
-  bool _isTableView = true; // ← default: Table View
+  bool _isTableView = true;
+  bool _initializedViewMode = false;
   bool _showLowStockOnly = false;
   String _sortColumn = 'productCode';
   bool _sortAsc = true;
 
   // ── Pagination ──────────────────────────────────────────────────
   int _currentPage = 1;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_initializedViewMode) return;
+    _isTableView = !context.isMobile;
+    _initializedViewMode = true;
+  }
 
   @override
   void dispose() {
@@ -164,6 +174,7 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
+        leading: buildMobileHomeLeading(context),
         title: const Text('สต๊อกคงเหลือ'),
         actions: [
           // Filter: สต๊อกต่ำ

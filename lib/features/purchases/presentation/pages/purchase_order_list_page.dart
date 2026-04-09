@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
+import 'package:pos_erp/shared/utils/responsive_utils.dart';
+import 'package:pos_erp/shared/widgets/app_dialogs.dart';
 import 'package:pos_erp/shared/widgets/pagination_bar.dart';
 import 'package:pos_erp/shared/widgets/escape_pop_scope.dart';
 import 'package:pos_erp/shared/pdf/pdf_report_button.dart';
+import 'package:pos_erp/shared/widgets/mobile_home_button.dart';
 import '../../../settings/presentation/pages/settings_page.dart';
 import '../providers/purchase_provider.dart';
 import '../../data/models/purchase_order_model.dart';
@@ -606,13 +609,12 @@ class _PurchaseOrderListPageState extends ConsumerState<PurchaseOrderListPage> {
   Future<void> _deletePurchaseOrder(PurchaseOrderModel order) async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            const Icon(Icons.delete_outline, color: AppTheme.error, size: 20),
-            const SizedBox(width: 8),
-            const Text('ยืนยันการลบ'),
-          ],
+      builder: (context) => AppDialog(
+        title: buildAppDialogTitle(
+          context,
+          title: 'ยืนยันการลบ',
+          icon: Icons.delete_outline,
+          iconColor: AppTheme.error,
         ),
         content: Text('ต้องการลบใบสั่งซื้อ ${order.poNo} ออกจากระบบ?'),
         actions: [
@@ -652,17 +654,12 @@ class _PurchaseOrderListPageState extends ConsumerState<PurchaseOrderListPage> {
   Future<void> _approvePurchaseOrder(PurchaseOrderModel order) async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            const Icon(
-              Icons.check_circle_outline,
-              color: AppTheme.success,
-              size: 20,
-            ),
-            const SizedBox(width: 8),
-            const Text('ยืนยันการอนุมัติ'),
-          ],
+      builder: (context) => AppDialog(
+        title: buildAppDialogTitle(
+          context,
+          title: 'ยืนยันการอนุมัติ',
+          icon: Icons.check_circle_outline,
+          iconColor: AppTheme.success,
         ),
         content: Text('อนุมัติใบสั่งซื้อ ${order.poNo} ใช่หรือไม่?'),
         actions: [
@@ -1119,25 +1116,27 @@ class _POBackBtn extends StatelessWidget {
   final bool isDark;
   const _POBackBtn({required this.isDark});
   @override
-  Widget build(BuildContext context) => InkWell(
-    onTap: () => Navigator.of(context).pop(),
-    borderRadius: BorderRadius.circular(8),
-    child: Container(
-      padding: const EdgeInsets.all(7),
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkElement : const Color(0xFFF5F5F5),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: isDark ? const Color(0xFF333333) : AppTheme.border,
-        ),
-      ),
-      child: Icon(
-        Icons.arrow_back_ios_new,
-        size: 15,
-        color: isDark ? const Color(0xFFAAAAAA) : const Color(0xFF8A8A8A),
-      ),
-    ),
-  );
+  Widget build(BuildContext context) => context.isMobile
+      ? buildMobileHomeCompactButton(context, isDark: isDark)
+      : InkWell(
+          onTap: () => Navigator.of(context).pop(),
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+              color: isDark ? AppTheme.darkElement : const Color(0xFFF5F5F5),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: isDark ? const Color(0xFF333333) : AppTheme.border,
+              ),
+            ),
+            child: Icon(
+              Icons.arrow_back_ios_new,
+              size: 15,
+              color: isDark ? const Color(0xFFAAAAAA) : const Color(0xFF8A8A8A),
+            ),
+          ),
+        );
 }
 
 class _POPageIcon extends StatelessWidget {

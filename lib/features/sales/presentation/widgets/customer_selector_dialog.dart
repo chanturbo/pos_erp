@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
+import 'package:pos_erp/shared/widgets/mobile_home_button.dart';
 import '../../../customers/presentation/providers/customer_provider.dart';
 import '../../../customers/data/models/customer_model.dart';
 
@@ -94,13 +95,9 @@ class _CustomerSelectorDialogState
                         setState(() => _showMembersOnly = !_showMembersOnly),
                   ),
                   const SizedBox(width: 8),
-                  InkWell(
-                    onTap: () => Navigator.pop(context),
-                    borderRadius: BorderRadius.circular(6),
-                    child: const Padding(
-                      padding: EdgeInsets.all(4),
-                      child: Icon(Icons.close, size: 18, color: AppTheme.textSub),
-                    ),
+                  buildMobileCloseCompactButton(
+                    context,
+                    isDark: Theme.of(context).brightness == Brightness.dark,
                   ),
                 ],
               ),

@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
+import 'package:pos_erp/shared/utils/responsive_utils.dart';
 import 'package:pos_erp/shared/widgets/escape_pop_scope.dart';
+import 'package:pos_erp/shared/widgets/mobile_home_button.dart';
 import '../../data/models/purchase_return_model.dart';
 import '../../data/models/purchase_return_item_model.dart';
 import '../providers/purchase_return_provider.dart';
@@ -998,14 +1000,16 @@ class _PRFormTitleBar extends StatelessWidget {
       padding: EdgeInsets.fromLTRB(4, safeTop + 6, 12, 10),
       child: Row(
         children: [
-          IconButton(
-            icon: const Icon(
-              Icons.arrow_back_ios_new,
-              size: 18,
-              color: Colors.white,
-            ),
-            onPressed: () => Navigator.pop(context),
-          ),
+          context.isMobile
+              ? buildMobileHomeCompactButton(context, isDark: true)
+              : IconButton(
+                  icon: const Icon(
+                    Icons.arrow_back_ios_new,
+                    size: 18,
+                    color: Colors.white,
+                  ),
+                  onPressed: () => Navigator.pop(context),
+                ),
           Container(
             width: 34,
             height: 34,

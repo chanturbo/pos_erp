@@ -37,6 +37,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
 import 'pdf_preview_dialog.dart';
+import '../widgets/app_dialogs.dart';
 
 class PdfExportService {
   // ── แสดง Preview Dialog ──────────────────────────────────────────
@@ -61,8 +62,13 @@ class PdfExportService {
       if (!context.mounted) return;
       await showDialog(
         context: context,
-        builder: (_) => AlertDialog(
-          title: const Text('ไม่สามารถแสดงตัวอย่าง PDF ได้'),
+        builder: (_) => AppDialog(
+          title: buildAppDialogTitle(
+            context,
+            title: 'ไม่สามารถแสดงตัวอย่าง PDF ได้',
+            icon: Icons.picture_as_pdf_outlined,
+            iconColor: Colors.orange,
+          ),
           content: Text(
             path == null
                 ? 'ระบบ preview ของอุปกรณ์นี้ไม่สามารถ raster PDF ชุดนี้ได้ กรุณาใช้การบันทึกหรือแชร์ PDF แทน'
