@@ -9,6 +9,7 @@ class SeedData {
     print('🌱 Starting seed data...');
     await seedBranches(db);
     await seedWarehouses(db);
+    await seedRoles(db);   // ✅ ต้องอยู่ก่อน seedUsers (FK constraint)
     await seedUsers(db);
     await seedCustomerGroups(db); // ✅ ต้องอยู่ก่อน seedCustomers
     await seedCustomers(db);
@@ -91,6 +92,41 @@ class SeedData {
   }
 
   /// Seed Users
+  /// Seed Roles — ต้องทำก่อน seedUsers เพราะ users.role_id FK → roles.role_id
+  static Future<void> seedRoles(AppDatabase db) async {
+    final roles = [
+      RolesCompanion.insert(
+        roleId: 'ADMIN',
+        roleName: 'ผู้ดูแลระบบ',
+        permissions: const <String, dynamic>{},
+      ),
+      RolesCompanion.insert(
+        roleId: 'MANAGER',
+        roleName: 'ผู้จัดการ',
+        permissions: const <String, dynamic>{},
+      ),
+      RolesCompanion.insert(
+        roleId: 'CASHIER',
+        roleName: 'แคชเชียร์',
+        permissions: const <String, dynamic>{},
+      ),
+      RolesCompanion.insert(
+        roleId: 'WAREHOUSE',
+        roleName: 'คลังสินค้า',
+        permissions: const <String, dynamic>{},
+      ),
+      RolesCompanion.insert(
+        roleId: 'ACCOUNTANT',
+        roleName: 'บัญชี',
+        permissions: const <String, dynamic>{},
+      ),
+    ];
+    for (final role in roles) {
+      await db.into(db.roles).insert(role, mode: InsertMode.insertOrIgnore);
+    }
+    print('   ✅ Roles seeded');
+  }
+
   static Future<void> seedUsers(AppDatabase db) async {
     final users = [
       UsersCompanion.insert(
@@ -117,13 +153,15 @@ class SeedData {
       ),
     ];
 
-    for (var user in users) {
+    for (final user in users) {
       try {
-        await db.into(db.users).insert(user, mode: InsertMode.insertOrIgnore);
+        // insertOrReplace เพื่อให้ roleId/branchId อัปเดตได้ถ้า user มีอยู่แล้วแต่ role เป็น null
+        await db.into(db.users).insertOnConflictUpdate(user);
       } catch (e) {
-        // User exists
+        print('⚠️ seedUsers error: $e');
       }
     }
+    print('   ✅ Users seeded');
   }
 
   /// Seed Customer Groups (ระดับราคา 1-5)
