@@ -35,7 +35,7 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
   late DateTime? _dateFrom = widget.initialDateFrom;
   late DateTime? _dateTo = widget.initialDateTo;
   String _paymentFilter = 'ALL'; // ALL | CASH | CARD | TRANSFER
-  String _statusFilter = 'ALL';  // ALL | COMPLETED | PENDING | CANCELLED
+  String _statusFilter = 'ALL'; // ALL | COMPLETED | PENDING | CANCELLED
 
   // ── Sort ────────────────────────────────────────────────────────
   String _sortColumn = 'date'; // date | orderNo | customer | amount | status
@@ -65,7 +65,8 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
       // search
       if (_searchQuery.isNotEmpty) {
         final q = _searchQuery.toLowerCase();
-        final match = o.orderNo.toLowerCase().contains(q) ||
+        final match =
+            o.orderNo.toLowerCase().contains(q) ||
             (o.customerName?.toLowerCase().contains(q) ?? false);
         if (!match) return false;
       }
@@ -74,8 +75,14 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
         if (o.orderDate.isBefore(_dateFrom!)) return false;
       }
       if (_dateTo != null) {
-        final endOfDay =
-            DateTime(_dateTo!.year, _dateTo!.month, _dateTo!.day, 23, 59, 59);
+        final endOfDay = DateTime(
+          _dateTo!.year,
+          _dateTo!.month,
+          _dateTo!.day,
+          23,
+          59,
+          59,
+        );
         if (o.orderDate.isAfter(endOfDay)) return false;
       }
       // payment
@@ -164,9 +171,10 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
   Widget build(BuildContext context) {
     final salesAsync = ref.watch(salesHistoryProvider);
     final pageSize = ref.watch(settingsProvider).listPageSize;
+    final colors = _SalesHistoryColors.of(context);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: colors.scaffoldBg,
       body: Column(
         children: [
           // ── Top Bar ──────────────────────────────────────────────
@@ -174,10 +182,16 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
             searchController: _searchController,
             searchQuery: _searchQuery,
             hasFilter: _hasFilter,
-            onSearchChanged: (v) => setState(() { _searchQuery = v; _currentPage = 1; }),
+            onSearchChanged: (v) => setState(() {
+              _searchQuery = v;
+              _currentPage = 1;
+            }),
             onSearchCleared: () {
               _searchController.clear();
-              setState(() { _searchQuery = ''; _currentPage = 1; });
+              setState(() {
+                _searchQuery = '';
+                _currentPage = 1;
+              });
             },
             onRefresh: () => ref.read(salesHistoryProvider.notifier).refresh(),
             onClearFilter: _hasFilter ? _clearFilters : null,
@@ -191,10 +205,22 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
             statusFilter: _statusFilter,
             onPickFrom: () => _pickDate(true),
             onPickTo: () => _pickDate(false),
-            onClearFrom: () => setState(() { _dateFrom = null; _currentPage = 1; }),
-            onClearTo: () => setState(() { _dateTo = null; _currentPage = 1; }),
-            onPaymentChanged: (v) => setState(() { _paymentFilter = v; _currentPage = 1; }),
-            onStatusChanged: (v) => setState(() { _statusFilter = v; _currentPage = 1; }),
+            onClearFrom: () => setState(() {
+              _dateFrom = null;
+              _currentPage = 1;
+            }),
+            onClearTo: () => setState(() {
+              _dateTo = null;
+              _currentPage = 1;
+            }),
+            onPaymentChanged: (v) => setState(() {
+              _paymentFilter = v;
+              _currentPage = 1;
+            }),
+            onStatusChanged: (v) => setState(() {
+              _statusFilter = v;
+              _currentPage = 1;
+            }),
           ),
 
           // ── Body ─────────────────────────────────────────────────
@@ -214,11 +240,15 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                 final totalPages = (filtered.length / pageSize).ceil();
                 final safePage = _currentPage.clamp(1, totalPages);
                 final pageStart = (safePage - 1) * pageSize;
-                final pageEnd = (pageStart + pageSize).clamp(0, filtered.length);
+                final pageEnd = (pageStart + pageSize).clamp(
+                  0,
+                  filtered.length,
+                );
                 final pageItems = filtered.sublist(pageStart, pageEnd);
 
                 final screenW = MediaQuery.of(context).size.width - 32;
-                final totalW = 40.0 +
+                final totalW =
+                    40.0 +
                     16.0 +
                     _colWidths.fold(0.0, (s, w) => s + w) +
                     28.0 +
@@ -231,16 +261,24 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                       margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
 
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: colors.cardBg,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppTheme.border),
+                        border: Border.all(color: colors.border),
+                        boxShadow: [
+                          if (!colors.isDark)
+                            BoxShadow(
+                              color: AppTheme.navy.withValues(alpha: 0.04),
+                              blurRadius: 16,
+                              offset: const Offset(0, 6),
+                            ),
+                        ],
                       ),
                       child: Column(
                         children: [
                           // ── Summary chip row ───────────────────
                           _SummaryBar(summary: summary, fmt: _fmt),
 
-                          const Divider(height: 1, color: AppTheme.border),
+                          Divider(height: 1, color: colors.border),
 
                           // ── Table ──────────────────────────────
                           Expanded(
@@ -275,19 +313,24 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                                         }),
                                         onReset: () => setState(() {
                                           _colWidths.setAll(0, [
-                                            140, 130, 180, 100, 110, 100, 70,
+                                            140,
+                                            130,
+                                            180,
+                                            100,
+                                            110,
+                                            100,
+                                            70,
                                           ]);
                                         }),
                                       ),
-                                      const Divider(
-                                          height: 1, color: AppTheme.border),
+                                      Divider(height: 1, color: colors.border),
                                       Expanded(
                                         child: ListView.separated(
                                           itemCount: pageItems.length,
-                                          separatorBuilder: (_, _) =>
-                                              const Divider(
-                                                  height: 1,
-                                                  color: AppTheme.border),
+                                          separatorBuilder: (_, _) => Divider(
+                                            height: 1,
+                                            color: colors.border,
+                                          ),
                                           itemBuilder: (context, i) {
                                             return _SalesOrderRow(
                                               order: pageItems[i],
@@ -299,8 +342,9 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                                                 MaterialPageRoute(
                                                   builder: (_) =>
                                                       OrderDetailsPage(
-                                                          orderId: pageItems[i]
-                                                              .orderId),
+                                                        orderId: pageItems[i]
+                                                            .orderId,
+                                                      ),
                                                 ),
                                               ),
                                             );
@@ -319,7 +363,8 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                             currentPage: safePage,
                             totalItems: filtered.length,
                             pageSize: pageSize,
-                            onPageChanged: (p) => setState(() => _currentPage = p),
+                            onPageChanged: (p) =>
+                                setState(() => _currentPage = p),
                             trailing: PdfReportButton(
                               emptyMessage: 'ไม่มีข้อมูลการขาย',
                               title: 'รายงานประวัติการขาย',
@@ -352,20 +397,44 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
   }
 
   Widget _buildEmpty(bool noData) {
+    final colors = _SalesHistoryColors.of(context);
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.receipt_long,
-              size: 80, color: Colors.grey.withValues(alpha: 0.4)),
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: colors.emptyIconBg,
+              shape: BoxShape.circle,
+              border: Border.all(color: colors.border),
+            ),
+            child: Icon(
+              Icons.inventory_2_outlined,
+              size: 38,
+              color: colors.emptyIcon,
+            ),
+          ),
           const SizedBox(height: 16),
           Text(
             noData ? 'ยังไม่มีรายการขาย' : 'ไม่พบรายการที่ตรงกับเงื่อนไข',
-            style: const TextStyle(fontSize: 15, color: AppTheme.textSub),
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+              color: colors.text,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            noData
+                ? 'เมื่อมีการขาย รายการจะปรากฏที่หน้านี้'
+                : 'ลองปรับคำค้นหา หรือรีเซตตัวกรองเพื่อดูข้อมูลเพิ่ม',
+            style: TextStyle(fontSize: 13, color: colors.subtext),
           ),
           if (_hasFilter) ...[
             const SizedBox(height: 12),
-            TextButton.icon(
+            ElevatedButton.icon(
               onPressed: _clearFilters,
               icon: const Icon(Icons.filter_alt_off, size: 16),
               label: const Text('ล้างตัวกรอง'),
@@ -377,18 +446,23 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
   }
 
   Widget _buildError(Object e) {
+    final colors = _SalesHistoryColors.of(context);
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.error_outline, size: 72, color: Colors.red),
+          const Icon(Icons.error_outline, size: 64, color: AppTheme.error),
           const SizedBox(height: 16),
-          Text('เกิดข้อผิดพลาด: $e'),
+          Text(
+            'เกิดข้อผิดพลาด: $e',
+            style: TextStyle(color: colors.text),
+            textAlign: TextAlign.center,
+          ),
           const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: () =>
-                ref.read(salesHistoryProvider.notifier).refresh(),
-            child: const Text('ลองใหม่'),
+          ElevatedButton.icon(
+            onPressed: () => ref.read(salesHistoryProvider.notifier).refresh(),
+            icon: const Icon(Icons.refresh),
+            label: const Text('ลองใหม่'),
           ),
         ],
       ),
@@ -424,9 +498,10 @@ class _SalesHistoryTopBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final isWide = MediaQuery.of(context).size.width >= _kBreak;
     final canPop = Navigator.of(context).canPop();
+    final colors = _SalesHistoryColors.of(context);
 
     return Container(
-      color: Colors.white,
+      decoration: BoxDecoration(color: colors.topBarBg),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: isWide
           ? _buildWide(context, canPop)
@@ -446,9 +521,10 @@ class _SalesHistoryTopBar extends StatelessWidget {
         const Text(
           'ประวัติการขาย',
           style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1A1A1A)),
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
         ),
         const Spacer(),
         ConstrainedBox(
@@ -461,10 +537,26 @@ class _SalesHistoryTopBar extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 8),
-        if (hasFilter)
-          _ClearFilterBtn(onTap: onClearFilter!),
+        if (hasFilter) _ClearFilterBtn(onTap: onClearFilter!),
         const SizedBox(width: 6),
         _RefreshBtn(onTap: onRefresh),
+        const SizedBox(width: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: AppTheme.primary.withValues(alpha: 0.2),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: AppTheme.primary.withValues(alpha: 0.5)),
+          ),
+          child: const Text(
+            'Sales History',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.primaryLight,
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -484,13 +576,13 @@ class _SalesHistoryTopBar extends StatelessWidget {
             const Text(
               'ประวัติการขาย',
               style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1A1A1A)),
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
             ),
             const Spacer(),
-            if (hasFilter)
-              _ClearFilterBtn(onTap: onClearFilter!),
+            if (hasFilter) _ClearFilterBtn(onTap: onClearFilter!),
             const SizedBox(width: 6),
             _RefreshBtn(onTap: onRefresh),
           ],
@@ -539,8 +631,12 @@ class _FilterBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = _SalesHistoryColors.of(context);
     return Container(
-      color: Colors.white,
+      decoration: BoxDecoration(
+        color: colors.searchBarBg,
+        border: Border(bottom: BorderSide(color: colors.border)),
+      ),
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       child: Wrap(
         spacing: 8,
@@ -611,14 +707,17 @@ class _SummaryBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = _SalesHistoryColors.of(context);
     final count = summary['count'] as int;
     final completedCount = summary['completedCount'] as int;
     final total = summary['total'] as double;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      color: const Color(0xFFFFF8F5),
-      child: Row(
+      decoration: BoxDecoration(color: colors.summaryBg),
+      child: Wrap(
+        spacing: 12,
+        runSpacing: 8,
         children: [
           _SummaryChip(
             icon: Icons.receipt_long,
@@ -648,22 +747,37 @@ class _SummaryChip extends StatelessWidget {
   final String label;
   final Color color;
 
-  const _SummaryChip(
-      {required this.icon, required this.label, required this.color});
+  const _SummaryChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 14, color: color),
-        const SizedBox(width: 4),
-        Text(
-          label,
-          style: TextStyle(
-              fontSize: 12, fontWeight: FontWeight.w600, color: color),
-        ),
-      ],
+    final colors = _SalesHistoryColors.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: colors.summaryChipBg,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: colors.border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -704,8 +818,9 @@ class _SalesTableHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = _SalesHistoryColors.of(context);
     return Container(
-      color: AppTheme.navy,
+      decoration: BoxDecoration(color: colors.tableHeaderBg),
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: [
@@ -714,11 +829,14 @@ class _SalesTableHeader extends StatelessWidget {
             width: 40,
             height: 40,
             child: Center(
-              child: Text('#',
-                  style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white70)),
+              child: Text(
+                '#',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white70,
+                ),
+              ),
             ),
           ),
           const SizedBox(width: 16),
@@ -737,8 +855,10 @@ class _SalesTableHeader extends StatelessWidget {
               isLast: i == _cols.length - 1,
               onSort: sortKey.isNotEmpty ? () => onSort(sortKey) : null,
               onResize: (delta) {
-                final newW =
-                    (colWidths[i] + delta).clamp(colMinW[i], colMaxW[i]);
+                final newW = (colWidths[i] + delta).clamp(
+                  colMinW[i],
+                  colMaxW[i],
+                );
                 onResize(i, newW);
               },
             );
@@ -753,8 +873,11 @@ class _SalesTableHeader extends StatelessWidget {
               borderRadius: BorderRadius.circular(4),
               child: const Padding(
                 padding: EdgeInsets.all(4),
-                child: Icon(Icons.settings_backup_restore,
-                    size: 14, color: Colors.white54),
+                child: Icon(
+                  Icons.settings_backup_restore,
+                  size: 14,
+                  color: Colors.white54,
+                ),
               ),
             ),
           ),
@@ -802,7 +925,7 @@ class _ResizableHeaderCellState extends State<_ResizableHeaderCell> {
   @override
   Widget build(BuildContext context) {
     const activeColor = Color(0xFFFF9D45);
-    const inactiveColor = Colors.white70;
+    final inactiveColor = _SalesHistoryColors.of(context).headerText;
     final labelColor = widget.isActive ? activeColor : inactiveColor;
     final canSort = widget.onSort != null;
 
@@ -818,7 +941,9 @@ class _ResizableHeaderCellState extends State<_ResizableHeaderCell> {
                     borderRadius: BorderRadius.circular(4),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
-                          vertical: 4, horizontal: 2),
+                        vertical: 4,
+                        horizontal: 2,
+                      ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -826,9 +951,10 @@ class _ResizableHeaderCellState extends State<_ResizableHeaderCell> {
                             child: Text(
                               widget.label,
                               style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: labelColor),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: labelColor,
+                              ),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
@@ -836,8 +962,8 @@ class _ResizableHeaderCellState extends State<_ResizableHeaderCell> {
                           Icon(
                             widget.isActive
                                 ? (widget.sortAsc
-                                    ? Icons.arrow_upward_rounded
-                                    : Icons.arrow_downward_rounded)
+                                      ? Icons.arrow_upward_rounded
+                                      : Icons.arrow_downward_rounded)
                                 : Icons.unfold_more_rounded,
                             size: 13,
                             color: widget.isActive
@@ -852,10 +978,11 @@ class _ResizableHeaderCellState extends State<_ResizableHeaderCell> {
                     padding: const EdgeInsets.symmetric(horizontal: 2),
                     child: Text(
                       widget.label,
-                      style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: inactiveColor),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: inactiveColor,
+                      ),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -872,8 +999,7 @@ class _ResizableHeaderCellState extends State<_ResizableHeaderCell> {
                   width: 4,
                   height: _hovering ? 28 : 20,
                   decoration: BoxDecoration(
-                    color:
-                        _hovering ? activeColor : Colors.white24,
+                    color: _hovering ? activeColor : Colors.white24,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -912,6 +1038,7 @@ class _SalesOrderRowState extends State<_SalesOrderRow> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = _SalesHistoryColors.of(context);
     final o = widget.order;
     final w = widget.colWidths;
     final isCompleted = o.status == 'COMPLETED';
@@ -924,9 +1051,7 @@ class _SalesOrderRowState extends State<_SalesOrderRow> {
         onTap: widget.onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 120),
-          color: _hovering
-              ? AppTheme.primary.withValues(alpha: 0.05)
-              : Colors.white,
+          color: _hovering ? colors.rowHoverBg : colors.cardBg,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           child: Row(
             children: [
@@ -938,20 +1063,20 @@ class _SalesOrderRowState extends State<_SalesOrderRow> {
                   backgroundColor: isCompleted
                       ? AppTheme.successContainer
                       : isCancelled
-                          ? AppTheme.errorContainer
-                          : const Color(0xFFFFF8E1),
+                      ? AppTheme.errorContainer
+                      : const Color(0xFFFFF8E1),
                   child: Icon(
                     isCompleted
                         ? Icons.check
                         : isCancelled
-                            ? Icons.close
-                            : Icons.hourglass_empty,
+                        ? Icons.close
+                        : Icons.hourglass_empty,
                     size: 14,
                     color: isCompleted
                         ? AppTheme.success
                         : isCancelled
-                            ? AppTheme.error
-                            : AppTheme.warning,
+                        ? AppTheme.error
+                        : AppTheme.warning,
                   ),
                 ),
               ),
@@ -962,8 +1087,7 @@ class _SalesOrderRowState extends State<_SalesOrderRow> {
                 width: w[0],
                 child: Text(
                   widget.dateFmt.format(o.orderDate),
-                  style: const TextStyle(
-                      fontSize: 12, color: AppTheme.textSub),
+                  style: const TextStyle(fontSize: 12, color: AppTheme.textSub),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -973,10 +1097,11 @@ class _SalesOrderRowState extends State<_SalesOrderRow> {
                 width: w[1],
                 child: Text(
                   o.orderNo,
-                  style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF1A1A1A)),
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: colors.text,
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -987,23 +1112,28 @@ class _SalesOrderRowState extends State<_SalesOrderRow> {
                 child: o.customerName != null
                     ? Row(
                         children: [
-                          const Icon(Icons.person_outline,
-                              size: 13, color: AppTheme.textSub),
+                          const Icon(
+                            Icons.person_outline,
+                            size: 13,
+                            color: AppTheme.textSub,
+                          ),
                           const SizedBox(width: 4),
                           Flexible(
                             child: Text(
                               o.customerName!,
-                              style: const TextStyle(
-                                  fontSize: 13,
-                                  color: Color(0xFF1A1A1A)),
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: colors.text,
+                              ),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],
                       )
-                    : const Text('Walk-in',
-                        style: TextStyle(
-                            fontSize: 12, color: AppTheme.textSub)),
+                    : const Text(
+                        'Walk-in',
+                        style: TextStyle(fontSize: 12, color: AppTheme.textSub),
+                      ),
               ),
 
               // ── ประเภทชำระ ─────────────────────────────────────
@@ -1015,18 +1145,23 @@ class _SalesOrderRowState extends State<_SalesOrderRow> {
               // ── ยอดรวม ─────────────────────────────────────────
               SizedBox(
                 width: w[4],
-                child: Text(
-                  '฿${widget.fmt.format(o.totalAmount)}',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: isCancelled
-                        ? AppTheme.textSub
-                        : AppTheme.info,
-                    decoration:
-                        isCancelled ? TextDecoration.lineThrough : null,
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    '฿${widget.fmt.format(o.totalAmount)}',
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: isCancelled
+                          ? colors.amountCancelledText
+                          : colors.amountText,
+                      decoration: isCancelled
+                          ? TextDecoration.lineThrough
+                          : null,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  overflow: TextOverflow.ellipsis,
                 ),
               ),
 
@@ -1050,10 +1185,16 @@ class _SalesOrderRowState extends State<_SalesOrderRow> {
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
                           color: AppTheme.primary.withValues(alpha: 0.08),
+                          border: Border.all(
+                            color: AppTheme.primary.withValues(alpha: 0.18),
+                          ),
                           borderRadius: BorderRadius.circular(6),
                         ),
-                        child: const Icon(Icons.open_in_new,
-                            size: 15, color: AppTheme.primary),
+                        child: const Icon(
+                          Icons.open_in_new,
+                          size: 15,
+                          color: AppTheme.primary,
+                        ),
                       ),
                     ),
                   ),
@@ -1077,21 +1218,28 @@ class _PaymentBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = _SalesHistoryColors.of(context);
     final (label, color, bg) = switch (type) {
       'CASH' => ('เงินสด', AppTheme.success, AppTheme.successContainer),
       'CARD' => ('บัตร', AppTheme.info, AppTheme.infoContainer),
       'TRANSFER' => ('โอน', const Color(0xFF6A1B9A), const Color(0xFFF3E5F5)),
-      _ => (type, AppTheme.textSub, const Color(0xFFF5F5F5)),
+      _ => (type, AppTheme.textSub, colors.neutralChipBg),
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
       ),
-      child: Text(label,
-          style: TextStyle(
-              fontSize: 11, fontWeight: FontWeight.w600, color: color)),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+      ),
     );
   }
 }
@@ -1102,29 +1250,19 @@ class _StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = _SalesHistoryColors.of(context);
     final (label, color, bg) = switch (status) {
-      'COMPLETED' => (
-          'สำเร็จ',
-          AppTheme.success,
-          AppTheme.successContainer
-        ),
-      'PENDING' => (
-          'รอดำเนินการ',
-          AppTheme.warning,
-          const Color(0xFFFFF8E1)
-        ),
-      'CANCELLED' => (
-          'ยกเลิก',
-          AppTheme.error,
-          AppTheme.errorContainer
-        ),
-      _ => (status, AppTheme.textSub, const Color(0xFFF5F5F5)),
+      'COMPLETED' => ('สำเร็จ', AppTheme.success, AppTheme.successContainer),
+      'PENDING' => ('รอดำเนินการ', AppTheme.warning, const Color(0xFFFFF8E1)),
+      'CANCELLED' => ('ยกเลิก', AppTheme.error, AppTheme.errorContainer),
+      _ => (status, AppTheme.textSub, colors.neutralChipBg),
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.16)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1135,11 +1273,14 @@ class _StatusBadge extends StatelessWidget {
             decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           ),
           const SizedBox(width: 5),
-          Text(label,
-              style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: color)),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
         ],
       ),
     );
@@ -1163,6 +1304,7 @@ class _DateChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = _SalesHistoryColors.of(context);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
@@ -1171,34 +1313,36 @@ class _DateChip extends StatelessWidget {
         decoration: BoxDecoration(
           color: active
               ? AppTheme.primary.withValues(alpha: 0.08)
-              : const Color(0xFFF5F5F5),
+              : colors.neutralChipBg,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: active ? AppTheme.primary : AppTheme.border,
-          ),
+          border: Border.all(color: active ? AppTheme.primary : colors.border),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon,
-                size: 14,
-                color: active ? AppTheme.primary : AppTheme.textSub),
+            Icon(
+              icon,
+              size: 14,
+              color: active ? AppTheme.primary : colors.subtext,
+            ),
             const SizedBox(width: 6),
             Text(
               label,
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
-                color: active ? AppTheme.primary : AppTheme.textSub,
+                color: active ? AppTheme.primary : colors.subtext,
               ),
             ),
             if (onClear != null) ...[
               const SizedBox(width: 6),
               InkWell(
                 onTap: onClear,
-                child: Icon(Icons.close,
-                    size: 13,
-                    color: active ? AppTheme.primary : AppTheme.textSub),
+                child: Icon(
+                  Icons.close,
+                  size: 13,
+                  color: active ? AppTheme.primary : colors.subtext,
+                ),
               ),
             ],
           ],
@@ -1223,36 +1367,39 @@ class _DropdownChip<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = _SalesHistoryColors.of(context);
     final isActive = items.first.$1 != value;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: isActive
             ? AppTheme.primary.withValues(alpha: 0.08)
-            : const Color(0xFFF5F5F5),
+            : colors.neutralChipBg,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: isActive ? AppTheme.primary : AppTheme.border,
-        ),
+        border: Border.all(color: isActive ? AppTheme.primary : colors.border),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<T>(
           value: value,
           isDense: true,
-          icon: Icon(Icons.arrow_drop_down,
-              size: 16,
-              color: isActive ? AppTheme.primary : AppTheme.textSub),
+          dropdownColor: colors.cardBg,
+          icon: Icon(
+            Icons.arrow_drop_down,
+            size: 16,
+            color: isActive ? AppTheme.primary : colors.subtext,
+          ),
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w500,
-            color: isActive ? AppTheme.primary : AppTheme.textSub,
+            color: isActive ? AppTheme.primary : colors.subtext,
           ),
           items: items
-              .map((e) => DropdownMenuItem<T>(
-                    value: e.$1,
-                    child: Text(e.$2,
-                        style: const TextStyle(fontSize: 12)),
-                  ))
+              .map(
+                (e) => DropdownMenuItem<T>(
+                  value: e.$1,
+                  child: Text(e.$2, style: const TextStyle(fontSize: 12)),
+                ),
+              )
               .toList(),
           onChanged: (v) {
             if (v != null) onChanged(v);
@@ -1278,42 +1425,49 @@ class _SearchField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SizedBox(
-        height: 38,
-        child: TextField(
-          controller: controller,
-          style: const TextStyle(fontSize: 13),
-          decoration: InputDecoration(
-            hintText: 'ค้นหาเลขที่ใบขาย, ชื่อลูกค้า...',
-            hintStyle:
-                const TextStyle(fontSize: 13, color: AppTheme.textSub),
-            prefixIcon: const Icon(Icons.search,
-                size: 17, color: AppTheme.textSub),
-            suffixIcon: query.isNotEmpty
-                ? IconButton(
-                    icon: const Icon(Icons.clear, size: 15),
-                    onPressed: onCleared,
-                  )
-                : null,
-            contentPadding: EdgeInsets.zero,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: AppTheme.border),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: AppTheme.border),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide:
-                  const BorderSide(color: AppTheme.primary, width: 1.5),
-            ),
-            filled: true,
-            fillColor: Colors.white,
-          ),
-          onChanged: onChanged,
+    height: 40,
+    child: TextField(
+      controller: controller,
+      style: TextStyle(
+        fontSize: 13,
+        color: _SalesHistoryColors.of(context).text,
+      ),
+      decoration: InputDecoration(
+        hintText: 'ค้นหาเลขที่ใบขาย, ชื่อลูกค้า...',
+        hintStyle: TextStyle(
+          fontSize: 13,
+          color: _SalesHistoryColors.of(context).subtext,
         ),
-      );
+        prefixIcon: Icon(
+          Icons.search,
+          size: 17,
+          color: _SalesHistoryColors.of(context).subtext,
+        ),
+        suffixIcon: query.isNotEmpty
+            ? IconButton(
+                icon: const Icon(Icons.clear, size: 15),
+                onPressed: onCleared,
+              )
+            : null,
+        contentPadding: EdgeInsets.zero,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: AppTheme.border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: AppTheme.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
+        ),
+        filled: true,
+        fillColor: _SalesHistoryColors.of(context).inputFill,
+      ),
+      onChanged: onChanged,
+    ),
+  );
 }
 
 class _RefreshBtn extends StatelessWidget {
@@ -1322,23 +1476,24 @@ class _RefreshBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Tooltip(
-        message: 'รีเฟรช',
-        waitDuration: const Duration(milliseconds: 600),
-        child: InkWell(
-          onTap: onTap,
+    message: 'รีเฟรช',
+    waitDuration: const Duration(milliseconds: 600),
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.all(7),
+        decoration: BoxDecoration(
+          color: _SalesHistoryColors.of(context).navButtonBg,
           borderRadius: BorderRadius.circular(8),
-          child: Container(
-            padding: const EdgeInsets.all(7),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF5F5F5),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppTheme.border),
-            ),
-            child:
-                const Icon(Icons.refresh, size: 17, color: AppTheme.textSub),
+          border: Border.all(
+            color: _SalesHistoryColors.of(context).navButtonBorder,
           ),
         ),
-      );
+        child: const Icon(Icons.refresh, size: 17, color: Colors.white70),
+      ),
+    ),
+  );
 }
 
 class _ClearFilterBtn extends StatelessWidget {
@@ -1347,37 +1502,36 @@ class _ClearFilterBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Tooltip(
-        message: 'ล้างตัวกรองทั้งหมด',
-        waitDuration: const Duration(milliseconds: 600),
-        child: InkWell(
-          onTap: onTap,
+    message: 'ล้างตัวกรองทั้งหมด',
+    waitDuration: const Duration(milliseconds: 600),
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(8),
-          child: Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-            decoration: BoxDecoration(
-              color: AppTheme.errorContainer,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFEF9A9A)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.filter_alt_off,
-                    size: 15, color: AppTheme.error),
-                const SizedBox(width: 5),
-                const Text(
-                  'ล้างตัวกรอง',
-                  style: TextStyle(
-                      fontSize: 12,
-                      color: AppTheme.error,
-                      fontWeight: FontWeight.w500),
-                ),
-              ],
-            ),
-          ),
+          border: Border.all(color: Colors.white24),
         ),
-      );
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.filter_alt_off, size: 15, color: Colors.white),
+            const SizedBox(width: 5),
+            const Text(
+              'ล้างตัวกรอง',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.white,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 class _BackBtn extends StatelessWidget {
@@ -1393,12 +1547,17 @@ class _BackBtn extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.all(7),
             decoration: BoxDecoration(
-              color: const Color(0xFFF5F5F5),
+              color: _SalesHistoryColors.of(context).navButtonBg,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppTheme.border),
+              border: Border.all(
+                color: _SalesHistoryColors.of(context).navButtonBorder,
+              ),
             ),
-            child: const Icon(Icons.arrow_back,
-                size: 17, color: AppTheme.textSub),
+            child: const Icon(
+              Icons.arrow_back,
+              size: 17,
+              color: Colors.white70,
+            ),
           ),
         );
 }
@@ -1406,13 +1565,92 @@ class _BackBtn extends StatelessWidget {
 class _PageIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
-        width: 30,
-        height: 30,
-        decoration: BoxDecoration(
-          color: AppTheme.infoContainer,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: const Icon(Icons.history,
-            size: 17, color: AppTheme.infoColor),
-      );
+    width: 30,
+    height: 30,
+    decoration: BoxDecoration(
+      color: AppTheme.primary.withValues(alpha: 0.18),
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(color: AppTheme.primary.withValues(alpha: 0.28)),
+    ),
+    child: const Icon(Icons.history, size: 17, color: AppTheme.primaryLight),
+  );
+}
+
+class _SalesHistoryColors {
+  final bool isDark;
+  final Color scaffoldBg;
+  final Color cardBg;
+  final Color border;
+  final Color text;
+  final Color subtext;
+  final Color topBarBg;
+  final Color searchBarBg;
+  final Color tableHeaderBg;
+  final Color headerText;
+  final Color summaryBg;
+  final Color summaryChipBg;
+  final Color inputFill;
+  final Color rowHoverBg;
+  final Color emptyIconBg;
+  final Color emptyIcon;
+  final Color neutralChipBg;
+  final Color navButtonBg;
+  final Color navButtonBorder;
+  final Color amountText;
+  final Color amountCancelledText;
+
+  const _SalesHistoryColors({
+    required this.isDark,
+    required this.scaffoldBg,
+    required this.cardBg,
+    required this.border,
+    required this.text,
+    required this.subtext,
+    required this.topBarBg,
+    required this.searchBarBg,
+    required this.tableHeaderBg,
+    required this.headerText,
+    required this.summaryBg,
+    required this.summaryChipBg,
+    required this.inputFill,
+    required this.rowHoverBg,
+    required this.emptyIconBg,
+    required this.emptyIcon,
+    required this.neutralChipBg,
+    required this.navButtonBg,
+    required this.navButtonBorder,
+    required this.amountText,
+    required this.amountCancelledText,
+  });
+
+  factory _SalesHistoryColors.of(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return _SalesHistoryColors(
+      isDark: isDark,
+      scaffoldBg: isDark ? AppTheme.darkBg : AppTheme.surface,
+      cardBg: isDark ? AppTheme.darkCard : Colors.white,
+      border: isDark ? const Color(0xFF333333) : AppTheme.border,
+      text: isDark ? const Color(0xFFE0E0E0) : const Color(0xFF1A1A1A),
+      subtext: isDark ? const Color(0xFF9E9E9E) : AppTheme.textSub,
+      topBarBg: isDark ? AppTheme.navyDark : AppTheme.navy,
+      searchBarBg: isDark ? AppTheme.darkTopBar : Colors.white,
+      tableHeaderBg: isDark ? AppTheme.navyDark : AppTheme.navy,
+      headerText: isDark ? const Color(0xFFE0E0E0) : Colors.white70,
+      summaryBg: isDark ? AppTheme.darkTopBar : const Color(0xFFFFF8F5),
+      summaryChipBg: isDark ? AppTheme.darkElement : Colors.white,
+      inputFill: isDark ? AppTheme.darkElement : Colors.white,
+      rowHoverBg: isDark
+          ? AppTheme.primary.withValues(alpha: 0.10)
+          : AppTheme.primary.withValues(alpha: 0.05),
+      emptyIconBg: isDark ? AppTheme.darkCard : AppTheme.surface,
+      emptyIcon: isDark ? const Color(0xFF9E9E9E) : Colors.grey,
+      neutralChipBg: isDark ? AppTheme.darkElement : const Color(0xFFF5F5F5),
+      navButtonBg: isDark
+          ? Colors.white.withValues(alpha: 0.08)
+          : AppTheme.navyLight,
+      navButtonBorder: isDark ? Colors.white24 : AppTheme.navy,
+      amountText: isDark ? AppTheme.primaryLight : AppTheme.info,
+      amountCancelledText: isDark ? const Color(0xFFB0B0B0) : AppTheme.textSub,
+    );
+  }
 }

@@ -250,10 +250,30 @@ class _PromotionUsageReportPageState
             ),
           ),
           const Spacer(),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: 'รีเฟรช',
-            onPressed: () => ref.invalidate(_promotionUsageProvider),
+          Tooltip(
+            message: 'รีเฟรช',
+            child: SizedBox(
+              width: 34,
+              height: 34,
+              child: Material(
+                color: Colors.transparent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  side: BorderSide(
+                    color: isDark ? Colors.white24 : AppTheme.border,
+                  ),
+                ),
+                child: InkWell(
+                  onTap: () => ref.invalidate(_promotionUsageProvider),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Icon(
+                    Icons.refresh,
+                    size: 18,
+                    color: isDark ? Colors.white70 : AppTheme.textSub,
+                  ),
+                ),
+              ),
+            ),
           ),
         ],
       ),
