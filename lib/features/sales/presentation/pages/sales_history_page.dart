@@ -172,6 +172,77 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
     final salesAsync = ref.watch(salesHistoryProvider);
     final pageSize = ref.watch(settingsProvider).listPageSize;
     final colors = _SalesHistoryColors.of(context);
+    final isDesktop = MediaQuery.of(context).size.width >= 600;
+    final filterFmt = DateFormat('dd/MM/yy');
+
+    // Filter chips widget สำหรับใส่ inline บน Desktop / Tablet
+    // ใช้ Row เพื่อให้ chips ไม่แตกบรรทัด
+    final inlineFilters = isDesktop
+        ? Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _DateChip(
+                label: _dateFrom != null
+                    ? 'ตั้งแต่: ${filterFmt.format(_dateFrom!)}'
+                    : 'ตั้งแต่วันที่',
+                icon: Icons.calendar_today,
+                active: _dateFrom != null,
+                onTap: () => _pickDate(true),
+                onClear: _dateFrom != null
+                    ? () => setState(() {
+                          _dateFrom = null;
+                          _currentPage = 1;
+                        })
+                    : null,
+              ),
+              const SizedBox(width: 8),
+              _DateChip(
+                label: _dateTo != null
+                    ? 'ถึง: ${filterFmt.format(_dateTo!)}'
+                    : 'ถึงวันที่',
+                icon: Icons.calendar_month,
+                active: _dateTo != null,
+                onTap: () => _pickDate(false),
+                onClear: _dateTo != null
+                    ? () => setState(() {
+                          _dateTo = null;
+                          _currentPage = 1;
+                        })
+                    : null,
+              ),
+              const SizedBox(width: 8),
+              _DropdownChip<String>(
+                icon: Icons.payment,
+                value: _paymentFilter,
+                items: const [
+                  ('ALL', 'ทุกประเภทชำระ'),
+                  ('CASH', '💵 เงินสด'),
+                  ('CARD', '💳 บัตร'),
+                  ('TRANSFER', '📲 โอน'),
+                ],
+                onChanged: (v) => setState(() {
+                  _paymentFilter = v;
+                  _currentPage = 1;
+                }),
+              ),
+              const SizedBox(width: 8),
+              _DropdownChip<String>(
+                icon: Icons.flag_outlined,
+                value: _statusFilter,
+                items: const [
+                  ('ALL', 'ทุกสถานะ'),
+                  ('COMPLETED', '✅ สำเร็จ'),
+                  ('PENDING', '⏳ รอดำเนินการ'),
+                  ('CANCELLED', '❌ ยกเลิก'),
+                ],
+                onChanged: (v) => setState(() {
+                  _statusFilter = v;
+                  _currentPage = 1;
+                }),
+              ),
+            ],
+          )
+        : null;
 
     return Scaffold(
       backgroundColor: colors.scaffoldBg,
@@ -197,31 +268,32 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
             onClearFilter: _hasFilter ? _clearFilters : null,
           ),
 
-          // ── Filter Bar ───────────────────────────────────────────
-          _FilterBar(
-            dateFrom: _dateFrom,
-            dateTo: _dateTo,
-            paymentFilter: _paymentFilter,
-            statusFilter: _statusFilter,
-            onPickFrom: () => _pickDate(true),
-            onPickTo: () => _pickDate(false),
-            onClearFrom: () => setState(() {
-              _dateFrom = null;
-              _currentPage = 1;
-            }),
-            onClearTo: () => setState(() {
-              _dateTo = null;
-              _currentPage = 1;
-            }),
-            onPaymentChanged: (v) => setState(() {
-              _paymentFilter = v;
-              _currentPage = 1;
-            }),
-            onStatusChanged: (v) => setState(() {
-              _statusFilter = v;
-              _currentPage = 1;
-            }),
-          ),
+          // ── Filter Bar (แสดงเฉพาะ mobile / tablet แคบ) ──────────
+          if (!isDesktop)
+            _FilterBar(
+              dateFrom: _dateFrom,
+              dateTo: _dateTo,
+              paymentFilter: _paymentFilter,
+              statusFilter: _statusFilter,
+              onPickFrom: () => _pickDate(true),
+              onPickTo: () => _pickDate(false),
+              onClearFrom: () => setState(() {
+                _dateFrom = null;
+                _currentPage = 1;
+              }),
+              onClearTo: () => setState(() {
+                _dateTo = null;
+                _currentPage = 1;
+              }),
+              onPaymentChanged: (v) => setState(() {
+                _paymentFilter = v;
+                _currentPage = 1;
+              }),
+              onStatusChanged: (v) => setState(() {
+                _statusFilter = v;
+                _currentPage = 1;
+              }),
+            ),
 
           // ── Body ─────────────────────────────────────────────────
           Expanded(
@@ -276,7 +348,11 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                       child: Column(
                         children: [
                           // ── Summary chip row ───────────────────
-                          _SummaryBar(summary: summary, fmt: _fmt),
+                          _SummaryBar(
+                            summary: summary,
+                            fmt: _fmt,
+                            inlineFilters: inlineFilters,
+                          ),
 
                           Divider(height: 1, color: colors.border),
 
@@ -702,8 +778,13 @@ class _FilterBar extends StatelessWidget {
 class _SummaryBar extends StatelessWidget {
   final Map<String, dynamic> summary;
   final NumberFormat fmt;
+  final Widget? inlineFilters;
 
-  const _SummaryBar({required this.summary, required this.fmt});
+  const _SummaryBar({
+    required this.summary,
+    required this.fmt,
+    this.inlineFilters,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -712,32 +793,49 @@ class _SummaryBar extends StatelessWidget {
     final completedCount = summary['completedCount'] as int;
     final total = summary['total'] as double;
 
+    final chips = [
+      _SummaryChip(
+        icon: Icons.receipt_long,
+        label: '$count รายการ',
+        color: AppTheme.info,
+      ),
+      const SizedBox(width: 12),
+      _SummaryChip(
+        icon: Icons.check_circle_outline,
+        label: '$completedCount สำเร็จ',
+        color: AppTheme.success,
+      ),
+      const SizedBox(width: 12),
+      _SummaryChip(
+        icon: Icons.attach_money,
+        label: '฿${fmt.format(total)}',
+        color: AppTheme.primary,
+      ),
+    ];
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(color: colors.summaryBg),
-      child: Wrap(
-        spacing: 12,
-        runSpacing: 8,
-        children: [
-          _SummaryChip(
-            icon: Icons.receipt_long,
-            label: '$count รายการ',
-            color: AppTheme.info,
-          ),
-          const SizedBox(width: 12),
-          _SummaryChip(
-            icon: Icons.check_circle_outline,
-            label: '$completedCount สำเร็จ',
-            color: AppTheme.success,
-          ),
-          const SizedBox(width: 12),
-          _SummaryChip(
-            icon: Icons.attach_money,
-            label: '฿${fmt.format(total)}',
-            color: AppTheme.primary,
-          ),
-        ],
-      ),
+      child: inlineFilters != null
+          ? LayoutBuilder(
+              builder: (context, constraints) => SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minWidth: constraints.maxWidth,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(mainAxisSize: MainAxisSize.min, children: chips),
+                      const SizedBox(width: 16),
+                      inlineFilters!,
+                    ],
+                  ),
+                ),
+              ),
+            )
+          : Wrap(spacing: 12, runSpacing: 8, children: chips),
     );
   }
 }
@@ -1636,15 +1734,15 @@ class _SalesHistoryColors {
       searchBarBg: isDark ? AppTheme.darkTopBar : Colors.white,
       tableHeaderBg: isDark ? AppTheme.navyDark : AppTheme.navy,
       headerText: isDark ? const Color(0xFFE0E0E0) : Colors.white70,
-      summaryBg: isDark ? AppTheme.darkTopBar : const Color(0xFFFFF8F5),
-      summaryChipBg: isDark ? AppTheme.darkElement : Colors.white,
+      summaryBg: isDark ? const Color(0xFF181818) : const Color(0xFFFFF8F5),
+      summaryChipBg: isDark ? const Color(0xFF2C2C2C) : Colors.white,
       inputFill: isDark ? AppTheme.darkElement : Colors.white,
       rowHoverBg: isDark
           ? AppTheme.primary.withValues(alpha: 0.10)
           : AppTheme.primary.withValues(alpha: 0.05),
       emptyIconBg: isDark ? AppTheme.darkCard : AppTheme.surface,
       emptyIcon: isDark ? const Color(0xFF9E9E9E) : Colors.grey,
-      neutralChipBg: isDark ? AppTheme.darkElement : const Color(0xFFF5F5F5),
+      neutralChipBg: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF0F0F0),
       navButtonBg: isDark
           ? Colors.white.withValues(alpha: 0.08)
           : AppTheme.navyLight,

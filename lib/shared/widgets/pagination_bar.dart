@@ -65,11 +65,16 @@ class PaginationBar extends StatelessWidget {
     final startItem = totalItems == 0 ? 0 : (currentPage - 1) * pageSize + 1;
     final endItem   = (currentPage * pageSize).clamp(0, totalItems);
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     final countText = Text(
       totalItems == 0
           ? 'ไม่มีรายการ'
           : 'แสดง $startItem–$endItem จาก $totalItems รายการ',
-      style: const TextStyle(fontSize: 12, color: AppTheme.textSub),
+      style: TextStyle(
+        fontSize: 12,
+        color: isDark ? Colors.white60 : AppTheme.textSub,
+      ),
     );
 
     final pageNav = Row(
@@ -83,9 +88,14 @@ class PaginationBar extends StatelessWidget {
         const SizedBox(width: 4),
         ...slots.map((slot) {
           if (slot == -1) {
-            return const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 2),
-              child: Text('...', style: TextStyle(color: AppTheme.textSub)),
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              child: Text(
+                '...',
+                style: TextStyle(
+                  color: isDark ? Colors.white38 : AppTheme.textSub,
+                ),
+              ),
             );
           }
           final isActive = slot == currentPage;
@@ -114,9 +124,9 @@ class PaginationBar extends StatelessWidget {
             horizontal: 16,
             vertical: isNarrow ? 6 : 8,
           ),
-          decoration: const BoxDecoration(
-            color: AppTheme.headerBg,
-            borderRadius: BorderRadius.only(
+          decoration: BoxDecoration(
+            color: isDark ? AppTheme.navyDark : AppTheme.headerBg,
+            borderRadius: const BorderRadius.only(
               bottomLeft: Radius.circular(12),
               bottomRight: Radius.circular(12),
             ),
@@ -168,6 +178,21 @@ class _NavButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor = enabled
+        ? (isDark
+            ? Colors.white.withValues(alpha: 0.10)
+            : Colors.white)
+        : Colors.transparent;
+    final borderColor = enabled
+        ? (isDark
+            ? Colors.white.withValues(alpha: 0.22)
+            : AppTheme.border)
+        : Colors.transparent;
+    final iconColor = enabled
+        ? (isDark ? Colors.white : Colors.black87)
+        : (isDark ? Colors.white24 : AppTheme.textSub);
+
     return InkWell(
       onTap: enabled ? onTap : null,
       borderRadius: BorderRadius.circular(6),
@@ -176,17 +201,11 @@ class _NavButton extends StatelessWidget {
         height: 28,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: enabled ? Colors.white : Colors.transparent,
+          color: bgColor,
           borderRadius: BorderRadius.circular(6),
-          border: Border.all(
-            color: enabled ? AppTheme.border : Colors.transparent,
-          ),
+          border: Border.all(color: borderColor),
         ),
-        child: Icon(
-          icon,
-          size: 16,
-          color: enabled ? Colors.black87 : AppTheme.textSub,
-        ),
+        child: Icon(icon, size: 16, color: iconColor),
       ),
     );
   }
@@ -201,6 +220,17 @@ class _PageButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor = isActive
+        ? AppTheme.primary
+        : (isDark ? Colors.white.withValues(alpha: 0.10) : Colors.white);
+    final borderColor = isActive
+        ? AppTheme.primary
+        : (isDark ? Colors.white.withValues(alpha: 0.22) : AppTheme.border);
+    final textColor = isActive
+        ? Colors.white
+        : (isDark ? Colors.white : Colors.black87);
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 2),
       child: InkWell(
@@ -212,18 +242,16 @@ class _PageButton extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 6),
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: isActive ? AppTheme.primary : Colors.white,
+            color: bgColor,
             borderRadius: BorderRadius.circular(6),
-            border: Border.all(
-              color: isActive ? AppTheme.primary : AppTheme.border,
-            ),
+            border: Border.all(color: borderColor),
           ),
           child: Text(
             '$page',
             style: TextStyle(
               fontSize: 12,
               fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-              color: isActive ? Colors.white : Colors.black87,
+              color: textColor,
             ),
           ),
         ),
