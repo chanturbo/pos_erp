@@ -39,9 +39,6 @@ class _MenuItem {
   final String title;
   final Widget page;
 
-  /// true = push เป็น full route (ไม่ swap ใน content area)
-  final bool pushAsRoute;
-
   /// permission key — null หมายถึงแสดงเสมอ (เช่น Dashboard สำหรับ Admin)
   final String? permissionKey;
 
@@ -49,7 +46,6 @@ class _MenuItem {
     required this.icon,
     required this.title,
     required this.page,
-    this.pushAsRoute = false,
     this.permissionKey,
   });
 }
@@ -80,18 +76,17 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   List<_MenuSection> get _sections => [
     _MenuSection('หลัก', [
-          _MenuItem(
-            icon: Icons.dashboard,
-            title: 'แดชบอร์ด',
-            permissionKey: AppPermission.dashboard,
-            page: DashboardPage(
-              showBackButton: false,
-              onGoToPos: () => context.hasPermanentSidebar
-                  ? _selectItem(1)
-                  : _push(context, const PosPage()),
-          onGoToSalesHistory: () => context.hasPermanentSidebar
-              ? _selectItem(2)
-              : _push(context, const SalesHistoryPage()),
+      _MenuItem(
+        icon: Icons.dashboard,
+        title: 'แดชบอร์ด',
+        permissionKey: AppPermission.dashboard,
+        page: DashboardPage(
+          showBackButton: false,
+          onGoToPos: () => context.isTabletOrWider
+              ? _selectItem(1)
+              : _push(context, const PosPage()),
+          onGoToSalesHistory: () =>
+              _showOverridePage(const SalesHistoryPage(), 2),
           onGoToProducts: () => context.hasPermanentSidebar
               ? _selectItem(4)
               : _push(context, const ProductListPage()),
@@ -108,6 +103,16 @@ class _HomePageState extends ConsumerState<HomePage> {
               2, // highlight "รายการขาย"
             );
           },
+          onGoToMonthSales: () {
+            final today = DateTime.now();
+            _showOverridePage(
+              SalesHistoryPage(
+                initialDateFrom: DateTime(today.year, today.month, 1),
+                initialDateTo: DateTime(today.year, today.month, today.day),
+              ),
+              2, // highlight "รายการขาย"
+            );
+          },
         ),
       ),
     ]),
@@ -116,7 +121,6 @@ class _HomePageState extends ConsumerState<HomePage> {
         icon: Icons.shopping_cart,
         title: 'หน้าขาย (POS)',
         page: const PosPage(),
-        pushAsRoute: true,
         permissionKey: AppPermission.pos,
       ),
       _MenuItem(
@@ -257,22 +261,14 @@ class _HomePageState extends ConsumerState<HomePage> {
   Widget get _currentPage => _overridePage ?? _allItems[_selectedIndex].page;
 
   void _selectItem(int i) {
-    final item = _allItems[i];
-
     // ปิด Drawer ก่อนเสมอ (tablet/mobile)
     final nav = Navigator.of(context);
     if (nav.canPop()) nav.pop();
 
-    // บนหน้าจอใหญ่ (permanent sidebar) → swap content area เสมอ แม้ pushAsRoute = true
-    // บนมือถือ/แท็บเล็ต → push เป็น route ใหม่ตามเดิม
-    if (item.pushAsRoute && !context.hasPermanentSidebar) {
-      _push(context, item.page);
-    } else {
-      setState(() {
-        _selectedIndex = i;
-        _overridePage = null;
-      });
-    }
+    setState(() {
+      _selectedIndex = i;
+      _overridePage = null;
+    });
   }
 
   /// แสดงหน้าพิเศษ (พร้อม parameter เฉพาะ) ใน content area โดย highlight เมนู [highlightIndex]
@@ -401,12 +397,11 @@ class _HomePageState extends ConsumerState<HomePage> {
         index: 0,
         page: DashboardPage(
           showBackButton: false,
-          onGoToPos: () => context.hasPermanentSidebar
+          onGoToPos: () => context.isTabletOrWider
               ? _selectItem(1)
               : _push(context, const PosPage()),
-          onGoToSalesHistory: () => context.hasPermanentSidebar
-              ? _selectItem(2)
-              : _push(context, const SalesHistoryPage()),
+          onGoToSalesHistory: () =>
+              _showOverridePage(const SalesHistoryPage(), 2),
           onGoToProducts: () => context.hasPermanentSidebar
               ? _selectItem(4)
               : _push(context, const ProductListPage()),
@@ -418,6 +413,16 @@ class _HomePageState extends ConsumerState<HomePage> {
             _showOverridePage(
               SalesHistoryPage(
                 initialDateFrom: DateTime(today.year, today.month, today.day),
+                initialDateTo: DateTime(today.year, today.month, today.day),
+              ),
+              2,
+            );
+          },
+          onGoToMonthSales: () {
+            final today = DateTime.now();
+            _showOverridePage(
+              SalesHistoryPage(
+                initialDateFrom: DateTime(today.year, today.month, 1),
                 initialDateTo: DateTime(today.year, today.month, today.day),
               ),
               2,
@@ -476,10 +481,6 @@ class _HomePageState extends ConsumerState<HomePage> {
       data: (value) => value,
       orElse: () => null,
     );
-    final sectionTitle = _sections
-        .expand((s) => s.items)
-        .toList()[_selectedIndex]
-        .title;
 
     return AppBar(
       // Hamburger menu icon สำหรับเปิด Drawer
@@ -488,20 +489,6 @@ class _HomePageState extends ConsumerState<HomePage> {
           icon: const Icon(Icons.menu),
           onPressed: () => Scaffold.of(ctx).openDrawer(),
         ),
-      ),
-      title: Row(
-        children: [
-          Container(
-            width: 7,
-            height: 7,
-            margin: const EdgeInsets.only(right: 8),
-            decoration: const BoxDecoration(
-              color: AppTheme.primaryColor,
-              shape: BoxShape.circle,
-            ),
-          ),
-          Text(sectionTitle),
-        ],
       ),
       actions: [
         // Sync badge
@@ -536,14 +523,35 @@ class _HomePageState extends ConsumerState<HomePage> {
           loading: () => const SizedBox(width: 48),
           error: (_, _) => const SizedBox(width: 48),
         ),
-        // User name (ซ่อนบน mobile เล็กมาก)
-        if (!context.isMobile)
+        if ((user?.fullName ?? '').isNotEmpty)
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 4),
             child: Center(
-              child: Text(
-                user?.fullName ?? '',
-                style: const TextStyle(fontSize: 13, color: Colors.white70),
+              child: Container(
+                constraints: BoxConstraints(
+                  maxWidth: context.isMobile ? 96 : 160,
+                ),
+                padding: EdgeInsets.symmetric(
+                  horizontal: context.isMobile ? 8 : 12,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.14),
+                  ),
+                ),
+                child: Text(
+                  user.fullName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: context.isMobile ? 11 : 13,
+                    color: Colors.white70,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
             ),
           ),

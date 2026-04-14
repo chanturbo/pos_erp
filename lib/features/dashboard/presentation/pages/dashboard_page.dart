@@ -19,6 +19,9 @@ class DashboardPage extends ConsumerWidget {
   /// เปิดหน้ารายการขาย กรองเฉพาะวันนี้ (ใช้ตอนกด card ยอดขายวันนี้/ออเดอร์วันนี้)
   final VoidCallback? onGoToTodaySales;
 
+  /// เปิดหน้ารายการขาย กรองเฉพาะเดือนนี้
+  final VoidCallback? onGoToMonthSales;
+
   const DashboardPage({
     super.key,
     this.onGoToPos,
@@ -26,6 +29,7 @@ class DashboardPage extends ConsumerWidget {
     this.onGoToCustomers,
     this.onGoToSalesHistory,
     this.onGoToTodaySales,
+    this.onGoToMonthSales,
     this.showBackButton = true,
   });
 
@@ -90,6 +94,7 @@ class DashboardPage extends ConsumerWidget {
             onGoToCustomers: onGoToCustomers,
             onGoToSalesHistory: onGoToSalesHistory,
             onGoToTodaySales: onGoToTodaySales,
+            onGoToMonthSales: onGoToMonthSales,
           ),
         ),
       ),
@@ -107,6 +112,7 @@ class _DashboardBody extends StatelessWidget {
   final VoidCallback? onGoToCustomers;
   final VoidCallback? onGoToSalesHistory;
   final VoidCallback? onGoToTodaySales;
+  final VoidCallback? onGoToMonthSales;
 
   const _DashboardBody({
     required this.stats,
@@ -115,6 +121,7 @@ class _DashboardBody extends StatelessWidget {
     this.onGoToCustomers,
     this.onGoToSalesHistory,
     this.onGoToTodaySales,
+    this.onGoToMonthSales,
   });
 
   @override
@@ -220,6 +227,10 @@ class _DashboardBody extends StatelessWidget {
   }
 
   void _openMonthSales(BuildContext context) {
+    if (onGoToMonthSales != null) {
+      onGoToMonthSales!();
+      return;
+    }
     final today = DateTime.now();
     _openSalesRange(
       context,
@@ -515,7 +526,7 @@ class _QuickActionsCard extends StatelessWidget {
       ),
       _QuickAction(
         icon: Icons.receipt_long_outlined,
-        label: 'รายงานการขาย',
+        label: 'รายการขาย',
         color: const Color(0xFFAD1457),
         onTap:
             onGoToSalesHistory ??

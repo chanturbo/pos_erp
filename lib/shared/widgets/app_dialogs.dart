@@ -44,26 +44,28 @@ class AppDialog extends StatelessWidget {
           Theme.of(context).colorScheme.surface,
       shape: effectiveShape,
       insetPadding: insetPadding,
-      child: Column(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 400),
+        child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (title != null)
             Padding(
               padding:
-                  titlePadding ?? const EdgeInsets.fromLTRB(24, 24, 24, 0),
+                  titlePadding ?? const EdgeInsets.fromLTRB(20, 16, 20, 0),
               child: title!,
             ),
           if (content != null)
             Padding(
               padding:
-                  contentPadding ?? const EdgeInsets.fromLTRB(24, 20, 24, 24),
+                  contentPadding ?? const EdgeInsets.fromLTRB(20, 12, 20, 16),
               child: content!,
             ),
           if (actions != null && actions!.isNotEmpty)
             Padding(
               padding:
-                  actionsPadding ?? const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  actionsPadding ?? const EdgeInsets.fromLTRB(16, 0, 16, 12),
               child: OverflowBar(
                 alignment: actionsAlignment,
                 spacing: 8,
@@ -72,6 +74,7 @@ class AppDialog extends StatelessWidget {
               ),
             ),
         ],
+        ),
       ),
     );
   }
