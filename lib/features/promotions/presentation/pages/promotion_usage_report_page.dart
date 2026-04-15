@@ -5,11 +5,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import '../../../../core/client/api_client.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/responsive_utils.dart';
 import '../../../../shared/widgets/escape_pop_scope.dart';
 import '../../../../shared/widgets/mobile_home_button.dart';
+import '../../../../shared/widgets/pagination_bar.dart';
+import '../../../../shared/pdf/pdf_report_button.dart';
+import '../../../settings/shared/settings_defaults.dart';
+import '../../../settings/presentation/pages/settings_page.dart' show settingsProvider;
 
 // ─── Models ──────────────────────────────────────────────────────────────────
 class _PromoOrderUsage {
@@ -105,6 +112,7 @@ class _PromotionUsageReportPageState
   String _filterType = 'ALL'; // ALL / BUY_X_GET_Y / DISCOUNT_PERCENT / ...
   String _filterStatus = 'ALL'; // ALL / ACTIVE / INACTIVE
   String _search = '';
+  int _currentPage = 1;
 
   final _dateFmt = DateFormat('dd/MM/yy');
   final _numFmt = NumberFormat('#,##0');
@@ -145,7 +153,7 @@ class _PromotionUsageReportPageState
     final usageAsync = ref.watch(_promotionUsageProvider);
 
     return Scaffold(
-      backgroundColor: isDark ? AppTheme.darkBg : const Color(0xFFF5F5F5),
+      backgroundColor: isDark ? AppTheme.darkBg : AppTheme.surface,
       body: EscapePopScope(
         child: Column(
           children: [
@@ -178,12 +186,19 @@ class _PromotionUsageReportPageState
                       ),
                     );
                   }
-                  // ── Summary cards ───────────────────────────────
+                  // ── Summary ─────────────────────────────────────
                   final totalUses = all.fold<int>(
                     0,
                     (s, p) => s + p.currentUses,
                   );
                   final activeCount = all.where((p) => p.isActive).length;
+                  // ── Pagination ──────────────────────────────────
+                  final pageSize = ref.watch(settingsProvider).listPageSize;
+                  final totalPages = ((list.length / pageSize).ceil()).clamp(1, 99999);
+                  final safePage = _currentPage.clamp(1, totalPages);
+                  final pageStart = (safePage - 1) * pageSize;
+                  final pageEnd = (pageStart + pageSize).clamp(0, list.length);
+                  final pageItems = list.sublist(pageStart, pageEnd);
                   return Column(
                     children: [
                       _buildSummaryRow(
@@ -192,7 +207,24 @@ class _PromotionUsageReportPageState
                         totalUses,
                         isDark,
                       ),
-                      Expanded(child: _buildTable(list, isDark)),
+                      Expanded(child: _buildTable(pageItems, isDark)),
+                      PaginationBar(
+                        currentPage: safePage,
+                        totalItems: list.length,
+                        pageSize: pageSize,
+                        onPageChanged: (p) =>
+                            setState(() => _currentPage = p),
+                        trailing: PdfReportButton(
+                          emptyMessage: 'ไม่มีข้อมูลรายงาน',
+                          title: 'รายงานการใช้งานโปรโมชั่น',
+                          filename: () => PdfFilename.generate(
+                            'promo_usage_report',
+                          ),
+                          buildPdf: () =>
+                              _PromoUsageReportPdfBuilder.build(list),
+                          hasData: list.isNotEmpty,
+                        ),
+                      ),
                     ],
                   );
                 },
@@ -206,72 +238,99 @@ class _PromotionUsageReportPageState
 
   // ── Header ──────────────────────────────────────────────────────────────────
   Widget _buildHeader(bool isDark) {
+    final navBg = isDark ? AppTheme.navyDark : AppTheme.navy;
+    final navButtonBg = isDark
+        ? Colors.white.withValues(alpha: 0.08)
+        : Colors.white.withValues(alpha: 0.15);
+    final navButtonBorder = isDark ? Colors.white24 : Colors.white30;
+
     return Container(
-      color: isDark ? AppTheme.darkTopBar : Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      decoration: BoxDecoration(color: navBg),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
           if (Navigator.of(context).canPop()) ...[
             context.isMobile
                 ? buildMobileHomeCompactButton(context, isDark: isDark)
-                : InkWell(
-                    onTap: () => Navigator.pop(context),
-                    borderRadius: BorderRadius.circular(6),
-                    child: Padding(
-                      padding: const EdgeInsets.all(4),
-                      child: Icon(
+                : Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: navButtonBg,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: navButtonBorder),
+                    ),
+                    child: InkWell(
+                      onTap: () => Navigator.pop(context),
+                      borderRadius: BorderRadius.circular(8),
+                      child: const Icon(
                         Icons.arrow_back,
-                        size: 20,
-                        color: isDark ? Colors.white70 : AppTheme.textSub,
+                        size: 18,
+                        color: Colors.white70,
                       ),
                     ),
                   ),
             const SizedBox(width: 10),
           ],
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(7),
             decoration: BoxDecoration(
-              color: AppTheme.infoContainer,
+              color: AppTheme.primary.withValues(alpha: 0.18),
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Icon(
               Icons.bar_chart,
-              color: AppTheme.infoColor,
-              size: 20,
+              color: AppTheme.primaryLight,
+              size: 18,
             ),
           ),
           const SizedBox(width: 12),
-          Text(
+          const Text(
             'รายงานการใช้งานโปรโมชั่น',
             style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
             ),
           ),
           const Spacer(),
           Tooltip(
             message: 'รีเฟรช',
-            child: SizedBox(
+            child: Container(
               width: 34,
               height: 34,
-              child: Material(
-                color: Colors.transparent,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  side: BorderSide(
-                    color: isDark ? Colors.white24 : AppTheme.border,
-                  ),
+              decoration: BoxDecoration(
+                color: navButtonBg,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: navButtonBorder),
+              ),
+              child: InkWell(
+                onTap: () => ref.invalidate(_promotionUsageProvider),
+                borderRadius: BorderRadius.circular(8),
+                child: const Icon(
+                  Icons.refresh,
+                  size: 18,
+                  color: Colors.white70,
                 ),
-                child: InkWell(
-                  onTap: () => ref.invalidate(_promotionUsageProvider),
-                  borderRadius: BorderRadius.circular(8),
-                  child: Icon(
-                    Icons.refresh,
-                    size: 18,
-                    color: isDark ? Colors.white70 : AppTheme.textSub,
-                  ),
-                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: AppTheme.primary.withValues(alpha: 0.22),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: AppTheme.primary.withValues(alpha: 0.4),
+              ),
+            ),
+            child: const Text(
+              'Usage Report',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                color: AppTheme.primaryLight,
               ),
             ),
           ),
@@ -282,22 +341,85 @@ class _PromotionUsageReportPageState
 
   // ── Filters ──────────────────────────────────────────────────────────────────
   Widget _buildFilters(bool isDark) {
+    final borderColor = isDark ? const Color(0xFF333333) : AppTheme.border;
+    final inputFill = isDark ? AppTheme.darkElement : Colors.white;
+    final inputBorder = isDark ? const Color(0xFF444444) : AppTheme.border;
+    final chipBg = isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF0F0F0);
+    final textStyle = TextStyle(
+      fontSize: 13,
+      color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+    );
+
+    Widget dropdownChip({
+      required String value,
+      required List<DropdownMenuItem<String>> items,
+      required ValueChanged<String?> onChanged,
+    }) {
+      return Container(
+        height: 36,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          color: chipBg,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: borderColor),
+        ),
+        child: DropdownButtonHideUnderline(
+          child: DropdownButton<String>(
+            value: value,
+            isDense: true,
+            style: textStyle,
+            dropdownColor: isDark ? AppTheme.darkCard : Colors.white,
+            icon: Icon(
+              Icons.arrow_drop_down,
+              size: 18,
+              color: isDark ? Colors.white54 : AppTheme.textSub,
+            ),
+            onChanged: onChanged,
+            items: items,
+          ),
+        ),
+      );
+    }
+
     return Container(
-      color: isDark ? AppTheme.darkCard : Colors.white,
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkCard : Colors.white,
+        border: Border(
+          bottom: BorderSide(color: borderColor),
+        ),
+      ),
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
       child: Row(
         children: [
           // Search
           Expanded(
             child: SizedBox(
-              height: 38,
+              height: 36,
               child: TextField(
+                style: textStyle,
                 decoration: InputDecoration(
                   hintText: 'ค้นหาชื่อ / รหัสโปรโมชั่น...',
-                  prefixIcon: const Icon(Icons.search, size: 18),
-                  border: OutlineInputBorder(
+                  hintStyle: TextStyle(
+                    fontSize: 13,
+                    color: isDark ? Colors.white38 : AppTheme.textSub,
+                  ),
+                  prefixIcon: Icon(
+                    Icons.search,
+                    size: 18,
+                    color: isDark ? Colors.white54 : AppTheme.textSub,
+                  ),
+                  filled: true,
+                  fillColor: inputFill,
+                  enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: AppTheme.border),
+                    borderSide: BorderSide(color: inputBorder),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(
+                      color: AppTheme.primary,
+                      width: 1.5,
+                    ),
                   ),
                   contentPadding: const EdgeInsets.symmetric(
                     vertical: 0,
@@ -305,44 +427,33 @@ class _PromotionUsageReportPageState
                   ),
                   isDense: true,
                 ),
-                onChanged: (v) => setState(() => _search = v),
+                onChanged: (v) => setState(() { _search = v; _currentPage = 1; }),
               ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           // Type filter
-          DropdownButton<String>(
+          dropdownChip(
             value: _filterType,
-            isDense: true,
-            onChanged: (v) => setState(() => _filterType = v!),
+            onChanged: (v) => setState(() { _filterType = v!; _currentPage = 1; }),
             items: _typeLabels.entries
                 .map(
                   (e) => DropdownMenuItem(
                     value: e.key,
-                    child: Text(e.value, style: const TextStyle(fontSize: 13)),
+                    child: Text(e.value),
                   ),
                 )
                 .toList(),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
           // Status filter
-          DropdownButton<String>(
+          dropdownChip(
             value: _filterStatus,
-            isDense: true,
-            onChanged: (v) => setState(() => _filterStatus = v!),
+            onChanged: (v) => setState(() { _filterStatus = v!; _currentPage = 1; }),
             items: const [
-              DropdownMenuItem(
-                value: 'ALL',
-                child: Text('ทุกสถานะ', style: TextStyle(fontSize: 13)),
-              ),
-              DropdownMenuItem(
-                value: 'ACTIVE',
-                child: Text('เปิดใช้งาน', style: TextStyle(fontSize: 13)),
-              ),
-              DropdownMenuItem(
-                value: 'INACTIVE',
-                child: Text('ปิดการใช้งาน', style: TextStyle(fontSize: 13)),
-              ),
+              DropdownMenuItem(value: 'ALL', child: Text('ทุกสถานะ')),
+              DropdownMenuItem(value: 'ACTIVE', child: Text('เปิดใช้งาน')),
+              DropdownMenuItem(value: 'INACTIVE', child: Text('ปิดการใช้งาน')),
             ],
           ),
         ],
@@ -352,103 +463,127 @@ class _PromotionUsageReportPageState
 
   // ── Summary Row ──────────────────────────────────────────────────────────────
   Widget _buildSummaryRow(int total, int active, int totalUses, bool isDark) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+    final summaryBg = isDark ? const Color(0xFF181818) : const Color(0xFFFFF8F5);
+    final borderColor = isDark ? const Color(0xFF333333) : AppTheme.border;
+
+    final chips = [
+      _summaryChip(
+        'โปรโมชั่นทั้งหมด',
+        '$total',
+        Icons.local_offer_outlined,
+        AppTheme.infoColor,
+        isDark,
+        borderColor,
+      ),
+      const SizedBox(width: 8),
+      _summaryChip(
+        'เปิดใช้งาน',
+        '$active',
+        Icons.check_circle_outline,
+        AppTheme.successColor,
+        isDark,
+        borderColor,
+      ),
+      const SizedBox(width: 8),
+      _summaryChip(
+        'ใช้งานรวม (ครั้ง)',
+        _numFmt.format(totalUses),
+        Icons.analytics_outlined,
+        const Color(0xFF9C27B0),
+        isDark,
+        borderColor,
+      ),
+    ];
+
+    return Container(
+      color: summaryBg,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: LayoutBuilder(
+        builder: (context, constraints) => SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minWidth: constraints.maxWidth),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.start,
+              children: chips,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _summaryChip(
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+    bool isDark,
+    Color borderColor,
+  ) {
+    final chipBg = isDark ? const Color(0xFF2C2C2C) : Colors.white;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: BoxDecoration(
+        color: chipBg,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: borderColor),
+      ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          _summaryCard(
-            'โปรโมชั่นทั้งหมด',
-            '$total',
-            Icons.local_offer,
-            AppTheme.infoColor,
-            isDark,
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: isDark ? Colors.white70 : AppTheme.textSub,
+            ),
           ),
-          const SizedBox(width: 12),
-          _summaryCard(
-            'เปิดใช้งาน',
-            '$active',
-            Icons.check_circle,
-            AppTheme.successColor,
-            isDark,
-          ),
-          const SizedBox(width: 12),
-          _summaryCard(
-            'ใช้งานรวม (ครั้ง)',
-            _numFmt.format(totalUses),
-            Icons.analytics,
-            const Color(0xFF9C27B0),
-            isDark,
+          const SizedBox(width: 6),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _summaryCard(
-    String label,
-    String value,
-    IconData icon,
-    Color color,
-    bool isDark,
-  ) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: isDark ? AppTheme.darkCard : Colors.white,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: AppTheme.border),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(icon, color: color, size: 20),
-            ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: const TextStyle(fontSize: 11, color: AppTheme.textSub),
-                ),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   // ── Table ────────────────────────────────────────────────────────────────────
   Widget _buildTable(List<_PromoUsage> list, bool isDark) {
+    final borderColor = isDark ? const Color(0xFF333333) : AppTheme.border;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       child: Container(
         decoration: BoxDecoration(
-          color: isDark ? AppTheme.darkCard : Colors.white,
+          color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppTheme.border),
+          border: Border.all(color: borderColor),
+          boxShadow: isDark
+              ? null
+              : [
+                  BoxShadow(
+                    color: AppTheme.navy.withValues(alpha: 0.04),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
         ),
         child: Column(
           children: [
             // Header
             Container(
-              decoration: const BoxDecoration(
-                color: AppTheme.headerBg,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+              decoration: BoxDecoration(
+                color: isDark ? AppTheme.navyDark : AppTheme.navy,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(12),
+                ),
               ),
               child: _tableRow(
                 cells: const [
@@ -461,15 +596,16 @@ class _PromotionUsageReportPageState
                   _Cell('สถานะ', flex: 2, align: TextAlign.center),
                 ],
                 isHeader: true,
+                isDark: isDark,
               ),
             ),
-            const Divider(height: 1, color: AppTheme.border),
+            Divider(height: 1, color: borderColor),
             // Rows
             Expanded(
               child: ListView.separated(
                 itemCount: list.length,
                 separatorBuilder: (_, _) =>
-                    const Divider(height: 1, color: AppTheme.border),
+                    Divider(height: 1, color: borderColor),
                 itemBuilder: (_, i) {
                   final p = list[i];
                   final now = DateTime.now();
@@ -481,7 +617,8 @@ class _PromotionUsageReportPageState
                       ? p.currentUses / p.maxUses!
                       : null;
 
-                  return InkWell(
+                  return _HoverableRow(
+                    isDark: isDark,
                     onTap: () => _showOrdersSheet(context, p),
                     child: _tableRow(
                       cells: [
@@ -798,7 +935,16 @@ class _PromotionUsageReportPageState
     );
   }
 
-  Widget _tableRow({required List<_Cell> cells, required bool isHeader}) {
+  Widget _tableRow({
+    required List<_Cell> cells,
+    required bool isHeader,
+    bool isDark = false,
+  }) {
+    final headerStyle = TextStyle(
+      fontSize: 12,
+      fontWeight: FontWeight.w600,
+      color: isDark ? Colors.white70 : Colors.white70,
+    );
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
@@ -812,14 +958,9 @@ class _PromotionUsageReportPageState
                     Text(
                       c.text,
                       textAlign: c.align,
-                      style:
-                          c.style ??
+                      style: c.style ??
                           (isHeader
-                              ? const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF1A1A1A),
-                                )
+                              ? headerStyle
                               : const TextStyle(fontSize: 13)),
                     ),
                     const SizedBox(height: 4),
@@ -829,14 +970,9 @@ class _PromotionUsageReportPageState
               : Text(
                   c.text,
                   textAlign: c.align,
-                  style:
-                      c.style ??
+                  style: c.style ??
                       (isHeader
-                          ? const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF1A1A1A),
-                            )
+                          ? headerStyle
                           : const TextStyle(fontSize: 13)),
                 );
           return Expanded(flex: c.flex, child: content);
@@ -889,6 +1025,244 @@ class _PromotionUsageReportPageState
     'FREE_ITEM' => const Color(0xFF009688),
     _ => AppTheme.textSub,
   };
+}
+
+// ─── PDF Builder ─────────────────────────────────────────────────────────────
+class _PromoUsageReportPdfBuilder {
+  static const _kBorder = PdfColor.fromInt(0xFFBBBBBB);
+  static const _kHdrBg = PdfColor.fromInt(0xFF16213E);
+  static const _kAltRow = PdfColor.fromInt(0xFFF5F5F5);
+  static const _kPrimary = PdfColor.fromInt(0xFFE57200);
+  static const _kSuccess = PdfColor.fromInt(0xFF2E7D32);
+  static const _kSub = PdfColor.fromInt(0xFF555555);
+
+  static Future<pw.Document> build(List<_PromoUsage> items) async {
+    final companyName = await SettingsStorage.getCompanyName();
+    final doc = pw.Document(
+      title: 'รายงานการใช้งานโปรโมชั่น',
+      author: companyName,
+    );
+    final ttfBold = await PdfGoogleFonts.notoSansThaiBold();
+    final ttf = await PdfGoogleFonts.notoSansThaiRegular();
+    final dateFmt = DateFormat('dd/MM/yy');
+    final numFmt = NumberFormat('#,##0');
+    final printedAt = DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now());
+
+    const rowsPerPage = 30;
+    final pages = (items.length / rowsPerPage).ceil().clamp(1, 9999);
+
+    for (int page = 0; page < pages; page++) {
+      final start = page * rowsPerPage;
+      final end = (start + rowsPerPage).clamp(0, items.length);
+      final pageItems = items.sublist(start, end);
+
+      doc.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(24),
+          build: (pw.Context ctx) => pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+            children: [
+              // ── Header ────────────────────────────────────────
+              pw.Container(
+                color: _kHdrBg,
+                padding: const pw.EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
+                child: pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text(
+                      'รายงานการใช้งานโปรโมชั่น',
+                      style: pw.TextStyle(
+                        font: ttfBold,
+                        fontSize: 14,
+                        color: PdfColors.white,
+                      ),
+                    ),
+                    pw.Text(
+                      companyName,
+                      style: pw.TextStyle(
+                        font: ttf,
+                        fontSize: 10,
+                        color: const PdfColor(1, 1, 1, 0.7),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              pw.SizedBox(height: 8),
+              // ── Table ─────────────────────────────────────────
+              pw.Table(
+                border: pw.TableBorder.all(color: _kBorder, width: 0.5),
+                columnWidths: const {
+                  0: pw.FlexColumnWidth(2),
+                  1: pw.FlexColumnWidth(4),
+                  2: pw.FlexColumnWidth(2),
+                  3: pw.FlexColumnWidth(3),
+                  4: pw.FlexColumnWidth(2),
+                  5: pw.FlexColumnWidth(1.5),
+                  6: pw.FlexColumnWidth(1.5),
+                },
+                children: [
+                  // header row
+                  pw.TableRow(
+                    decoration: const pw.BoxDecoration(color: _kHdrBg),
+                    children: [
+                      'รหัส',
+                      'ชื่อโปรโมชั่น',
+                      'ประเภท',
+                      'ช่วงเวลา',
+                      'ใช้งานแล้ว',
+                      'สูงสุด',
+                      'สถานะ',
+                    ]
+                        .map(
+                          (h) => pw.Padding(
+                            padding: const pw.EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 5,
+                            ),
+                            child: pw.Text(
+                              h,
+                              style: pw.TextStyle(
+                                font: ttfBold,
+                                fontSize: 9,
+                                color: PdfColors.white,
+                              ),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                  // data rows
+                  ...pageItems.asMap().entries.map((entry) {
+                    final i = entry.key;
+                    final p = entry.value;
+                    final now = DateTime.now();
+                    final isRunning = p.isActive &&
+                        now.isAfter(p.startDate) &&
+                        now.isBefore(p.endDate);
+                    final statusLabel = isRunning
+                        ? 'กำลังใช้งาน'
+                        : p.isActive
+                            ? 'รอเวลา'
+                            : 'ปิด';
+                    final statusColor = isRunning
+                        ? _kSuccess
+                        : p.isActive
+                            ? _kPrimary
+                            : _kSub;
+                    final bg =
+                        i.isEven ? PdfColors.white : _kAltRow;
+                    return pw.TableRow(
+                      decoration: pw.BoxDecoration(color: bg),
+                      children: [
+                        p.promotionCode,
+                        p.promotionName,
+                        _typeLabel(p.promotionType),
+                        '${dateFmt.format(p.startDate)}\n– ${dateFmt.format(p.endDate)}',
+                        '${numFmt.format(p.currentUses)} ครั้ง',
+                        p.maxUses != null
+                            ? numFmt.format(p.maxUses!)
+                            : '∞',
+                        statusLabel,
+                      ].asMap().entries.map((e) {
+                        final isStatus = e.key == 6;
+                        return pw.Padding(
+                          padding: const pw.EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 4,
+                          ),
+                          child: pw.Text(
+                            e.value,
+                            style: pw.TextStyle(
+                              font: isStatus ? ttfBold : ttf,
+                              fontSize: 9,
+                              color: isStatus ? statusColor : PdfColors.black,
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    );
+                  }),
+                ],
+              ),
+              pw.Spacer(),
+              // ── Footer ────────────────────────────────────────
+              pw.Divider(color: _kBorder, thickness: 0.5),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text(
+                    'พิมพ์เมื่อ $printedAt',
+                    style: pw.TextStyle(font: ttf, fontSize: 8, color: _kSub),
+                  ),
+                  pw.Text(
+                    'หน้า ${page + 1} / $pages',
+                    style: pw.TextStyle(font: ttf, fontSize: 8, color: _kSub),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    return doc;
+  }
+
+  static String _typeLabel(String type) => switch (type) {
+        'BUY_X_GET_Y' => 'ซื้อ X แถม Y',
+        'DISCOUNT_PERCENT' => 'ลด %',
+        'DISCOUNT_AMOUNT' => 'ลดเงิน',
+        'FREE_ITEM' => 'ของแถม',
+        _ => type,
+      };
+}
+
+// ─── Hoverable row wrapper ────────────────────────────────────────────────────
+class _HoverableRow extends StatefulWidget {
+  final Widget child;
+  final VoidCallback? onTap;
+  final bool isDark;
+
+  const _HoverableRow({
+    required this.child,
+    required this.isDark,
+    this.onTap,
+  });
+
+  @override
+  State<_HoverableRow> createState() => _HoverableRowState();
+}
+
+class _HoverableRowState extends State<_HoverableRow> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final normalBg =
+        widget.isDark ? const Color(0xFF2C2C2C) : Colors.white;
+    final hoverBg = widget.isDark
+        ? AppTheme.primaryLight.withValues(alpha: 0.15)
+        : AppTheme.primaryLight;
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          color: _hovered ? hoverBg : normalBg,
+          child: widget.child,
+        ),
+      ),
+    );
+  }
 }
 
 // ─── Helper data class ───────────────────────────────────────────────────────

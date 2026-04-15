@@ -130,7 +130,7 @@ class _PromotionFormPageState extends ConsumerState<PromotionFormPage> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: isDark ? AppTheme.darkBg : const Color(0xFFF5F5F5),
+      backgroundColor: isDark ? AppTheme.darkBg : AppTheme.surface,
       body: EscapePopScope(
         child: Column(
           children: [
@@ -209,30 +209,39 @@ class _PromotionFormPageState extends ConsumerState<PromotionFormPage> {
     IconData? icon,
     String? prefix,
     String? suffix,
-  }) => InputDecoration(
-    labelText: label,
-    labelStyle: const TextStyle(color: AppTheme.textSub, fontSize: 13),
-    floatingLabelStyle: const TextStyle(
-      color: AppTheme.infoColor,
-      fontSize: 12,
-    ),
-    prefixIcon: icon != null ? Icon(icon, size: 18) : null,
-    prefixText: prefix,
-    suffixText: suffix,
-    border: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(8),
-      borderSide: const BorderSide(color: AppTheme.border),
-    ),
-    enabledBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(8),
-      borderSide: const BorderSide(color: AppTheme.border),
-    ),
-    focusedBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(8),
-      borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
-    ),
-    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-  );
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final borderColor = isDark ? const Color(0xFF444444) : AppTheme.border;
+    final fillColor = isDark ? AppTheme.darkElement : Colors.white;
+    final labelColor = isDark ? const Color(0xFF9E9E9E) : AppTheme.textSub;
+
+    return InputDecoration(
+      labelText: label,
+      labelStyle: TextStyle(color: labelColor, fontSize: 13),
+      floatingLabelStyle: const TextStyle(
+        color: AppTheme.infoColor,
+        fontSize: 12,
+      ),
+      prefixIcon: icon != null ? Icon(icon, size: 18) : null,
+      prefixText: prefix,
+      suffixText: suffix,
+      filled: true,
+      fillColor: fillColor,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(color: borderColor),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(color: borderColor),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+    );
+  }
 
   // ─── Promotion Type ───────────────────────────────────────────────────────
   Widget _buildPromotionTypeCard() {
@@ -248,13 +257,9 @@ class _PromotionFormPageState extends ConsumerState<PromotionFormPage> {
     return _SectionCard(
       title: 'ประเภทโปรโมชั่น',
       icon: Icons.category_outlined,
-      child: GridView.count(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        crossAxisCount: 2,
-        childAspectRatio: 3.0,
-        mainAxisSpacing: 8,
-        crossAxisSpacing: 8,
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
         children: types.map((t) {
           final selected = _promotionType == t.$1;
           final color = t.$4;
@@ -262,23 +267,28 @@ class _PromotionFormPageState extends ConsumerState<PromotionFormPage> {
             onTap: () => setState(() => _promotionType = t.$1),
             borderRadius: BorderRadius.circular(8),
             child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: selected
                     ? color.withValues(alpha: 0.12)
-                    : (isDark ? AppTheme.darkBg : const Color(0xFFF5F5F5)),
+                    : (isDark
+                          ? const Color(0xFF2A2A2A)
+                          : const Color(0xFFF0F0F0)),
                 border: Border.all(
-                  color: selected ? color : AppTheme.border,
+                  color: selected
+                      ? color
+                      : (isDark ? const Color(0xFF444444) : AppTheme.border),
                   width: selected ? 1.5 : 1,
                 ),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
                     t.$3,
                     color: selected ? color : AppTheme.textSub,
-                    size: 18,
+                    size: 16,
                   ),
                   const SizedBox(width: 6),
                   Text(
@@ -985,47 +995,62 @@ class _TitleBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final canPop = Navigator.of(context).canPop();
+    final navBg = isDark
+        ? Colors.white.withValues(alpha: 0.08)
+        : AppTheme.navyLight;
+    final navBorder = isDark ? Colors.white24 : AppTheme.navy;
+
     return Container(
-      color: isDark ? AppTheme.darkTopBar : Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.navyDark : AppTheme.navy,
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
           if (canPop) ...[
             context.isMobile
-                ? buildMobileHomeCompactButton(context, isDark: isDark)
+                ? buildMobileHomeCompactButton(context)
                 : InkWell(
                     onTap: () => Navigator.pop(context),
-                    borderRadius: BorderRadius.circular(6),
-                    child: Padding(
-                      padding: const EdgeInsets.all(4),
-                      child: Icon(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: navBg,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: navBorder),
+                      ),
+                      child: const Icon(
                         Icons.arrow_back,
-                        size: 20,
-                        color: isDark ? Colors.white70 : AppTheme.textSub,
+                        size: 17,
+                        color: Colors.white70,
                       ),
                     ),
                   ),
             const SizedBox(width: 10),
           ],
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(7),
             decoration: BoxDecoration(
-              color: AppTheme.infoContainer,
+              color: AppTheme.primary.withValues(alpha: 0.18),
               borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: AppTheme.primary.withValues(alpha: 0.28),
+              ),
             ),
             child: const Icon(
               Icons.local_offer,
-              color: AppTheme.infoColor,
-              size: 20,
+              color: AppTheme.primaryLight,
+              size: 18,
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Text(
             isEdit ? 'แก้ไขโปรโมชั่น' : 'สร้างโปรโมชั่น',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
             ),
           ),
           const Spacer(),
@@ -1034,7 +1059,7 @@ class _TitleBar extends StatelessWidget {
               width: 20,
               height: 20,
               child: CircularProgressIndicator(
-                color: AppTheme.primaryColor,
+                color: Colors.white70,
                 strokeWidth: 2,
               ),
             )
@@ -1048,10 +1073,30 @@ class _TitleBar extends StatelessWidget {
                   horizontal: 16,
                   vertical: 10,
                 ),
+                elevation: 0,
               ),
               icon: const Icon(Icons.save, size: 16),
               label: const Text('บันทึก'),
             ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: AppTheme.primary.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                color: AppTheme.primary.withValues(alpha: 0.5),
+              ),
+            ),
+            child: const Text(
+              'Promotions',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.primaryLight,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -1075,38 +1120,61 @@ class _SectionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final borderColor = isDark ? const Color(0xFF333333) : AppTheme.border;
+    final headerBg = isDark ? AppTheme.darkElement : AppTheme.headerBg;
+    final titleColor = isDark ? const Color(0xFFE0E0E0) : const Color(0xFF1A1A1A);
+
     return Container(
       decoration: BoxDecoration(
         color: isDark ? AppTheme.darkCard : Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.border),
+        border: Border.all(color: borderColor),
+        boxShadow: [
+          if (!isDark)
+            BoxShadow(
+              color: AppTheme.navy.withValues(alpha: 0.04),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
+          // Header — dashboard accent-bar style
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: const BoxDecoration(
-              color: AppTheme.headerBg,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+            decoration: BoxDecoration(
+              color: headerBg,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(12),
+              ),
             ),
             child: Row(
               children: [
-                Icon(icon, size: 16, color: AppTheme.infoColor),
+                Container(
+                  width: 4,
+                  height: 16,
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Icon(icon, size: 16, color: AppTheme.primary),
                 const SizedBox(width: 8),
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF1A1A1A),
+                    color: titleColor,
                   ),
                 ),
               ],
             ),
           ),
-          const Divider(height: 1, color: AppTheme.border),
+          Divider(height: 1, color: borderColor),
           // Body
           Padding(padding: const EdgeInsets.all(16), child: child),
         ],
@@ -1123,26 +1191,33 @@ class _InfoBox extends StatelessWidget {
   const _InfoBox({required this.text});
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(12),
-    decoration: BoxDecoration(
-      color: AppTheme.infoContainer,
-      borderRadius: BorderRadius.circular(8),
-      border: Border.all(color: AppTheme.infoColor.withValues(alpha: 0.3)),
-    ),
-    child: Row(
-      children: [
-        const Icon(Icons.info_outline, color: AppTheme.infoColor, size: 16),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            text,
-            style: const TextStyle(color: AppTheme.infoColor, fontSize: 12),
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark
+        ? AppTheme.infoColor.withValues(alpha: 0.12)
+        : AppTheme.infoContainer;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.infoColor.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.info_outline, color: AppTheme.infoColor, size: 16),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(color: AppTheme.infoColor, fontSize: 12),
+            ),
           ),
-        ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────

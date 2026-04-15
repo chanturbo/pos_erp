@@ -2,7 +2,7 @@
 
 > อ้างอิงจาก `lib/features/sales/presentation/pages/sales_history_page.dart`  
 > และ `lib/shared/theme/app_theme.dart`  
-> อัปเดตล่าสุด: 2026-04-15
+> อัปเดตล่าสุด: 2026-04-15 (rev 2)
 
 ---
 
@@ -153,10 +153,10 @@
 
 - default BG:
   - Light: `Colors.white`
-  - Dark: `AppTheme.darkCard`
+  - Dark: `#2C2C2C` *(ไม่ใช้ `AppTheme.darkCard` `#1E1E1E` เพราะมืดเกินไป)*
 - hover BG:
-  - Light: `AppTheme.primary @ 5%`
-  - Dark: `AppTheme.primary @ 10%`
+  - Light: `AppTheme.primaryLight` (`#FF9D45`) — เหมือน customer_list_page
+  - Dark: `AppTheme.primaryLight @ 15%`
 - horizontal padding: `16`
 - vertical padding: `10`
 
@@ -266,8 +266,8 @@
 | Token / ค่าสี | ใช้ที่ไหน |
 |---|---|
 | `AppTheme.darkBg` `#121212` | Scaffold background |
-| `AppTheme.darkCard` `#1E1E1E` | Main card, row, empty state surface |
-| `#2C2C2C` | Summary chip BG (dark) |
+| `AppTheme.darkCard` `#1E1E1E` | Outer card container, empty state surface |
+| `#2C2C2C` | **Table row BG** (dark), Summary chip BG |
 | `#2A2A2A` | Neutral chip BG / Input fill (dark) |
 | `#181818` | Summary Bar background (dark) |
 | `AppTheme.darkTopBar` `#1E1E1E` | Filter Bar background (mobile dark) |
@@ -275,6 +275,8 @@
 | `#333333` | border ทุกจุดใน dark mode |
 | `#E0E0E0` | ข้อความหลัก (dark) |
 | `#9E9E9E` | ข้อความรอง (dark) |
+
+> **หมายเหตุ:** Row BG ใช้ `#2C2C2C` แทน `AppTheme.darkCard` (`#1E1E1E`) เพื่อให้แยกแถวออกจาก scaffold ได้ชัดเจนขึ้น
 
 ---
 

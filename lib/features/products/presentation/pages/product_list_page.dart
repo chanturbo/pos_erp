@@ -366,57 +366,75 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
             color: colors.summaryBg,
             border: Border(bottom: BorderSide(color: colors.border)),
           ),
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // แถว 1 — จำนวน
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _SummaryChip('ทั้งหมด', all.length, AppTheme.info),
-                  _SummaryChip('กรองแล้ว', filtered.length, AppTheme.primary),
-                  _SummaryChip(
-                    'ใช้งาน',
-                    all.where((p) => p.isActive).length,
-                    AppTheme.success,
-                  ),
-                  _SummaryChip(
-                    'ปิดใช้',
-                    all.where((p) => !p.isActive).length,
-                    AppTheme.error,
-                  ),
-                ],
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: LayoutBuilder(
+            builder: (context, constraints) => SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // ซ้าย — จำนวนสินค้า
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _SummaryChip('ทั้งหมด', all.length, AppTheme.info),
+                        const SizedBox(width: 8),
+                        _SummaryChip(
+                          'กรองแล้ว',
+                          filtered.length,
+                          AppTheme.primary,
+                        ),
+                        const SizedBox(width: 8),
+                        _SummaryChip(
+                          'ใช้งาน',
+                          all.where((p) => p.isActive).length,
+                          AppTheme.success,
+                        ),
+                        const SizedBox(width: 8),
+                        _SummaryChip(
+                          'ปิดใช้',
+                          all.where((p) => !p.isActive).length,
+                          AppTheme.error,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(width: 16),
+                    // ขวา — มูลค่าสินค้าในคลัง
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _ValueStat(
+                          label: 'ต้นทุนรวม',
+                          value: totalCost,
+                          color: AppTheme.navy,
+                          emphasis: _ValueStatEmphasis.medium,
+                        ),
+                        const SizedBox(width: 8),
+                        _ValueStat(
+                          label: 'มูลค่าขาย',
+                          value: totalSelling,
+                          color: AppTheme.primaryDark,
+                          emphasis: _ValueStatEmphasis.medium,
+                        ),
+                        const SizedBox(width: 8),
+                        _ValueStat(
+                          label: profit >= 0
+                              ? 'กำไรคาดการณ์'
+                              : 'ขาดทุนคาดการณ์',
+                          value: profit.abs(),
+                          color:
+                              profit >= 0 ? AppTheme.success : AppTheme.error,
+                          sign: profit >= 0 ? '+' : '-',
+                          emphasis: _ValueStatEmphasis.high,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 8),
-              // แถว 2 — มูลค่าสินค้าในคลัง (cost × stock, price × stock)
-              Row(
-                children: [
-                  _ValueStat(
-                    label: 'ต้นทุนรวม',
-                    value: totalCost,
-                    color: AppTheme.navy,
-                    emphasis: _ValueStatEmphasis.medium,
-                  ),
-                  const SizedBox(width: 8),
-                  _ValueStat(
-                    label: 'มูลค่าขาย',
-                    value: totalSelling,
-                    color: AppTheme.primaryDark,
-                    emphasis: _ValueStatEmphasis.medium,
-                  ),
-                  const SizedBox(width: 8),
-                  _ValueStat(
-                    label: profit >= 0 ? 'กำไรคาดการณ์' : 'ขาดทุนคาดการณ์',
-                    value: profit.abs(),
-                    color: profit >= 0 ? AppTheme.success : AppTheme.error,
-                    sign: profit >= 0 ? '+' : '-',
-                    emphasis: _ValueStatEmphasis.high,
-                  ),
-                ],
-              ),
-            ],
+            ),
           ),
         );
       },
@@ -531,8 +549,12 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
               Divider(height: 1, color: _ProductListColors.of(context).border),
               // Rows — shrinkWrap ได้เพราะ Column รู้ขนาดจาก SizedBox แล้ว
               Expanded(
-                child: ListView.builder(
+                child: ListView.separated(
                   itemCount: products.length,
+                  separatorBuilder: (_, _) => Divider(
+                    height: 1,
+                    color: _ProductListColors.of(context).border,
+                  ),
                   itemBuilder: (_, i) => _ProductTableRow(
                     product: products[i],
                     no: i + 1,
@@ -1965,13 +1987,13 @@ class _ProductListColors {
     return _ProductListColors(
       isDark: isDark,
       scaffoldBg: isDark ? AppTheme.darkBg : AppTheme.surface,
-      cardBg: isDark ? AppTheme.darkCard : Colors.white,
+      cardBg: isDark ? const Color(0xFF2C2C2C) : Colors.white,
       border: isDark ? const Color(0xFF333333) : AppTheme.border,
       text: isDark ? const Color(0xFFE0E0E0) : const Color(0xFF1A1A1A),
       subtext: isDark ? const Color(0xFF9E9E9E) : AppTheme.textSub,
       topBarBg: isDark ? AppTheme.navyDark : AppTheme.navy,
-      summaryBg: isDark ? AppTheme.darkTopBar : const Color(0xFFFFF8F5),
-      summaryChipBg: isDark ? AppTheme.darkElement : Colors.white,
+      summaryBg: isDark ? const Color(0xFF181818) : const Color(0xFFFFF8F5),
+      summaryChipBg: isDark ? const Color(0xFF2C2C2C) : Colors.white,
       inputFill: isDark ? AppTheme.darkElement : Colors.white,
       emptyIconBg: isDark ? AppTheme.darkCard : AppTheme.surface,
       emptyIcon: isDark ? const Color(0xFF9E9E9E) : Colors.grey,
@@ -1980,8 +2002,8 @@ class _ProductListColors {
           : AppTheme.navyLight,
       navButtonBorder: isDark ? Colors.white24 : AppTheme.navy,
       rowHoverBg: isDark
-          ? AppTheme.primary.withValues(alpha: 0.10)
-          : AppTheme.primary.withValues(alpha: 0.05),
+          ? AppTheme.primaryLight.withValues(alpha: 0.15)
+          : AppTheme.primaryLight,
       tableHeaderBg: isDark ? AppTheme.navyDark : AppTheme.navy,
       headerText: isDark ? const Color(0xFFE0E0E0) : Colors.white70,
       amountText: isDark ? AppTheme.primaryLight : AppTheme.info,

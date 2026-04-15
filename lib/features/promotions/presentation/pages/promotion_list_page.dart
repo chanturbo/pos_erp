@@ -104,6 +104,40 @@ class _PromotionListPageState extends ConsumerState<PromotionListPage> {
     final promotionsAsync = ref.watch(promotionListProvider);
     final pageSize = ref.watch(settingsProvider).listPageSize;
     final colors = _PromotionListColors.of(context);
+    final isDesktop = MediaQuery.of(context).size.width >= 600;
+
+    // Filter chips สำหรับ inline บน Desktop / Tablet
+    Widget? inlineFilter;
+    if (isDesktop) {
+      final chips = <Widget>[];
+      for (final item in _FilterBar._items) {
+        if (chips.isNotEmpty) chips.add(const SizedBox(width: 8));
+        final selected = _filter == item.$1;
+        final color = item.$3 ?? AppTheme.primaryColor;
+        chips.add(FilterChip(
+          label: Text(
+            item.$2,
+            style: TextStyle(
+              fontSize: 12,
+              color: selected ? color : colors.subtext,
+              fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+            ),
+          ),
+          selected: selected,
+          selectedColor: color.withValues(alpha: 0.12),
+          checkmarkColor: color,
+          side: BorderSide(color: selected ? color : colors.border),
+          backgroundColor: colors.neutralChipBg,
+          visualDensity: VisualDensity.compact,
+          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          onSelected: (_) => setState(() {
+            _filter = item.$1;
+            _currentPage = 1;
+          }),
+        ));
+      }
+      inlineFilter = Row(mainAxisSize: MainAxisSize.min, children: chips);
+    }
 
     void openCoupon() => Navigator.push(
       context,
@@ -142,14 +176,15 @@ class _PromotionListPageState extends ConsumerState<PromotionListPage> {
               ),
             ),
 
-            // ── Filter Bar ──────────────────────────────────────
-            _FilterBar(
-              filter: _filter,
-              onFilterChanged: (v) => setState(() {
-                _filter = v;
-                _currentPage = 1;
-              }),
-            ),
+            // ── Filter Bar (mobile เท่านั้น < 600px) ────────────
+            if (!isDesktop)
+              _FilterBar(
+                filter: _filter,
+                onFilterChanged: (v) => setState(() {
+                  _filter = v;
+                  _currentPage = 1;
+                }),
+              ),
 
             // ── Body ────────────────────────────────────────────
             Expanded(
@@ -198,7 +233,10 @@ class _PromotionListPageState extends ConsumerState<PromotionListPage> {
                     child: Column(
                       children: [
                         // ── Summary Bar ──────────────────
-                        _SummaryBar(summary: summary),
+                        _SummaryBar(
+                          summary: summary,
+                          inlineFilter: inlineFilter,
+                        ),
                         Divider(height: 1, color: colors.border),
 
                         // ── List ─────────────────────────
@@ -768,42 +806,68 @@ class _FilterBar extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────
 class _SummaryBar extends StatelessWidget {
   final Map<String, int> summary;
-  const _SummaryBar({required this.summary});
+  final Widget? inlineFilter;
+
+  const _SummaryBar({required this.summary, this.inlineFilter});
 
   @override
   Widget build(BuildContext context) {
     final colors = _PromotionListColors.of(context);
+
+    final chips = <Widget>[
+      _SummaryChip(
+        icon: Icons.local_offer,
+        label: '${summary['total']} รายการ',
+        color: AppTheme.info,
+      ),
+      _SummaryChip(
+        icon: Icons.play_circle_outline,
+        label: '${summary['active']} ใช้งาน',
+        color: AppTheme.successColor,
+      ),
+      if ((summary['upcoming'] ?? 0) > 0)
+        _SummaryChip(
+          icon: Icons.schedule,
+          label: '${summary['upcoming']} เร็วๆ นี้',
+          color: AppTheme.infoColor,
+        ),
+      if ((summary['expired'] ?? 0) > 0)
+        _SummaryChip(
+          icon: Icons.cancel_outlined,
+          label: '${summary['expired']} หมดอายุ',
+          color: AppTheme.errorColor,
+        ),
+    ];
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(color: colors.summaryBg),
-      child: Wrap(
-        spacing: 12,
-        runSpacing: 6,
-        children: [
-          _SummaryChip(
-            icon: Icons.local_offer,
-            label: '${summary['total']} รายการ',
-            color: AppTheme.info,
-          ),
-          _SummaryChip(
-            icon: Icons.play_circle_outline,
-            label: '${summary['active']} ใช้งาน',
-            color: AppTheme.successColor,
-          ),
-          if ((summary['upcoming'] ?? 0) > 0)
-            _SummaryChip(
-              icon: Icons.schedule,
-              label: '${summary['upcoming']} เร็วๆ นี้',
-              color: AppTheme.infoColor,
-            ),
-          if ((summary['expired'] ?? 0) > 0)
-            _SummaryChip(
-              icon: Icons.cancel_outlined,
-              label: '${summary['expired']} หมดอายุ',
-              color: AppTheme.errorColor,
-            ),
-        ],
-      ),
+      child: inlineFilter != null
+          ? LayoutBuilder(
+              builder: (context, constraints) => SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          for (int i = 0; i < chips.length; i++) ...[
+                            if (i > 0) const SizedBox(width: 12),
+                            chips[i],
+                          ],
+                        ],
+                      ),
+                      const SizedBox(width: 16),
+                      inlineFilter!,
+                    ],
+                  ),
+                ),
+              ),
+            )
+          : Wrap(spacing: 12, runSpacing: 6, children: chips),
     );
   }
 }
@@ -1432,18 +1496,18 @@ class _PromotionListColors {
     return _PromotionListColors(
       isDark: isDark,
       scaffoldBg: isDark ? AppTheme.darkBg : AppTheme.surface,
-      cardBg: isDark ? AppTheme.darkCard : Colors.white,
+      cardBg: isDark ? const Color(0xFF2C2C2C) : Colors.white,
       border: isDark ? const Color(0xFF333333) : AppTheme.border,
       text: isDark ? const Color(0xFFE0E0E0) : const Color(0xFF1A1A1A),
       subtext: isDark ? const Color(0xFF9E9E9E) : AppTheme.textSub,
       topBarBg: isDark ? AppTheme.navyDark : AppTheme.navy,
       searchBarBg: isDark ? AppTheme.darkTopBar : Colors.white,
-      summaryBg: isDark ? AppTheme.darkTopBar : const Color(0xFFFFF8F5),
-      summaryChipBg: isDark ? AppTheme.darkElement : Colors.white,
+      summaryBg: isDark ? const Color(0xFF181818) : const Color(0xFFFFF8F5),
+      summaryChipBg: isDark ? const Color(0xFF2C2C2C) : Colors.white,
       inputFill: isDark ? AppTheme.darkElement : Colors.white,
       emptyIconBg: isDark ? AppTheme.darkCard : AppTheme.surface,
       emptyIcon: isDark ? const Color(0xFF9E9E9E) : Colors.grey,
-      neutralChipBg: isDark ? AppTheme.darkElement : const Color(0xFFF5F5F5),
+      neutralChipBg: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF0F0F0),
       navButtonBg: isDark
           ? Colors.white.withValues(alpha: 0.08)
           : AppTheme.navyLight,

@@ -1726,7 +1726,7 @@ class _SalesHistoryColors {
     return _SalesHistoryColors(
       isDark: isDark,
       scaffoldBg: isDark ? AppTheme.darkBg : AppTheme.surface,
-      cardBg: isDark ? AppTheme.darkCard : Colors.white,
+      cardBg: isDark ? const Color(0xFF2C2C2C) : Colors.white,
       border: isDark ? const Color(0xFF333333) : AppTheme.border,
       text: isDark ? const Color(0xFFE0E0E0) : const Color(0xFF1A1A1A),
       subtext: isDark ? const Color(0xFF9E9E9E) : AppTheme.textSub,
@@ -1738,8 +1738,8 @@ class _SalesHistoryColors {
       summaryChipBg: isDark ? const Color(0xFF2C2C2C) : Colors.white,
       inputFill: isDark ? AppTheme.darkElement : Colors.white,
       rowHoverBg: isDark
-          ? AppTheme.primary.withValues(alpha: 0.10)
-          : AppTheme.primary.withValues(alpha: 0.05),
+          ? AppTheme.primaryLight.withValues(alpha: 0.15)
+          : AppTheme.primaryLight,
       emptyIconBg: isDark ? AppTheme.darkCard : AppTheme.surface,
       emptyIcon: isDark ? const Color(0xFF9E9E9E) : Colors.grey,
       neutralChipBg: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF0F0F0),
