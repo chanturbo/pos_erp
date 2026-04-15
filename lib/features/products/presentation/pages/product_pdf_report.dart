@@ -41,6 +41,7 @@ class ProductPdfBuilder {
   static Future<pw.Document> build(
     List<ProductModel> products, {
     String? companyName,
+    Map<String, double> stockQtyMap = const {},
     double? totalCost,
     double? totalSelling,
     double? totalProfit,
@@ -113,6 +114,7 @@ class ProductPdfBuilder {
               _buildTable(
                 pageProducts,
                 startNo: startNo,
+                stockQtyMap: stockQtyMap,
                 ttf: ttf,
                 ttfRegular: ttfRegular,
               ),
@@ -263,19 +265,21 @@ class ProductPdfBuilder {
   static pw.Widget _buildTable(
     List<ProductModel> products, {
     required int startNo,
+    required Map<String, double> stockQtyMap,
     required pw.Font ttf,
     required pw.Font ttfRegular,
   }) {
-    // portrait A4 usable ≈ 547pt — fixed total 362pt → flex ≈ 185pt
+    // portrait A4 usable ≈ 547pt — fixed = 26+68+52+38+56+56+62+40 = 398pt → flex ≈ 149pt
     const colWidths = [
       pw.FixedColumnWidth(26), // #
-      pw.FixedColumnWidth(72), // รหัส
+      pw.FixedColumnWidth(68), // รหัส
       pw.FlexColumnWidth(1), // ชื่อ
-      pw.FixedColumnWidth(45), // หน่วย
-      pw.FixedColumnWidth(62), // ราคา
-      pw.FixedColumnWidth(62), // ต้นทุน
-      pw.FixedColumnWidth(50), // สต๊อก
-      pw.FixedColumnWidth(45), // สถานะ
+      pw.FixedColumnWidth(52), // คงเหลือ
+      pw.FixedColumnWidth(38), // หน่วย
+      pw.FixedColumnWidth(56), // ราคา
+      pw.FixedColumnWidth(56), // ต้นทุน
+      pw.FixedColumnWidth(62), // มูลค่า
+      pw.FixedColumnWidth(40), // สถานะ
     ];
 
     pw.Widget cell(
@@ -314,10 +318,11 @@ class ProductPdfBuilder {
                     '#',
                     'รหัสสินค้า',
                     'ชื่อสินค้า',
+                    'คงเหลือ',
                     'หน่วย',
                     'ราคาขาย',
                     'ต้นทุน',
-                    'ควบคุมสต๊อก',
+                    'มูลค่า',
                     'สถานะ',
                   ]
                   .map(
@@ -344,6 +349,9 @@ class ProductPdfBuilder {
           final p = e.value;
           final rowBg = i.isEven ? _kAltRow : null;
           final statusColor = p.isActive ? _kSuccess : _kError;
+          final qty = stockQtyMap[p.productId] ?? 0;
+          final stockValue = p.standardCost * qty;
+          final qtyFmt = NumberFormat('#,##0', 'th').format(qty);
           return pw.TableRow(
             children: [
               cell(
@@ -354,6 +362,12 @@ class ProductPdfBuilder {
               ),
               cell(p.productCode, ttfRegular, bgColor: rowBg),
               cell(p.productName, ttf, bgColor: rowBg),
+              cell(
+                qtyFmt,
+                ttfRegular,
+                align: pw.Alignment.centerRight,
+                bgColor: rowBg,
+              ),
               cell(
                 p.baseUnit,
                 ttfRegular,
@@ -373,9 +387,9 @@ class ProductPdfBuilder {
                 bgColor: rowBg,
               ),
               cell(
-                p.isStockControl ? 'ควบคุม' : '-',
+                _fmt(stockValue),
                 ttfRegular,
-                align: pw.Alignment.center,
+                align: pw.Alignment.centerRight,
                 bgColor: rowBg,
               ),
               cell(

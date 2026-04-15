@@ -68,7 +68,7 @@ class StockBalancePdfBuilder {
 
       doc.addPage(
         pw.Page(
-          pageFormat: PdfPageFormat.a4.landscape,
+          pageFormat: PdfPageFormat.a4,
           margin: const pw.EdgeInsets.all(24),
           build: (ctx) => pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.stretch,
@@ -180,15 +180,17 @@ class StockBalancePdfBuilder {
     required pw.Font ttf,
     required pw.Font ttfRegular,
   }) {
+    // portrait A4 usable ≈ 547pt
+    // fixed = 26+68+58+38+64+70 = 324pt → flex space ≈ 223pt (flex unit ≈ 74pt)
     const colWidths = {
-      0: pw.FixedColumnWidth(28), // #
-      1: pw.FixedColumnWidth(72), // รหัส
-      2: pw.FlexColumnWidth(2.5), // ชื่อ
-      3: pw.FlexColumnWidth(1.4), // คลัง
-      4: pw.FixedColumnWidth(62), // คงเหลือ
-      5: pw.FixedColumnWidth(42), // หน่วย
-      6: pw.FixedColumnWidth(72), // ต้นทุน/หน่วย
-      7: pw.FixedColumnWidth(80), // มูลค่าสต๊อก
+      0: pw.FixedColumnWidth(26), // #
+      1: pw.FixedColumnWidth(68), // รหัส
+      2: pw.FlexColumnWidth(2),   // ชื่อ  ≈ 149pt
+      3: pw.FlexColumnWidth(1),   // คลัง  ≈ 74pt
+      4: pw.FixedColumnWidth(58), // คงเหลือ
+      5: pw.FixedColumnWidth(38), // หน่วย
+      6: pw.FixedColumnWidth(64), // ต้นทุน/หน่วย
+      7: pw.FixedColumnWidth(70), // มูลค่าสต๊อก
     };
 
     pw.Widget cell(

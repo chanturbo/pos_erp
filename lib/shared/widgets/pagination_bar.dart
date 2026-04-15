@@ -13,12 +13,18 @@ import 'package:pos_erp/shared/theme/app_theme.dart';
 /// )
 /// ```
 class PaginationBar extends StatelessWidget {
-  final int currentPage;   // 1-based
+  final int currentPage; // 1-based
   final int totalItems;
   final int pageSize;
   final ValueChanged<int> onPageChanged;
 
-  /// Widget แสดงก่อนปุ่มเลขหน้า เช่น ปุ่ม PDF
+  /// โซนซ้ายสุดของแถบ หากไม่ส่งค่า จะใช้ข้อความจำนวนรายการ
+  final Widget? leading;
+
+  /// โซนกลางของแถบ หากไม่ส่งค่า จะใช้ปุ่มเลขหน้า
+  final Widget? center;
+
+  /// โซนขวาสุดของแถบ เช่น ปุ่ม PDF / action buttons
   final Widget? trailing;
 
   const PaginationBar({
@@ -27,6 +33,8 @@ class PaginationBar extends StatelessWidget {
     required this.totalItems,
     required this.pageSize,
     required this.onPageChanged,
+    this.leading,
+    this.center,
     this.trailing,
   });
 
@@ -45,7 +53,7 @@ class PaginationBar extends StatelessWidget {
     if (currentPage > 3) slots.add(-1); // left ellipsis
 
     final start = (currentPage - 1).clamp(2, total - 1);
-    final end   = (currentPage + 1).clamp(2, total - 1);
+    final end = (currentPage + 1).clamp(2, total - 1);
     for (int p = start; p <= end; p++) {
       slots.add(p);
     }
@@ -63,7 +71,7 @@ class PaginationBar extends StatelessWidget {
     final slots = _buildSlots();
 
     final startItem = totalItems == 0 ? 0 : (currentPage - 1) * pageSize + 1;
-    final endItem   = (currentPage * pageSize).clamp(0, totalItems);
+    final endItem = (currentPage * pageSize).clamp(0, totalItems);
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -114,14 +122,17 @@ class PaginationBar extends StatelessWidget {
       ],
     );
 
+    final Widget resolvedLeading = leading ?? countText;
+    final Widget resolvedCenter = center ?? pageNav;
+
     return LayoutBuilder(
       builder: (context, constraints) {
-        // แบ่ง 2 แถวเมื่อหน้าจอแคบและมี trailing widget
-        final isNarrow = trailing != null && constraints.maxWidth < 560;
+        final hasTrailing = trailing != null;
+        final isNarrow = hasTrailing && constraints.maxWidth < 720;
 
         return Container(
           padding: EdgeInsets.symmetric(
-            horizontal: 16,
+            horizontal: hasTrailing ? 8 : 16,
             vertical: isNarrow ? 6 : 8,
           ),
           decoration: BoxDecoration(
@@ -132,37 +143,56 @@ class PaginationBar extends StatelessWidget {
             ),
           ),
           child: isNarrow
-              // ── หน้าจอแคบ: trailing บนสุด, pagination แถวล่าง ──
+              // ── หน้าจอแคบ: leading/trailing แถวบน, center แถวล่าง ──
               ? Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [trailing!],
+                      children: [
+                        Expanded(
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: resolvedLeading,
+                          ),
+                        ),
+                        if (hasTrailing) trailing!,
+                      ],
                     ),
                     const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        countText,
-                        const Spacer(),
-                        pageNav,
-                      ],
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: resolvedCenter,
+                      ),
                     ),
                   ],
                 )
-              // ── หน้าจอกว้าง: แถวเดียว ──
-              : Row(
-                  children: [
-                    Flexible(child: countText),
-                    const SizedBox(width: 8),
-                    const Spacer(),
-                    if (trailing != null) ...[
-                      trailing!,
-                      const SizedBox(width: 8),
+              // ── หน้าจอกว้าง: leading | center | trailing ──
+              : SizedBox(
+                  width: double.infinity,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: resolvedLeading,
+                      ),
+                      Align(
+                        alignment: Alignment.center,
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: resolvedCenter,
+                        ),
+                      ),
+                      if (hasTrailing)
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: trailing!,
+                        ),
                     ],
-                    pageNav,
-                  ],
+                  ),
                 ),
         );
       },
@@ -175,20 +205,20 @@ class _NavButton extends StatelessWidget {
   final bool enabled;
   final VoidCallback onTap;
 
-  const _NavButton({required this.icon, required this.enabled, required this.onTap});
+  const _NavButton({
+    required this.icon,
+    required this.enabled,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bgColor = enabled
-        ? (isDark
-            ? Colors.white.withValues(alpha: 0.10)
-            : Colors.white)
+        ? (isDark ? Colors.white.withValues(alpha: 0.10) : Colors.white)
         : Colors.transparent;
     final borderColor = enabled
-        ? (isDark
-            ? Colors.white.withValues(alpha: 0.22)
-            : AppTheme.border)
+        ? (isDark ? Colors.white.withValues(alpha: 0.22) : AppTheme.border)
         : Colors.transparent;
     final iconColor = enabled
         ? (isDark ? Colors.white : Colors.black87)
@@ -217,7 +247,11 @@ class _PageButton extends StatelessWidget {
   final bool isActive;
   final VoidCallback onTap;
 
-  const _PageButton({required this.page, required this.isActive, required this.onTap});
+  const _PageButton({
+    required this.page,
+    required this.isActive,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {

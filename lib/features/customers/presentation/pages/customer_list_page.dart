@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:pos_erp/features/customers/data/models/customer_model.dart';
-import '../../../../shared/pdf/pdf_report_button.dart';
+import 'package:pos_erp/features/settings/presentation/pages/settings_page.dart';
+import 'package:pos_erp/shared/pdf/pdf_report_button.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
 import 'package:pos_erp/shared/utils/responsive_utils.dart';
 import 'package:pos_erp/shared/widgets/app_dialogs.dart';
 import 'package:pos_erp/shared/widgets/escape_pop_scope.dart';
 import 'package:pos_erp/shared/widgets/mobile_home_button.dart';
 import 'package:pos_erp/shared/widgets/pagination_bar.dart';
-import 'package:pos_erp/features/settings/presentation/pages/settings_page.dart';
+
 import '../providers/customer_provider.dart';
-import 'customer_detail_page.dart'; // ✅
+import 'customer_detail_page.dart';
 import 'customer_form_page.dart';
 import 'customer_pdf_report.dart';
 
@@ -23,27 +25,22 @@ class CustomerListPage extends ConsumerStatefulWidget {
 
 class _CustomerListPageState extends ConsumerState<CustomerListPage> {
   final _searchController = TextEditingController();
+  final _hScroll = ScrollController();
+  final _currencyFmt = NumberFormat('#,##0');
+
   String _searchQuery = '';
   bool _showMembersOnly = false;
   bool _isTableView = true;
   bool _userResized = false;
 
-  // ── Sort ───────────────────────────────────────────────────────
-  // column keys: 'name','code','phone','memberNo','points','creditLimit','status'
   String _sortColumn = 'name';
   bool _sortAsc = true;
 
-  // ── Pagination ──────────────────────────────────────────────────
   int _currentPage = 1;
 
-  // ✅ ความกว้างคอลัมน์ (pixel) — auto-fit ตามเนื้อหา + ลากขยาย/ย่อได้
-  // ลำดับ: [ชื่อ, รหัส, โทร, สมาชิก, คะแนน, เครดิต, สถานะ, จัดการ]
-  final List<double> _colWidths = [200, 110, 120, 120, 80, 110, 80, 100];
-  static const List<double> _colMinW = [120, 80, 80, 80, 70, 80, 70, 100];
-  static const List<double> _colMaxW = [400, 250, 220, 220, 160, 200, 120, 100];
-
-  // ✅ ScrollControllers สำหรับแสดง scrollbar
-  final _hScroll = ScrollController();
+  final List<double> _colWidths = [220, 120, 130, 140, 90, 120, 90, 138];
+  static const List<double> _colMinW = [140, 90, 90, 100, 80, 90, 80, 138];
+  static const List<double> _colMaxW = [400, 220, 220, 220, 150, 190, 130, 138];
 
   @override
   void dispose() {
@@ -52,682 +49,204 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
     super.dispose();
   }
 
-  // ── Avatar color จาก initial ──────────────────────────────────
   Color _avatarColor(String name) {
     final colors = [
       const Color(0xFFE8622A),
       const Color(0xFF4CAF50),
       const Color(0xFF2196F3),
-      const Color(0xFF9C27B0),
-      const Color(0xFFFF5722),
-      const Color(0xFF009688),
-      const Color(0xFF3F51B5),
-      const Color(0xFFFF9800),
+      const Color(0xFF00897B),
+      const Color(0xFFEF6C00),
+      const Color(0xFF6A1B9A),
+      const Color(0xFF3949AB),
+      const Color(0xFFD81B60),
     ];
+    if (name.isEmpty) return colors.first;
     return colors[name.codeUnitAt(0) % colors.length];
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final customerAsync = ref.watch(customerListProvider);
-    final pageSize = ref.watch(settingsProvider).listPageSize;
-    final canPop = Navigator.of(context).canPop();
+  List<CustomerModel> _applyFilter(List<CustomerModel> customers) {
+    return customers.where((c) {
+      final isMember = c.memberNo != null && c.memberNo!.trim().isNotEmpty;
+      if (_showMembersOnly && !isMember) return false;
+      if (_searchQuery.isEmpty) return true;
 
-    return EscapePopScope(
-      child: Scaffold(
-        backgroundColor: AppTheme.surfaceColorOf(context),
-        appBar: AppBar(
-          leading: buildMobileHomeLeading(context),
-          automaticallyImplyLeading: canPop,
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('รายการลูกค้า'),
-              Text(
-                'ค้นหา จัดการ และติดตามข้อมูลลูกค้าในระบบ',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.white.withValues(alpha: 0.65),
-                  fontWeight: FontWeight.normal,
-                ),
-              ),
-            ],
-          ),
-        ),
-        body: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: context.contentMaxWidth),
-            child: Column(
-              children: [
-                // ── Top Bar (Responsive) ───────────────────────────────
-                _CustomerListTopBar(
-                  searchController: _searchController,
-                  searchQuery: _searchQuery,
-                  showMembersOnly: _showMembersOnly,
-                  isTableView: _isTableView,
-                  onSearchChanged: (v) => setState(() {
-                    _searchQuery = v;
-                    _currentPage = 1;
-                  }),
-                  onSearchCleared: () {
-                    _searchController.clear();
-                    setState(() {
-                      _searchQuery = '';
-                      _currentPage = 1;
-                    });
-                  },
-                  onToggleMember: () => setState(() {
-                    _showMembersOnly = !_showMembersOnly;
-                    _currentPage = 1;
-                  }),
-                  onToggleView: () =>
-                      setState(() => _isTableView = !_isTableView),
-                  onRefresh: () =>
-                      ref.read(customerListProvider.notifier).refresh(),
-                  onAdd: () async {
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const CustomerFormPage(),
-                      ),
-                    );
-                    // ✅ refresh หลังเพิ่มลูกค้าใหม่
-                    if (context.mounted) {
-                      ref.read(customerListProvider.notifier).refresh();
-                    }
-                  },
-                ),
-
-                // ── Table ──────────────────────────────────────────────
-                Expanded(
-                  child: customerAsync.when(
-                    loading: () => Center(
-                      child: Padding(
-                        padding: context.pagePadding,
-                        child: const CircularProgressIndicator(
-                          color: AppTheme.primary,
-                        ),
-                      ),
-                    ),
-                    error: (e, _) => _buildError(e),
-                    data: (customers) {
-                      final filtered = customers.where((c) {
-                        if (_showMembersOnly &&
-                            (c.memberNo == null || c.memberNo!.isEmpty)) {
-                          return false;
-                        }
-                        if (_searchQuery.isEmpty) return true;
-                        final q = _searchQuery.toLowerCase();
-                        return c.customerName.toLowerCase().contains(q) ||
-                            c.customerCode.toLowerCase().contains(q) ||
-                            (c.phone?.toLowerCase().contains(q) ?? false) ||
-                            (c.memberNo?.toLowerCase().contains(q) ?? false);
-                      }).toList();
-
-                      // ── Sort ────────────────────────────────────────
-                      filtered.sort((a, b) {
-                        int cmp;
-                        switch (_sortColumn) {
-                          case 'name':
-                            cmp = a.customerName.compareTo(b.customerName);
-                          case 'code':
-                            cmp = a.customerCode.compareTo(b.customerCode);
-                          case 'phone':
-                            cmp = (a.phone ?? '').compareTo(b.phone ?? '');
-                          case 'memberNo':
-                            cmp = (a.memberNo ?? '').compareTo(
-                              b.memberNo ?? '',
-                            );
-                          case 'points':
-                            cmp = a.points.compareTo(b.points);
-                          case 'creditLimit':
-                            cmp = a.creditLimit.compareTo(b.creditLimit);
-                          case 'status':
-                            cmp = (b.isActive ? 1 : 0).compareTo(
-                              a.isActive ? 1 : 0,
-                            );
-                          default:
-                            cmp = 0;
-                        }
-                        return _sortAsc ? cmp : -cmp;
-                      });
-
-                      if (filtered.isEmpty) return _buildEmpty();
-
-                      // Pagination
-                      final totalPages = (filtered.length / pageSize).ceil();
-                      final safePage = _currentPage.clamp(1, totalPages);
-                      final pageStart = (safePage - 1) * pageSize;
-                      final pageEnd = (pageStart + pageSize).clamp(
-                        0,
-                        filtered.length,
-                      );
-                      final pageItems = filtered.sublist(pageStart, pageEnd);
-
-                      // ✅ Card View เมื่อ user เลือก
-                      if (!_isTableView) {
-                        return Column(
-                          children: [
-                            Expanded(
-                              child: _buildCustomerCardView(context, pageItems),
-                            ),
-                            PaginationBar(
-                              currentPage: safePage,
-                              totalItems: filtered.length,
-                              pageSize: pageSize,
-                              onPageChanged: (p) =>
-                                  setState(() => _currentPage = p),
-                            ),
-                          ],
-                        );
-                      }
-
-                      // ✅ Auto-fit colWidths ตามเนื้อหา (เฉพาะครั้งแรก / ยังไม่ resize)
-                      final screenW = MediaQuery.of(context).size.width - 32;
-                      if (!_userResized) _autoFitColWidths(filtered, screenW);
-
-                      final totalW =
-                          40.0 +
-                          16.0 +
-                          _colWidths.fold(0.0, (s, w) => s + w) +
-                          28.0 +
-                          32.0;
-                      final tableW = totalW > screenW ? totalW : screenW;
-
-                      return Stack(
-                        children: [
-                          Container(
-                            margin: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: AppTheme.border),
-                            ),
-                            // ✅ แนวตั้ง scroll ด้านนอก, แนวนอน scroll ด้านใน
-                            child: Column(
-                              children: [
-                                // ── Header + Rows scroll แนวนอนพร้อมกัน ──────
-                                Expanded(
-                                  child: Scrollbar(
-                                    controller: _hScroll,
-                                    thumbVisibility: true,
-                                    trackVisibility: true,
-                                    child: SingleChildScrollView(
-                                      controller: _hScroll,
-                                      scrollDirection: Axis.horizontal,
-                                      child: SizedBox(
-                                        width: tableW,
-                                        child: Column(
-                                          children: [
-                                            // Header (resizable + sortable)
-                                            _ResizableTableHeader(
-                                              colWidths: _colWidths,
-                                              colMinW: _colMinW,
-                                              colMaxW: _colMaxW,
-                                              sortColumn: _sortColumn,
-                                              sortAsc: _sortAsc,
-                                              onSort: (col) => setState(() {
-                                                if (_sortColumn == col) {
-                                                  _sortAsc = !_sortAsc;
-                                                } else {
-                                                  _sortColumn = col;
-                                                  _sortAsc = true;
-                                                }
-                                                _currentPage = 1;
-                                              }),
-                                              onResize: (i, w) => setState(() {
-                                                _colWidths[i] = w;
-                                                _userResized = true;
-                                              }),
-                                              onReset: () => setState(() {
-                                                _colWidths.setAll(0, [
-                                                  200,
-                                                  110,
-                                                  120,
-                                                  120,
-                                                  80,
-                                                  110,
-                                                  80,
-                                                  100,
-                                                ]);
-                                                _userResized = false;
-                                              }),
-                                            ),
-                                            const Divider(
-                                              height: 1,
-                                              color: AppTheme.border,
-                                            ),
-                                            // Rows — ใช้ shrinkWrap ภายใน Column ที่รู้ขนาดแล้ว
-                                            Expanded(
-                                              child: ListView.separated(
-                                                itemCount: pageItems.length,
-                                                separatorBuilder: (_, _) =>
-                                                    const Divider(
-                                                      height: 1,
-                                                      color: AppTheme.border,
-                                                    ),
-                                                itemBuilder: (context, i) {
-                                                  final c = pageItems[i];
-                                                  final isMember =
-                                                      c.memberNo != null &&
-                                                      c.memberNo!.isNotEmpty;
-                                                  final isSystem =
-                                                      c.customerId == 'WALK_IN';
-                                                  return _CustomerRow(
-                                                    customer: c,
-                                                    isMember: isMember,
-                                                    isSystem: isSystem,
-                                                    colWidths: _colWidths,
-                                                    avatarColor: isSystem
-                                                        ? const Color(
-                                                            0xFF546E7A,
-                                                          )
-                                                        : _avatarColor(
-                                                            c.customerName,
-                                                          ),
-                                                    // ✅ กดเพื่อดูรายละเอียด
-                                                    onTap: () => Navigator.push(
-                                                      context,
-                                                      MaterialPageRoute(
-                                                        builder: (_) =>
-                                                            CustomerDetailPage(
-                                                              customer: c,
-                                                            ),
-                                                      ),
-                                                    ),
-                                                    onEdit: isSystem
-                                                        ? null
-                                                        : () async {
-                                                            await Navigator.push(
-                                                              context,
-                                                              MaterialPageRoute(
-                                                                builder: (_) =>
-                                                                    CustomerFormPage(
-                                                                      customer:
-                                                                          c,
-                                                                    ),
-                                                              ),
-                                                            );
-                                                            // ✅ refresh หลังแก้ไข
-                                                            if (context
-                                                                .mounted) {
-                                                              ref
-                                                                  .read(
-                                                                    customerListProvider
-                                                                        .notifier,
-                                                                  )
-                                                                  .refresh();
-                                                            }
-                                                          },
-                                                    onDelete: isSystem
-                                                        ? null
-                                                        : () => _confirmDelete(
-                                                            c.customerId,
-                                                            c.customerName,
-                                                          ),
-                                                  );
-                                                },
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                // ── Footer / Pagination ───────────────────
-                                PaginationBar(
-                                  currentPage: safePage,
-                                  totalItems: filtered.length,
-                                  pageSize: pageSize,
-                                  onPageChanged: (p) =>
-                                      setState(() => _currentPage = p),
-                                  trailing: PdfReportButton(
-                                    emptyMessage: 'ไม่มีข้อมูลลูกค้า',
-                                    title: 'รายงานลูกค้า',
-                                    filename: () =>
-                                        PdfFilename.generate('customer_report'),
-                                    buildPdf: () =>
-                                        CustomerPdfBuilder.build(filtered),
-                                    hasData: filtered.isNotEmpty,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ), // Container
-                        ],
-                      ); // Stack
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
+      final q = _searchQuery.toLowerCase();
+      return c.customerName.toLowerCase().contains(q) ||
+          c.customerCode.toLowerCase().contains(q) ||
+          (c.phone?.toLowerCase().contains(q) ?? false) ||
+          (c.memberNo?.toLowerCase().contains(q) ?? false) ||
+          (c.email?.toLowerCase().contains(q) ?? false);
+    }).toList();
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // Card View — แสดงเมื่อ user เลือก Card mode
-  // ─────────────────────────────────────────────────────────────
-  Widget _buildCustomerCardView(BuildContext context, List<dynamic> customers) {
-    return ListView.separated(
-      padding: const EdgeInsets.all(12),
-      itemCount: customers.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 8),
-      itemBuilder: (context, i) {
-        final c = customers[i];
-        final isMember = c.memberNo != null && c.memberNo!.isNotEmpty;
-        final isSystem = c.customerId == 'WALK_IN';
-        final color = _avatarColor(c.customerName);
-        final initial = c.customerName.isNotEmpty
-            ? c.customerName.substring(0, 1).toUpperCase()
-            : '?';
-
-        return Card(
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-            side: const BorderSide(color: AppTheme.border),
-          ),
-          color: Colors.white,
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              children: [
-                // Avatar
-                Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    CircleAvatar(
-                      radius: 20,
-                      backgroundColor: isSystem
-                          ? const Color(0xFF546E7A)
-                          : (isMember ? const Color(0xFFFFB300) : color),
-                      child: Text(
-                        initial,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    if (isMember)
-                      Positioned(
-                        right: -2,
-                        bottom: -2,
-                        child: Container(
-                          width: 14,
-                          height: 14,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFFB300),
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 1.5),
-                          ),
-                          child: const Icon(
-                            Icons.star,
-                            size: 8,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(width: 12),
-
-                // Info
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              c.customerName,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF1A1A1A),
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          // Status badge
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: c.isActive
-                                  ? const Color(0xFFE8F5E9)
-                                  : const Color(0xFFFFEBEE),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  width: 5,
-                                  height: 5,
-                                  decoration: BoxDecoration(
-                                    color: c.isActive
-                                        ? const Color(0xFF4CAF50)
-                                        : const Color(0xFFF44336),
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  c.isActive ? 'ใช้งาน' : 'ปิดใช้',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w600,
-                                    color: c.isActive
-                                        ? const Color(0xFF2E7D32)
-                                        : const Color(0xFFC62828),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        'รหัส: ${c.customerCode}',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: AppTheme.textSub,
-                        ),
-                      ),
-                      if (c.phone != null)
-                        Text(
-                          'โทร: ${c.phone}',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: AppTheme.textSub,
-                          ),
-                        ),
-                      if (isMember)
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.card_membership,
-                              size: 11,
-                              color: Colors.amber[700],
-                            ),
-                            const SizedBox(width: 3),
-                            Text(
-                              '${c.memberNo}  ·  ${c.points} pt',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.amber[700],
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      if (c.creditLimit > 0)
-                        Text(
-                          'วงเงิน: ฿${c.creditLimit.toStringAsFixed(0)}',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: Color(0xFF1565C0),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-
-                // Actions
-                if (isSystem)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFECEFF1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Text(
-                      'ระบบ',
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: Color(0xFF546E7A),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  )
-                else
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _ActionIcon(
-                        icon: Icons.edit_outlined,
-                        color: const Color(0xFF1565C0),
-                        tooltip: 'แก้ไข',
-                        onTap: () async {
-                          await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => CustomerFormPage(customer: c),
-                            ),
-                          );
-                          // ✅ refresh หลังแก้ไข
-                          if (context.mounted) {
-                            ref.read(customerListProvider.notifier).refresh();
-                          }
-                        },
-                      ),
-                      const SizedBox(width: 4),
-                      _ActionIcon(
-                        icon: Icons.delete_outline,
-                        color: const Color(0xFFC62828),
-                        tooltip: 'ลบ',
-                        onTap: () =>
-                            _confirmDelete(c.customerId, c.customerName),
-                      ),
-                    ],
-                  ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
+  List<CustomerModel> _applySort(List<CustomerModel> customers) {
+    customers.sort((a, b) {
+      int cmp;
+      switch (_sortColumn) {
+        case 'name':
+          cmp = a.customerName.compareTo(b.customerName);
+        case 'code':
+          cmp = a.customerCode.compareTo(b.customerCode);
+        case 'phone':
+          cmp = (a.phone ?? '').compareTo(b.phone ?? '');
+        case 'memberNo':
+          cmp = (a.memberNo ?? '').compareTo(b.memberNo ?? '');
+        case 'points':
+          cmp = a.points.compareTo(b.points);
+        case 'creditLimit':
+          cmp = a.creditLimit.compareTo(b.creditLimit);
+        case 'status':
+          cmp = (a.isActive ? 1 : 0).compareTo(b.isActive ? 1 : 0);
+        default:
+          cmp = 0;
+      }
+      return _sortAsc ? cmp : -cmp;
+    });
+    return customers;
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // Auto-fit colWidths ตามความยาวข้อความจริงใน list
-  // ─────────────────────────────────────────────────────────────
-  void _autoFitColWidths(List<CustomerModel> rows, double screenW) {
-    // ── Header label widths (fontSize 12, w600 ~7.5px/char Thai)
-    // คอลัมน์ที่ sort ได้ บวก sort icon (13px) + gap (3px) = +16
-    // คอลัมน์ที่ไม่ sort บวกแค่ padding (16px)
-    const hPad = 16.0;
-    const sortIcon = 16.0;
-    const hCharW = 7.5;
+  Map<String, dynamic> _calcSummary(List<CustomerModel> customers) {
+    final members = customers
+        .where((c) => c.memberNo != null && c.memberNo!.trim().isNotEmpty)
+        .length;
+    final active = customers.where((c) => c.isActive).length;
+    final creditLimit = customers.fold<double>(
+      0,
+      (sum, c) => sum + c.creditLimit,
+    );
 
-    // [ชื่อ-นามสกุล, รหัสลูกค้า, โทรศัพท์, เลขสมาชิก, คะแนน, วงเงินเครดิต, สถานะ, จัดการ]
-    final labels = [
-      'ชื่อ-นามสกุล',
-      'รหัสลูกค้า',
-      'โทรศัพท์',
-      'เลขสมาชิก',
-      'คะแนน',
-      'วงเงินเครดิต',
-      'สถานะ',
-      'จัดการ',
+    return {
+      'count': customers.length,
+      'memberCount': members,
+      'activeCount': active,
+      'creditLimit': creditLimit,
+    };
+  }
+
+  double _measureTextWidth(
+    BuildContext context,
+    String text, {
+    required TextStyle style,
+  }) {
+    final painter = TextPainter(
+      text: TextSpan(text: text, style: style),
+      textDirection: Directionality.of(context),
+      maxLines: 1,
+    )..layout();
+    return painter.width;
+  }
+
+  void _autoFitColWidths(List<CustomerModel> rows) {
+    // Column definitions: (label, isSortable) — ตรงกับ _CustomerTableHeader._cols
+    const headers = [
+      ('ชื่อ-นามสกุล', true),
+      ('รหัสลูกค้า', true),
+      ('โทรศัพท์', true),
+      ('เลขสมาชิก', true),
+      ('คะแนน', true),
+      ('วงเงินเครดิต', true),
+      ('สถานะ', true),
+      ('จัดการ', false),
     ];
-    final hasSort = [true, true, true, true, true, true, true, false];
+    final headerStyle = const TextStyle(
+      fontSize: 12,
+      fontWeight: FontWeight.w600,
+    );
+    final cellStyle = TextStyle(
+      fontSize: 13,
+      color: _CustomerListColors.of(context).subtext,
+    );
+    final emphasisStyle = TextStyle(
+      fontSize: 13,
+      fontWeight: FontWeight.w700,
+      color: _CustomerListColors.of(context).amountText,
+    );
+    final badgeStyle = const TextStyle(
+      fontSize: 11,
+      fontWeight: FontWeight.w600,
+    );
 
-    final headerMinW = List<double>.generate(labels.length, (i) {
-      final lw = labels[i].length * hCharW + hPad;
-      return hasSort[i] ? lw + sortIcon : lw;
+    // ใช้ formula เดียวกับ product_list_page:
+    //   colWidth = labelW + basePadding(16) + sortChrome(20 if sortable)
+    //            + resizeHandle(14 if not last) + buffer(10)
+    const basePadding = 16.0;
+    const sortChrome = 20.0; // gap(4) + icon(12) + 4px buffer
+    const resizeHandle = 14.0;
+    const headerBuffer = 10.0;
+
+    final maxW = List<double>.generate(headers.length, (i) {
+      final label = headers[i].$1;
+      final isSortable = headers[i].$2;
+      final isLast = i == headers.length - 1;
+      final labelW = _measureTextWidth(context, label, style: headerStyle);
+      return labelW +
+          basePadding +
+          (isSortable ? sortChrome : 0.0) +
+          (isLast ? 0.0 : resizeHandle) +
+          headerBuffer;
     });
 
-    // เริ่มต้น maxW = header min (floor ที่ content ย่อไม่ได้)
-    final maxW = List<double>.from(headerMinW);
-
-    // ── Content character widths ──────────────────────────────
-    const charW = 7.2; // regular fontSize 13
-    const numCharW = 7.4; // ตัวเลข
-    const cPad = 24.0; // horizontal padding ต่อ cell content
-
     for (final c in rows) {
-      // 0: ชื่อ + avatar(36) + gap(10)
-      final nameW = c.customerName.length * charW + 46 + cPad;
-      if (nameW > maxW[0]) maxW[0] = nameW.clamp(_colMinW[0], _colMaxW[0]);
+      // ชื่อ-นามสกุล: มี CircleAvatar (radius 18 → diameter 36) + gap 10 + text + buffer 10
+      final nameW =
+          _measureTextWidth(context, c.customerName, style: cellStyle) + 56;
+      if (nameW > maxW[0]) maxW[0] = nameW;
 
-      // 1: รหัสลูกค้า
-      final codeW = c.customerCode.length * charW + cPad;
-      if (codeW > maxW[1]) maxW[1] = codeW.clamp(_colMinW[1], _colMaxW[1]);
+      final codeW =
+          _measureTextWidth(context, c.customerCode, style: cellStyle) + 20;
+      if (codeW > maxW[1]) maxW[1] = codeW;
 
-      // 2: โทรศัพท์
-      final phoneW = (c.phone?.length ?? 1) * charW + cPad;
-      if (phoneW > maxW[2]) maxW[2] = phoneW.clamp(_colMinW[2], _colMaxW[2]);
+      final phoneW =
+          _measureTextWidth(context, c.phone ?? '-', style: cellStyle) + 20;
+      if (phoneW > maxW[2]) maxW[2] = phoneW;
 
-      // 3: เลขสมาชิก (icon 13 + gap 4 = +17)
-      final memW = (c.memberNo?.length ?? 1) * charW + 17 + cPad;
-      if (memW > maxW[3]) maxW[3] = memW.clamp(_colMinW[3], _colMaxW[3]);
+      // เลขสมาชิก: ถ้ามี badge = icon(14)+gap(4)+text+badge-padding(24) = +42
+      final isMember = c.memberNo != null && c.memberNo!.trim().isNotEmpty;
+      final memberW =
+          _measureTextWidth(
+            context,
+            c.memberNo ?? '-',
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: AppTheme.warningColor,
+            ),
+          ) +
+          (isMember ? 42 : 20);
+      if (memberW > maxW[3]) maxW[3] = memberW;
 
-      // 4: คะแนน — badge "XXXXX pt" icon(12)+gap(3)+text
-      final ptW = '${c.points} pt'.length * 7.0 + 15 + cPad;
-      if (ptW > maxW[4]) maxW[4] = ptW.clamp(_colMinW[4], _colMaxW[4]);
+      // คะแนน: ถ้ามี badge = text + 39
+      final pointW =
+          _measureTextWidth(
+            context,
+            isMember ? '${c.points} pt' : '-',
+            style: isMember
+                ? badgeStyle.copyWith(color: const Color(0xFFE65100))
+                : cellStyle,
+          ) +
+          (isMember ? 39 : 20);
+      if (pointW > maxW[4]) maxW[4] = pointW;
 
-      // 5: วงเงินเครดิต
-      final creditStr = c.creditLimit > 0
-          ? '฿${c.creditLimit.toStringAsFixed(0)}'
-          : '-';
-      final creditW = creditStr.length * numCharW + cPad;
-      if (creditW > maxW[5]) maxW[5] = creditW.clamp(_colMinW[5], _colMaxW[5]);
+      final creditW =
+          _measureTextWidth(
+            context,
+            c.creditLimit > 0 ? '฿${_currencyFmt.format(c.creditLimit)}' : '-',
+            style: c.creditLimit > 0 ? emphasisStyle : cellStyle,
+          ) +
+          20;
+      if (creditW > maxW[5]) maxW[5] = creditW;
 
-      // 6: สถานะ — badge fixed ≥ header
-      // 7: จัดการ — fixed 100px
+      // สถานะ badge: dot(8)+gap(4)+text+horizontal-padding(22) = +34
+      final statusLabel = c.isActive ? 'ใช้งาน' : 'ปิดใช้';
+      final statusW =
+          _measureTextWidth(context, statusLabel, style: badgeStyle) + 34;
+      if (statusW > maxW[6]) maxW[6] = statusW;
+
+      maxW[7] = 138; // จัดการ — fixed
     }
 
-    // clamp ทุกคอลัมน์
     for (int i = 0; i < maxW.length; i++) {
       maxW[i] = maxW[i].clamp(_colMinW[i], _colMaxW[i]);
-    }
-    maxW[7] = 100.0; // จัดการ fixed
-
-    // กระจาย space ที่เหลือให้คอลัมน์ชื่อ (index 0)
-    const totalFixed = 116.0; // ลำดับ(40+16) + reset(28) + padding(32)
-    final totalCols = maxW.fold(0.0, (s, w) => s + w);
-    final available = screenW - totalFixed;
-    if (totalCols < available) {
-      maxW[0] = (maxW[0] + (available - totalCols)).clamp(
-        _colMinW[0],
-        _colMaxW[0],
-      );
     }
 
     for (int i = 0; i < _colWidths.length; i++) {
@@ -735,8 +254,490 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
     }
   }
 
+  Future<void> _openCreateForm() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const CustomerFormPage()),
+    );
+    if (!mounted) return;
+    ref.read(customerListProvider.notifier).refresh();
+  }
+
+  Future<void> _openEditForm(CustomerModel customer) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => CustomerFormPage(customer: customer)),
+    );
+    if (!mounted) return;
+    ref.read(customerListProvider.notifier).refresh();
+  }
+
+  void _openDetail(CustomerModel customer) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => CustomerDetailPage(customer: customer)),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final customerAsync = ref.watch(customerListProvider);
+    final pageSize = ref.watch(settingsProvider).listPageSize;
+    final colors = _CustomerListColors.of(context);
+    final isDesktop = MediaQuery.of(context).size.width >= 600;
+
+    final inlineFilters = isDesktop
+        ? _ToggleChip(
+            icon: Icons.card_membership,
+            label: _showMembersOnly ? 'เฉพาะสมาชิก' : 'ลูกค้าทั้งหมด',
+            active: _showMembersOnly,
+            onTap: () => setState(() {
+              _showMembersOnly = !_showMembersOnly;
+              _currentPage = 1;
+            }),
+          )
+        : null;
+
+    return EscapePopScope(
+      child: Scaffold(
+        backgroundColor: colors.scaffoldBg,
+        body: Column(
+          children: [
+            _CustomerListTopBar(
+              searchController: _searchController,
+              searchQuery: _searchQuery,
+              isTableView: _isTableView,
+              onSearchChanged: (v) => setState(() {
+                _searchQuery = v;
+                _currentPage = 1;
+              }),
+              onSearchCleared: () {
+                _searchController.clear();
+                setState(() {
+                  _searchQuery = '';
+                  _currentPage = 1;
+                });
+              },
+              onToggleView: () => setState(() => _isTableView = !_isTableView),
+              onRefresh: () =>
+                  ref.read(customerListProvider.notifier).refresh(),
+              onAdd: _openCreateForm,
+            ),
+            if (!isDesktop)
+              _CustomerFilterBar(
+                searchController: _searchController,
+                searchQuery: _searchQuery,
+                showMembersOnly: _showMembersOnly,
+                isTableView: _isTableView,
+                onSearchChanged: (v) => setState(() {
+                  _searchQuery = v;
+                  _currentPage = 1;
+                }),
+                onSearchCleared: () {
+                  _searchController.clear();
+                  setState(() {
+                    _searchQuery = '';
+                    _currentPage = 1;
+                  });
+                },
+                onToggleMember: () => setState(() {
+                  _showMembersOnly = !_showMembersOnly;
+                  _currentPage = 1;
+                }),
+                onToggleView: () =>
+                    setState(() => _isTableView = !_isTableView),
+              ),
+            Expanded(
+              child: customerAsync.when(
+                loading: () => const Center(
+                  child: CircularProgressIndicator(color: AppTheme.primary),
+                ),
+                error: (e, _) => _buildError(e),
+                data: (customers) {
+                  final filtered = _applySort(_applyFilter(customers));
+                  final summary = _calcSummary(filtered);
+
+                  if (filtered.isEmpty) return _buildEmpty(customers.isEmpty);
+
+                  final totalPages = (filtered.length / pageSize).ceil();
+                  final safePage = _currentPage.clamp(1, totalPages);
+                  final pageStart = (safePage - 1) * pageSize;
+                  final pageEnd = (pageStart + pageSize).clamp(
+                    0,
+                    filtered.length,
+                  );
+                  final pageItems = filtered.sublist(pageStart, pageEnd);
+
+                  final screenWidth = MediaQuery.of(context).size.width - 32;
+                  if (_isTableView && !_userResized) {
+                    _autoFitColWidths(filtered);
+                  }
+
+                  final totalW =
+                      40.0 +
+                      16.0 +
+                      _colWidths.fold(0.0, (sum, w) => sum + w) +
+                      28.0 +
+                      32.0;
+                  final tableW = totalW > screenWidth ? totalW : screenWidth;
+
+                  return Container(
+                    margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    decoration: BoxDecoration(
+                      color: colors.cardBg,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: colors.border),
+                      boxShadow: [
+                        if (!colors.isDark)
+                          BoxShadow(
+                            color: AppTheme.navy.withValues(alpha: 0.04),
+                            blurRadius: 16,
+                            offset: const Offset(0, 6),
+                          ),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        _CustomerSummaryBar(
+                          summary: summary,
+                          fmt: _currencyFmt,
+                          inlineFilters: inlineFilters,
+                        ),
+                        Divider(height: 1, color: colors.border),
+                        Expanded(
+                          child: _isTableView
+                              ? Scrollbar(
+                                  controller: _hScroll,
+                                  thumbVisibility: true,
+                                  trackVisibility: true,
+                                  child: SingleChildScrollView(
+                                    controller: _hScroll,
+                                    scrollDirection: Axis.horizontal,
+                                    child: SizedBox(
+                                      width: tableW,
+                                      child: Column(
+                                        children: [
+                                          _CustomerTableHeader(
+                                            colWidths: _colWidths,
+                                            colMinW: _colMinW,
+                                            colMaxW: _colMaxW,
+                                            sortColumn: _sortColumn,
+                                            sortAsc: _sortAsc,
+                                            onSort: (col) => setState(() {
+                                              if (_sortColumn == col) {
+                                                _sortAsc = !_sortAsc;
+                                              } else {
+                                                _sortColumn = col;
+                                                _sortAsc = true;
+                                              }
+                                              _currentPage = 1;
+                                            }),
+                                            onResize: (i, w) => setState(() {
+                                              _colWidths[i] = w;
+                                              _userResized = true;
+                                            }),
+                                            onReset: () => setState(() {
+                                              _colWidths.setAll(0, [
+                                                220,
+                                                120,
+                                                130,
+                                                140,
+                                                90,
+                                                120,
+                                                90,
+                                                138,
+                                              ]);
+                                              _userResized = false;
+                                            }),
+                                          ),
+                                          Divider(
+                                            height: 1,
+                                            color: colors.border,
+                                          ),
+                                          Expanded(
+                                            child: ListView.separated(
+                                              itemCount: pageItems.length,
+                                              separatorBuilder: (_, _) =>
+                                                  Divider(
+                                                    height: 1,
+                                                    color: colors.border,
+                                                  ),
+                                              itemBuilder: (context, index) {
+                                                final customer =
+                                                    pageItems[index];
+                                                return _CustomerRow(
+                                                  customer: customer,
+                                                  colWidths: _colWidths,
+                                                  avatarColor:
+                                                      customer.customerId ==
+                                                          'WALK_IN'
+                                                      ? const Color(0xFF546E7A)
+                                                      : _avatarColor(
+                                                          customer.customerName,
+                                                        ),
+                                                  onTap: () =>
+                                                      _openDetail(customer),
+                                                  onEdit:
+                                                      customer.customerId ==
+                                                          'WALK_IN'
+                                                      ? null
+                                                      : () => _openEditForm(
+                                                          customer,
+                                                        ),
+                                                  onDelete:
+                                                      customer.customerId ==
+                                                          'WALK_IN'
+                                                      ? null
+                                                      : () => _confirmDelete(
+                                                          customer.customerId,
+                                                          customer.customerName,
+                                                        ),
+                                                );
+                                              },
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : _buildCustomerCardView(pageItems),
+                        ),
+                        PaginationBar(
+                          currentPage: safePage,
+                          totalItems: filtered.length,
+                          pageSize: pageSize,
+                          onPageChanged: (p) =>
+                              setState(() => _currentPage = p),
+                          trailing: PdfReportButton(
+                            emptyMessage: 'ไม่มีข้อมูลลูกค้า',
+                            title: 'รายงานลูกค้า',
+                            filename: () =>
+                                PdfFilename.generate('customer_report'),
+                            buildPdf: () => CustomerPdfBuilder.build(filtered),
+                            hasData: filtered.isNotEmpty,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCustomerCardView(List<CustomerModel> customers) {
+    return ListView.separated(
+      padding: const EdgeInsets.all(12),
+      itemCount: customers.length,
+      separatorBuilder: (_, _) =>
+          Divider(height: 1, color: _CustomerListColors.of(context).border),
+      itemBuilder: (context, index) {
+        final customer = customers[index];
+        final isSystem = customer.customerId == 'WALK_IN';
+        final isMember =
+            customer.memberNo != null && customer.memberNo!.trim().isNotEmpty;
+        final initial = customer.customerName.isNotEmpty
+            ? customer.customerName.substring(0, 1).toUpperCase()
+            : '?';
+
+        final colors = _CustomerListColors.of(context);
+
+        return Card(
+          elevation: 0,
+          margin: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+            side: BorderSide(color: colors.border),
+          ),
+          color: colors.cardBg,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(10),
+            onTap: () => _openDetail(customer),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      CircleAvatar(
+                        radius: 20,
+                        backgroundColor: isSystem
+                            ? const Color(0xFF546E7A)
+                            : _avatarColor(customer.customerName),
+                        child: Text(
+                          initial,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      if (isMember)
+                        Positioned(
+                          right: -2,
+                          bottom: -2,
+                          child: Container(
+                            width: 14,
+                            height: 14,
+                            decoration: BoxDecoration(
+                              color: AppTheme.warningColor,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Colors.white,
+                                width: 1.5,
+                              ),
+                            ),
+                            child: const Icon(
+                              Icons.card_membership,
+                              size: 8,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                customer.customerName,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: colors.text,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            _StatusBadge(isActive: customer.isActive),
+                          ],
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          'รหัส: ${customer.customerCode}',
+                          style: TextStyle(fontSize: 11, color: colors.subtext),
+                        ),
+                        if (customer.phone != null &&
+                            customer.phone!.trim().isNotEmpty)
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.phone_outlined,
+                                size: 11,
+                                color: colors.subtext,
+                              ),
+                              const SizedBox(width: 3),
+                              Expanded(
+                                child: Text(
+                                  customer.phone!,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: colors.subtext,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        const SizedBox(height: 2),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 6,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            if (isMember)
+                              _MemberBadge(
+                                memberNo: customer.memberNo!,
+                                points: customer.points,
+                              ),
+                            if (customer.creditLimit > 0)
+                              Text(
+                                'วงเงิน ฿${_currencyFmt.format(customer.creditLimit)}',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: colors.amountText,
+                                ),
+                              ),
+                            if (!isMember)
+                              Text(
+                                'แต้ม ${customer.points} pt',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: colors.subtext,
+                                ),
+                              ),
+                            if (isSystem)
+                              Text(
+                                'ลูกค้าระบบ',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: colors.subtext,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _ActionPill(
+                        icon: Icons.open_in_new,
+                        tooltip: 'ดูรายละเอียด',
+                        color: AppTheme.primary,
+                        compact: true,
+                        onTap: () => _openDetail(customer),
+                      ),
+                      if (!isSystem) ...[
+                        const SizedBox(height: 4),
+                        _ActionPill(
+                          icon: Icons.edit_outlined,
+                          tooltip: 'แก้ไข',
+                          color: AppTheme.info,
+                          compact: true,
+                          onTap: () => _openEditForm(customer),
+                        ),
+                        const SizedBox(height: 4),
+                        _ActionPill(
+                          icon: Icons.delete_outline,
+                          tooltip: 'ลบ',
+                          color: AppTheme.error,
+                          compact: true,
+                          onTap: () => _confirmDelete(
+                            customer.customerId,
+                            customer.customerName,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _confirmDelete(String id, String name) async {
-    // ── Pre-check ก่อนแสดง dialog ────────────────────────────────
     final check = await ref
         .read(customerListProvider.notifier)
         .checkDeleteCustomer(id);
@@ -762,19 +763,16 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
         ),
         content: hasHistory
             ? Text(
-                'ลูกค้า "$name" มี$details\n\n'
-                'ไม่สามารถลบได้ ระบบจะปิดการใช้งานแทนเพื่อเก็บประวัติไว้',
+                'ลูกค้า "$name" มี$details\n\nไม่สามารถลบได้ ระบบจะปิดการใช้งานแทนเพื่อเก็บประวัติไว้',
               )
-            : Text(
-                'ต้องการลบลูกค้า "$name" '
-                'ออกจากระบบอย่างถาวรใช่หรือไม่?',
-              ),
+            : Text('ต้องการลบลูกค้า "$name" ออกจากระบบอย่างถาวรใช่หรือไม่?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: const Text('ยกเลิก'),
           ),
           FilledButton.icon(
+            onPressed: () => Navigator.pop(context, true),
             icon: Icon(
               hasHistory ? Icons.pause_circle_outline : Icons.delete_forever,
               size: 16,
@@ -786,17 +784,18 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
                   : AppTheme.error,
               foregroundColor: Colors.white,
             ),
-            onPressed: () => Navigator.pop(context, true),
           ),
         ],
       ),
     );
+
     if (confirmed != true || !mounted) return;
 
     final message = await ref
         .read(customerListProvider.notifier)
         .deleteCustomer(id);
     if (!mounted) return;
+
     final success = message != null;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -807,122 +806,390 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
     );
   }
 
-  Widget _buildEmpty() {
+  Widget _buildEmpty(bool noData) {
+    final colors = _CustomerListColors.of(context);
     return Center(
-      child: Padding(
-        padding: context.pagePadding,
-        child: Card(
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: AppTheme.borderColorOf(context)),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 36),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  _showMembersOnly
-                      ? Icons.card_membership
-                      : Icons.people_outline,
-                  size: 72,
-                  color: Colors.grey[300],
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  _searchQuery.isEmpty
-                      ? (_showMembersOnly ? 'ยังไม่มีสมาชิก' : 'ยังไม่มีลูกค้า')
-                      : 'ไม่พบลูกค้าที่ค้นหา',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'ลองเปลี่ยนคำค้นหา หรือลูกค้าใหม่เพื่อเริ่มต้นใช้งาน',
-                  style: TextStyle(
-                    color: AppTheme.subtextColorOf(context),
-                    fontSize: 12,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                ElevatedButton.icon(
-                  onPressed: () async {
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const CustomerFormPage(),
-                      ),
-                    );
-                    if (context.mounted) {
-                      ref.read(customerListProvider.notifier).refresh();
-                    }
-                  },
-                  icon: const Icon(Icons.add),
-                  label: const Text('เพิ่มลูกค้า'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primary,
-                    foregroundColor: Colors.white,
-                  ),
-                ),
-              ],
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: colors.emptyIconBg,
+              shape: BoxShape.circle,
+              border: Border.all(color: colors.border),
+            ),
+            child: Icon(
+              _showMembersOnly ? Icons.card_membership : Icons.people_outline,
+              size: 38,
+              color: colors.emptyIcon,
             ),
           ),
-        ),
+          const SizedBox(height: 16),
+          Text(
+            noData ? 'ยังไม่มีข้อมูลลูกค้า' : 'ไม่พบลูกค้าที่ตรงกับเงื่อนไข',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+              color: colors.text,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            noData
+                ? 'เมื่อลงทะเบียนลูกค้า รายการจะปรากฏที่หน้านี้'
+                : 'ลองปรับคำค้นหา สลับมุมมอง หรือแสดงลูกค้าทั้งหมดอีกครั้ง',
+            style: TextStyle(fontSize: 13, color: colors.subtext),
+          ),
+          const SizedBox(height: 12),
+          if (_showMembersOnly)
+            ElevatedButton.icon(
+              onPressed: () => setState(() {
+                _showMembersOnly = false;
+                _currentPage = 1;
+              }),
+              icon: const Icon(Icons.filter_alt_off, size: 16),
+              label: const Text('แสดงลูกค้าทั้งหมด'),
+            )
+          else
+            ElevatedButton.icon(
+              onPressed: _openCreateForm,
+              icon: const Icon(Icons.add, size: 16),
+              label: const Text('เพิ่มลูกค้า'),
+            ),
+        ],
       ),
     );
   }
 
-  Widget _buildError(Object e) {
+  Widget _buildError(Object error) {
+    final colors = _CustomerListColors.of(context);
     return Center(
-      child: Padding(
-        padding: context.pagePadding,
-        child: Card(
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: AppTheme.borderColorOf(context)),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.error_outline, size: 64, color: AppTheme.error),
+          const SizedBox(height: 16),
+          Text(
+            'เกิดข้อผิดพลาด: $error',
+            style: TextStyle(color: colors.text),
+            textAlign: TextAlign.center,
           ),
-          child: Padding(
-            padding: context.cardPadding,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.error_outline, size: 64, color: Colors.red),
-                const SizedBox(height: 16),
-                Text('เกิดข้อผิดพลาด: $e', textAlign: TextAlign.center),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: () =>
-                      ref.read(customerListProvider.notifier).refresh(),
-                  child: const Text('ลองใหม่'),
-                ),
-              ],
-            ),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: () => ref.read(customerListProvider.notifier).refresh(),
+            icon: const Icon(Icons.refresh),
+            label: const Text('ลองใหม่'),
           ),
-        ),
+        ],
       ),
     );
   }
 }
 
-// ─────────────────────────────────────────────────────────────────
-// _ResizableTableHeader — header ที่ลากขยาย/ย่อ + กดเรียงลำดับได้
-// ─────────────────────────────────────────────────────────────────
-class _ResizableTableHeader extends StatelessWidget {
+class _CustomerListTopBar extends StatelessWidget {
+  final TextEditingController searchController;
+  final String searchQuery;
+  final bool isTableView;
+  final ValueChanged<String> onSearchChanged;
+  final VoidCallback onSearchCleared;
+  final VoidCallback onToggleView;
+  final VoidCallback onRefresh;
+  final VoidCallback onAdd;
+
+  const _CustomerListTopBar({
+    required this.searchController,
+    required this.searchQuery,
+    required this.isTableView,
+    required this.onSearchChanged,
+    required this.onSearchCleared,
+    required this.onToggleView,
+    required this.onRefresh,
+    required this.onAdd,
+  });
+
+  static const _kBreak = 600.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final isWide = MediaQuery.of(context).size.width >= _kBreak;
+    final canPop = Navigator.of(context).canPop();
+    final colors = _CustomerListColors.of(context);
+
+    return Container(
+      decoration: BoxDecoration(color: colors.topBarBg),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: isWide
+          ? _buildWide(context, canPop, colors.isDark)
+          : _buildNarrow(context, canPop, colors.isDark),
+    );
+  }
+
+  Widget _buildWide(BuildContext context, bool canPop, bool isDark) {
+    return Row(
+      children: [
+        _TopBarLeading(canPop: canPop, isDark: isDark),
+        const SizedBox(width: 10),
+        const _TopBarPageIcon(),
+        const SizedBox(width: 10),
+        const Text(
+          'รายการลูกค้า',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+        ),
+        const Spacer(),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 280),
+          child: _TopSearchField(
+            controller: searchController,
+            query: searchQuery,
+            onChanged: onSearchChanged,
+            onCleared: onSearchCleared,
+          ),
+        ),
+        const SizedBox(width: 8),
+        _ViewModeChip(isTableView: isTableView, onTap: onToggleView),
+        const SizedBox(width: 8),
+        _TopBarRefreshButton(onTap: onRefresh),
+        const SizedBox(width: 8),
+        _TopBarAddButton(onTap: onAdd),
+        const SizedBox(width: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: AppTheme.primary.withValues(alpha: 0.2),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: AppTheme.primary.withValues(alpha: 0.5)),
+          ),
+          child: const Text(
+            'Customer List',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.primaryLight,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildNarrow(BuildContext context, bool canPop, bool isDark) {
+    return Row(
+      children: [
+        _TopBarLeading(canPop: canPop, isDark: isDark),
+        const SizedBox(width: 8),
+        const _TopBarPageIcon(),
+        const SizedBox(width: 8),
+        const Expanded(
+          child: Text(
+            'รายการลูกค้า',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        _ViewModeChip(isTableView: isTableView, onTap: onToggleView),
+        const SizedBox(width: 6),
+        _TopBarRefreshButton(onTap: onRefresh),
+        const SizedBox(width: 6),
+        _TopBarAddButton(onTap: onAdd, compact: true),
+      ],
+    );
+  }
+}
+
+class _CustomerFilterBar extends StatelessWidget {
+  final TextEditingController searchController;
+  final String searchQuery;
+  final bool showMembersOnly;
+  final bool isTableView;
+  final ValueChanged<String> onSearchChanged;
+  final VoidCallback onSearchCleared;
+  final VoidCallback onToggleMember;
+  final VoidCallback onToggleView;
+
+  const _CustomerFilterBar({
+    required this.searchController,
+    required this.searchQuery,
+    required this.showMembersOnly,
+    required this.isTableView,
+    required this.onSearchChanged,
+    required this.onSearchCleared,
+    required this.onToggleMember,
+    required this.onToggleView,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = _CustomerListColors.of(context);
+    return Container(
+      decoration: BoxDecoration(
+        color: colors.searchBarBg,
+        border: Border(bottom: BorderSide(color: colors.border)),
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      child: Column(
+        children: [
+          _TopSearchField(
+            controller: searchController,
+            query: searchQuery,
+            onChanged: onSearchChanged,
+            onCleared: onSearchCleared,
+            fillColor: colors.inputFill,
+            textColor: colors.text,
+            hintColor: colors.subtext,
+            iconColor: colors.subtext,
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _ToggleChip(
+                  icon: Icons.card_membership,
+                  label: showMembersOnly ? 'เฉพาะสมาชิก' : 'ลูกค้าทั้งหมด',
+                  active: showMembersOnly,
+                  onTap: onToggleMember,
+                ),
+              ),
+              const SizedBox(width: 8),
+              _ViewModeChip(isTableView: isTableView, onTap: onToggleView),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CustomerSummaryBar extends StatelessWidget {
+  final Map<String, dynamic> summary;
+  final NumberFormat fmt;
+  final Widget? inlineFilters;
+
+  const _CustomerSummaryBar({
+    required this.summary,
+    required this.fmt,
+    this.inlineFilters,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final count = summary['count'] as int;
+    final memberCount = summary['memberCount'] as int;
+    final activeCount = summary['activeCount'] as int;
+    final creditLimit = summary['creditLimit'] as double;
+
+    final chips = [
+      _SummaryChip(
+        icon: Icons.people_outline,
+        label: '$count รายการ',
+        color: AppTheme.info,
+      ),
+      const SizedBox(width: 12),
+      _SummaryChip(
+        icon: Icons.card_membership,
+        label: '$memberCount สมาชิก',
+        color: AppTheme.success,
+      ),
+      const SizedBox(width: 12),
+      _SummaryChip(
+        icon: Icons.verified_user_outlined,
+        label: '$activeCount ใช้งาน',
+        color: AppTheme.primary,
+      ),
+      const SizedBox(width: 12),
+      _SummaryChip(
+        icon: Icons.account_balance_wallet_outlined,
+        label: '฿${fmt.format(creditLimit)}',
+        color: const Color(0xFF6A1B9A),
+      ),
+    ];
+
+    final colors = _CustomerListColors.of(context);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(color: colors.summaryBg),
+      child: inlineFilters != null
+          ? LayoutBuilder(
+              builder: (context, constraints) => SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(mainAxisSize: MainAxisSize.min, children: chips),
+                      const SizedBox(width: 16),
+                      inlineFilters!,
+                    ],
+                  ),
+                ),
+              ),
+            )
+          : Wrap(spacing: 12, runSpacing: 8, children: chips),
+    );
+  }
+}
+
+class _SummaryChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _SummaryChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = _CustomerListColors.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: colors.summaryChipBg,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: colors.border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CustomerTableHeader extends StatelessWidget {
   final List<double> colWidths;
   final List<double> colMinW;
   final List<double> colMaxW;
   final String sortColumn;
   final bool sortAsc;
-  final void Function(String column) onSort;
-  final void Function(int index, double width) onResize;
+  final void Function(String) onSort;
+  final void Function(int, double) onResize;
   final VoidCallback onReset;
 
-  // label, sortKey ('' = ไม่ sort ได้)
   static const _cols = [
     ('ชื่อ-นามสกุล', 'name'),
     ('รหัสลูกค้า', 'code'),
@@ -934,7 +1201,7 @@ class _ResizableTableHeader extends StatelessWidget {
     ('จัดการ', ''),
   ];
 
-  const _ResizableTableHeader({
+  const _CustomerTableHeader({
     required this.colWidths,
     required this.colMinW,
     required this.colMaxW,
@@ -947,18 +1214,18 @@ class _ResizableTableHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = _CustomerListColors.of(context);
     return Container(
-      color: AppTheme.navy,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+      decoration: BoxDecoration(color: colors.tableHeaderBg),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: [
-          // ลำดับ (fixed, ไม่ sort)
           const SizedBox(
             width: 40,
             height: 40,
             child: Center(
               child: Text(
-                'รหัส',
+                '#',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
@@ -968,14 +1235,11 @@ class _ResizableTableHeader extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 16),
-
-          // คอลัมน์ที่ resize + sort ได้
           ...List.generate(_cols.length, (i) {
             final (label, sortKey) = _cols[i];
             final isActive = sortKey.isNotEmpty && sortColumn == sortKey;
-            return _ResizableCell(
+            return _ResizableHeaderCell(
               label: label,
-              sortKey: sortKey,
               width: colWidths[i],
               minWidth: colMinW[i],
               maxWidth: colMaxW[i],
@@ -992,10 +1256,9 @@ class _ResizableTableHeader extends StatelessWidget {
               },
             );
           }),
-
-          // ปุ่ม reset
           Tooltip(
             message: 'รีเซตความกว้างคอลัมน์',
+            waitDuration: const Duration(milliseconds: 600),
             child: InkWell(
               onTap: onReset,
               borderRadius: BorderRadius.circular(4),
@@ -1015,12 +1278,8 @@ class _ResizableTableHeader extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────
-// _ResizableCell — เซลล์ header พร้อม drag handle + กด sort
-// ─────────────────────────────────────────────────────────────────
-class _ResizableCell extends StatefulWidget {
+class _ResizableHeaderCell extends StatefulWidget {
   final String label;
-  final String sortKey;
   final double width;
   final double minWidth;
   final double maxWidth;
@@ -1030,9 +1289,8 @@ class _ResizableCell extends StatefulWidget {
   final VoidCallback? onSort;
   final void Function(double delta) onResize;
 
-  const _ResizableCell({
+  const _ResizableHeaderCell({
     required this.label,
-    required this.sortKey,
     required this.width,
     required this.minWidth,
     required this.maxWidth,
@@ -1044,26 +1302,24 @@ class _ResizableCell extends StatefulWidget {
   });
 
   @override
-  State<_ResizableCell> createState() => _ResizableCellState();
+  State<_ResizableHeaderCell> createState() => _ResizableHeaderCellState();
 }
 
-class _ResizableCellState extends State<_ResizableCell> {
+class _ResizableHeaderCellState extends State<_ResizableHeaderCell> {
   bool _hovering = false;
 
   @override
   Widget build(BuildContext context) {
-    final canSort = widget.onSort != null;
-    // active = ส้ม, inactive = white70 (บน navy background)
-    const activeColor = Color(0xFFFF9D45); // เหมือน product
+    const activeColor = Color(0xFFFF9D45);
     const inactiveColor = Colors.white70;
     final labelColor = widget.isActive ? activeColor : inactiveColor;
+    final canSort = widget.onSort != null;
 
     return SizedBox(
       width: widget.width,
       height: 40,
       child: Row(
         children: [
-          // ── Label (กดเพื่อ sort) ──────────────────────────────
           Expanded(
             child: canSort
                 ? InkWell(
@@ -1075,7 +1331,6 @@ class _ResizableCellState extends State<_ResizableCell> {
                         horizontal: 2,
                       ),
                       child: Row(
-                        mainAxisSize: MainAxisSize.min,
                         children: [
                           Flexible(
                             child: Text(
@@ -1089,7 +1344,6 @@ class _ResizableCellState extends State<_ResizableCell> {
                             ),
                           ),
                           const SizedBox(width: 3),
-                          // Sort icon
                           Icon(
                             widget.isActive
                                 ? (widget.sortAsc
@@ -1118,8 +1372,6 @@ class _ResizableCellState extends State<_ResizableCell> {
                     ),
                   ),
           ),
-
-          // ── Drag handle ───────────────────────────────────────
           if (!widget.isLast)
             MouseRegion(
               cursor: SystemMouseCursors.resizeColumn,
@@ -1138,8 +1390,8 @@ class _ResizableCellState extends State<_ResizableCell> {
                     height: _hovering ? 22 : 12,
                     decoration: BoxDecoration(
                       color: _hovering
-                          ? const Color(0xFFFF9D45) // active = ส้ม
-                          : Colors.white24, // inactive = white บน navy
+                          ? const Color(0xFFFF9D45)
+                          : Colors.white24,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -1152,28 +1404,21 @@ class _ResizableCellState extends State<_ResizableCell> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────
-// Customer Row
-// ─────────────────────────────────────────────────────────────────
 class _CustomerRow extends StatefulWidget {
-  final dynamic customer;
-  final bool isMember;
-  final bool isSystem;
-  final List<double> colWidths; // ✅ รับความกว้างจาก parent
+  final CustomerModel customer;
+  final List<double> colWidths;
   final Color avatarColor;
-  final VoidCallback? onTap; // ✅ เปิดหน้า detail
+  final VoidCallback onTap;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
 
   const _CustomerRow({
     required this.customer,
-    required this.isMember,
-    required this.isSystem,
     required this.colWidths,
     required this.avatarColor,
-    this.onTap,
-    required this.onEdit,
-    required this.onDelete,
+    required this.onTap,
+    this.onEdit,
+    this.onDelete,
   });
 
   @override
@@ -1185,693 +1430,748 @@ class _CustomerRowState extends State<_CustomerRow> {
 
   @override
   Widget build(BuildContext context) {
-    final c = widget.customer;
-    final initial = c.customerName.isNotEmpty
-        ? c.customerName.substring(0, 1).toUpperCase()
+    final colors = _CustomerListColors.of(context);
+    final customer = widget.customer;
+    final isMember =
+        customer.memberNo != null && customer.memberNo!.trim().isNotEmpty;
+    final isSystem = customer.customerId == 'WALK_IN';
+    final initial = customer.customerName.isNotEmpty
+        ? customer.customerName.substring(0, 1).toUpperCase()
         : '?';
-
     final w = widget.colWidths;
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          color: _hovered ? AppTheme.primaryLight : Colors.white,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            children: [
-              // ลำดับ (fixed)
-              SizedBox(
-                width: 40,
-                child: Text(
-                  c.customerCode.length > 6
-                      ? c.customerCode.substring(c.customerCode.length - 4)
-                      : c.customerCode,
-                  style: const TextStyle(fontSize: 11, color: AppTheme.textSub),
-                ),
-              ),
-              const SizedBox(width: 16),
-
-              // ชื่อ + Avatar — w[0]
-              SizedBox(
-                width: w[0],
-                child: Row(
-                  children: [
-                    Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        CircleAvatar(
-                          radius: 18,
-                          backgroundColor: widget.avatarColor,
-                          child: Text(
-                            initial,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        if (widget.isMember)
-                          Positioned(
-                            right: -2,
-                            bottom: -2,
-                            child: Container(
-                              width: 14,
-                              height: 14,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFFFB300),
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: Colors.white,
-                                  width: 1.5,
-                                ),
-                              ),
-                              child: const Icon(
-                                Icons.star,
-                                size: 8,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        c.customerName,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.black87,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // รหัส — w[1]
-              SizedBox(
-                width: w[1],
-                child: Text(
-                  c.customerCode,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 13, color: AppTheme.textSub),
-                ),
-              ),
-
-              // โทร — w[2]
-              SizedBox(
-                width: w[2],
-                child: Text(
-                  c.phone ?? '-',
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 13, color: AppTheme.textSub),
-                ),
-              ),
-
-              // เลขสมาชิก — w[3]
-              SizedBox(
-                width: w[3],
-                child: widget.isMember
-                    ? Row(
-                        children: [
-                          const Icon(
-                            Icons.card_membership,
-                            size: 13,
-                            color: Color(0xFFFFB300),
-                          ),
-                          const SizedBox(width: 4),
-                          Flexible(
-                            child: Text(
-                              c.memberNo ?? '',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Color(0xFFFFB300),
-                                fontWeight: FontWeight.w500,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      )
-                    : const Text(
-                        '-',
-                        style: TextStyle(fontSize: 13, color: AppTheme.textSub),
-                      ),
-              ),
-
-              // คะแนน — w[4]
-              SizedBox(
-                width: w[4],
-                child: widget.isMember
-                    ? Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFFF8E1),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: const Color(0xFFFFE082)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.stars,
-                              size: 12,
-                              color: Color(0xFFFFB300),
-                            ),
-                            const SizedBox(width: 3),
-                            Text(
-                              '${c.points} pt',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFFE65100),
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    : const Text(
-                        '-',
-                        style: TextStyle(fontSize: 13, color: AppTheme.textSub),
-                      ),
-              ),
-
-              // วงเงินเครดิต — w[5]
-              SizedBox(
-                width: w[5],
-                child: c.creditLimit > 0
-                    ? Text(
-                        '฿${c.creditLimit.toStringAsFixed(0)}',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Color(0xFF1565C0),
-                        ),
-                      )
-                    : const Text(
-                        '-',
-                        style: TextStyle(fontSize: 13, color: AppTheme.textSub),
-                      ),
-              ),
-
-              // สถานะ — w[6]
-              SizedBox(
-                width: w[6],
-                child: Center(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: c.isActive
-                          ? const Color(0xFFE8F5E9)
-                          : const Color(0xFFFFEBEE),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 6,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            color: c.isActive
-                                ? const Color(0xFF4CAF50)
-                                : const Color(0xFFF44336),
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 5),
-                        Text(
-                          c.isActive ? 'ใช้งาน' : 'ปิดใช้',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: c.isActive
-                                ? const Color(0xFF2E7D32)
-                                : const Color(0xFFC62828),
-                          ),
-                        ),
-                      ],
-                    ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: widget.onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 120),
+            color: _hovered ? colors.rowHoverBg : colors.cardBg,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 40,
+                  child: Text(
+                    customer.customerCode.length > 6
+                        ? customer.customerCode.substring(
+                            customer.customerCode.length - 4,
+                          )
+                        : customer.customerCode,
+                    style: TextStyle(fontSize: 11, color: colors.subtext),
                   ),
                 ),
-              ),
-
-              // จัดการ — w[7]
-              SizedBox(
-                width: w[7],
-                child: widget.isSystem
-                    // ✅ ลูกค้าระบบ — แสดง badge แทนปุ่ม
-                    ? Center(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFECEFF1),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: const Color(0xFFB0BEC5)),
-                          ),
-                          child: const Text(
-                            'ระบบ',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF546E7A),
-                            ),
+                const SizedBox(width: 16),
+                SizedBox(
+                  width: w[0],
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 18,
+                        backgroundColor: widget.avatarColor,
+                        child: Text(
+                          initial,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
-                      )
-                    : Row(
-                        mainAxisSize: MainAxisSize.min,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          _ActionIcon(
-                            icon: Icons.edit_outlined,
-                            color: const Color(0xFF1565C0),
-                            tooltip: 'แก้ไข',
-                            onTap: widget.onEdit!,
-                          ),
-                          const SizedBox(width: 6),
-                          _ActionIcon(
-                            icon: Icons.delete_outline,
-                            color: const Color(0xFFC62828),
-                            tooltip: 'ลบ',
-                            onTap: widget.onDelete!,
-                          ),
-                        ],
                       ),
-              ),
-            ],
-          ),
-        ), // AnimatedContainer
-      ), // GestureDetector
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────
-// Shared small widgets
-// ─────────────────────────────────────────────────────────────────
-// ─────────────────────────────────────────────────────────────────
-// Responsive Top Bar — 1 แถวบน desktop, 2 แถวบน tablet/mobile
-// ─────────────────────────────────────────────────────────────────
-class _CustomerListTopBar extends StatelessWidget {
-  final TextEditingController searchController;
-  final String searchQuery;
-  final bool showMembersOnly;
-  final bool isTableView; // ✅ เพิ่ม
-  final ValueChanged<String> onSearchChanged;
-  final VoidCallback onSearchCleared;
-  final VoidCallback onToggleMember;
-  final VoidCallback onToggleView; // ✅ เพิ่ม
-  final VoidCallback onRefresh;
-  final VoidCallback onAdd;
-
-  const _CustomerListTopBar({
-    required this.searchController,
-    required this.searchQuery,
-    required this.showMembersOnly,
-    required this.isTableView,
-    required this.onSearchChanged,
-    required this.onSearchCleared,
-    required this.onToggleMember,
-    required this.onToggleView,
-    required this.onRefresh,
-    required this.onAdd,
-  });
-
-  // breakpoint: desktop เล็กยังควรแตก 2 แถวเพื่อไม่ให้ toolbar แน่นเกินไป
-  static const _kBreak = 980.0;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: context.pagePadding,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final isWide = constraints.maxWidth >= _kBreak;
-          return Card(
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: BorderSide(color: AppTheme.borderColorOf(context)),
-            ),
-            child: Padding(
-              padding: context.cardPadding,
-              child: isWide
-                  ? _buildSingleRow(context)
-                  : _buildDoubleRow(context),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  // ── Desktop / Wide: ทุกอย่างอยู่แถวเดียว ──────────────────────
-  Widget _buildSingleRow(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  _PageIcon(),
-                  const SizedBox(width: 10),
-                  Text(
-                    'ค้นหาและตัวกรอง',
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          customer.customerName,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: colors.text,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(
+                  width: w[1],
+                  child: Text(
+                    customer.customerCode,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 13, color: colors.subtext),
+                  ),
+                ),
+                SizedBox(
+                  width: w[2],
+                  child: Text(
+                    customer.phone ?? '-',
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 13, color: colors.subtext),
+                  ),
+                ),
+                SizedBox(
+                  width: w[3],
+                  child: isMember
+                      ? _MemberInlineBadge(memberNo: customer.memberNo!)
+                      : Text(
+                          '-',
+                          style: TextStyle(fontSize: 13, color: colors.subtext),
+                        ),
+                ),
+                SizedBox(
+                  width: w[4],
+                  child: isMember
+                      ? _PointsBadge(points: customer.points)
+                      : Text(
+                          '-',
+                          style: TextStyle(fontSize: 13, color: colors.subtext),
+                        ),
+                ),
+                SizedBox(
+                  width: w[5],
+                  child: Text(
+                    customer.creditLimit > 0
+                        ? '฿${NumberFormat('#,##0').format(customer.creditLimit)}'
+                        : '-',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
-                      color: Theme.of(context).colorScheme.onSurface,
+                      color: customer.creditLimit > 0
+                          ? colors.amountText
+                          : colors.subtext,
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'ค้นหาลูกค้า ดูเฉพาะสมาชิก และสลับมุมมองรายการ',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: AppTheme.subtextColorOf(context),
                 ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 16),
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 280),
-          child: _SearchField(
-            controller: searchController,
-            query: searchQuery,
-            onChanged: onSearchChanged,
-            onCleared: onSearchCleared,
-          ),
-        ),
-        const SizedBox(width: 8),
-        _MemberToggle(active: showMembersOnly, onTap: onToggleMember),
-        const SizedBox(width: 6),
-        // ✅ ปุ่ม Table/Card toggle
-        Tooltip(
-          message: isTableView ? 'Card View' : 'Table View',
-          child: InkWell(
-            onTap: onToggleView,
-            borderRadius: BorderRadius.circular(8),
-            child: Container(
-              padding: const EdgeInsets.all(7),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF5F5F5),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppTheme.border),
-              ),
-              child: Icon(
-                isTableView
-                    ? Icons.view_agenda_outlined
-                    : Icons.table_rows_outlined,
-                size: 17,
-                color: AppTheme.textSub,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 6),
-        _RefreshBtn(onTap: onRefresh),
-        const SizedBox(width: 6),
-        _AddBtn(onTap: onAdd),
-      ],
-    );
-  }
-
-  // ── Mobile / Tablet: แถว 1 = title+ปุ่ม, แถว 2 = search ──────
-  Widget _buildDoubleRow(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            _PageIcon(),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'ค้นหาและตัวกรอง',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Text(
-          'ค้นหาลูกค้า ดูเฉพาะสมาชิก และสลับมุมมองรายการ',
-          style: TextStyle(
-            fontSize: 12,
-            color: AppTheme.subtextColorOf(context),
-          ),
-        ),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: 6,
-          runSpacing: 6,
-          children: [
-            _MemberToggle(active: showMembersOnly, onTap: onToggleMember),
-            Tooltip(
-              message: isTableView ? 'Card View' : 'Table View',
-              child: InkWell(
-                onTap: onToggleView,
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  padding: const EdgeInsets.all(7),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF5F5F5),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppTheme.border),
-                  ),
-                  child: Icon(
-                    isTableView
-                        ? Icons.view_agenda_outlined
-                        : Icons.table_rows_outlined,
-                    size: 17,
-                    color: AppTheme.textSub,
+                SizedBox(
+                  width: w[6],
+                  child: Center(
+                    child: _StatusBadge(isActive: customer.isActive),
                   ),
                 ),
-              ),
+                SizedBox(
+                  width: w[7],
+                  child: isSystem
+                      ? const Center(
+                          child: _InfoChip(
+                            icon: Icons.shield_outlined,
+                            label: 'ระบบ',
+                            color: AppTheme.textSub,
+                            compact: true,
+                          ),
+                        )
+                      : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            _ActionPill(
+                              icon: Icons.open_in_new,
+                              tooltip: 'ดูรายละเอียด',
+                              color: AppTheme.primary,
+                              onTap: widget.onTap,
+                              compact: true,
+                            ),
+                            const SizedBox(width: 6),
+                            _ActionPill(
+                              icon: Icons.edit_outlined,
+                              tooltip: 'แก้ไข',
+                              color: AppTheme.info,
+                              onTap: widget.onEdit!,
+                              compact: true,
+                            ),
+                            const SizedBox(width: 6),
+                            _ActionPill(
+                              icon: Icons.delete_outline,
+                              tooltip: 'ลบ',
+                              color: AppTheme.error,
+                              onTap: widget.onDelete!,
+                              compact: true,
+                            ),
+                          ],
+                        ),
+                ),
+              ],
             ),
-            _RefreshBtn(onTap: onRefresh),
-            _AddBtn(onTap: onAdd, compact: true),
-          ],
+          ),
         ),
-        const SizedBox(height: 10),
-        _SearchField(
-          controller: searchController,
-          query: searchQuery,
-          onChanged: onSearchChanged,
-          onCleared: onSearchCleared,
-        ),
-      ],
+      ),
     );
   }
 }
 
-// ── Sub-widgets ───────────────────────────────────────────────────
+class _TopBarLeading extends StatelessWidget {
+  final bool canPop;
+  final bool isDark;
 
-class _PageIcon extends StatelessWidget {
+  const _TopBarLeading({required this.canPop, required this.isDark});
+
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(7),
-    decoration: BoxDecoration(
-      color: AppTheme.infoContainer,
-      borderRadius: BorderRadius.circular(8),
-    ),
-    child: const Icon(Icons.people, color: AppTheme.infoColor, size: 18),
-  );
+  Widget build(BuildContext context) {
+    if (canPop) {
+      return _TopBarIconButton(
+        icon: Icons.arrow_back,
+        tooltip: 'ย้อนกลับ',
+        onTap: () => Navigator.of(context).maybePop(),
+      );
+    }
+    if (context.isMobile) {
+      return buildMobileHomeCompactButton(context, isDark: isDark);
+    }
+    return const SizedBox.shrink();
+  }
 }
 
-class _SearchField extends StatelessWidget {
+class _TopBarPageIcon extends StatelessWidget {
+  const _TopBarPageIcon();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(7),
+      decoration: BoxDecoration(
+        color: AppTheme.primary.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.35)),
+      ),
+      child: const Icon(Icons.people_outline, color: Colors.white, size: 18),
+    );
+  }
+}
+
+class _TopSearchField extends StatelessWidget {
   final TextEditingController controller;
   final String query;
   final ValueChanged<String> onChanged;
   final VoidCallback onCleared;
+  final Color? fillColor;
+  final Color? textColor;
+  final Color? hintColor;
+  final Color? iconColor;
 
-  const _SearchField({
+  const _TopSearchField({
     required this.controller,
     required this.query,
     required this.onChanged,
     required this.onCleared,
+    this.fillColor,
+    this.textColor,
+    this.hintColor,
+    this.iconColor,
   });
 
   @override
-  Widget build(BuildContext context) => SizedBox(
-    height: 38,
-    child: TextField(
-      controller: controller,
-      style: const TextStyle(fontSize: 13),
-      decoration: InputDecoration(
-        hintText: 'ค้นหาลูกค้า...',
-        hintStyle: const TextStyle(fontSize: 13, color: AppTheme.textSub),
-        prefixIcon: const Icon(Icons.search, size: 17, color: AppTheme.textSub),
-        suffixIcon: query.isNotEmpty
-            ? IconButton(
-                icon: const Icon(Icons.clear, size: 15),
-                onPressed: onCleared,
-              )
-            : null,
-        contentPadding: EdgeInsets.zero,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppTheme.border),
+  Widget build(BuildContext context) {
+    final colors = _CustomerListColors.of(context);
+    return SizedBox(
+      height: 40,
+      child: TextField(
+        controller: controller,
+        style: TextStyle(fontSize: 13, color: textColor ?? colors.text),
+        decoration: InputDecoration(
+          hintText: 'ค้นหาชื่อ, รหัส, โทร, สมาชิก...',
+          hintStyle: TextStyle(
+            fontSize: 13,
+            color: hintColor ?? colors.subtext,
+          ),
+          prefixIcon: Icon(
+            Icons.search,
+            size: 17,
+            color: iconColor ?? colors.subtext,
+          ),
+          suffixIcon: query.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.clear, size: 15),
+                  onPressed: onCleared,
+                )
+              : null,
+          contentPadding: EdgeInsets.zero,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: AppTheme.border),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: AppTheme.border),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
+          ),
+          filled: true,
+          fillColor: fillColor ?? colors.inputFill,
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppTheme.border),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
-        ),
-        filled: true,
-        fillColor: Colors.white,
+        onChanged: onChanged,
       ),
-      onChanged: onChanged,
-    ),
-  );
+    );
+  }
 }
 
-class _MemberToggle extends StatelessWidget {
+class _ToggleChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
   final bool active;
   final VoidCallback onTap;
-  const _MemberToggle({required this.active, required this.onTap});
+
+  const _ToggleChip({
+    required this.icon,
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
 
   @override
-  Widget build(BuildContext context) => Tooltip(
-    message: active ? 'แสดงทั้งหมด' : 'แสดงเฉพาะสมาชิก',
-    child: InkWell(
+  Widget build(BuildContext context) {
+    final colors = _CustomerListColors.of(context);
+    return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
       child: Container(
-        padding: const EdgeInsets.all(7),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
         decoration: BoxDecoration(
-          color: active ? const Color(0xFFFFF8E1) : const Color(0xFFF5F5F5),
+          color: active
+              ? AppTheme.primary.withValues(alpha: 0.08)
+              : colors.neutralChipBg,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: active ? const Color(0xFFFFE082) : AppTheme.border,
-          ),
+          border: Border.all(color: active ? AppTheme.primary : colors.border),
         ),
-        child: Icon(
-          Icons.card_membership,
-          size: 17,
-          color: active ? const Color(0xFFFFB300) : AppTheme.textSub,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 14,
+              color: active ? AppTheme.primary : colors.subtext,
+            ),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: active ? AppTheme.primary : colors.subtext,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
-    ),
-  );
+    );
+  }
 }
 
-class _RefreshBtn extends StatelessWidget {
+class _ViewModeChip extends StatelessWidget {
+  final bool isTableView;
   final VoidCallback onTap;
-  const _RefreshBtn({required this.onTap});
+
+  const _ViewModeChip({required this.isTableView, required this.onTap});
 
   @override
-  Widget build(BuildContext context) => Tooltip(
-    message: 'รีเฟรช',
-    child: InkWell(
+  Widget build(BuildContext context) {
+    return _TopBarIconButton(
+      icon: isTableView
+          ? Icons.view_agenda_outlined
+          : Icons.table_rows_outlined,
+      tooltip: isTableView ? 'Card View' : 'Table View',
       onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.all(7),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF5F5F5),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppTheme.border),
-        ),
-        child: const Icon(Icons.refresh, size: 17, color: AppTheme.textSub),
-      ),
-    ),
-  );
+      lightScheme: false,
+    );
+  }
 }
 
-class _AddBtn extends StatelessWidget {
+class _TopBarRefreshButton extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _TopBarRefreshButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return _TopBarIconButton(
+      icon: Icons.refresh,
+      tooltip: 'รีเฟรช',
+      onTap: onTap,
+    );
+  }
+}
+
+class _TopBarAddButton extends StatelessWidget {
   final VoidCallback onTap;
   final bool compact;
-  const _AddBtn({required this.onTap, this.compact = false});
+
+  const _TopBarAddButton({required this.onTap, this.compact = false});
 
   @override
-  Widget build(BuildContext context) => ElevatedButton.icon(
-    onPressed: onTap,
-    icon: const Icon(Icons.add, size: 18),
-    label: compact
-        ? const SizedBox.shrink()
-        : const Text(
-            'เพิ่มลูกค้า',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-          ),
-    style: ElevatedButton.styleFrom(
-      backgroundColor: AppTheme.primary,
-      foregroundColor: Colors.white,
-      // ✅ เพิ่มความสูง: vertical 9 → 13
-      padding: EdgeInsets.symmetric(
-        horizontal: compact ? 12 : 18,
-        vertical: 13,
+  Widget build(BuildContext context) {
+    final colors = _CustomerListColors.of(context);
+    return ElevatedButton.icon(
+      onPressed: onTap,
+      icon: const Icon(Icons.add, size: 18),
+      label: compact
+          ? const SizedBox.shrink()
+          : const Text(
+              'เพิ่มลูกค้า',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: compact ? colors.navButtonBg : AppTheme.primary,
+        foregroundColor: compact ? Colors.white70 : Colors.white,
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 12 : 18,
+          vertical: 13,
+        ),
+        minimumSize: Size.zero,
+        elevation: 0,
+        side: compact ? BorderSide(color: colors.navButtonBorder) : null,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
-      minimumSize: Size.zero,
-      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      elevation: 0,
-    ),
-  );
+    );
+  }
 }
 
-class _ActionIcon extends StatelessWidget {
+class _TopBarIconButton extends StatelessWidget {
   final IconData icon;
-  final Color color;
   final String tooltip;
   final VoidCallback onTap;
+  final bool lightScheme;
 
-  const _ActionIcon({
+  const _TopBarIconButton({
     required this.icon,
-    required this.color,
     required this.tooltip,
     required this.onTap,
+    this.lightScheme = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = _CustomerListColors.of(context);
+    return Tooltip(
+      message: tooltip,
+      waitDuration: const Duration(milliseconds: 600),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.all(7),
+          decoration: BoxDecoration(
+            color: lightScheme ? colors.navButtonBg : colors.neutralChipBg,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: lightScheme ? colors.navButtonBorder : colors.border,
+            ),
+          ),
+          child: Icon(
+            icon,
+            size: 17,
+            color: lightScheme ? Colors.white70 : colors.subtext,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusBadge extends StatelessWidget {
+  final bool isActive;
+
+  const _StatusBadge({required this.isActive});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isActive ? AppTheme.success : AppTheme.error;
+    final bg = isActive ? AppTheme.successContainer : AppTheme.errorContainer;
+    final label = isActive ? 'ใช้งาน' : 'ปิดใช้';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.16)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MemberInlineBadge extends StatelessWidget {
+  final String memberNo;
+
+  const _MemberInlineBadge({required this.memberNo});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const Icon(
+          Icons.card_membership,
+          size: 13,
+          color: AppTheme.warningColor,
+        ),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            memberNo,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: AppTheme.warningColor,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PointsBadge extends StatelessWidget {
+  final int points;
+
+  const _PointsBadge({required this.points});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppTheme.warningContainer,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppTheme.warningLight),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.stars, size: 12, color: AppTheme.warningColor),
+          const SizedBox(width: 3),
+          Text(
+            '$points pt',
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFFE65100),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MemberBadge extends StatelessWidget {
+  final String memberNo;
+  final int points;
+
+  const _MemberBadge({required this.memberNo, required this.points});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppTheme.warningContainer,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppTheme.warningLight),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.card_membership,
+            size: 13,
+            color: AppTheme.warningColor,
+          ),
+          const SizedBox(width: 5),
+          Text(
+            '$memberNo · $points pt',
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFFE65100),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final bool compact;
+
+  const _InfoChip({
+    required this.icon,
+    required this.label,
+    this.color = AppTheme.info,
+    this.compact = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = _CustomerListColors.of(context);
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 7 : 8,
+        vertical: compact ? 4 : 5,
+      ),
+      decoration: BoxDecoration(
+        color: colors.summaryChipBg,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.16)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: color),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActionPill extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final Color color;
+  final VoidCallback onTap;
+  final bool compact;
+
+  const _ActionPill({
+    required this.icon,
+    required this.tooltip,
+    required this.color,
+    required this.onTap,
+    this.compact = false,
   });
 
   @override
   Widget build(BuildContext context) {
     return Tooltip(
       message: tooltip,
+      waitDuration: const Duration(milliseconds: 600),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(8),
         child: Container(
-          // ✅ ลด padding เพื่อให้ 2 ปุ่มพอดีกับ 100px
-          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 6),
+          padding: EdgeInsets.symmetric(
+            horizontal: compact ? 7 : 8,
+            vertical: compact ? 6 : 7,
+          ),
           decoration: BoxDecoration(
             color: color.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: color.withValues(alpha: 0.18)),
           ),
           child: Icon(icon, size: 15, color: color),
         ),
       ),
+    );
+  }
+}
+
+class _CustomerListColors {
+  final bool isDark;
+  final Color scaffoldBg;
+  final Color cardBg;
+  final Color border;
+  final Color text;
+  final Color subtext;
+  final Color topBarBg;
+  final Color searchBarBg;
+  final Color tableHeaderBg;
+  final Color summaryBg;
+  final Color summaryChipBg;
+  final Color inputFill;
+  final Color rowHoverBg;
+  final Color emptyIconBg;
+  final Color emptyIcon;
+  final Color neutralChipBg;
+  final Color navButtonBg;
+  final Color navButtonBorder;
+  final Color amountText;
+
+  const _CustomerListColors({
+    required this.isDark,
+    required this.scaffoldBg,
+    required this.cardBg,
+    required this.border,
+    required this.text,
+    required this.subtext,
+    required this.topBarBg,
+    required this.searchBarBg,
+    required this.tableHeaderBg,
+    required this.summaryBg,
+    required this.summaryChipBg,
+    required this.inputFill,
+    required this.rowHoverBg,
+    required this.emptyIconBg,
+    required this.emptyIcon,
+    required this.neutralChipBg,
+    required this.navButtonBg,
+    required this.navButtonBorder,
+    required this.amountText,
+  });
+
+  factory _CustomerListColors.of(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return _CustomerListColors(
+      isDark: isDark,
+      scaffoldBg: isDark ? AppTheme.darkBg : AppTheme.surface,
+      cardBg: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+      border: isDark ? const Color(0xFF333333) : AppTheme.border,
+      text: isDark ? const Color(0xFFE0E0E0) : const Color(0xFF1A1A1A),
+      subtext: isDark ? const Color(0xFF9E9E9E) : AppTheme.textSub,
+      topBarBg: isDark ? AppTheme.navyDark : AppTheme.navy,
+      searchBarBg: isDark ? AppTheme.darkTopBar : Colors.white,
+      tableHeaderBg: isDark ? AppTheme.navyDark : AppTheme.navy,
+      summaryBg: isDark ? const Color(0xFF181818) : const Color(0xFFFFF8F5),
+      summaryChipBg: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+      inputFill: isDark ? AppTheme.darkElement : Colors.white,
+      rowHoverBg: isDark
+          ? AppTheme.primaryLight.withValues(alpha: 0.15)
+          : AppTheme.primaryLight,
+      emptyIconBg: isDark ? AppTheme.darkCard : AppTheme.surface,
+      emptyIcon: isDark ? const Color(0xFF9E9E9E) : Colors.grey,
+      neutralChipBg: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF0F0F0),
+      navButtonBg: isDark
+          ? Colors.white.withValues(alpha: 0.08)
+          : AppTheme.navyLight,
+      navButtonBorder: isDark ? Colors.white24 : AppTheme.navy,
+      amountText: isDark ? AppTheme.primaryLight : AppTheme.info,
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:pos_erp/shared/widgets/pagination_bar.dart';
 
 import '../../../settings/presentation/pages/settings_page.dart';
@@ -31,7 +32,21 @@ class StockBalancePage extends ConsumerStatefulWidget {
 }
 
 class _StockBalancePageState extends ConsumerState<StockBalancePage> {
+  static const List<double> _baseDefaultColWidths = [
+    120,
+    200,
+    140,
+    106,
+    70,
+    140,
+    136,
+    86,
+    120,
+  ];
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _hScroll = ScrollController();
+  final NumberFormat _qtyFmt = NumberFormat('#,##0');
+  final NumberFormat _moneyFmt = NumberFormat('#,##0.00');
   String _searchQuery = '';
   String _selectedWarehouse = 'WH001'; // ✅ เหมือนไฟล์เดิม
   bool _isTableView = true;
@@ -42,6 +57,32 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
 
   // ── Pagination ──────────────────────────────────────────────────
   int _currentPage = 1;
+  bool _userResized = false; // ป้องกัน auto-fit override ค่าที่ user ลากไว้
+
+  // ลำดับ: [รหัส, ชื่อ, คลัง, คงเหลือ, หน่วย, ต้นทุน/หน่วย, มูลค่าสต๊อก, สถานะ, จัดการ]
+  final List<double> _colWidths = List<double>.from(_baseDefaultColWidths);
+  static const List<double> _colMinW = [
+    110, // รหัสสินค้า
+    120, // ชื่อสินค้า
+    86, // คลัง
+    100, // คงเหลือ
+    60, // หน่วย
+    136, // ต้นทุน/หน่วย
+    130, // มูลค่าสต๊อก
+    80, // สถานะ
+    44, // จัดการ
+  ];
+  static const List<double> _colMaxW = [
+    220,
+    300,
+    240,
+    160,
+    120,
+    200,
+    210,
+    140,
+    120,
+  ];
 
   @override
   void didChangeDependencies() {
@@ -54,6 +95,7 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
   @override
   void dispose() {
     _searchController.dispose();
+    _hScroll.dispose();
     super.dispose();
   }
 
@@ -161,6 +203,172 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
     });
   }
 
+  double _measureTextWidth(
+    BuildContext context,
+    String text, {
+    required TextStyle style,
+  }) {
+    final painter = TextPainter(
+      text: TextSpan(text: text, style: style),
+      textDirection: Directionality.of(context),
+      maxLines: 1,
+    )..layout();
+    return painter.width;
+  }
+
+  List<double> _defaultColWidthsFor(BuildContext context) {
+    final compactActions = MediaQuery.sizeOf(context).width < 1180;
+    return [
+      _baseDefaultColWidths[0],
+      _baseDefaultColWidths[1],
+      _baseDefaultColWidths[2],
+      _baseDefaultColWidths[3],
+      _baseDefaultColWidths[4],
+      _baseDefaultColWidths[5],
+      _baseDefaultColWidths[6],
+      _baseDefaultColWidths[7],
+      compactActions ? 44 : _baseDefaultColWidths[8],
+    ];
+  }
+
+  void _autoFitColWidths(List<StockBalanceModel> rows, _StockColors colors) {
+    // (label, isSortable) — ลำดับต้องตรงกับ _colWidths
+    final headers = [
+      ('รหัสสินค้า', true),
+      ('ชื่อสินค้า', true),
+      ('คลัง', false),
+      ('คงเหลือ', true),
+      ('หน่วย', false),
+      ('ต้นทุน/หน่วย', true),
+      ('มูลค่าสต๊อก', true),
+      ('สถานะ', false),
+      ('', false), // actions (last)
+    ];
+    const headerStyle = TextStyle(
+      fontSize: 12,
+      fontWeight: FontWeight.w600,
+      letterSpacing: 0.4,
+    );
+    final codeStyle = TextStyle(
+      fontSize: 13,
+      fontFamily: 'monospace',
+      fontWeight: FontWeight.w500,
+      color: colors.subtext,
+    );
+    final nameStyle = TextStyle(fontSize: 13, color: colors.text);
+    final subtext12 = TextStyle(fontSize: 12, color: colors.subtext);
+    final qtyStyle = TextStyle(
+      fontSize: 14,
+      fontWeight: FontWeight.bold,
+      color: AppTheme.success,
+    );
+    final moneyStyle = TextStyle(fontSize: 12, color: colors.text);
+    final costStyle = TextStyle(
+      fontSize: 12,
+      color: colors.isDark ? AppTheme.primaryLight : AppTheme.info,
+    );
+    const badgeStyle = TextStyle(fontSize: 11, fontWeight: FontWeight.w600);
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final compactActions = screenWidth < 1180;
+    final tightDesktop = screenWidth < 1080;
+
+    // เหมือน product_list_page: basePadding + sortChrome + resizeHandle + buffer
+    const basePadding = 16.0;
+    const sortChrome = 20.0; // gap(4) + icon(12) + 4px buffer
+    const resizeHandle = 14.0;
+    const headerBuffer = 10.0;
+
+    final maxW = List<double>.generate(headers.length, (i) {
+      final label = headers[i].$1;
+      final isSortable = headers[i].$2;
+      final isLast = i == headers.length - 1;
+      final labelW = label.isEmpty
+          ? 0.0
+          : _measureTextWidth(context, label, style: headerStyle);
+      return labelW +
+          basePadding +
+          (isSortable ? sortChrome : 0.0) +
+          (isLast ? 0.0 : resizeHandle) +
+          headerBuffer;
+    });
+
+    for (final s in rows) {
+      final codeW =
+          _measureTextWidth(context, s.productCode, style: codeStyle) + 20;
+      final barcodeW = (s.barcode != null && s.barcode!.isNotEmpty)
+          ? _measureTextWidth(
+                  context,
+                  s.barcode!,
+                  style: const TextStyle(fontSize: 11),
+                ) +
+                16
+          : 0.0;
+      final nameW = [
+        _measureTextWidth(context, s.productName, style: nameStyle) + 20,
+        barcodeW,
+      ].reduce((a, b) => a > b ? a : b);
+      final whW =
+          _measureTextWidth(context, s.warehouseName, style: subtext12) + 20;
+      final qtyW =
+          _measureTextWidth(
+            context,
+            _qtyFmt.format(s.balance),
+            style: qtyStyle.copyWith(
+              color: s.balance < 0 ? AppTheme.error : AppTheme.success,
+            ),
+          ) +
+          20;
+      final unitW =
+          _measureTextWidth(context, s.baseUnit, style: subtext12) + 20;
+      final costText = s.avgCost > 0 ? '฿${_moneyFmt.format(s.avgCost)}' : '-';
+      final costW =
+          _measureTextWidth(
+            context,
+            costText,
+            style: s.avgCost > 0 ? costStyle : subtext12,
+          ) +
+          20;
+      final stockValueText = s.avgCost > 0
+          ? '฿${NumberFormat('#,##0').format(s.stockValue)}'
+          : '-';
+      final stockValueW =
+          _measureTextWidth(
+            context,
+            stockValueText,
+            style: s.avgCost > 0
+                ? moneyStyle.copyWith(fontWeight: FontWeight.w600)
+                : subtext12,
+          ) +
+          20;
+      final statusLabel = s.balance < 0 ? 'ติดลบ' : 'สต๊อกต่ำ';
+      final statusW =
+          _measureTextWidth(context, statusLabel, style: badgeStyle) + 34;
+      final actionW = compactActions
+          ? 44.0
+          : tightDesktop
+          ? 104.0
+          : 120.0;
+
+      if (codeW > maxW[0]) maxW[0] = codeW;
+      if (nameW > maxW[1]) maxW[1] = nameW;
+      if (whW > maxW[2]) maxW[2] = whW;
+      if (qtyW > maxW[3]) maxW[3] = qtyW;
+      if (unitW > maxW[4]) maxW[4] = unitW;
+      if (costW > maxW[5]) maxW[5] = costW;
+      if (stockValueW > maxW[6]) maxW[6] = stockValueW;
+      if (statusW > maxW[7]) maxW[7] = statusW;
+      if (actionW > maxW[8]) maxW[8] = actionW;
+    }
+
+    for (int i = 0; i < maxW.length; i++) {
+      maxW[i] = maxW[i].clamp(_colMinW[i], _colMaxW[i]);
+    }
+
+    for (int i = 0; i < _colWidths.length; i++) {
+      _colWidths[i] = maxW[i];
+    }
+  }
+
   // ─────────────────────────────────────────────────────────────
   // Build
   // ─────────────────────────────────────────────────────────────
@@ -191,7 +399,10 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
                     children: [
                       CircularProgressIndicator(color: AppTheme.primary),
                       const SizedBox(height: 16),
-                      Text('กำลังโหลดสต๊อก...', style: TextStyle(color: colors.subtext)),
+                      Text(
+                        'กำลังโหลดสต๊อก...',
+                        style: TextStyle(color: colors.subtext),
+                      ),
                     ],
                   ),
                 ),
@@ -201,7 +412,10 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
                     children: [
                       const Icon(Icons.error_outline, size: 64, color: _error),
                       const SizedBox(height: 16),
-                      Text('เกิดข้อผิดพลาด: $e', style: TextStyle(color: colors.text)),
+                      Text(
+                        'เกิดข้อผิดพลาด: $e',
+                        style: TextStyle(color: colors.text),
+                      ),
                       const SizedBox(height: 16),
                       ElevatedButton.icon(
                         icon: const Icon(Icons.refresh, size: 16),
@@ -246,18 +460,17 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
                                 ? null
                                 : [
                                     BoxShadow(
-                                      color: AppTheme.navy.withValues(alpha: 0.04),
+                                      color: AppTheme.navy.withValues(
+                                        alpha: 0.04,
+                                      ),
                                       blurRadius: 8,
                                       offset: const Offset(0, 2),
                                     ),
                                   ],
                           ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: effectiveTableView
-                                ? _buildTableView(pageItems, settings, colors)
-                                : _buildCardView(pageItems, settings, colors),
-                          ),
+                          child: effectiveTableView
+                              ? _buildTableView(pageItems, settings, colors)
+                              : _buildCardView(pageItems, settings, colors),
                         ),
                       ),
                       // ── Footer / Pagination ──────────────────────
@@ -309,144 +522,156 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
 
   // ── Shared sub-widgets ──────────────────────────────────────
   Widget _pageIcon() => Container(
-        padding: const EdgeInsets.all(6),
-        decoration: BoxDecoration(
-          color: AppTheme.primary.withValues(alpha: 0.18),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: const Icon(Icons.inventory_2_outlined, size: 16, color: AppTheme.primaryLight),
-      );
+    padding: const EdgeInsets.all(6),
+    decoration: BoxDecoration(
+      color: AppTheme.primary.withValues(alpha: 0.18),
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child: const Icon(
+      Icons.inventory_2_outlined,
+      size: 16,
+      color: AppTheme.primaryLight,
+    ),
+  );
 
   Widget _stockBadge() => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: AppTheme.primary.withValues(alpha: 0.2),
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: AppTheme.primary.withValues(alpha: 0.5)),
-        ),
-        child: const Text(
-          'Stock',
-          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.primaryLight),
-        ),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+    decoration: BoxDecoration(
+      color: AppTheme.primary.withValues(alpha: 0.2),
+      borderRadius: BorderRadius.circular(6),
+      border: Border.all(color: AppTheme.primary.withValues(alpha: 0.5)),
+    ),
+    child: const Text(
+      'Stock',
+      style: TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+        color: AppTheme.primaryLight,
+      ),
+    ),
+  );
 
   List<Widget> _actionButtons(_StockColors colors) => [
-        _TopBarBtn(
-          icon: _showLowStockOnly ? Icons.warning_amber_rounded : Icons.warning_amber_outlined,
-          colors: colors,
-          active: _showLowStockOnly,
-          onTap: () => setState(() { _showLowStockOnly = !_showLowStockOnly; _currentPage = 1; }),
-        ),
-        const SizedBox(width: 6),
-        _TopBarBtn(
-          icon: _isTableView ? Icons.view_agenda_outlined : Icons.table_rows_outlined,
-          colors: colors,
-          onTap: () => setState(() => _isTableView = !_isTableView),
-        ),
-        const SizedBox(width: 6),
-        _TopBarBtn(
-          icon: Icons.history,
-          colors: colors,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const StockMovementHistoryPage()),
-          ),
-        ),
-        const SizedBox(width: 6),
-        _TopBarBtn(
-          icon: Icons.refresh,
-          colors: colors,
-          onTap: () => ref.read(stockBalanceProvider.notifier).refresh(),
-        ),
-      ];
+    _TopBarBtn(
+      icon: _showLowStockOnly
+          ? Icons.warning_amber_rounded
+          : Icons.warning_amber_outlined,
+      tooltip: _showLowStockOnly ? 'แสดงทั้งหมด' : 'แสดงเฉพาะสต๊อกต่ำ',
+      colors: colors,
+      active: _showLowStockOnly,
+      onTap: () => setState(() {
+        _showLowStockOnly = !_showLowStockOnly;
+        _currentPage = 1;
+      }),
+    ),
+    const SizedBox(width: 6),
+    _TopBarBtn(
+      icon: _isTableView
+          ? Icons.view_agenda_outlined
+          : Icons.table_rows_outlined,
+      tooltip: _isTableView ? 'สลับเป็นการ์ด' : 'สลับเป็นตาราง',
+      colors: colors,
+      onTap: () => setState(() => _isTableView = !_isTableView),
+    ),
+    const SizedBox(width: 6),
+    _TopBarBtn(
+      icon: Icons.history,
+      tooltip: 'ประวัติการเคลื่อนไหวสต๊อก',
+      colors: colors,
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const StockMovementHistoryPage()),
+      ),
+    ),
+    const SizedBox(width: 6),
+    _TopBarBtn(
+      icon: Icons.refresh,
+      tooltip: 'รีเฟรชข้อมูล',
+      colors: colors,
+      onTap: () => ref.read(stockBalanceProvider.notifier).refresh(),
+    ),
+  ];
 
   Widget _searchField(_StockColors colors, {bool inTopBar = false}) {
-    final isDark = colors.isDark;
     return SizedBox(
-      height: 36,
+      height: 40,
       child: TextField(
         controller: _searchController,
-        style: TextStyle(
-          fontSize: 13,
-          color: inTopBar ? Colors.white : colors.text,
-        ),
+        style: TextStyle(fontSize: 13, color: colors.text),
         decoration: InputDecoration(
           hintText: 'ค้นหาชื่อ / รหัสสินค้า...',
-          hintStyle: TextStyle(
-            fontSize: 13,
-            color: inTopBar ? Colors.white54 : colors.subtext,
-          ),
-          prefixIcon: Icon(
-            Icons.search,
-            size: 17,
-            color: inTopBar ? Colors.white54 : colors.subtext,
-          ),
+          hintStyle: TextStyle(fontSize: 13, color: colors.subtext),
+          prefixIcon: Icon(Icons.search, size: 17, color: colors.subtext),
           suffixIcon: _searchQuery.isNotEmpty
               ? IconButton(
-                  icon: Icon(Icons.clear, size: 15,
-                      color: inTopBar ? Colors.white54 : colors.subtext),
+                  icon: Icon(Icons.clear, size: 15, color: colors.subtext),
                   onPressed: () {
                     _searchController.clear();
-                    setState(() { _searchQuery = ''; _currentPage = 1; });
+                    setState(() {
+                      _searchQuery = '';
+                      _currentPage = 1;
+                    });
                   },
                 )
               : null,
           contentPadding: EdgeInsets.zero,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(
-              color: inTopBar ? Colors.white24 : colors.border,
-            ),
+            borderSide: BorderSide(color: colors.border),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(
-              color: inTopBar ? Colors.white24 : colors.border,
-            ),
+            borderSide: BorderSide(color: colors.border),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(
-              color: inTopBar ? Colors.white : AppTheme.primary,
-              width: 1.5,
-            ),
+            borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
           ),
           filled: true,
-          fillColor: inTopBar
-              ? Colors.white.withValues(alpha: 0.10)
-              : (isDark ? colors.inputFill : Colors.white),
+          fillColor: colors.inputFill,
         ),
-        onChanged: (v) => setState(() { _searchQuery = v; _currentPage = 1; }),
+        onChanged: (v) => setState(() {
+          _searchQuery = v;
+          _currentPage = 1;
+        }),
       ),
     );
   }
 
   Widget _warehouseDropdown(_StockColors colors, {bool inTopBar = false}) {
-    final textColor = inTopBar ? Colors.white : colors.text;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      height: 40,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
-        border: Border.all(
-          color: inTopBar ? Colors.white24 : colors.border,
-        ),
+        border: Border.all(color: colors.border),
         borderRadius: BorderRadius.circular(8),
-        color: inTopBar
-            ? Colors.white.withValues(alpha: 0.10)
-            : colors.inputFill,
+        color: colors.inputFill,
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: _selectedWarehouse,
           isDense: true,
           dropdownColor: colors.cardBg,
-          style: TextStyle(fontSize: 13, color: textColor),
-          iconEnabledColor: inTopBar ? Colors.white54 : colors.subtext,
+          style: TextStyle(fontSize: 13, color: colors.text),
+          iconEnabledColor: colors.subtext,
           items: [
-            DropdownMenuItem(value: 'ALL',   child: Text('ทุกคลัง',  style: TextStyle(color: colors.text))),
-            DropdownMenuItem(value: 'WH001', child: Text('คลังหลัก', style: TextStyle(color: colors.text))),
-            DropdownMenuItem(value: 'WH002', child: Text('คลังสยาม', style: TextStyle(color: colors.text))),
+            DropdownMenuItem(
+              value: 'ALL',
+              child: Text('ทุกคลัง', style: TextStyle(color: colors.text)),
+            ),
+            DropdownMenuItem(
+              value: 'WH001',
+              child: Text('คลังหลัก', style: TextStyle(color: colors.text)),
+            ),
+            DropdownMenuItem(
+              value: 'WH002',
+              child: Text('คลังสยาม', style: TextStyle(color: colors.text)),
+            ),
           ],
-          onChanged: (v) => setState(() { _selectedWarehouse = v!; _currentPage = 1; }),
+          onChanged: (v) => setState(() {
+            _selectedWarehouse = v!;
+            _currentPage = 1;
+          }),
         ),
       ),
     );
@@ -465,7 +690,11 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
         const SizedBox(width: 10),
         const Text(
           'สต๊อกคงเหลือ',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white),
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
         ),
         const Spacer(),
         // Search field
@@ -502,7 +731,11 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
             const Expanded(
               child: Text(
                 'สต๊อกคงเหลือ',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.white),
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -528,9 +761,22 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
   Widget _buildToolbar(AsyncValue stockAsync, settings, _StockColors colors) {
     final summaryBar = stockAsync.whenOrNull(
       data: (stocks) {
-        final filtered = _applyFilters(stocks, settings.lowStockThreshold, settings.enableLowStockAlert);
-        final lowCount = filtered.where((s) => settings.enableLowStockAlert && s.balance < settings.lowStockThreshold).length;
-        final totalValue = filtered.fold<double>(0, (sum, s) => sum + s.stockValue);
+        final filtered = _applyFilters(
+          stocks,
+          settings.lowStockThreshold,
+          settings.enableLowStockAlert,
+        );
+        final lowCount = filtered
+            .where(
+              (s) =>
+                  settings.enableLowStockAlert &&
+                  s.balance < settings.lowStockThreshold,
+            )
+            .length;
+        final totalValue = filtered.fold<double>(
+          0,
+          (sum, s) => sum + s.stockValue,
+        );
         return Container(
           width: double.infinity,
           decoration: BoxDecoration(
@@ -542,10 +788,20 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
             spacing: 8,
             runSpacing: 6,
             children: [
-              _SummaryChip('รายการ', filtered.length, AppTheme.info, icon: Icons.receipt_long),
+              _SummaryChip(
+                'รายการ',
+                filtered.length,
+                AppTheme.info,
+                icon: Icons.receipt_long,
+              ),
               if (totalValue > 0) _ValueChip(totalValue),
               if (lowCount > 0)
-                _SummaryChip('สต๊อกต่ำ', lowCount, _error, icon: Icons.warning_amber_rounded),
+                _SummaryChip(
+                  'สต๊อกต่ำ',
+                  lowCount,
+                  _error,
+                  icon: Icons.warning_amber_rounded,
+                ),
             ],
           ),
         );
@@ -557,104 +813,85 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
   // ─────────────────────────────────────────────────────────────
   // TABLE VIEW
   // ─────────────────────────────────────────────────────────────
-  Widget _buildTableView(List<StockBalanceModel> stocks, settings, _StockColors colors) {
+  Widget _buildTableView(
+    List<StockBalanceModel> stocks,
+    settings,
+    _StockColors colors,
+  ) {
     final int threshold = settings.lowStockThreshold;
     final bool alertOn = settings.enableLowStockAlert;
+    if (!_userResized) _autoFitColWidths(stocks, colors);
 
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          // Header
-          Container(
-            color: colors.tableHeaderBg,
-            child: Row(
-              children: [
-                const _HeaderCell('#', width: 48, center: true),
-                _SortableHeader(
-                  'รหัสสินค้า',
-                  'productCode',
-                  _sortColumn,
-                  _sortAsc,
-                  _onSort,
-                  flex: 2,
-                ),
-                _SortableHeader(
-                  'ชื่อสินค้า',
-                  'productName',
-                  _sortColumn,
-                  _sortAsc,
-                  _onSort,
-                  flex: 3,
-                ),
-                const _HeaderCell('คลัง', flex: 2),
-                _SortableHeader(
-                  'คงเหลือ',
-                  'balance',
-                  _sortColumn,
-                  _sortAsc,
-                  _onSort,
-                  flex: 2,
-                  rightAlign: true,
-                ),
-                const _HeaderCell('หน่วย', flex: 1, center: true),
-                _SortableHeader(
-                  'ต้นทุน/หน่วย',
-                  'avgCost',
-                  _sortColumn,
-                  _sortAsc,
-                  _onSort,
-                  flex: 2,
-                  rightAlign: true,
-                ),
-                _SortableHeader(
-                  'มูลค่าสต๊อก',
-                  'stockValue',
-                  _sortColumn,
-                  _sortAsc,
-                  _onSort,
-                  flex: 2,
-                  rightAlign: true,
-                ),
-                const _HeaderCell('สถานะ', flex: 2, center: true),
-                const _HeaderCell('', width: 120),
-              ],
-            ),
-          ),
+    final screenW = MediaQuery.sizeOf(context).width - 32;
+    final totalW = 48.0 + _colWidths.fold(0.0, (sum, w) => sum + w) + 28.0;
+    final tableW = totalW > screenW ? totalW : screenW;
 
-          // Rows
-          ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: stocks.length,
-            itemBuilder: (_, i) {
-              final s = stocks[i];
-              final isLow = alertOn && s.balance < threshold;
-              return _StockTableRow(
-                stock: s,
-                no: i + 1,
-                isEven: i.isEven,
-                isLow: isLow,
-                onTap: () => _showStockActions(context, s),
-                onStockIn: () => showDialog(
-                  context: context,
-                  builder: (_) => StockInDialog(stock: s),
+    return Scrollbar(
+      controller: _hScroll,
+      thumbVisibility: true,
+      trackVisibility: true,
+      child: SingleChildScrollView(
+        controller: _hScroll,
+        scrollDirection: Axis.horizontal,
+        child: SizedBox(
+          width: tableW,
+          child: Column(
+            children: [
+              _StockResizableHeader(
+                colWidths: _colWidths,
+                colMinW: _colMinW,
+                colMaxW: _colMaxW,
+                sortColumn: _sortColumn,
+                sortAsc: _sortAsc,
+                onSort: _onSort,
+                onResize: (i, w) => setState(() {
+                  _colWidths[i] = w;
+                  _userResized = true;
+                }),
+                onReset: () => setState(() {
+                  _colWidths.setAll(0, _defaultColWidthsFor(context));
+                  _userResized = false;
+                }),
+              ),
+              Divider(height: 1, color: colors.border),
+              Expanded(
+                child: ListView.separated(
+                  itemCount: stocks.length,
+                  separatorBuilder: (_, _) =>
+                      Divider(height: 1, color: colors.border),
+                  itemBuilder: (_, i) {
+                    final s = stocks[i];
+                    final isLow = alertOn && s.balance < threshold;
+                    return _StockTableRow(
+                      stock: s,
+                      no: i + 1,
+                      isEven: i.isEven,
+                      isLow: isLow,
+                      colWidths: _colWidths,
+                      onTap: () => _showStockActions(context, s),
+                      onStockIn: () => showDialog(
+                        context: context,
+                        builder: (_) => StockInDialog(stock: s),
+                      ),
+                      onStockOut: () => showDialog(
+                        context: context,
+                        builder: (_) => StockOutDialog(stock: s),
+                      ),
+                      onTransfer: () => showDialog(
+                        context: context,
+                        builder: (_) => StockTransferDialog(stock: s),
+                      ),
+                      onAdjust: () => showDialog(
+                        context: context,
+                        builder: (_) => StockAdjustDialog(stock: s),
+                      ),
+                    );
+                  },
                 ),
-                onStockOut: () => showDialog(
-                  context: context,
-                  builder: (_) => StockOutDialog(stock: s),
-                ),
-                onTransfer: () => showDialog(
-                  context: context,
-                  builder: (_) => StockTransferDialog(stock: s),
-                ),
-                onAdjust: () => showDialog(
-                  context: context,
-                  builder: (_) => StockAdjustDialog(stock: s),
-                ),
-              );
-            },
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -662,7 +899,11 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
   // ─────────────────────────────────────────────────────────────
   // CARD VIEW (ListView)
   // ─────────────────────────────────────────────────────────────
-  Widget _buildCardView(List<StockBalanceModel> stocks, settings, _StockColors colors) {
+  Widget _buildCardView(
+    List<StockBalanceModel> stocks,
+    settings,
+    _StockColors colors,
+  ) {
     final int threshold = settings.lowStockThreshold;
     final bool alertOn = settings.enableLowStockAlert;
 
@@ -675,214 +916,211 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
       AppTheme.tealColor,
     ];
 
-    return Builder(
-      builder: (ctx) {
-        final cs = Theme.of(ctx).colorScheme;
-        final isDark = colors.isDark;
+    return ListView.separated(
+      padding: const EdgeInsets.all(12),
+      itemCount: stocks.length,
+      separatorBuilder: (_, _) => Divider(height: 1, color: colors.border),
+      itemBuilder: (context, i) {
+        final s = stocks[i];
+        final isLow = alertOn && s.balance < threshold;
+        final initial = s.productName.isNotEmpty
+            ? s.productName.substring(0, 1).toUpperCase()
+            : '?';
+        final avatarColor =
+            avatarColors[s.productName.codeUnitAt(0) % avatarColors.length];
 
-        return ListView.separated(
-          padding: const EdgeInsets.all(12),
-          itemCount: stocks.length,
-          separatorBuilder: (_, _) => const SizedBox(height: 8),
-          itemBuilder: (context, i) {
-            final s = stocks[i];
-            final isLow = alertOn && s.balance < threshold;
-            final initial = s.productName.isNotEmpty
-                ? s.productName.substring(0, 1).toUpperCase()
-                : '?';
-            final avatarColor =
-                avatarColors[s.productName.codeUnitAt(0) % avatarColors.length];
-            final cardBg = isLow
-                ? (isDark ? const Color(0xFF3E2E00) : const Color(0xFFFFFDE7))
-                : cs.surface;
-            final borderClr = isLow
-                ? _warning
-                : cs.outline.withValues(alpha: 0.3);
-
-            return Card(
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-                side: BorderSide(color: borderClr, width: isLow ? 1.5 : 1),
-              ),
-              color: cardBg,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(10),
-                onTap: () => _showStockActions(context, s),
-                hoverColor: AppTheme.primaryLight.withValues(alpha: 0.6),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Row(
-                    children: [
-                      // ── Avatar + low-stock dot badge ──────────────
-                      Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          CircleAvatar(
-                            radius: 20,
-                            backgroundColor: avatarColor,
-                            child: Text(
-                              initial,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                          if (isLow)
-                            Positioned(
-                              right: -2,
-                              bottom: -2,
-                              child: Container(
-                                width: 14,
-                                height: 14,
-                                decoration: BoxDecoration(
-                                  color: _warning,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: cardBg, width: 1.5),
-                                ),
-                                child: const Icon(
-                                  Icons.warning_amber_rounded,
-                                  size: 8,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(width: 12),
-
-                      // ── Info (เหมือน product card) ──────────────────
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // ชื่อ + badge สต๊อกต่ำ
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    s.productName,
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                      color: cs.onSurface,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                    maxLines: 1,
-                                  ),
-                                ),
-                                if (isLow) ...[
-                                  const SizedBox(width: 8),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 7,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFFFF3CD),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: Text(
-                                      'สต๊อกต่ำ',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w600,
-                                        color: _warning,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                            const SizedBox(height: 3),
-
-                            // รหัส · คลัง — บรรทัดเดียว (เหมือน product code + barcode)
-                            Row(
-                              children: [
-                                Text(
-                                  'รหัส: ${s.productCode}',
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    color: AppTheme.textSub,
-                                  ),
-                                ),
-                                const Text(
-                                  '  ·  ',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: AppTheme.textSub,
-                                  ),
-                                ),
-                                const Icon(
-                                  Icons.warehouse_outlined,
-                                  size: 11,
-                                  color: AppTheme.textSub,
-                                ),
-                                const SizedBox(width: 3),
-                                Expanded(
-                                  child: Text(
-                                    s.warehouseName,
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      color: AppTheme.textSub,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                    maxLines: 1,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
+        return Card(
+          elevation: 0,
+          margin: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+            side: BorderSide(color: colors.border),
+          ),
+          color: colors.cardBg,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    CircleAvatar(
+                      radius: 20,
+                      backgroundColor: avatarColor,
+                      child: Text(
+                        initial,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-
-                      // ── Balance + WAC column ──────────────────────────────
-                      const SizedBox(width: 8),
-                      Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.end,
+                    ),
+                    if (isLow)
+                      Positioned(
+                        right: -2,
+                        bottom: -2,
+                        child: Container(
+                          width: 14,
+                          height: 14,
+                          decoration: BoxDecoration(
+                            color: _warning,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: colors.cardBg,
+                              width: 1.5,
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.warning_amber_rounded,
+                            size: 8,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              s.productName,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: colors.text,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isLow
+                                  ? AppTheme.errorContainer
+                                  : AppTheme.successContainer,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color:
+                                    (isLow ? AppTheme.error : AppTheme.success)
+                                        .withValues(alpha: 0.18),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 5,
+                                  height: 5,
+                                  decoration: BoxDecoration(
+                                    color: isLow
+                                        ? const Color(0xFFF44336)
+                                        : const Color(0xFF4CAF50),
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  isLow ? 'สต๊อกต่ำ' : 'ปกติ',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: isLow
+                                        ? const Color(0xFFC62828)
+                                        : const Color(0xFF2E7D32),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        'รหัส: ${s.productCode}',
+                        style: TextStyle(fontSize: 11, color: colors.subtext),
+                      ),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.warehouse_outlined,
+                            size: 11,
+                            color: colors.subtext,
+                          ),
+                          const SizedBox(width: 3),
+                          Expanded(
+                            child: Text(
+                              s.warehouseName,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: colors.subtext,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Row(
                         children: [
                           Text(
                             s.balance.toStringAsFixed(0),
                             style: TextStyle(
-                              fontSize: 14,
+                              fontSize: 12,
                               fontWeight: FontWeight.w700,
-                              color: isLow ? _error : _success,
+                              color: isLow ? AppTheme.error : AppTheme.info,
                             ),
                           ),
+                          const SizedBox(width: 6),
                           Text(
-                            s.baseUnit,
-                            style: const TextStyle(
+                            '/ ${s.baseUnit}',
+                            style: TextStyle(
                               fontSize: 11,
-                              color: AppTheme.textSub,
+                              color: colors.subtext,
                             ),
                           ),
                           if (s.avgCost > 0) ...[
-                            const SizedBox(height: 2),
+                            const SizedBox(width: 8),
                             Text(
-                              'ต้นทุน ฿${s.avgCost.toStringAsFixed(2)}',
-                              style: const TextStyle(
-                                fontSize: 10,
-                                color: Color(0xFF1565C0),
+                              'ต้นทุน: ฿${s.avgCost.toStringAsFixed(2)}',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: colors.subtext,
                               ),
                             ),
                           ],
-                          const SizedBox(height: 4),
-                          Icon(
-                            Icons.chevron_right,
-                            size: 16,
-                            color: cs.onSurface.withValues(alpha: 0.3),
-                          ),
                         ],
                       ),
+                      if (s.stockValue > 0)
+                        Text(
+                          'มูลค่าสต๊อก: ฿${s.stockValue.toStringAsFixed(2)}',
+                          style: TextStyle(fontSize: 11, color: colors.subtext),
+                        ),
                     ],
                   ),
                 ),
-              ),
-            );
-          },
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _StockActionIconBtn(
+                      icon: Icons.open_in_new,
+                      color: AppTheme.primary,
+                      tooltip: 'ดูรายละเอียด',
+                      onTap: () => _showStockActions(context, s),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         );
       },
     );
@@ -1011,16 +1249,26 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
             shape: BoxShape.circle,
             border: Border.all(color: colors.border),
           ),
-          child: Icon(Icons.inventory_2_outlined, size: 38, color: colors.subtext),
+          child: Icon(
+            Icons.inventory_2_outlined,
+            size: 38,
+            color: colors.subtext,
+          ),
         ),
         const SizedBox(height: 16),
         Text(
           _showLowStockOnly ? 'ไม่มีสินค้าที่สต๊อกต่ำ' : 'ไม่พบข้อมูลสต๊อก',
-          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: colors.text),
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
+            color: colors.text,
+          ),
         ),
         const SizedBox(height: 6),
         Text(
-          _showLowStockOnly ? 'สินค้าทุกรายการยังมีสต๊อกเพียงพอ' : 'ลองค้นหาด้วยคำอื่น หรือล้างตัวกรอง',
+          _showLowStockOnly
+              ? 'สินค้าทุกรายการยังมีสต๊อกเพียงพอ'
+              : 'ลองค้นหาด้วยคำอื่น หรือล้างตัวกรอง',
           style: TextStyle(fontSize: 13, color: colors.subtext),
         ),
         if (_searchQuery.isNotEmpty || _showLowStockOnly) ...[
@@ -1049,6 +1297,7 @@ class _StockTableRow extends StatefulWidget {
   final int no;
   final bool isEven;
   final bool isLow;
+  final List<double> colWidths;
   final VoidCallback onTap;
   final VoidCallback onStockIn;
   final VoidCallback onStockOut;
@@ -1060,6 +1309,7 @@ class _StockTableRow extends StatefulWidget {
     required this.no,
     required this.isEven,
     required this.isLow,
+    required this.colWidths,
     required this.onTap,
     required this.onStockIn,
     required this.onStockOut,
@@ -1081,12 +1331,15 @@ class _StockTableRowState extends State<_StockTableRow> {
     final isEven = widget.isEven;
     final isLow = widget.isLow;
     final colors = _StockColors.of(context);
+    final w = widget.colWidths;
 
     final nameColor = colors.text;
     final codeColor = colors.subtext;
     final whColor = colors.subtext;
     final unitColor = colors.text;
-    final noColor = colors.isDark ? const Color(0xFF666666) : const Color(0xFFBBBBBB);
+    final noColor = colors.isDark
+        ? const Color(0xFF666666)
+        : const Color(0xFFBBBBBB);
 
     final lightLowBg = const Color(0xFFFFF8E1);
     final darkLowBg = const Color(0xFF3E2E00);
@@ -1124,8 +1377,8 @@ class _StockTableRowState extends State<_StockTableRow> {
                 ),
               ),
               // รหัส
-              Expanded(
-                flex: 2,
+              SizedBox(
+                width: w[0],
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                     vertical: 11,
@@ -1143,8 +1396,8 @@ class _StockTableRowState extends State<_StockTableRow> {
                 ),
               ),
               // ชื่อ + barcode
-              Expanded(
-                flex: 3,
+              SizedBox(
+                width: w[1],
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                     vertical: 10,
@@ -1169,25 +1422,26 @@ class _StockTableRowState extends State<_StockTableRow> {
                 ),
               ),
               // คลัง
-              Expanded(
-                flex: 2,
+              SizedBox(
+                width: w[2],
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   child: Text(
                     stock.warehouseName,
                     style: TextStyle(fontSize: 12, color: whColor),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ),
               // คงเหลือ
-              Expanded(
-                flex: 2,
+              SizedBox(
+                width: w[3],
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   child: Align(
                     alignment: Alignment.centerRight,
                     child: Text(
-                      stock.balance.toStringAsFixed(0),
+                      NumberFormat('#,##0').format(stock.balance),
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
@@ -1198,8 +1452,8 @@ class _StockTableRowState extends State<_StockTableRow> {
                 ),
               ),
               // หน่วย
-              Expanded(
-                flex: 1,
+              SizedBox(
+                width: w[4],
                 child: Center(
                   child: Text(
                     stock.baseUnit,
@@ -1208,8 +1462,8 @@ class _StockTableRowState extends State<_StockTableRow> {
                 ),
               ),
               // ต้นทุน/หน่วย (WAC)
-              Expanded(
-                flex: 2,
+              SizedBox(
+                width: w[5],
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   child: Align(
@@ -1220,15 +1474,17 @@ class _StockTableRowState extends State<_StockTableRow> {
                           : '-',
                       style: TextStyle(
                         fontSize: 12,
-                        color: colors.isDark ? AppTheme.primaryLight : AppTheme.info,
+                        color: colors.isDark
+                            ? AppTheme.primaryLight
+                            : AppTheme.info,
                       ),
                     ),
                   ),
                 ),
               ),
               // มูลค่าสต๊อก
-              Expanded(
-                flex: 2,
+              SizedBox(
+                width: w[6],
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   child: Align(
@@ -1246,8 +1502,8 @@ class _StockTableRowState extends State<_StockTableRow> {
                   ),
                 ),
               ),
-              Expanded(
-                flex: 2,
+              SizedBox(
+                width: w[7],
                 child: Center(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -1260,7 +1516,7 @@ class _StockTableRowState extends State<_StockTableRow> {
               ),
               // Actions
               SizedBox(
-                width: compactActions ? 52 : 120,
+                width: w[8],
                 child: compactActions
                     ? Center(
                         child: _StockActionsMenu(
@@ -1452,96 +1708,229 @@ class _StockStatusBadge extends StatelessWidget {
   }
 }
 
-class _HeaderCell extends StatelessWidget {
-  final String label;
-  final int flex;
-  final double? width;
-  final bool center;
-  const _HeaderCell(
-    this.label, {
-    this.flex = 1,
-    this.width,
-    this.center = false,
+// ════════════════════════════════════════════════════════════════
+// _StockResizableHeader — header ลากปรับขนาดคอลัมน์ได้ + reset
+// ════════════════════════════════════════════════════════════════
+class _StockResizableHeader extends StatelessWidget {
+  final List<double> colWidths;
+  final List<double> colMinW;
+  final List<double> colMaxW;
+  final String sortColumn;
+  final bool sortAsc;
+  final void Function(String) onSort;
+  final void Function(int, double) onResize;
+  final VoidCallback onReset;
+
+  // (label, sortKey) — '' = ไม่ sort
+  static const _cols = [
+    ('รหัสสินค้า', 'productCode'),
+    ('ชื่อสินค้า', 'productName'),
+    ('คลัง', ''),
+    ('คงเหลือ', 'balance'),
+    ('หน่วย', ''),
+    ('ต้นทุน/หน่วย', 'avgCost'),
+    ('มูลค่าสต๊อก', 'stockValue'),
+    ('สถานะ', ''),
+    ('', ''), // actions
+  ];
+
+  const _StockResizableHeader({
+    required this.colWidths,
+    required this.colMinW,
+    required this.colMaxW,
+    required this.sortColumn,
+    required this.sortAsc,
+    required this.onSort,
+    required this.onResize,
+    required this.onReset,
   });
 
   @override
   Widget build(BuildContext context) {
-    final text = Text(
-      label,
-      style: const TextStyle(
-        color: Colors.white70,
-        fontSize: 12,
-        fontWeight: FontWeight.w600,
-        letterSpacing: 0.4,
+    final colors = _StockColors.of(context);
+    return Container(
+      color: colors.tableHeaderBg,
+      child: Row(
+        children: [
+          // No. fixed
+          const SizedBox(
+            width: 48,
+            child: Center(
+              child: Text(
+                '#',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+          // คอลัมน์ resize ได้
+          ...List.generate(_cols.length, (i) {
+            final (label, sortKey) = _cols[i];
+            final isActive = sortKey.isNotEmpty && sortColumn == sortKey;
+            final isLast = i == _cols.length - 1;
+            return _StockResizableCell(
+              label: label,
+              width: colWidths[i],
+              minWidth: colMinW[i],
+              maxWidth: colMaxW[i],
+              sortKey: sortKey,
+              isActive: isActive,
+              sortAsc: sortAsc,
+              isLast: isLast,
+              onSort: sortKey.isNotEmpty ? () => onSort(sortKey) : null,
+              onResize: (delta) {
+                final newW = (colWidths[i] + delta).clamp(
+                  colMinW[i],
+                  colMaxW[i],
+                );
+                onResize(i, newW);
+              },
+            );
+          }),
+          // ปุ่ม reset
+          Tooltip(
+            message: 'รีเซตความกว้างคอลัมน์',
+            child: InkWell(
+              onTap: onReset,
+              borderRadius: BorderRadius.circular(4),
+              child: const Padding(
+                padding: EdgeInsets.all(6),
+                child: Icon(
+                  Icons.settings_backup_restore,
+                  size: 14,
+                  color: Colors.white38,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
-    final content = Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-      child: center ? Center(child: text) : text,
-    );
-    if (width != null) return SizedBox(width: width, child: content);
-    return Expanded(flex: flex, child: content);
   }
 }
 
-class _SortableHeader extends StatelessWidget {
+// ════════════════════════════════════════════════════════════════
+// _StockResizableCell — cell ใน header ที่ลากปรับขนาดได้
+// ════════════════════════════════════════════════════════════════
+class _StockResizableCell extends StatefulWidget {
   final String label;
-  final String column;
-  final String current;
-  final bool ascending;
-  final void Function(String) onSort;
-  final int flex;
-  final bool rightAlign;
-  const _SortableHeader(
-    this.label,
-    this.column,
-    this.current,
-    this.ascending,
-    this.onSort, {
-    this.flex = 1,
-    this.rightAlign = false,
+  final double width;
+  final double minWidth;
+  final double maxWidth;
+  final String sortKey;
+  final bool isActive;
+  final bool sortAsc;
+  final bool isLast;
+  final VoidCallback? onSort;
+  final void Function(double delta) onResize;
+
+  const _StockResizableCell({
+    required this.label,
+    required this.width,
+    required this.minWidth,
+    required this.maxWidth,
+    required this.sortKey,
+    required this.isActive,
+    required this.sortAsc,
+    required this.isLast,
+    required this.onSort,
+    required this.onResize,
   });
 
   @override
+  State<_StockResizableCell> createState() => _StockResizableCellState();
+}
+
+class _StockResizableCellState extends State<_StockResizableCell> {
+  bool _hovering = false;
+  bool _dragging = false;
+
+  @override
   Widget build(BuildContext context) {
-    final isActive = current == column;
-    final tightDesktop = MediaQuery.sizeOf(context).width < 1080;
-    return Expanded(
-      flex: flex,
-      child: InkWell(
-        onTap: () => onSort(column),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: rightAlign
-                ? MainAxisAlignment.end
-                : MainAxisAlignment.start,
-            children: [
-              Flexible(
-                child: Text(
-                  label,
-                  overflow: TextOverflow.ellipsis,
-                  softWrap: false,
-                  style: TextStyle(
-                    color: isActive ? AppTheme.primaryLight : Colors.white70,
-                    fontSize: tightDesktop ? 11 : 12,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.4,
-                  ),
+    final labelColor = widget.isActive
+        ? const Color(0xFFFF9D45) // AppTheme.primaryLight
+        : Colors.white70;
+    final dividerColor = _dragging || _hovering
+        ? const Color(0xFFFF9D45)
+        : Colors.white24;
+
+    return SizedBox(
+      width: widget.width,
+      child: Row(
+        children: [
+          // Label + sort icon
+          Expanded(
+            child: GestureDetector(
+              onTap: widget.onSort,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 10,
+                  horizontal: 8,
+                ),
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        widget.label,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: labelColor,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.4,
+                        ),
+                      ),
+                    ),
+                    if (widget.isActive) ...[
+                      const SizedBox(width: 4),
+                      Icon(
+                        widget.sortAsc
+                            ? Icons.arrow_upward
+                            : Icons.arrow_downward,
+                        size: 12,
+                        color: labelColor,
+                      ),
+                    ] else if (widget.sortKey.isNotEmpty) ...[
+                      const SizedBox(width: 4),
+                      const Icon(
+                        Icons.unfold_more,
+                        size: 12,
+                        color: Colors.white38,
+                      ),
+                    ],
+                  ],
                 ),
               ),
-              SizedBox(width: tightDesktop ? 2 : 4),
-              Icon(
-                isActive
-                    ? (ascending ? Icons.arrow_upward : Icons.arrow_downward)
-                    : Icons.unfold_more,
-                size: tightDesktop ? 12 : 13,
-                color: isActive ? AppTheme.primaryLight : Colors.white38,
-              ),
-            ],
+            ),
           ),
-        ),
+          // Drag handle
+          if (!widget.isLast)
+            MouseRegion(
+              cursor: SystemMouseCursors.resizeColumn,
+              onEnter: (_) => setState(() => _hovering = true),
+              onExit: (_) => setState(() {
+                _hovering = false;
+                _dragging = false;
+              }),
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onHorizontalDragStart: (_) => setState(() => _dragging = true),
+                onHorizontalDragUpdate: (d) => widget.onResize(d.delta.dx),
+                onHorizontalDragEnd: (_) => setState(() => _dragging = false),
+                onHorizontalDragCancel: () => setState(() => _dragging = false),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 120),
+                  width: 14,
+                  height: 36,
+                  alignment: Alignment.center,
+                  child: Container(width: 1.5, height: 20, color: dividerColor),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -1591,7 +1980,12 @@ class _SummaryChip extends StatelessWidget {
   final int count;
   final Color color;
   final IconData icon;
-  const _SummaryChip(this.label, this.count, this.color, {this.icon = Icons.info_outline});
+  const _SummaryChip(
+    this.label,
+    this.count,
+    this.color, {
+    this.icon = Icons.info_outline,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1627,12 +2021,14 @@ class _SummaryChip extends StatelessWidget {
 // ════════════════════════════════════════════════════════════════
 class _TopBarBtn extends StatelessWidget {
   final IconData icon;
+  final String tooltip;
   final _StockColors colors;
   final VoidCallback onTap;
   final bool active;
 
   const _TopBarBtn({
     required this.icon,
+    required this.tooltip,
     required this.colors,
     required this.onTap,
     this.active = false,
@@ -1640,33 +2036,71 @@ class _TopBarBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 34,
-      height: 34,
-      child: Material(
-        color: active
-            ? AppTheme.primary.withValues(alpha: 0.25)
-            : colors.navButtonBg,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-          side: BorderSide(
-            color: active ? AppTheme.primaryLight : colors.navButtonBorder,
+    return Tooltip(
+      message: tooltip,
+      waitDuration: const Duration(milliseconds: 600),
+      child: SizedBox(
+        width: 34,
+        height: 34,
+        child: Material(
+          color: active
+              ? AppTheme.primary.withValues(alpha: 0.25)
+              : colors.navButtonBg,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+            side: BorderSide(
+              color: active ? AppTheme.primaryLight : colors.navButtonBorder,
+            ),
           ),
-        ),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(8),
-          child: Center(
-            child: Icon(
-              icon,
-              size: 17,
-              color: active ? AppTheme.primaryLight : Colors.white70,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(8),
+            child: Center(
+              child: Icon(
+                icon,
+                size: 17,
+                color: active ? AppTheme.primaryLight : Colors.white70,
+              ),
             ),
           ),
         ),
       ),
     );
   }
+}
+
+class _StockActionIconBtn extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  const _StockActionIconBtn({
+    required this.icon,
+    required this.color,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+    message: tooltip,
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        width: 32,
+        height: 32,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: color.withValues(alpha: 0.18)),
+        ),
+        child: Icon(icon, size: 16, color: color),
+      ),
+    ),
+  );
 }
 
 // ════════════════════════════════════════════════════════════════

@@ -170,15 +170,26 @@ class _StockProductHistoryDialogState
     return all.where((m) => m.movementType == type).toList();
   }
 
+  int _countByType(List<_Movement> all, String type) =>
+      _filter(all, type).length;
+
   @override
   Widget build(BuildContext context) {
     final productId = widget.stock.productId;
     final historyAsync = ref.watch(_productHistoryProvider(productId));
     final dialogPageSize = ref.watch(settingsProvider).dialogPageSize;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surface = isDark ? AppTheme.darkCard : Colors.white;
+    final border = isDark ? const Color(0xFF333333) : AppTheme.border;
+    final subtextColor = isDark ? const Color(0xFF9E9E9E) : AppTheme.textSub;
+    final summaryBg = isDark
+        ? const Color(0xFF181818)
+        : const Color(0xFFFFF8F5);
+    final summaryChipBg = isDark ? const Color(0xFF2C2C2C) : Colors.white;
 
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-      backgroundColor: Colors.white,
+      backgroundColor: surface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 680, maxHeight: 620),
@@ -189,7 +200,7 @@ class _StockProductHistoryDialogState
             Container(
               padding: const EdgeInsets.fromLTRB(20, 16, 12, 16),
               decoration: BoxDecoration(
-                color: AppTheme.primaryContainer,
+                color: isDark ? AppTheme.navyDark : AppTheme.navy,
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(12),
                 ),
@@ -200,12 +211,12 @@ class _StockProductHistoryDialogState
                     width: 38,
                     height: 38,
                     decoration: BoxDecoration(
-                      color: AppTheme.primaryColor.withValues(alpha: 0.15),
+                      color: AppTheme.primary.withValues(alpha: 0.18),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Icon(
                       Icons.history,
-                      color: AppTheme.primaryColor,
+                      color: AppTheme.primaryLight,
                       size: 20,
                     ),
                   ),
@@ -217,16 +228,16 @@ class _StockProductHistoryDialogState
                         const Text(
                           'ประวัติสต๊อกสินค้า',
                           style: TextStyle(
-                            fontWeight: FontWeight.bold,
                             fontSize: 15,
-                            color: AppTheme.navyColor,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
                           ),
                         ),
                         Text(
                           '${widget.stock.productCode}  ${widget.stock.productName}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
-                            color: Color(0xFF555555),
+                            color: Colors.white.withValues(alpha: 0.72),
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -240,10 +251,10 @@ class _StockProductHistoryDialogState
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: AppTheme.successColor.withValues(alpha: 0.12),
+                      color: AppTheme.primary.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: AppTheme.successColor.withValues(alpha: 0.4),
+                        color: AppTheme.primary.withValues(alpha: 0.5),
                       ),
                     ),
                     child: Text(
@@ -251,7 +262,7 @@ class _StockProductHistoryDialogState
                       style: const TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
-                        color: AppTheme.successColor,
+                        color: AppTheme.primaryLight,
                       ),
                     ),
                   ),
@@ -261,64 +272,135 @@ class _StockProductHistoryDialogState
               ),
             ),
 
-            // ── TabBar ──────────────────────────────────────────
+            // ── Filter Bar ──────────────────────────────────────
             Container(
-              color: Colors.white,
-              child: TabBar(
-                controller: _tabController,
-                isScrollable: true,
-                tabAlignment: TabAlignment.start,
-                indicatorColor: AppTheme.primaryColor,
-                labelColor: AppTheme.primaryColor,
-                unselectedLabelColor: const Color(0xFF888888),
-                labelStyle: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-                tabs: _tabs.map((t) {
-                  final (type, label, icon, color) = t;
-                  return Tab(
-                    child: historyAsync.when(
-                      loading: () => Text(label),
-                      error: (_, _) => Text(label),
-                      data: (all) {
-                        final cnt = _filter(all, type).length;
-                        return Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(icon, size: 13, color: color),
-                            const SizedBox(width: 4),
-                            Text(label),
-                            if (cnt > 0) ...[
-                              const SizedBox(width: 5),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 5,
-                                  vertical: 1,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: color.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Text(
-                                  '$cnt',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: color,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
+              decoration: BoxDecoration(
+                color: isDark ? AppTheme.darkTopBar : Colors.white,
+                border: Border(bottom: BorderSide(color: border)),
+              ),
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: TabBar(
+                  controller: _tabController,
+                  isScrollable: true,
+                  tabAlignment: TabAlignment.start,
+                  indicatorColor: AppTheme.primaryColor,
+                  labelColor: AppTheme.primaryColor,
+                  unselectedLabelColor: subtextColor,
+                  dividerColor: Colors.transparent,
+                  overlayColor: WidgetStateProperty.all(Colors.transparent),
+                  labelStyle: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  tabs: _tabs.map((t) {
+                    final (type, label, icon, color) = t;
+                    return Tab(
+                      child: historyAsync.when(
+                        loading: () => Text(label),
+                        error: (_, _) => Text(label),
+                        data: (all) {
+                          final cnt = _countByType(all, type);
+                          return Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _tabs[_tabIndex].$1 == type
+                                  ? color.withValues(alpha: 0.12)
+                                  : (isDark
+                                        ? const Color(0xFF2A2A2A)
+                                        : const Color(0xFFF0F0F0)),
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                color: _tabs[_tabIndex].$1 == type
+                                    ? color
+                                    : border,
                               ),
-                            ],
-                          ],
-                        );
-                      },
-                    ),
-                  );
-                }).toList(),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(icon, size: 13, color: color),
+                                const SizedBox(width: 4),
+                                Text(label),
+                                if (cnt > 0) ...[
+                                  const SizedBox(width: 5),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 5,
+                                      vertical: 1,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: color.withValues(alpha: 0.14),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Text(
+                                      '$cnt',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: color,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    );
+                  }).toList(),
+                ),
               ),
             ),
-            const Divider(height: 1),
+
+            // ── Summary Bar ─────────────────────────────────────
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(color: summaryBg),
+              child: historyAsync.when(
+                loading: () => const SizedBox.shrink(),
+                error: (_, _) => const SizedBox.shrink(),
+                data: (all) => Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _HistorySummaryChip(
+                      icon: Icons.receipt_long,
+                      label: '${all.length} รายการ',
+                      color: AppTheme.info,
+                      bg: summaryChipBg,
+                      border: border,
+                    ),
+                    _HistorySummaryChip(
+                      icon: Icons.add_box_rounded,
+                      label: '${_countByType(all, 'IN')} รับเข้า',
+                      color: const Color(0xFF2E7D32),
+                      bg: summaryChipBg,
+                      border: border,
+                    ),
+                    _HistorySummaryChip(
+                      icon: Icons.remove_circle_rounded,
+                      label: '${_countByType(all, 'OUT')} เบิกออก',
+                      color: const Color(0xFFE65100),
+                      bg: summaryChipBg,
+                      border: border,
+                    ),
+                    _HistorySummaryChip(
+                      icon: Icons.tune_rounded,
+                      label: '${_countByType(all, 'ADJUST')} ปรับสต๊อก',
+                      color: const Color(0xFF1565C0),
+                      bg: summaryChipBg,
+                      border: border,
+                    ),
+                  ],
+                ),
+              ),
+            ),
 
             // ── Content + Pagination (เหมือน product list) ──────
             Expanded(
@@ -378,13 +460,14 @@ class _StockProductHistoryDialogState
 
                             if (tabFiltered.isEmpty) return _buildEmpty();
                             return ListView.separated(
-                              padding: const EdgeInsets.all(12),
+                              padding: EdgeInsets.fromLTRB(12, 12, 12, 12),
                               itemCount: pageItems.length,
                               separatorBuilder: (_, _) =>
                                   const SizedBox(height: 6),
                               itemBuilder: (_, i) => _HistoryCard(
                                 movement: pageItems[i],
                                 baseUnit: widget.stock.baseUnit,
+                                isDark: isDark,
                               ),
                             );
                           }).toList(),
@@ -459,11 +542,59 @@ class _StockProductHistoryDialogState
   );
 }
 
+class _HistorySummaryChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final Color bg;
+  final Color border;
+
+  const _HistorySummaryChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.bg,
+    required this.border,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ── HistoryCard ────────────────────────────────────────────────────
 class _HistoryCard extends StatelessWidget {
   final _Movement movement;
   final String baseUnit;
-  const _HistoryCard({required this.movement, required this.baseUnit});
+  final bool isDark;
+  const _HistoryCard({
+    required this.movement,
+    required this.baseUnit,
+    required this.isDark,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -476,9 +607,11 @@ class _HistoryCard extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE8E8E8)),
+        color: isDark ? AppTheme.darkCard : Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isDark ? const Color(0xFF333333) : const Color(0xFFE8E8E8),
+        ),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       child: Row(
@@ -517,33 +650,41 @@ class _HistoryCard extends StatelessWidget {
                 // date + warehouse
                 Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.access_time,
                       size: 11,
-                      color: Color(0xFF9E9E9E),
+                      color: isDark
+                          ? const Color(0xFF9E9E9E)
+                          : const Color(0xFF9E9E9E),
                     ),
                     const SizedBox(width: 3),
                     Text(
                       DateFormat(
                         'dd/MM/yyyy HH:mm',
                       ).format(movement.movementDate),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
-                        color: Color(0xFF777777),
+                        color: isDark
+                            ? const Color(0xFF9E9E9E)
+                            : const Color(0xFF777777),
                       ),
                     ),
                     const SizedBox(width: 10),
-                    const Icon(
+                    Icon(
                       Icons.warehouse_outlined,
                       size: 11,
-                      color: Color(0xFF9E9E9E),
+                      color: isDark
+                          ? const Color(0xFF9E9E9E)
+                          : const Color(0xFF9E9E9E),
                     ),
                     const SizedBox(width: 3),
                     Text(
                       movement.warehouseName,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
-                        color: Color(0xFF777777),
+                        color: isDark
+                            ? const Color(0xFF9E9E9E)
+                            : const Color(0xFF777777),
                       ),
                     ),
                   ],
@@ -555,14 +696,22 @@ class _HistoryCard extends StatelessWidget {
                   const SizedBox(height: 2),
                   Row(
                     children: [
-                      const Icon(Icons.tag, size: 11, color: Color(0xFF9E9E9E)),
+                      Icon(
+                        Icons.tag,
+                        size: 11,
+                        color: isDark
+                            ? const Color(0xFF9E9E9E)
+                            : const Color(0xFF9E9E9E),
+                      ),
                       const SizedBox(width: 3),
                       Expanded(
                         child: Text(
                           movement.referenceNo!,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 11,
-                            color: Color(0xFF555555),
+                            color: isDark
+                                ? const Color(0xFFD0D0D0)
+                                : const Color(0xFF555555),
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -574,18 +723,22 @@ class _HistoryCard extends StatelessWidget {
                   const SizedBox(height: 2),
                   Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.notes,
                         size: 11,
-                        color: Color(0xFF9E9E9E),
+                        color: isDark
+                            ? const Color(0xFF9E9E9E)
+                            : const Color(0xFF9E9E9E),
                       ),
                       const SizedBox(width: 3),
                       Expanded(
                         child: Text(
                           movement.remark!,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 11,
-                            color: Color(0xFF888888),
+                            color: isDark
+                                ? const Color(0xFFAAAAAA)
+                                : const Color(0xFF888888),
                             fontStyle: FontStyle.italic,
                           ),
                           overflow: TextOverflow.ellipsis,

@@ -301,7 +301,9 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
                                 ? null
                                 : [
                                     BoxShadow(
-                                      color: AppTheme.navy.withValues(alpha: 0.04),
+                                      color: AppTheme.navy.withValues(
+                                        alpha: 0.04,
+                                      ),
                                       blurRadius: 8,
                                       offset: const Offset(0, 2),
                                     ),
@@ -314,10 +316,8 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
                               Expanded(
                                 child: ListView.separated(
                                   itemCount: items.length,
-                                  separatorBuilder: (_, _) => Divider(
-                                    height: 1,
-                                    color: colors.border,
-                                  ),
+                                  separatorBuilder: (_, _) =>
+                                      Divider(height: 1, color: colors.border),
                                   itemBuilder: (ctx, i) => _CouponRow(
                                     coupon: items[i],
                                     dateFmt: _dateFmt,
@@ -714,11 +714,7 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(
-            Icons.error_outline,
-            size: 64,
-            color: AppTheme.errorColor,
-          ),
+          const Icon(Icons.error_outline, size: 64, color: AppTheme.errorColor),
           const SizedBox(height: 16),
           Text('เกิดข้อผิดพลาด: $e'),
           const SizedBox(height: 16),
@@ -931,10 +927,10 @@ class _CouponListPageState extends ConsumerState<CouponListPage> {
     List<CouponModel> items,
     AsyncValue<List<PromotionModel>> promotionsAsync,
   ) {
-    return IntrinsicHeight(
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
       child: Row(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _CompactBtn(
             icon: Icons.checklist,
@@ -1169,9 +1165,7 @@ class _FilterBar extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: colors.searchBarBg,
-        border: Border(
-          bottom: BorderSide(color: colors.border),
-        ),
+        border: Border(bottom: BorderSide(color: colors.border)),
       ),
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
       child: Row(
@@ -1231,8 +1225,9 @@ class _FilterBar extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12,
                       color: hasExpiry ? AppTheme.primaryColor : colors.subtext,
-                      fontWeight:
-                          hasExpiry ? FontWeight.w600 : FontWeight.normal,
+                      fontWeight: hasExpiry
+                          ? FontWeight.w600
+                          : FontWeight.normal,
                     ),
                   ),
                   const SizedBox(width: 6),
@@ -1262,8 +1257,7 @@ class _FilterBar extends StatelessWidget {
                     InkWell(
                       onTap: onClearExpiryDates,
                       borderRadius: BorderRadius.circular(4),
-                      child:
-                          Icon(Icons.close, size: 16, color: colors.subtext),
+                      child: Icon(Icons.close, size: 16, color: colors.subtext),
                     ),
                   ],
                 ],
@@ -1277,10 +1271,7 @@ class _FilterBar extends StatelessWidget {
             borderRadius: BorderRadius.circular(8),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(
-                horizontal: 10,
-                vertical: 6,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
                 color: groupByPromotion
                     ? AppTheme.primaryColor
@@ -1627,9 +1618,7 @@ class _CouponRow extends StatelessWidget {
                             decoration: coupon.isUsed
                                 ? TextDecoration.lineThrough
                                 : null,
-                            color: coupon.isUsed
-                                ? colors.subtext
-                                : colors.text,
+                            color: coupon.isUsed ? colors.subtext : colors.text,
                           ),
                         ),
                         if (!selectionMode) ...[
@@ -1691,10 +1680,7 @@ class _CouponRow extends StatelessWidget {
 
               // Status badge — dot + label + border
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 4,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: st.color.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(12),
@@ -2416,6 +2402,74 @@ class _SelectionBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final paperSelector = SegmentedButton<CouponPaperSize>(
+      segments: const [
+        ButtonSegment(
+          value: CouponPaperSize.a6,
+          label: Text('A6'),
+          icon: Icon(Icons.crop_landscape_outlined, size: 14),
+        ),
+        ButtonSegment(
+          value: CouponPaperSize.a4,
+          label: Text('A4'),
+          icon: Icon(Icons.crop_portrait_outlined, size: 14),
+        ),
+      ],
+      selected: {paperSize},
+      onSelectionChanged: (s) => onPaperSizeChanged(s.first),
+      style: const ButtonStyle(
+        visualDensity: VisualDensity.compact,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+    );
+
+    final actionButtons = Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      alignment: WrapAlignment.end,
+      children: [
+        TextButton(
+          onPressed: onCancel,
+          child: const Text(
+            'ยกเลิก',
+            style: TextStyle(fontSize: 13, color: AppTheme.textSub),
+          ),
+        ),
+        ElevatedButton.icon(
+          onPressed: onPrint,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppTheme.primaryColor,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          icon: const Icon(Icons.picture_as_pdf_outlined, size: 16),
+          label: Text(
+            selectedCount == 0 ? 'แสดง PDF' : 'แสดง $selectedCount ใบ',
+            style: const TextStyle(fontSize: 13),
+          ),
+        ),
+        ElevatedButton.icon(
+          onPressed: onShare,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.teal,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          icon: const Icon(Icons.share_outlined, size: 16),
+          label: Text(
+            selectedCount == 0 ? 'แชร์ PDF' : 'แชร์ $selectedCount ใบ',
+            style: const TextStyle(fontSize: 13),
+          ),
+        ),
+      ],
+    );
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
@@ -2429,101 +2483,90 @@ class _SelectionBar extends StatelessWidget {
           ),
         ],
       ),
-      child: Row(
-        children: [
-          // Count
-          Text(
-            'เลือก $selectedCount / $totalCount',
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.primaryColor,
-            ),
-          ),
-          const SizedBox(width: 12),
-          // Select all / deselect all toggle
-          TextButton.icon(
-            onPressed: allSelected ? onDeselectAll : onSelectAll,
-            icon: Icon(
-              allSelected ? Icons.deselect : Icons.select_all,
-              size: 16,
-            ),
-            label: Text(
-              allSelected ? 'ยกเลิกทั้งหมด' : 'เลือกทั้งหมด',
-              style: const TextStyle(fontSize: 12),
-            ),
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-            ),
-          ),
-          const Spacer(),
-          // Paper size toggle
-          SegmentedButton<CouponPaperSize>(
-            segments: const [
-              ButtonSegment(
-                value: CouponPaperSize.a6,
-                label: Text('A6'),
-                icon: Icon(Icons.crop_landscape_outlined, size: 14),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isNarrow = constraints.maxWidth < 860;
+          if (isNarrow) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      'เลือก $selectedCount / $totalCount',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.primaryColor,
+                      ),
+                    ),
+                    TextButton.icon(
+                      onPressed: allSelected ? onDeselectAll : onSelectAll,
+                      icon: Icon(
+                        allSelected ? Icons.deselect : Icons.select_all,
+                        size: 16,
+                      ),
+                      label: Text(
+                        allSelected ? 'ยกเลิกทั้งหมด' : 'เลือกทั้งหมด',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: paperSelector,
+                ),
+                const SizedBox(height: 10),
+                actionButtons,
+              ],
+            );
+          }
+
+          return Row(
+            children: [
+              Text(
+                'เลือก $selectedCount / $totalCount',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.primaryColor,
+                ),
               ),
-              ButtonSegment(
-                value: CouponPaperSize.a4,
-                label: Text('A4'),
-                icon: Icon(Icons.crop_portrait_outlined, size: 14),
+              const SizedBox(width: 12),
+              TextButton.icon(
+                onPressed: allSelected ? onDeselectAll : onSelectAll,
+                icon: Icon(
+                  allSelected ? Icons.deselect : Icons.select_all,
+                  size: 16,
+                ),
+                label: Text(
+                  allSelected ? 'ยกเลิกทั้งหมด' : 'เลือกทั้งหมด',
+                  style: const TextStyle(fontSize: 12),
+                ),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                ),
+              ),
+              const Spacer(),
+              paperSelector,
+              const SizedBox(width: 8),
+              Flexible(
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: actionButtons,
+                ),
               ),
             ],
-            selected: {paperSize},
-            onSelectionChanged: (s) => onPaperSizeChanged(s.first),
-            style: const ButtonStyle(
-              visualDensity: VisualDensity.compact,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-          ),
-          const SizedBox(width: 8),
-          // Cancel
-          TextButton(
-            onPressed: onCancel,
-            child: const Text(
-              'ยกเลิก',
-              style: TextStyle(fontSize: 13, color: AppTheme.textSub),
-            ),
-          ),
-          const SizedBox(width: 8),
-          // Preview/Print button
-          ElevatedButton.icon(
-            onPressed: onPrint,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryColor,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            icon: const Icon(Icons.picture_as_pdf_outlined, size: 16),
-            label: Text(
-              selectedCount == 0 ? 'แสดง PDF' : 'แสดง $selectedCount ใบ',
-              style: const TextStyle(fontSize: 13),
-            ),
-          ),
-          const SizedBox(width: 6),
-          // Share button
-          ElevatedButton.icon(
-            onPressed: onShare,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.teal,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            icon: const Icon(Icons.share_outlined, size: 16),
-            label: Text(
-              selectedCount == 0 ? 'แชร์ PDF' : 'แชร์ $selectedCount ใบ',
-              style: const TextStyle(fontSize: 13),
-            ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }

@@ -5,8 +5,10 @@ import '../providers/promotion_provider.dart';
 import '../../data/models/promotion_model.dart';
 import 'promotion_form_page.dart';
 import 'coupon_list_page.dart';
+import 'coupon_pdf_report.dart';
 import 'promotion_usage_report_page.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
+import 'package:pos_erp/shared/pdf/pdf_report_button.dart';
 import 'package:pos_erp/shared/utils/responsive_utils.dart';
 import 'package:pos_erp/shared/widgets/app_dialogs.dart';
 import 'package:pos_erp/shared/widgets/escape_pop_scope.dart';
@@ -102,6 +104,7 @@ class _PromotionListPageState extends ConsumerState<PromotionListPage> {
   @override
   Widget build(BuildContext context) {
     final promotionsAsync = ref.watch(promotionListProvider);
+    final couponStateAsync = ref.watch(couponListProvider);
     final pageSize = ref.watch(settingsProvider).listPageSize;
     final colors = _PromotionListColors.of(context);
     final isDesktop = MediaQuery.of(context).size.width >= 600;
@@ -114,27 +117,29 @@ class _PromotionListPageState extends ConsumerState<PromotionListPage> {
         if (chips.isNotEmpty) chips.add(const SizedBox(width: 8));
         final selected = _filter == item.$1;
         final color = item.$3 ?? AppTheme.primaryColor;
-        chips.add(FilterChip(
-          label: Text(
-            item.$2,
-            style: TextStyle(
-              fontSize: 12,
-              color: selected ? color : colors.subtext,
-              fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+        chips.add(
+          FilterChip(
+            label: Text(
+              item.$2,
+              style: TextStyle(
+                fontSize: 12,
+                color: selected ? color : colors.subtext,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+              ),
             ),
+            selected: selected,
+            selectedColor: color.withValues(alpha: 0.12),
+            checkmarkColor: color,
+            side: BorderSide(color: selected ? color : colors.border),
+            backgroundColor: colors.neutralChipBg,
+            visualDensity: VisualDensity.compact,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            onSelected: (_) => setState(() {
+              _filter = item.$1;
+              _currentPage = 1;
+            }),
           ),
-          selected: selected,
-          selectedColor: color.withValues(alpha: 0.12),
-          checkmarkColor: color,
-          side: BorderSide(color: selected ? color : colors.border),
-          backgroundColor: colors.neutralChipBg,
-          visualDensity: VisualDensity.compact,
-          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          onSelected: (_) => setState(() {
-            _filter = item.$1;
-            _currentPage = 1;
-          }),
-        ));
+        );
       }
       inlineFilter = Row(mainAxisSize: MainAxisSize.min, children: chips);
     }
@@ -264,7 +269,10 @@ class _PromotionListPageState extends ConsumerState<PromotionListPage> {
                           pageSize: pageSize,
                           onPageChanged: (p) =>
                               setState(() => _currentPage = p),
-                          trailing: _buildFooterBtns(openCoupon),
+                          trailing: _buildFooterBtns(
+                            openCoupon,
+                            couponStateAsync.asData?.value.items ?? const [],
+                          ),
                         ),
                       ],
                     ),
@@ -343,35 +351,45 @@ class _PromotionListPageState extends ConsumerState<PromotionListPage> {
             totalItems: 0,
             pageSize: ref.read(settingsProvider).listPageSize,
             onPageChanged: (_) {},
-            trailing: _buildFooterBtns(openCoupon),
+            trailing: _buildFooterBtns(
+              openCoupon,
+              ref.watch(couponListProvider).asData?.value.items ?? const [],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildFooterBtns(VoidCallback openCoupon) {
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _PromoFooterBtn(
-            icon: Icons.confirmation_number_outlined,
-            label: 'จัดการคูปอง',
-            color: AppTheme.infoColor,
-            filled: true,
-            onTap: openCoupon,
-          ),
-          const SizedBox(width: 6),
-          _PromoFooterBtn(
-            icon: Icons.add,
-            label: 'สร้างโปรโมชั่น',
-            color: AppTheme.primaryColor,
-            filled: true,
-            onTap: () => _openForm(null),
-          ),
-        ],
-      ),
+  Widget _buildFooterBtns(VoidCallback openCoupon, List<CouponModel> coupons) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        PdfReportButton(
+          emptyMessage: 'ไม่มีข้อมูลคูปอง',
+          title: 'รายงานคูปอง',
+          filename: () => PdfFilename.generate('coupon_report'),
+          buildPdf: () => CouponPdfBuilder.build(coupons),
+          hasData: coupons.isNotEmpty,
+        ),
+        const SizedBox(width: 6),
+        _PromoFooterBtn(
+          icon: Icons.confirmation_number_outlined,
+          label: 'จัดการคูปอง',
+          color: AppTheme.infoColor,
+          filled: true,
+          onTap: openCoupon,
+        ),
+        const SizedBox(width: 6),
+        _PromoFooterBtn(
+          icon: Icons.add,
+          label: 'สร้างโปรโมชั่น',
+          color: AppTheme.primaryColor,
+          filled: true,
+          onTap: () => _openForm(null),
+        ),
+      ],
     );
   }
 
@@ -626,7 +644,6 @@ class _TopBar extends StatelessWidget {
   }
 
   Widget _buildWide(BuildContext context, bool canPop) {
-    final colors = _PromotionListColors.of(context);
     return Row(
       children: [
         if (canPop) ...[
@@ -657,26 +674,9 @@ class _TopBar extends StatelessWidget {
         if (hasFilter && onClearFilter != null)
           _ClearFilterBtn(onTap: onClearFilter!),
         const SizedBox(width: 6),
-        _RefreshBtn(onTap: onRefresh),
+        _ReportBtn(onTap: onReport),
         const SizedBox(width: 6),
-        SizedBox(
-          width: 34,
-          height: 34,
-          child: Material(
-            color: colors.navButtonBg,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-              side: BorderSide(color: colors.navButtonBorder),
-            ),
-            child: InkWell(
-              onTap: onReport,
-              borderRadius: BorderRadius.circular(8),
-              child: const Center(
-                child: Icon(Icons.bar_chart, size: 17, color: Colors.white70),
-              ),
-            ),
-          ),
-        ),
+        _RefreshBtn(onTap: onRefresh),
         const SizedBox(width: 8),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -721,6 +721,8 @@ class _TopBar extends StatelessWidget {
             const Spacer(),
             if (hasFilter && onClearFilter != null)
               _ClearFilterBtn(onTap: onClearFilter!),
+            const SizedBox(width: 6),
+            _ReportBtn(onTap: onReport),
             const SizedBox(width: 6),
             _RefreshBtn(onTap: onRefresh),
           ],
@@ -1213,6 +1215,7 @@ class _PromoFooterBtn extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
       child: Container(
+        constraints: const BoxConstraints(minHeight: 36),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
         decoration: BoxDecoration(
           color: filled ? color : colors.summaryChipBg,
@@ -1382,6 +1385,37 @@ class _RefreshBtn extends StatelessWidget {
       ),
     ),
   );
+}
+
+class _ReportBtn extends StatelessWidget {
+  final VoidCallback onTap;
+  const _ReportBtn({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = _PromotionListColors.of(context);
+    return Tooltip(
+      message: 'รายงานการใช้คูปอง',
+      child: SizedBox(
+        width: 34,
+        height: 34,
+        child: Material(
+          color: colors.navButtonBg,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+            side: BorderSide(color: colors.navButtonBorder),
+          ),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(8),
+            child: const Center(
+              child: Icon(Icons.bar_chart, size: 17, color: Colors.white70),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _ClearFilterBtn extends StatelessWidget {

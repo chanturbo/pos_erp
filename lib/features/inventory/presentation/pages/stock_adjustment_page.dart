@@ -31,163 +31,138 @@ class StockAdjustmentPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = _StockAdjustmentColors.of(context);
     return Scaffold(
-      backgroundColor: AppTheme.surfaceColorOf(context),
-      appBar: AppBar(
-        leading: buildMobileHomeLeading(context),
-        automaticallyImplyLeading: Navigator.of(context).canPop(),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      backgroundColor: colors.scaffoldBg,
+      body: EscapePopScope(
+        child: Column(
           children: [
-            const Text('ปรับปรุงสต๊อก'),
-            Text(
-              'ปรับเพิ่ม ลด ตรวจนับ โอนย้าย และติดตามผลต่างสต๊อก',
-              style: TextStyle(
-                fontSize: 11,
-                color: Colors.white.withValues(alpha: 0.65),
-                fontWeight: FontWeight.normal,
+            const _StockAdjustmentTopBar(
+              title: 'ปรับปรุงสต๊อก',
+              pageTag: 'Stock Adjustment',
+              icon: Icons.inventory_2_outlined,
+            ),
+            Expanded(
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: context.contentMaxWidth,
+                  ),
+                  child: SingleChildScrollView(
+                    padding: context.pagePadding,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          decoration: BoxDecoration(
+                            color: colors.summaryBg,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: colors.border),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          child: Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: const [
+                              _AdjustmentSummaryChip(
+                                icon: Icons.tune,
+                                label: 'ปรับเพิ่ม/ลด',
+                                color: AppTheme.primary,
+                              ),
+                              _AdjustmentSummaryChip(
+                                icon: Icons.fact_check_outlined,
+                                label: 'ตรวจนับสต๊อก',
+                                color: AppTheme.warning,
+                              ),
+                              _AdjustmentSummaryChip(
+                                icon: Icons.swap_horiz,
+                                label: 'โอนย้าย',
+                                color: AppTheme.info,
+                              ),
+                              _AdjustmentSummaryChip(
+                                icon: Icons.analytics_outlined,
+                                label: 'รายงานผลต่าง',
+                                color: AppTheme.success,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        _AdjustmentSectionCard(
+                          title: 'เลือกประเภทการปรับสต๊อก',
+                          icon: Icons.inventory_2_outlined,
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: GridView.count(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              crossAxisCount: context.isMobile ? 1 : 2,
+                              crossAxisSpacing: 10,
+                              mainAxisSpacing: 10,
+                              childAspectRatio: context.isMobile ? 3.2 : 2.8,
+                              children: [
+                                _MenuCard(
+                                  icon: Icons.tune,
+                                  label: 'ปรับสต๊อก (เพิ่ม/ลด)',
+                                  color: AppTheme.primaryColor,
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const AdjustStockSubPage(),
+                                    ),
+                                  ),
+                                ),
+                                _MenuCard(
+                                  icon: Icons.fact_check_outlined,
+                                  label: 'ตรวจนับสต๊อก',
+                                  color: AppTheme.warningColor,
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const StockTakeSubPage(),
+                                    ),
+                                  ),
+                                ),
+                                _MenuCard(
+                                  icon: Icons.swap_horiz,
+                                  label: 'โอนย้ายสต๊อก',
+                                  color: AppTheme.tealColor,
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const StockTransferSubPage(),
+                                    ),
+                                  ),
+                                ),
+                                _MenuCard(
+                                  icon: Icons.analytics_outlined,
+                                  label: 'รายงานผลต่าง',
+                                  color: AppTheme.purpleColor,
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const VarianceReportPage(),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ),
           ],
-        ),
-      ),
-      body: EscapePopScope(
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: context.contentMaxWidth),
-            child: SingleChildScrollView(
-              padding: context.pagePadding,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Card(
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: BorderSide(color: AppTheme.borderColorOf(context)),
-                    ),
-                    child: Padding(
-                      padding: context.cardPadding,
-                      child: const Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(
-                            Icons.info_outline,
-                            color: AppTheme.primaryColor,
-                            size: 18,
-                          ),
-                          SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              'เลือกประเภทการปรับปรุงสต๊อกที่ต้องการ ทุกการเปลี่ยนแปลงจะบันทึกประวัติไว้ในระบบ',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: AppTheme.primaryColor,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Row(
-                    children: [
-                      Container(
-                        width: 34,
-                        height: 34,
-                        decoration: BoxDecoration(
-                          color: AppTheme.primary.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(
-                          Icons.inventory_2_outlined,
-                          color: AppTheme.primary,
-                          size: 18,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        'เลือกประเภทการปรับสต๊อก',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: Theme.of(context).colorScheme.onSurface,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Card(
-                    elevation: 0,
-                    color: Theme.of(context).cardColor,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: BorderSide(color: AppTheme.borderColorOf(context)),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: GridView.count(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        crossAxisCount: context.isMobile ? 1 : 2,
-                        crossAxisSpacing: 10,
-                        mainAxisSpacing: 10,
-                        childAspectRatio: context.isMobile ? 3.2 : 2.8,
-                        children: [
-                          _MenuCard(
-                            icon: Icons.tune,
-                            label: 'ปรับสต๊อก (เพิ่ม/ลด)',
-                            color: AppTheme.primaryColor,
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const AdjustStockSubPage(),
-                              ),
-                            ),
-                          ),
-                          _MenuCard(
-                            icon: Icons.fact_check_outlined,
-                            label: 'ตรวจนับสต๊อก',
-                            color: AppTheme.warningColor,
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const StockTakeSubPage(),
-                              ),
-                            ),
-                          ),
-                          _MenuCard(
-                            icon: Icons.swap_horiz,
-                            label: 'โอนย้ายสต๊อก',
-                            color: AppTheme.tealColor,
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const StockTransferSubPage(),
-                              ),
-                            ),
-                          ),
-                          _MenuCard(
-                            icon: Icons.analytics_outlined,
-                            label: 'รายงานผลต่าง',
-                            color: AppTheme.purpleColor,
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const VarianceReportPage(),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
         ),
       ),
     );
@@ -261,415 +236,396 @@ class _AdjustStockSubPageState extends ConsumerState<AdjustStockSubPage> {
   @override
   Widget build(BuildContext context) {
     final stockAsync = ref.watch(stockBalanceProvider);
+    final colors = _StockAdjustmentColors.of(context);
 
     return Scaffold(
-      backgroundColor: AppTheme.surfaceColorOf(context),
-      appBar: AppBar(
-        leading: buildMobileHomeLeading(context),
-        automaticallyImplyLeading: Navigator.of(context).canPop(),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      backgroundColor: colors.scaffoldBg,
+      body: EscapePopScope(
+        child: Column(
           children: [
-            const Text('ปรับสต๊อก (เพิ่ม/ลด)'),
-            Text(
-              'ค้นหาสินค้า เลือกรายการ และบันทึกการเปลี่ยนแปลงสต๊อก',
-              style: TextStyle(
-                fontSize: 11,
-                color: Colors.white.withValues(alpha: 0.65),
-                fontWeight: FontWeight.normal,
+            _StockAdjustmentTopBar(
+              title: 'ปรับสต๊อก (เพิ่ม/ลด)',
+              pageTag: 'Adjust Stock',
+              icon: Icons.tune,
+              trailing: Tooltip(
+                message: 'รีเฟรช',
+                child: _StockAdjustmentTopBtn(
+                  icon: Icons.refresh,
+                  onTap: () =>
+                      ref.read(stockBalanceProvider.notifier).refresh(),
+                ),
               ),
             ),
-          ],
-        ),
-      ),
-      body: EscapePopScope(
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: context.contentMaxWidth),
-            child: Column(
-              children: [
-                Padding(
-                  padding: context.pagePadding,
-                  child: Card(
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: BorderSide(color: AppTheme.borderColorOf(context)),
-                    ),
-                    child: Padding(
-                      padding: context.cardPadding,
-                      child: LayoutBuilder(
-                        builder: (context, constraints) {
-                          final wide = constraints.maxWidth >= 980;
-                          final searchField = ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 320),
-                            child: SizedBox(
-                              height: 36,
-                              child: TextField(
-                                controller: _searchController,
-                                style: TextStyle(
-                                  fontSize: 12.5,
-                                  color: Theme.of(context).colorScheme.onSurface,
-                                ),
-                                decoration: InputDecoration(
-                                  hintText: 'ค้นหาชื่อ / รหัสสินค้า...',
-                                  hintStyle: TextStyle(
-                                    fontSize: 12,
-                                    color: AppTheme.subtextColorOf(context),
+            Expanded(
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: context.contentMaxWidth,
+                  ),
+                  child: Column(
+                    children: [
+                      Padding(
+                        padding: context.pagePadding,
+                        child: _AdjustmentSectionCard(
+                          title: 'ค้นหาและเลือกสินค้า',
+                          icon: Icons.tune,
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: LayoutBuilder(
+                              builder: (context, constraints) {
+                                final wide = constraints.maxWidth >= 980;
+                                final searchField = ConstrainedBox(
+                                  constraints: const BoxConstraints(
+                                    maxWidth: 320,
                                   ),
-                                  prefixIcon: Icon(
-                                    Icons.search,
-                                    size: 17,
-                                    color: AppTheme.subtextColorOf(context),
-                                  ),
-                                  suffixIcon: _searchQuery.isNotEmpty
-                                      ? IconButton(
-                                          icon: const Icon(
-                                            Icons.clear,
-                                            size: 15,
-                                          ),
-                                          onPressed: () {
-                                            _searchController.clear();
-                                            setState(() => _searchQuery = '');
-                                          },
-                                        )
-                                      : ScannerButton(
-                                          onScanned: (value) {
-                                            _searchController.text = value;
-                                            setState(
-                                              () => _searchQuery = value,
-                                            );
-                                          },
-                                        ),
-                                  contentPadding: EdgeInsets.zero,
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                    borderSide: const BorderSide(
-                                      color: Color(0xFFE0E0E0),
-                                    ),
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                    borderSide: const BorderSide(
-                                      color: Color(0xFFE0E0E0),
-                                    ),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                    borderSide: const BorderSide(
-                                      color: AppTheme.primary,
-                                      width: 1.5,
-                                    ),
-                                  ),
-                                  filled: true,
-                                  fillColor: Theme.of(context).cardColor,
-                                ),
-                                onChanged: (v) =>
-                                    setState(() => _searchQuery = v),
-                              ),
-                            ),
-                          );
-
-                          final headerBlock = Row(
-                            children: [
-                              Container(
-                                width: 34,
-                                height: 34,
-                                decoration: BoxDecoration(
-                                  color: AppTheme.primary.withValues(
-                                    alpha: 0.12,
-                                  ),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: const Icon(
-                                  Icons.tune,
-                                  color: AppTheme.primary,
-                                  size: 18,
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'ค้นหาและเลือกสินค้า',
+                                  child: SizedBox(
+                                    height: 40,
+                                    child: TextField(
+                                      controller: _searchController,
                                       style: TextStyle(
                                         fontSize: 13,
-                                        fontWeight: FontWeight.w700,
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.onSurface,
+                                        color: colors.text,
                                       ),
+                                      decoration: InputDecoration(
+                                        hintText: 'ค้นหาชื่อ / รหัสสินค้า...',
+                                        hintStyle: TextStyle(
+                                          fontSize: 13,
+                                          color: colors.subtext,
+                                        ),
+                                        prefixIcon: Icon(
+                                          Icons.search,
+                                          size: 17,
+                                          color: colors.subtext,
+                                        ),
+                                        suffixIcon: _searchQuery.isNotEmpty
+                                            ? IconButton(
+                                                icon: const Icon(
+                                                  Icons.clear,
+                                                  size: 15,
+                                                ),
+                                                onPressed: () {
+                                                  _searchController.clear();
+                                                  setState(
+                                                    () => _searchQuery = '',
+                                                  );
+                                                },
+                                              )
+                                            : ScannerButton(
+                                                onScanned: (value) {
+                                                  _searchController.text =
+                                                      value;
+                                                  setState(
+                                                    () => _searchQuery = value,
+                                                  );
+                                                },
+                                              ),
+                                        contentPadding: EdgeInsets.zero,
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                          borderSide: BorderSide(
+                                            color: colors.border,
+                                          ),
+                                        ),
+                                        enabledBorder: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                          borderSide: BorderSide(
+                                            color: colors.border,
+                                          ),
+                                        ),
+                                        focusedBorder: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                          borderSide: const BorderSide(
+                                            color: AppTheme.primary,
+                                            width: 1.5,
+                                          ),
+                                        ),
+                                        filled: true,
+                                        fillColor: colors.inputFill,
+                                      ),
+                                      onChanged: (v) =>
+                                          setState(() => _searchQuery = v),
                                     ),
-                                    const SizedBox(height: 3),
-                                    Text(
-                                      'ค้นหาจากชื่อสินค้า รหัสสินค้า หรือสแกนบาร์โค้ด',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: AppTheme.subtextColorOf(context),
+                                  ),
+                                );
+
+                                final headerBlock = Row(
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'ค้นหาจากชื่อสินค้า รหัสสินค้า หรือสแกนบาร์โค้ด',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w600,
+                                              color: colors.text,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 3),
+                                          Text(
+                                            'เลือกรายการที่ต้องการปรับ แล้วกรอกจำนวนและเหตุผลก่อนบันทึก',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: colors.subtext,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   ],
-                                ),
-                              ),
-                            ],
-                          );
+                                );
 
-                          final actions = Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
-                              searchField,
-                              Tooltip(
-                                message: 'รีเฟรช',
-                                child: InkWell(
-                                  onTap: () => ref
-                                      .read(stockBalanceProvider.notifier)
-                                      .refresh(),
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(6),
-                                    decoration: BoxDecoration(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .surfaceContainerHighest
-                                          .withValues(alpha: 0.55),
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(
-                                        color: AppTheme.borderColorOf(context),
-                                      ),
-                                    ),
-                                    child: Icon(
-                                      Icons.refresh,
-                                      size: 16,
-                                      color: AppTheme.subtextColorOf(context),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          );
+                                final actions = Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: [searchField],
+                                );
 
-                          if (wide) {
-                            return Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(child: headerBlock),
-                                const SizedBox(width: 16),
-                                actions,
-                              ],
-                            );
-                          }
-
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              headerBlock,
-                              const SizedBox(height: 12),
-                              actions,
-                            ],
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: stockAsync.when(
-                    loading: () =>
-                        const Center(child: CircularProgressIndicator()),
-                    error: (e, _) => Center(child: Text('เกิดข้อผิดพลาด: $e')),
-                    data: (stocks) {
-                      final filtered = _filter(stocks);
-                      return LayoutBuilder(
-                        builder: (context, constraints) {
-                          final isWide = constraints.maxWidth >= 1120;
-                          final useCardView = context.isMobile;
-
-                          final listPanel = Card(
-                            elevation: 0,
-                            margin: EdgeInsets.zero,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              side: BorderSide(
-                                color: AppTheme.borderColorOf(context),
-                              ),
-                            ),
-                            child: Column(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.fromLTRB(
-                                    12,
-                                    10,
-                                    12,
-                                    10,
-                                  ),
-                                  child: Wrap(
-                                    spacing: 8,
-                                    runSpacing: 8,
+                                if (wide) {
+                                  return Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      _AdjSummaryChip(
-                                        'ทั้งหมด',
-                                        stocks.length,
-                                        AppTheme.navy,
+                                      Expanded(child: headerBlock),
+                                      const SizedBox(width: 16),
+                                      actions,
+                                    ],
+                                  );
+                                }
+
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    headerBlock,
+                                    const SizedBox(height: 12),
+                                    actions,
+                                  ],
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: stockAsync.when(
+                          loading: () =>
+                              const Center(child: CircularProgressIndicator()),
+                          error: (e, _) =>
+                              Center(child: Text('เกิดข้อผิดพลาด: $e')),
+                          data: (stocks) {
+                            final filtered = _filter(stocks);
+                            return LayoutBuilder(
+                              builder: (context, constraints) {
+                                final isWide = constraints.maxWidth >= 1120;
+                                final useCardView = context.isMobile;
+
+                                final listPanel = Card(
+                                  elevation: 0,
+                                  margin: EdgeInsets.zero,
+                                  color: colors.cardBg,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    side: BorderSide(color: colors.border),
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      Container(
+                                        width: double.infinity,
+                                        decoration: BoxDecoration(
+                                          color: colors.summaryBg,
+                                          borderRadius:
+                                              const BorderRadius.vertical(
+                                                top: Radius.circular(12),
+                                              ),
+                                        ),
+                                        padding: const EdgeInsets.fromLTRB(
+                                          12,
+                                          10,
+                                          12,
+                                          10,
+                                        ),
+                                        child: Wrap(
+                                          spacing: 8,
+                                          runSpacing: 8,
+                                          children: [
+                                            _AdjSummaryChip(
+                                              'ทั้งหมด',
+                                              stocks.length,
+                                              AppTheme.info,
+                                            ),
+                                            _AdjSummaryChip(
+                                              'กรองแล้ว',
+                                              filtered.length,
+                                              AppTheme.primary,
+                                            ),
+                                          ],
+                                        ),
                                       ),
-                                      _AdjSummaryChip(
-                                        'กรองแล้ว',
-                                        filtered.length,
-                                        AppTheme.primaryDark,
+                                      Divider(height: 1, color: colors.border),
+                                      Expanded(
+                                        child: filtered.isEmpty
+                                            ? Center(
+                                                child: Column(
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment.center,
+                                                  children: [
+                                                    Icon(
+                                                      Icons.search_off_outlined,
+                                                      size: 56,
+                                                      color: Theme.of(context)
+                                                          .colorScheme
+                                                          .outline
+                                                          .withValues(
+                                                            alpha: 0.5,
+                                                          ),
+                                                    ),
+                                                    const SizedBox(height: 10),
+                                                    Text(
+                                                      _searchQuery.isEmpty
+                                                          ? 'ไม่มีข้อมูลสต๊อก'
+                                                          : 'ไม่พบสินค้า "$_searchQuery"',
+                                                      style: TextStyle(
+                                                        color: colors.subtext,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              )
+                                            : useCardView
+                                            ? GridView.builder(
+                                                padding: const EdgeInsets.all(
+                                                  8,
+                                                ),
+                                                gridDelegate:
+                                                    SliverGridDelegateWithFixedCrossAxisCount(
+                                                      crossAxisCount:
+                                                          constraints.maxWidth <
+                                                              420
+                                                          ? 1
+                                                          : 2,
+                                                      mainAxisSpacing: 8,
+                                                      crossAxisSpacing: 8,
+                                                      childAspectRatio:
+                                                          constraints.maxWidth <
+                                                              420
+                                                          ? 2.9
+                                                          : 1.15,
+                                                    ),
+                                                itemCount: filtered.length,
+                                                itemBuilder: (context, index) {
+                                                  final stock = filtered[index];
+                                                  final isSelected =
+                                                      _selectedStock
+                                                              ?.productId ==
+                                                          stock.productId &&
+                                                      _selectedStock
+                                                              ?.warehouseId ==
+                                                          stock.warehouseId;
+                                                  return _AdjStockItemCard(
+                                                    stock: stock,
+                                                    isSelected: isSelected,
+                                                    compact: true,
+                                                    onTap: () => setState(() {
+                                                      _selectedStock = stock;
+                                                      _qtyController.clear();
+                                                    }),
+                                                  );
+                                                },
+                                              )
+                                            : ListView.separated(
+                                                padding: const EdgeInsets.all(
+                                                  8,
+                                                ),
+                                                itemCount: filtered.length,
+                                                separatorBuilder: (_, _) =>
+                                                    const SizedBox(height: 6),
+                                                itemBuilder: (context, index) {
+                                                  final stock = filtered[index];
+                                                  final isSelected =
+                                                      _selectedStock
+                                                              ?.productId ==
+                                                          stock.productId &&
+                                                      _selectedStock
+                                                              ?.warehouseId ==
+                                                          stock.warehouseId;
+                                                  return _AdjStockItemCard(
+                                                    stock: stock,
+                                                    isSelected: isSelected,
+                                                    onTap: () => setState(() {
+                                                      _selectedStock = stock;
+                                                      _qtyController.clear();
+                                                    }),
+                                                  );
+                                                },
+                                              ),
                                       ),
                                     ],
                                   ),
-                                ),
-                                Divider(
-                                  height: 1,
-                                  color: AppTheme.borderColorOf(context),
-                                ),
-                                Expanded(
-                                  child: filtered.isEmpty
-                                      ? Center(
-                                          child: Column(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: [
-                                              Icon(
-                                                Icons.search_off_outlined,
-                                                size: 56,
-                                                color: Theme.of(context)
-                                                    .colorScheme
-                                                    .outline
-                                                    .withValues(alpha: 0.5),
-                                              ),
-                                              const SizedBox(height: 10),
-                                              Text(
-                                                _searchQuery.isEmpty
-                                                    ? 'ไม่มีข้อมูลสต๊อก'
-                                                    : 'ไม่พบสินค้า "$_searchQuery"',
-                                                style: TextStyle(
-                                                  color: AppTheme.subtextColorOf(
-                                                    context,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        )
-                                      : useCardView
-                                      ? GridView.builder(
-                                          padding: const EdgeInsets.all(8),
-                                          gridDelegate:
-                                              SliverGridDelegateWithFixedCrossAxisCount(
-                                                crossAxisCount:
-                                                    constraints.maxWidth < 420
-                                                    ? 1
-                                                    : 2,
-                                                mainAxisSpacing: 8,
-                                                crossAxisSpacing: 8,
-                                                childAspectRatio:
-                                                    constraints.maxWidth < 420
-                                                    ? 2.9
-                                                    : 1.15,
-                                              ),
-                                          itemCount: filtered.length,
-                                          itemBuilder: (context, index) {
-                                            final stock = filtered[index];
-                                            final isSelected =
-                                                _selectedStock?.productId ==
-                                                    stock.productId &&
-                                                _selectedStock?.warehouseId ==
-                                                    stock.warehouseId;
-                                            return _AdjStockItemCard(
-                                              stock: stock,
-                                              isSelected: isSelected,
-                                              compact: true,
-                                              onTap: () => setState(() {
-                                                _selectedStock = stock;
-                                                _qtyController.clear();
-                                              }),
-                                            );
-                                          },
-                                        )
-                                      : ListView.separated(
-                                          padding: const EdgeInsets.all(8),
-                                          itemCount: filtered.length,
-                                          separatorBuilder: (_, _) =>
-                                              const SizedBox(height: 6),
-                                          itemBuilder: (context, index) {
-                                            final stock = filtered[index];
-                                            final isSelected =
-                                                _selectedStock?.productId ==
-                                                    stock.productId &&
-                                                _selectedStock?.warehouseId ==
-                                                    stock.warehouseId;
-                                            return _AdjStockItemCard(
-                                              stock: stock,
-                                              isSelected: isSelected,
-                                              onTap: () => setState(() {
-                                                _selectedStock = stock;
-                                                _qtyController.clear();
-                                              }),
-                                            );
-                                          },
-                                        ),
-                                ),
-                              ],
-                            ),
-                          );
+                                );
 
-                          final formPanel = Card(
-                            elevation: 0,
-                            margin: EdgeInsets.zero,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              side: BorderSide(
-                                color: AppTheme.borderColorOf(context),
-                              ),
-                            ),
-                            child: _selectedStock == null
-                                ? _buildEmptyState()
-                                : _buildAdjustForm(),
-                          );
+                                final formPanel = Card(
+                                  elevation: 0,
+                                  margin: EdgeInsets.zero,
+                                  color: colors.cardBg,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    side: BorderSide(color: colors.border),
+                                  ),
+                                  child: _selectedStock == null
+                                      ? _buildEmptyState()
+                                      : _buildAdjustForm(),
+                                );
 
-                          final contentPadding = EdgeInsets.fromLTRB(
-                            context.pagePadding.left,
-                            0,
-                            context.pagePadding.right,
-                            context.pagePadding.bottom,
-                          );
+                                final contentPadding = EdgeInsets.fromLTRB(
+                                  context.pagePadding.left,
+                                  0,
+                                  context.pagePadding.right,
+                                  context.pagePadding.bottom,
+                                );
 
-                          if (isWide) {
-                            return Padding(
-                              padding: contentPadding,
-                              child: Row(
-                                children: [
-                                  SizedBox(width: 340, child: listPanel),
-                                  const SizedBox(width: 12),
-                                  Expanded(child: formPanel),
-                                ],
-                              ),
+                                if (isWide) {
+                                  return Padding(
+                                    padding: contentPadding,
+                                    child: Row(
+                                      children: [
+                                        SizedBox(width: 340, child: listPanel),
+                                        const SizedBox(width: 12),
+                                        Expanded(child: formPanel),
+                                      ],
+                                    ),
+                                  );
+                                }
+
+                                return Padding(
+                                  padding: contentPadding,
+                                  child: Column(
+                                    children: [
+                                      SizedBox(height: 320, child: listPanel),
+                                      const SizedBox(height: 12),
+                                      Expanded(child: formPanel),
+                                    ],
+                                  ),
+                                );
+                              },
                             );
-                          }
-
-                          return Padding(
-                            padding: contentPadding,
-                            child: Column(
-                              children: [
-                                SizedBox(height: 320, child: listPanel),
-                                const SizedBox(height: 12),
-                                Expanded(child: formPanel),
-                              ],
-                            ),
-                          );
-                        },
-                      );
-                    },
+                          },
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
@@ -678,6 +634,7 @@ class _AdjustStockSubPageState extends ConsumerState<AdjustStockSubPage> {
   // ── Empty state ────────────────────────────────────────────
   Widget _buildEmptyState() {
     final cs = Theme.of(context).colorScheme;
+    final colors = _StockAdjustmentColors.of(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -687,12 +644,9 @@ class _AdjustStockSubPageState extends ConsumerState<AdjustStockSubPage> {
             Container(
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: AppTheme.primaryContainer.withValues(
-                  alpha: Theme.of(context).brightness == Brightness.dark
-                      ? 0.28
-                      : 1,
-                ),
+                color: colors.emptyIconBg,
                 shape: BoxShape.circle,
+                border: Border.all(color: colors.border),
               ),
               child: const Icon(
                 Icons.touch_app,
@@ -713,10 +667,7 @@ class _AdjustStockSubPageState extends ConsumerState<AdjustStockSubPage> {
             const SizedBox(height: 6),
             Text(
               'เลือกรายการจากแผงด้านบนหรือด้านซ้าย',
-              style: TextStyle(
-                fontSize: 12,
-                color: AppTheme.subtextColorOf(context),
-              ),
+              style: TextStyle(fontSize: 12, color: colors.subtext),
               textAlign: TextAlign.center,
             ),
           ],
@@ -738,16 +689,9 @@ class _AdjustStockSubPageState extends ConsumerState<AdjustStockSubPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ── Product Info Card ──────────────────────────
-            Card(
-              elevation: 0,
-              color: AppTheme.primaryContainer,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: const BorderSide(
-                  color: AppTheme.primaryColor,
-                  width: 0.5,
-                ),
-              ),
+            _AdjustmentSectionCard(
+              title: 'ข้อมูลสินค้า',
+              icon: Icons.inventory_2_outlined,
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: LayoutBuilder(
@@ -882,37 +826,36 @@ class _AdjustStockSubPageState extends ConsumerState<AdjustStockSubPage> {
             const SizedBox(height: 24),
 
             // ── ประเภทการปรับ ──────────────────────────────
-            const Text(
-              'ประเภทการปรับ',
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _AdjustTypeButton(
-                  label: 'เพิ่มสต๊อก',
-                  icon: Icons.add_circle,
-                  color: AppTheme.success,
-                  isSelected: _adjustType == 'INCREASE',
-                  onTap: () => setState(() => _adjustType = 'INCREASE'),
-                ),
-                _AdjustTypeButton(
-                  label: 'ลดสต๊อก',
-                  icon: Icons.remove_circle,
-                  color: AppTheme.error,
-                  isSelected: _adjustType == 'DECREASE',
-                  onTap: () => setState(() => _adjustType = 'DECREASE'),
-                ),
-                _AdjustTypeButton(
-                  label: 'กำหนดยอด',
-                  icon: Icons.edit,
-                  color: AppTheme.warning,
-                  isSelected: _adjustType == 'SET',
-                  onTap: () => setState(() => _adjustType = 'SET'),
-                ),
-              ],
+            _AdjustmentSectionCard(
+              title: 'ประเภทการปรับ',
+              icon: Icons.category_outlined,
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _AdjustTypeButton(
+                    label: 'เพิ่มสต๊อก',
+                    icon: Icons.add_circle,
+                    color: AppTheme.success,
+                    isSelected: _adjustType == 'INCREASE',
+                    onTap: () => setState(() => _adjustType = 'INCREASE'),
+                  ),
+                  _AdjustTypeButton(
+                    label: 'ลดสต๊อก',
+                    icon: Icons.remove_circle,
+                    color: AppTheme.error,
+                    isSelected: _adjustType == 'DECREASE',
+                    onTap: () => setState(() => _adjustType = 'DECREASE'),
+                  ),
+                  _AdjustTypeButton(
+                    label: 'กำหนดยอด',
+                    icon: Icons.edit,
+                    color: AppTheme.warning,
+                    isSelected: _adjustType == 'SET',
+                    onTap: () => setState(() => _adjustType = 'SET'),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 24),
 
@@ -922,11 +865,11 @@ class _AdjustStockSubPageState extends ConsumerState<AdjustStockSubPage> {
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
               ),
-              decoration: InputDecoration(
+              decoration: _adjustInputDecoration(
+                context,
                 labelText: _adjustType == 'SET'
                     ? 'กำหนดสต๊อกใหม่ *'
                     : 'จำนวนที่ต้องการ${_adjustType == 'INCREASE' ? 'เพิ่ม' : 'ลด'} *',
-                border: const OutlineInputBorder(),
                 suffixText: stock.baseUnit,
                 prefixIcon: Icon(
                   _adjustType == 'INCREASE'
@@ -1023,11 +966,11 @@ class _AdjustStockSubPageState extends ConsumerState<AdjustStockSubPage> {
             // ── เลขที่อ้างอิง ──────────────────────────────
             TextFormField(
               controller: _referenceController,
-              decoration: const InputDecoration(
+              decoration: _adjustInputDecoration(
+                context,
                 labelText: 'เลขที่เอกสารอ้างอิง',
-                border: OutlineInputBorder(),
                 hintText: 'เช่น ADJ-2024-001',
-                prefixIcon: Icon(Icons.numbers),
+                prefixIcon: const Icon(Icons.numbers),
               ),
             ),
             const SizedBox(height: 16),
@@ -1035,11 +978,11 @@ class _AdjustStockSubPageState extends ConsumerState<AdjustStockSubPage> {
             // ── หมายเหตุ ───────────────────────────────────
             TextFormField(
               controller: _remarkController,
-              decoration: const InputDecoration(
+              decoration: _adjustInputDecoration(
+                context,
                 labelText: 'เหตุผล / หมายเหตุ *',
-                border: OutlineInputBorder(),
                 hintText: 'เช่น สินค้าชำรุด, นับสต๊อกรอบปี, แก้ไขยอดผิด',
-                prefixIcon: Icon(Icons.note_alt_outlined),
+                prefixIcon: const Icon(Icons.note_alt_outlined),
               ),
               maxLines: 2,
               validator: (value) {
@@ -1176,42 +1119,186 @@ class _AdjSummaryChip extends StatelessWidget {
   const _AdjSummaryChip(this.label, this.count, this.color);
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-    decoration: BoxDecoration(
-      color: color.withValues(alpha: 0.1),
-      borderRadius: BorderRadius.circular(20),
-      border: Border.all(color: color.withValues(alpha: 0.3)),
-    ),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
+  Widget build(BuildContext context) {
+    final colors = _StockAdjustmentColors.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: colors.summaryChipBg,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: colors.border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            '$count',
+            style: TextStyle(
+              fontSize: 12,
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StockAdjustmentTopBar extends StatelessWidget {
+  final String title;
+  final String pageTag;
+  final IconData icon;
+  final Widget? trailing;
+
+  const _StockAdjustmentTopBar({
+    required this.title,
+    required this.pageTag,
+    required this.icon,
+    this.trailing,
+  });
+
+  static const _kBreak = 600.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final isWide = MediaQuery.of(context).size.width >= _kBreak;
+    final colors = _StockAdjustmentColors.of(context);
+
+    return Container(
+      decoration: BoxDecoration(color: colors.topBarBg),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: isWide ? _buildWide(context) : _buildNarrow(context),
+    );
+  }
+
+  Widget _buildWide(BuildContext context) {
+    final canPop = Navigator.of(context).canPop();
+    return Row(
       children: [
+        if (canPop) ...[
+          const _StockAdjustmentBackBtn(),
+          const SizedBox(width: 10),
+        ],
+        _StockAdjustmentPageIcon(icon: icon),
+        const SizedBox(width: 10),
         Text(
-          label,
-          style: TextStyle(
-            fontSize: 11,
-            color: color,
-            fontWeight: FontWeight.w500,
+          title,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
           ),
         ),
-        const SizedBox(width: 4),
+        const Spacer(),
+        if (trailing != null) ...[trailing!, const SizedBox(width: 8)],
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(10),
+            color: AppTheme.primary.withValues(alpha: 0.2),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: AppTheme.primary.withValues(alpha: 0.5)),
           ),
           child: Text(
-            '$count',
+            pageTag,
             style: const TextStyle(
               fontSize: 11,
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.primaryLight,
             ),
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildNarrow(BuildContext context) {
+    final canPop = Navigator.of(context).canPop();
+    return Row(
+      children: [
+        if (canPop) ...[
+          const _StockAdjustmentBackBtn(),
+          const SizedBox(width: 8),
+        ],
+        _StockAdjustmentPageIcon(icon: icon),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            title,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        if (trailing != null) ...[const SizedBox(width: 8), trailing!],
+      ],
+    );
+  }
+}
+
+class _StockAdjustmentBackBtn extends StatelessWidget {
+  const _StockAdjustmentBackBtn();
+
+  @override
+  Widget build(BuildContext context) => context.isMobile
+      ? buildMobileHomeCompactButton(context)
+      : _StockAdjustmentTopBtn(
+          icon: Icons.arrow_back,
+          onTap: () => Navigator.of(context).pop(),
+        );
+}
+
+class _StockAdjustmentTopBtn extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _StockAdjustmentTopBtn({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = _StockAdjustmentColors.of(context);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.all(7),
+        decoration: BoxDecoration(
+          color: colors.navButtonBg,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: colors.navButtonBorder),
+        ),
+        child: Icon(icon, size: 17, color: Colors.white70),
+      ),
+    );
+  }
+}
+
+class _StockAdjustmentPageIcon extends StatelessWidget {
+  final IconData icon;
+
+  const _StockAdjustmentPageIcon({required this.icon});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(7),
+    decoration: BoxDecoration(
+      color: AppTheme.primary.withValues(alpha: 0.18),
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(color: AppTheme.primary.withValues(alpha: 0.28)),
     ),
+    child: Icon(icon, color: AppTheme.primaryLight, size: 18),
   );
 }
 
@@ -1330,9 +1417,7 @@ class _AdjStockItemCard extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12.5,
                   fontWeight: FontWeight.w600,
-                  color: isSelected
-                      ? AppTheme.primaryColor
-                      : textColor,
+                  color: isSelected ? AppTheme.primaryColor : textColor,
                 ),
               ),
               const SizedBox(height: 4),
@@ -1403,19 +1488,14 @@ class _AdjStockItemCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w600,
-                      color: isSelected
-                          ? AppTheme.primaryColor
-                          : textColor,
+                      color: isSelected ? AppTheme.primaryColor : textColor,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 2),
                   Text(
                     '${stock.productCode} • ${stock.warehouseName}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: subText,
-                    ),
+                    style: TextStyle(fontSize: 11, color: subText),
                   ),
                 ],
               ),
@@ -1466,45 +1546,237 @@ class _AdjustTypeButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? color.withValues(alpha: 0.12)
+              : (isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF0F0F0)),
+          border: Border.all(
             color: isSelected
                 ? color
-                : (isDark
-                    ? Theme.of(context).colorScheme.surfaceContainerHighest
-                        .withValues(alpha: 0.28)
-                    : Colors.grey[100]),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: isSelected
-                  ? color
-                  : (isDark
-                      ? AppTheme.borderColorOf(context)
-                      : Colors.grey[300]!),
-              width: isSelected ? 2 : 1,
-            ),
+                : (isDark ? const Color(0xFF444444) : AppTheme.border),
+            width: isSelected ? 1.5 : 1,
           ),
-          child: Column(
-            children: [
-              Icon(icon, color: isSelected ? Colors.white : color, size: 20),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.bold,
-                  color: isSelected ? Colors.white : color,
-                ),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: isSelected ? color : AppTheme.textSub, size: 16),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? color : AppTheme.textSub,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                fontSize: 13,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
+    );
+  }
+}
+
+class _AdjustmentSectionCard extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final Widget child;
+
+  const _AdjustmentSectionCard({
+    required this.title,
+    required this.icon,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = _StockAdjustmentColors.of(context);
+    return Container(
+      decoration: BoxDecoration(
+        color: colors.cardBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colors.border),
+        boxShadow: [
+          if (!colors.isDark)
+            BoxShadow(
+              color: AppTheme.navy.withValues(alpha: 0.04),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: colors.headerBg,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(12),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 4,
+                  height: 16,
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Icon(icon, size: 16, color: AppTheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: colors.text,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Divider(height: 1, color: colors.border),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _AdjustmentSummaryChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _AdjustmentSummaryChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = _StockAdjustmentColors.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: colors.summaryChipBg,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: colors.border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+InputDecoration _adjustInputDecoration(
+  BuildContext context, {
+  required String labelText,
+  String? hintText,
+  String? suffixText,
+  Widget? prefixIcon,
+}) {
+  final colors = _StockAdjustmentColors.of(context);
+  return InputDecoration(
+    labelText: labelText,
+    hintText: hintText,
+    suffixText: suffixText,
+    prefixIcon: prefixIcon,
+    filled: true,
+    fillColor: colors.inputFill,
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: BorderSide(color: colors.border),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: BorderSide(color: colors.border),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
+    ),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+  );
+}
+
+class _StockAdjustmentColors {
+  final bool isDark;
+  final Color scaffoldBg;
+  final Color cardBg;
+  final Color border;
+  final Color text;
+  final Color subtext;
+  final Color topBarBg;
+  final Color summaryBg;
+  final Color summaryChipBg;
+  final Color inputFill;
+  final Color headerBg;
+  final Color emptyIconBg;
+  final Color navButtonBg;
+  final Color navButtonBorder;
+
+  const _StockAdjustmentColors({
+    required this.isDark,
+    required this.scaffoldBg,
+    required this.cardBg,
+    required this.border,
+    required this.text,
+    required this.subtext,
+    required this.topBarBg,
+    required this.summaryBg,
+    required this.summaryChipBg,
+    required this.inputFill,
+    required this.headerBg,
+    required this.emptyIconBg,
+    required this.navButtonBg,
+    required this.navButtonBorder,
+  });
+
+  factory _StockAdjustmentColors.of(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return _StockAdjustmentColors(
+      isDark: isDark,
+      scaffoldBg: isDark ? AppTheme.darkBg : AppTheme.surface,
+      cardBg: isDark ? AppTheme.darkCard : Colors.white,
+      border: isDark ? const Color(0xFF333333) : AppTheme.border,
+      text: isDark ? const Color(0xFFE0E0E0) : const Color(0xFF1A1A1A),
+      subtext: isDark ? const Color(0xFF9E9E9E) : AppTheme.textSub,
+      topBarBg: isDark ? AppTheme.navyDark : AppTheme.navy,
+      summaryBg: isDark ? const Color(0xFF181818) : const Color(0xFFFFF8F5),
+      summaryChipBg: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+      inputFill: isDark ? AppTheme.darkElement : Colors.white,
+      headerBg: isDark ? AppTheme.darkElement : AppTheme.headerBg,
+      emptyIconBg: isDark ? AppTheme.darkCard : AppTheme.surface,
+      navButtonBg: isDark
+          ? Colors.white.withValues(alpha: 0.08)
+          : AppTheme.navyLight,
+      navButtonBorder: isDark ? Colors.white24 : AppTheme.navy,
     );
   }
 }
@@ -4462,47 +4734,39 @@ class _SummaryStatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: color.withValues(alpha: 0.25)),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: color, size: 28),
-            const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFF8A8A8A),
-                  ),
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 28),
+          const SizedBox(width: 10),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(fontSize: 11, color: Color(0xFF8A8A8A)),
+              ),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: color,
                 ),
-                Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: color,
-                  ),
-                ),
-                Text(
-                  unit,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFF8A8A8A),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+              ),
+              Text(
+                unit,
+                style: const TextStyle(fontSize: 11, color: Color(0xFF8A8A8A)),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

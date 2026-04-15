@@ -39,7 +39,20 @@ class StockRoutes {
           w.warehouse_id,
           w.warehouse_name,
           COALESCE(SUM(sm.quantity), 0) as balance,
-          COALESCE(sb.avg_cost, 0) as avg_cost,
+          COALESCE(
+            NULLIF(sb.avg_cost, 0),
+            NULLIF(sb.last_cost, 0),
+            (
+              SELECT sm2.unit_cost
+              FROM stock_movements sm2
+              WHERE sm2.product_id = p.product_id
+                AND sm2.warehouse_id = w.warehouse_id
+                AND COALESCE(sm2.unit_cost, 0) > 0
+              ORDER BY sm2.movement_date DESC, sm2.created_at DESC
+              LIMIT 1
+            ),
+            0
+          ) as avg_cost,
           COALESCE(sb.last_cost, 0) as last_cost,
           COALESCE(sb.reserved_qty, 0) as reserved_qty
         FROM products p
@@ -56,28 +69,24 @@ class StockRoutes {
 
       final result = await db.customSelect(query).get();
 
-      final stockData = result
-          .map(
-            (row) {
-              final balance = row.read<double>('balance');
-              final reservedQty = row.read<double>('reserved_qty');
-              return {
-                'product_id': row.read<String>('product_id'),
-                'product_code': row.read<String>('product_code'),
-                'product_name': row.read<String>('product_name'),
-                'barcode': row.readNullable<String>('barcode'),
-                'base_unit': row.read<String>('base_unit'),
-                'warehouse_id': row.read<String>('warehouse_id'),
-                'warehouse_name': row.read<String>('warehouse_name'),
-                'balance': balance,
-                'reserved_qty': reservedQty,
-                'available_qty': (balance - reservedQty).clamp(0.0, double.infinity),
-                'avg_cost': row.read<double>('avg_cost'),
-                'last_cost': row.read<double>('last_cost'),
-              };
-            },
-          )
-          .toList();
+      final stockData = result.map((row) {
+        final balance = row.read<double>('balance');
+        final reservedQty = row.read<double>('reserved_qty');
+        return {
+          'product_id': row.read<String>('product_id'),
+          'product_code': row.read<String>('product_code'),
+          'product_name': row.read<String>('product_name'),
+          'barcode': row.readNullable<String>('barcode'),
+          'base_unit': row.read<String>('base_unit'),
+          'warehouse_id': row.read<String>('warehouse_id'),
+          'warehouse_name': row.read<String>('warehouse_name'),
+          'balance': balance,
+          'reserved_qty': reservedQty,
+          'available_qty': (balance - reservedQty).clamp(0.0, double.infinity),
+          'avg_cost': row.read<double>('avg_cost'),
+          'last_cost': row.read<double>('last_cost'),
+        };
+      }).toList();
 
       return Response.ok(
         jsonEncode({'success': true, 'data': stockData}),
@@ -127,10 +136,13 @@ class StockRoutes {
 
   /// GET /api/stock/movements/product/:productId - ประวัติของสินค้าตัวนั้น
   Future<Response> _getProductMovementsHandler(
-      Request request, String productId) async {
+    Request request,
+    String productId,
+  ) async {
     try {
-      final result = await db.customSelect(
-        '''
+      final result = await db
+          .customSelect(
+            '''
         SELECT
           sm.movement_id,
           sm.movement_no,
@@ -152,27 +164,31 @@ class StockRoutes {
         WHERE sm.product_id = ?
         ORDER BY sm.movement_date DESC
         ''',
-        variables: [Variable.withString(productId)],
-      ).get();
+            variables: [Variable.withString(productId)],
+          )
+          .get();
 
       final data = result
-          .map((row) => {
-                'movement_id': row.read<String>('movement_id'),
-                'movement_no': row.readNullable<String>('movement_no'),
-                'movement_date':
-                    row.read<DateTime>('movement_date').toIso8601String(),
-                'movement_type': row.read<String>('movement_type'),
-                'product_id': row.read<String>('product_id'),
-                'product_name': row.readNullable<String>('product_name'),
-                'product_code': row.readNullable<String>('product_code'),
-                'base_unit': row.readNullable<String>('base_unit'),
-                'warehouse_id': row.read<String>('warehouse_id'),
-                'warehouse_name': row.readNullable<String>('warehouse_name'),
-                'quantity': row.read<double>('quantity'),
-                'unit_cost': row.read<double>('unit_cost'),
-                'reference_no': row.readNullable<String>('reference_no'),
-                'remark': row.readNullable<String>('remark'),
-              })
+          .map(
+            (row) => {
+              'movement_id': row.read<String>('movement_id'),
+              'movement_no': row.readNullable<String>('movement_no'),
+              'movement_date': row
+                  .read<DateTime>('movement_date')
+                  .toIso8601String(),
+              'movement_type': row.read<String>('movement_type'),
+              'product_id': row.read<String>('product_id'),
+              'product_name': row.readNullable<String>('product_name'),
+              'product_code': row.readNullable<String>('product_code'),
+              'base_unit': row.readNullable<String>('base_unit'),
+              'warehouse_id': row.read<String>('warehouse_id'),
+              'warehouse_name': row.readNullable<String>('warehouse_name'),
+              'quantity': row.read<double>('quantity'),
+              'unit_cost': row.read<double>('unit_cost'),
+              'reference_no': row.readNullable<String>('reference_no'),
+              'remark': row.readNullable<String>('remark'),
+            },
+          )
           .toList();
 
       return Response.ok(
@@ -201,7 +217,9 @@ class StockRoutes {
       final quantity = (data['quantity'] as num).toDouble();
       final unitCost = (data['unit_cost'] as num?)?.toDouble() ?? 0.0;
 
-      await db.into(db.stockMovements).insert(
+      await db
+          .into(db.stockMovements)
+          .insert(
             StockMovementsCompanion(
               movementId: Value(movementId),
               movementNo: Value('IN-$ts'),
@@ -262,7 +280,9 @@ class StockRoutes {
       final movementId = 'STK$ts';
       final userId = getAuthUser(request)?.userId ?? 'USR001';
 
-      await db.into(db.stockMovements).insert(
+      await db
+          .into(db.stockMovements)
+          .insert(
             StockMovementsCompanion(
               movementId: Value(movementId),
               movementNo: Value('OUT-$ts'),
@@ -312,7 +332,9 @@ class StockRoutes {
       final movementId = 'STK$ts';
       final userId = getAuthUser(request)?.userId ?? 'USR001';
 
-      await db.into(db.stockMovements).insert(
+      await db
+          .into(db.stockMovements)
+          .insert(
             StockMovementsCompanion(
               movementId: Value(movementId),
               movementNo: Value('ADJ-$ts'),
@@ -380,7 +402,9 @@ class StockRoutes {
 
       await db.transaction(() async {
         // OUT จากคลังต้นทาง
-        await db.into(db.stockMovements).insert(
+        await db
+            .into(db.stockMovements)
+            .insert(
               StockMovementsCompanion(
                 movementId: Value('${transferId}_OUT'),
                 movementNo: Value('TRF-${ts}_OUT'),
@@ -396,7 +420,9 @@ class StockRoutes {
             );
 
         // IN เข้าคลังปลายทาง
-        await db.into(db.stockMovements).insert(
+        await db
+            .into(db.stockMovements)
+            .insert(
               StockMovementsCompanion(
                 movementId: Value('${transferId}_IN'),
                 movementNo: Value('TRF-${ts}_IN'),
@@ -457,17 +483,19 @@ class StockRoutes {
     double qtyDelta,
     double unitCost,
   ) async {
-    final existing = await (db.select(db.stockBalances)
-          ..where(
-            (s) =>
-                s.productId.equals(productId) &
-                s.warehouseId.equals(warehouseId),
-          ))
-        .getSingleOrNull();
+    final existing =
+        await (db.select(db.stockBalances)..where(
+              (s) =>
+                  s.productId.equals(productId) &
+                  s.warehouseId.equals(warehouseId),
+            ))
+            .getSingleOrNull();
 
     if (existing == null) {
       final newAvg = (qtyDelta > 0 && unitCost > 0) ? unitCost : 0.0;
-      await db.into(db.stockBalances).insert(
+      await db
+          .into(db.stockBalances)
+          .insert(
             StockBalancesCompanion(
               stockId: Value('SB_${productId}_$warehouseId'),
               productId: Value(productId),
@@ -493,9 +521,9 @@ class StockRoutes {
         newLast = unitCost;
       }
 
-      await (db.update(db.stockBalances)
-            ..where((s) => s.stockId.equals(existing.stockId)))
-          .write(
+      await (db.update(
+        db.stockBalances,
+      )..where((s) => s.stockId.equals(existing.stockId))).write(
         StockBalancesCompanion(
           quantity: Value(newQty),
           avgCost: Value(newAvg),

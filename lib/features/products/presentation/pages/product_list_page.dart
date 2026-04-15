@@ -26,6 +26,7 @@ class ProductListPage extends ConsumerStatefulWidget {
 class _ProductListPageState extends ConsumerState<ProductListPage> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  String _selectedWarehouse = 'ALL';
   bool _isTableView = true;
   bool _initializedViewMode = false;
   bool _isActiveOnly = false; // filter เฉพาะสินค้าที่ใช้งาน
@@ -37,11 +38,20 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
   // ── Pagination ──────────────────────────────────────────────────
   int _currentPage = 1;
 
-  // ✅ ความกว้างคอลัมน์ที่ resize ได้ (ค่าเริ่มต้นก่อน auto-fit)
-  // ลำดับ: [รหัส, ชื่อ, หน่วย, ราคา, ต้นทุน, สต๊อก, สถานะ, จัดการ]
-  final List<double> _colWidths = [90, 200, 60, 90, 80, 56, 72, 88];
-  static const List<double> _colMinW = [80, 140, 60, 80, 80, 50, 60, 88];
-  static const List<double> _colMaxW = [220, 500, 140, 180, 180, 100, 120, 88];
+  // ลำดับ: [รหัส, ชื่อ, คงเหลือ, หน่วย, ราคา, ต้นทุน, มูลค่า, สถานะ, จัดการ]
+  final List<double> _colWidths = [120, 200, 100, 60, 110, 96, 110, 76, 88];
+  static const List<double> _colMinW = [110, 120, 96, 56, 100, 90, 96, 72, 88];
+  static const List<double> _colMaxW = [
+    220,
+    300,
+    140,
+    140,
+    180,
+    180,
+    200,
+    120,
+    88,
+  ];
 
   // ✅ ScrollControllers สำหรับแสดง scrollbar
   final _hScroll = ScrollController();
@@ -79,7 +89,10 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
         .toList();
   }
 
-  List<ProductModel> _sort(List<ProductModel> src) {
+  List<ProductModel> _sort(
+    List<ProductModel> src,
+    Map<String, _ProductStockSnapshot> stockMap,
+  ) {
     final list = List<ProductModel>.from(src);
     list.sort((a, b) {
       int c;
@@ -95,6 +108,16 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
           break;
         case 'standardCost':
           c = a.standardCost.compareTo(b.standardCost);
+          break;
+        case 'balance':
+          c = (stockMap[a.productId]?.qty ?? 0).compareTo(
+            stockMap[b.productId]?.qty ?? 0,
+          );
+          break;
+        case 'stockValue':
+          c = (a.standardCost * (stockMap[a.productId]?.qty ?? 0)).compareTo(
+            b.standardCost * (stockMap[b.productId]?.qty ?? 0),
+          );
           break;
         default:
           c = 0;
@@ -115,6 +138,37 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
       _currentPage = 1;
     });
   }
+
+  double _measureTextWidth(
+    BuildContext context,
+    String text, {
+    required TextStyle style,
+  }) {
+    final painter = TextPainter(
+      text: TextSpan(text: text, style: style),
+      textDirection: Directionality.of(context),
+      maxLines: 1,
+    )..layout();
+    return painter.width;
+  }
+
+  Map<String, _ProductStockSnapshot> _stockMap(List<StockBalanceModel> stocks) {
+    final map = <String, _ProductStockSnapshot>{};
+    for (final s in stocks) {
+      if (_selectedWarehouse != 'ALL' && s.warehouseId != _selectedWarehouse) {
+        continue;
+      }
+      final prev = map[s.productId] ?? const _ProductStockSnapshot();
+      map[s.productId] = _ProductStockSnapshot(qty: prev.qty + s.balance);
+    }
+    return map;
+  }
+
+  String get _selectedWarehouseLabel => switch (_selectedWarehouse) {
+    'WH001' => 'คลังหลัก',
+    'WH002' => 'คลังสยาม',
+    _ => 'ทุกคลัง',
+  };
 
   // ─────────────────────────────────────────────────────────────
   // Delete — ใช้ pattern เดียวกับไฟล์ที่แนบมา
@@ -211,6 +265,7 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
           _ProductListTopBar(
             searchController: _searchController,
             searchQuery: _searchQuery,
+            selectedWarehouse: _selectedWarehouse,
             isActiveOnly: _isActiveOnly,
             isTableView: _isTableView,
             onSearchChanged: (v) => setState(() {
@@ -226,6 +281,10 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
             },
             onToggleActive: () => setState(() {
               _isActiveOnly = !_isActiveOnly;
+              _currentPage = 1;
+            }),
+            onWarehouseChanged: (v) => setState(() {
+              _selectedWarehouse = v;
               _currentPage = 1;
             }),
             onToggleView: () => setState(() => _isTableView = !_isTableView),
@@ -257,7 +316,8 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
               data: (products) {
                 final filtered = _filter(products);
                 if (filtered.isEmpty) return _buildEmpty();
-                final sorted = _sort(filtered);
+                final stockMap = _stockMap(stockAsync.value ?? const []);
+                final sorted = _sort(filtered, stockMap);
                 final totalPages = (sorted.length / pageSize).ceil();
                 final safePage = _currentPage.clamp(1, totalPages);
                 final pageStart = (safePage - 1) * pageSize;
@@ -282,8 +342,12 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
                           ],
                         ),
                         child: _isTableView
-                            ? _buildTableView(pageItems)
-                            : _buildCardView(pageItems),
+                            ? _buildTableView(
+                                visibleProducts: pageItems,
+                                allFittedProducts: sorted,
+                                stockMap: stockMap,
+                              )
+                            : _buildCardView(pageItems, stockMap),
                       ),
                     ),
                     // ── Footer / Pagination ──────────────────────
@@ -297,21 +361,22 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
                         title: 'รายงานสินค้า',
                         filename: () => PdfFilename.generate('product_report'),
                         buildPdf: () {
-                          // คำนวณ stockMap จาก stockAsync ที่ capture ไว้
-                          final stocks = stockAsync.value ?? [];
-                          final stockMap = <String, double>{};
-                          for (final s in stocks) {
-                            stockMap[s.productId] =
-                                (stockMap[s.productId] ?? 0) + s.balance;
-                          }
+                          final stockMap = _stockMap(
+                            stockAsync.value ?? const [],
+                          );
                           double cost = 0, selling = 0;
                           for (final p in filtered) {
-                            final qty = stockMap[p.productId] ?? 0;
+                            final qty = stockMap[p.productId]?.qty ?? 0;
                             cost += p.standardCost * qty;
                             selling += p.priceLevel1 * qty;
                           }
+                          final qtyMap = {
+                            for (final e in stockMap.entries)
+                              e.key: e.value.qty,
+                          };
                           return ProductPdfBuilder.build(
                             List<ProductModel>.from(filtered),
+                            stockQtyMap: qtyMap,
                             totalCost: cost,
                             totalSelling: selling,
                             totalProfit: selling - cost,
@@ -343,19 +408,16 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
         final all = products as List<ProductModel>;
         final filtered = _filter(all);
 
-        // สร้าง stockMap: productId → ยอดรวมทุก warehouse
-        final stockMap = <String, double>{};
-        stockAsync.whenData((stocks) {
-          for (final s in stocks) {
-            stockMap[s.productId] = (stockMap[s.productId] ?? 0) + s.balance;
-          }
-        });
+        final stockMap = _stockMap(stockAsync.value ?? const []);
 
-        // คำนวณมูลค่าจากสินค้าที่ filter แล้ว
         double totalCost = 0;
         double totalSelling = 0;
+        double totalQty = 0;
         for (final p in filtered) {
-          final qty = stockMap[p.productId] ?? 0;
+          final snapshot =
+              stockMap[p.productId] ?? const _ProductStockSnapshot();
+          final qty = snapshot.qty;
+          totalQty += qty;
           totalCost += p.standardCost * qty;
           totalSelling += p.priceLevel1 * qty;
         }
@@ -398,6 +460,12 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
                           all.where((p) => !p.isActive).length,
                           AppTheme.error,
                         ),
+                        const SizedBox(width: 8),
+                        _SummaryChip(
+                          _selectedWarehouseLabel,
+                          totalQty.round(),
+                          AppTheme.info,
+                        ),
                       ],
                     ),
                     const SizedBox(width: 16),
@@ -406,7 +474,7 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         _ValueStat(
-                          label: 'ต้นทุนรวม',
+                          label: 'ต้นทุนรวม ($_selectedWarehouseLabel)',
                           value: totalCost,
                           color: AppTheme.navy,
                           emphasis: _ValueStatEmphasis.medium,
@@ -424,8 +492,9 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
                               ? 'กำไรคาดการณ์'
                               : 'ขาดทุนคาดการณ์',
                           value: profit.abs(),
-                          color:
-                              profit >= 0 ? AppTheme.success : AppTheme.error,
+                          color: profit >= 0
+                              ? AppTheme.success
+                              : AppTheme.error,
                           sign: profit >= 0 ? '+' : '-',
                           emphasis: _ValueStatEmphasis.high,
                         ),
@@ -447,61 +516,136 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
   // ─────────────────────────────────────────────────────────────
   // Auto-fit colWidths ตามความยาวข้อความจริงใน list
   // ─────────────────────────────────────────────────────────────
-  void _autoFitColWidths(List<ProductModel> rows, double screenW) {
-    // ── Header minimum widths (hardcoded จากการวัดจริง) ───────────
-    // วัดจาก NotoSansThai fontSize=12, w600
-    // = label width + padding(16) + sort icon(16) [เฉพาะคอลัมน์ที่ sort ได้]
-    // [รหัสสินค้า, ชื่อสินค้า, หน่วย, ราคาขาย, ต้นทุน, สต๊อก, สถานะ, จัดการ]
-    const headerMinW = [112.0, 112.0, 60.0, 96.0, 84.0, 58.0, 62.0, 88.0];
-    //  รหัสสินค้า: 10 Thai + sort = ~112
-    //  ชื่อสินค้า: 10 Thai + sort = ~112
-    //  หน่วย:      5 Thai         = ~60
-    //  ราคาขาย:   7 Thai + sort  = ~96   ← ปัญหาเดิม ต้องไม่ต่ำกว่านี้
-    //  ต้นทุน:    6 Thai + sort  = ~84
-    //  สต๊อก:     5 Thai         = ~58
-    //  สถานะ:     5 Thai         = ~62
-    //  จัดการ:    6 Thai (no sort)= ~88 (ตรงกับ colMinW)
+  void _autoFitColWidths(
+    List<ProductModel> rows,
+    Map<String, _ProductStockSnapshot> stockMap,
+  ) {
+    final headers = [
+      ('รหัสสินค้า', true),
+      ('ชื่อสินค้า', true),
+      ('คงเหลือ', true),
+      ('หน่วย', false),
+      ('ราคาขาย', true),
+      ('ต้นทุน', true),
+      ('มูลค่า', true),
+      ('สถานะ', false),
+      ('', false),
+    ];
+    final headerStyle = const TextStyle(
+      fontSize: 12,
+      fontWeight: FontWeight.w600,
+      letterSpacing: 0.4,
+    );
+    final codeStyle = TextStyle(
+      fontFamily: 'monospace',
+      fontSize: 13,
+      fontWeight: FontWeight.w500,
+      color: _ProductListColors.of(context).subtext,
+    );
+    final nameStyle = TextStyle(
+      fontSize: 13,
+      color: _ProductListColors.of(context).text,
+    );
+    final subtextStyle = TextStyle(
+      fontSize: 12,
+      color: _ProductListColors.of(context).subtext,
+    );
+    final priceStyle = TextStyle(
+      fontSize: 13,
+      fontWeight: FontWeight.w600,
+      color: _ProductListColors.of(context).amountText,
+    );
+    final statusStyle = const TextStyle(
+      fontSize: 11,
+      fontWeight: FontWeight.w600,
+    );
 
-    // เริ่มต้น maxW = headerMinW — content ย่อต่ำกว่านี้ไม่ได้
-    final maxW = List<double>.from(headerMinW);
+    final maxW = List<double>.generate(headers.length, (i) {
+      final label = headers[i].$1;
+      final isSortable = headers[i].$2;
+      final isLast = i == headers.length - 1;
+      final labelW = label.isEmpty
+          ? 0.0
+          : _measureTextWidth(context, label, style: headerStyle);
 
-    // ── Content widths ────────────────────────────────────────────
-    const codeCharW = 7.8; // monospace fontSize 13
-    const nameCharW = 7.2; // regular fontSize 13
-    const unitCharW = 7.2;
-    const numCharW = 7.4; // ตัวเลข
-    const cPad = 20.0; // horizontal padding ต่อ cell
+      // Header cell uses: horizontal padding 8+8, sort icon/gap when sortable,
+      // and resize handle width on every column except the last one.
+      // +10 buffer for Thai font pixel rounding & icon rendering variance.
+      const basePadding = 16.0;
+      const sortChrome = 20.0; // gap(4) + icon(12) + 4px buffer
+      const resizeHandle = 14.0;
+      const headerBuffer = 10.0;
+      return labelW +
+          basePadding +
+          (isSortable ? sortChrome : 0.0) +
+          (isLast ? 0.0 : resizeHandle) +
+          headerBuffer;
+    });
 
     for (final p in rows) {
-      final codeW = p.productCode.length * codeCharW + cPad;
-      final nameW = p.productName.length * nameCharW + cPad;
-      final unitW = p.baseUnit.length * unitCharW + cPad;
+      final codeW =
+          _measureTextWidth(context, p.productCode, style: codeStyle) + 20;
+      final barcodeW = (p.barcode != null && p.barcode!.isNotEmpty)
+          ? _measureTextWidth(
+                  context,
+                  p.barcode!,
+                  style: const TextStyle(fontSize: 11),
+                ) +
+                16
+          : 0.0;
+      final nameW = [
+        _measureTextWidth(context, p.productName, style: nameStyle) + 20,
+        barcodeW,
+      ].reduce((a, b) => a > b ? a : b);
+      final unitW =
+          _measureTextWidth(context, p.baseUnit, style: subtextStyle) + 20;
       final priceW =
-          '฿${p.priceLevel1.toStringAsFixed(2)}'.length * numCharW + cPad;
+          _measureTextWidth(
+            context,
+            '฿${p.priceLevel1.toStringAsFixed(2)}',
+            style: priceStyle,
+          ) +
+          20;
       final costW =
-          '฿${p.standardCost.toStringAsFixed(2)}'.length * numCharW + cPad;
+          _measureTextWidth(
+            context,
+            '฿${p.standardCost.toStringAsFixed(2)}',
+            style: subtextStyle,
+          ) +
+          20;
+      final snapshot = stockMap[p.productId] ?? const _ProductStockSnapshot();
+      final stockValue = p.standardCost * snapshot.qty;
+      final qtyW =
+          _measureTextWidth(
+            context,
+            NumberFormat('#,##0').format(snapshot.qty),
+            style: priceStyle,
+          ) +
+          20;
+      final valueW =
+          _measureTextWidth(
+            context,
+            '฿${NumberFormat('#,##0.00').format(stockValue)}',
+            style: subtextStyle,
+          ) +
+          20;
+      final statusLabel = p.isActive ? 'ใช้งาน' : 'ปิดใช้';
+      final statusW =
+          _measureTextWidth(context, statusLabel, style: statusStyle) + 34;
 
       if (codeW > maxW[0]) maxW[0] = codeW;
       if (nameW > maxW[1]) maxW[1] = nameW;
-      if (unitW > maxW[2]) maxW[2] = unitW;
-      if (priceW > maxW[3]) maxW[3] = priceW;
-      if (costW > maxW[4]) maxW[4] = costW;
-      // [5] สต๊อก, [6] สถานะ, [7] จัดการ — ไม่มี text content → headerMinW เป็น floor อยู่แล้ว
+      if (qtyW > maxW[2]) maxW[2] = qtyW;
+      if (unitW > maxW[3]) maxW[3] = unitW;
+      if (priceW > maxW[4]) maxW[4] = priceW;
+      if (costW > maxW[5]) maxW[5] = costW;
+      if (valueW > maxW[6]) maxW[6] = valueW;
+      if (statusW > maxW[7]) maxW[7] = statusW;
+      maxW[8] = 88;
     }
 
-    // ── Clamp: floor = max(headerMinW, colMinW), ceil = colMaxW ───
     for (int i = 0; i < maxW.length; i++) {
-      final floor = headerMinW[i] > _colMinW[i] ? headerMinW[i] : _colMinW[i];
-      maxW[i] = maxW[i].clamp(floor, _colMaxW[i]);
-    }
-
-    // กระจาย space ที่เหลือให้คอลัมน์ชื่อ (index 1)
-    const totalFixed = 76.0; // No.(48) + reset(28)
-    final totalCols = maxW.fold(0.0, (s, w) => s + w);
-    final available = screenW - totalFixed;
-    if (totalCols < available) {
-      final floor1 = headerMinW[1] > _colMinW[1] ? headerMinW[1] : _colMinW[1];
-      maxW[1] = (maxW[1] + (available - totalCols)).clamp(floor1, _colMaxW[1]);
+      maxW[i] = maxW[i].clamp(_colMinW[i], _colMaxW[i]);
     }
 
     for (int i = 0; i < _colWidths.length; i++) {
@@ -509,10 +653,14 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
     }
   }
 
-  Widget _buildTableView(List<ProductModel> products) {
-    // ✅ Auto-fit colWidths ตามเนื้อหา เฉพาะครั้งแรก / ยังไม่ resize
-    final screenW = MediaQuery.of(context).size.width;
-    if (!_userResized) _autoFitColWidths(products, screenW);
+  Widget _buildTableView({
+    required List<ProductModel> visibleProducts,
+    required List<ProductModel> allFittedProducts,
+    required Map<String, _ProductStockSnapshot> stockMap,
+  }) {
+    // หักลบ margin ซ้าย-ขวา 16px ออกจาก screenW เพื่อให้ tableW ตรงกับพื้นที่จริง
+    final screenW = MediaQuery.of(context).size.width - 32;
+    if (!_userResized) _autoFitColWidths(allFittedProducts, stockMap);
 
     final totalW = 48.0 + _colWidths.fold(0.0, (s, w) => s + w) + 28.0;
     final tableW = totalW > screenW ? totalW : screenW;
@@ -542,7 +690,7 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
                   _userResized = true; // ✅ user resize แล้ว หยุด auto-adjust
                 }),
                 onReset: () => setState(() {
-                  _colWidths.setAll(0, [90, 200, 60, 90, 80, 56, 72, 88]);
+                  _colWidths.setAll(0, [120, 200, 100, 60, 110, 96, 110, 76, 88]);
                   _userResized = false; // ✅ reset → auto-fit ทำงานอีกครั้ง
                 }),
               ),
@@ -550,23 +698,27 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
               // Rows — shrinkWrap ได้เพราะ Column รู้ขนาดจาก SizedBox แล้ว
               Expanded(
                 child: ListView.separated(
-                  itemCount: products.length,
+                  itemCount: visibleProducts.length,
                   separatorBuilder: (_, _) => Divider(
                     height: 1,
                     color: _ProductListColors.of(context).border,
                   ),
                   itemBuilder: (_, i) => _ProductTableRow(
-                    product: products[i],
+                    product: visibleProducts[i],
+                    stock:
+                        stockMap[visibleProducts[i].productId] ??
+                        const _ProductStockSnapshot(),
                     no: i + 1,
                     isEven: i.isEven,
                     colWidths: _colWidths,
                     onEdit: () => Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => ProductFormPage(product: products[i]),
+                        builder: (_) =>
+                            ProductFormPage(product: visibleProducts[i]),
                       ),
                     ),
-                    onDelete: () => _confirmDelete(products[i]),
+                    onDelete: () => _confirmDelete(visibleProducts[i]),
                   ),
                 ),
               ),
@@ -580,7 +732,10 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
   // ─────────────────────────────────────────────────────────────
   // CARD VIEW — ใช้ ListTile pattern เดิมจากไฟล์ที่แนบมา + ปรับ style
   // ─────────────────────────────────────────────────────────────
-  Widget _buildCardView(List<ProductModel> products) {
+  Widget _buildCardView(
+    List<ProductModel> products,
+    Map<String, _ProductStockSnapshot> stockMap,
+  ) {
     return ListView.separated(
       padding: const EdgeInsets.all(12),
       itemCount: products.length,
@@ -604,6 +759,8 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
             avatarPalette[p.productName.codeUnitAt(0) % avatarPalette.length];
 
         final colors = _ProductListColors.of(context);
+        final stock = stockMap[p.productId] ?? const _ProductStockSnapshot();
+        final stockValue = p.standardCost * stock.qty;
 
         return Card(
           elevation: 0,
@@ -783,6 +940,11 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
                           ],
                         ],
                       ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '$_selectedWarehouseLabel: ${stock.qty.toStringAsFixed(0)} ${p.baseUnit} · มูลค่า ฿${stockValue.toStringAsFixed(2)}',
+                        style: TextStyle(fontSize: 11, color: colors.subtext),
+                      ),
                     ],
                   ),
                 ),
@@ -909,11 +1071,13 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
 class _ProductListTopBar extends StatelessWidget {
   final TextEditingController searchController;
   final String searchQuery;
+  final String selectedWarehouse;
   final bool isActiveOnly;
   final bool isTableView;
   final ValueChanged<String> onSearchChanged;
   final VoidCallback onSearchCleared;
   final VoidCallback onToggleActive;
+  final ValueChanged<String> onWarehouseChanged;
   final VoidCallback onToggleView;
   final VoidCallback onRefresh;
   final VoidCallback onManageGroups;
@@ -922,11 +1086,13 @@ class _ProductListTopBar extends StatelessWidget {
   const _ProductListTopBar({
     required this.searchController,
     required this.searchQuery,
+    required this.selectedWarehouse,
     required this.isActiveOnly,
     required this.isTableView,
     required this.onSearchChanged,
     required this.onSearchCleared,
     required this.onToggleActive,
+    required this.onWarehouseChanged,
     required this.onToggleView,
     required this.onRefresh,
     required this.onManageGroups,
@@ -977,6 +1143,11 @@ class _ProductListTopBar extends StatelessWidget {
             onChanged: onSearchChanged,
             onCleared: onSearchCleared,
           ),
+        ),
+        const SizedBox(width: 8),
+        _PWarehouseDropdown(
+          value: selectedWarehouse,
+          onChanged: onWarehouseChanged,
         ),
         const SizedBox(width: 8),
         // Toggle active-only
@@ -1074,11 +1245,22 @@ class _ProductListTopBar extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 10),
-        _PSearchField(
-          controller: searchController,
-          query: searchQuery,
-          onChanged: onSearchChanged,
-          onCleared: onSearchCleared,
+        Row(
+          children: [
+            Expanded(
+              child: _PSearchField(
+                controller: searchController,
+                query: searchQuery,
+                onChanged: onSearchChanged,
+                onCleared: onSearchCleared,
+              ),
+            ),
+            const SizedBox(width: 8),
+            _PWarehouseDropdown(
+              value: selectedWarehouse,
+              onChanged: onWarehouseChanged,
+            ),
+          ],
         ),
       ],
     );
@@ -1231,6 +1413,44 @@ class _PToggleBtn extends StatelessWidget {
   );
 }
 
+class _PWarehouseDropdown extends StatelessWidget {
+  final String value;
+  final ValueChanged<String> onChanged;
+
+  const _PWarehouseDropdown({required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = _ProductListColors.of(context);
+    return Container(
+      height: 40,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        color: colors.inputFill,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: colors.navButtonBorder),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: value,
+          isDense: true,
+          dropdownColor: colors.cardBg,
+          style: TextStyle(fontSize: 13, color: colors.text),
+          iconEnabledColor: colors.subtext,
+          items: const [
+            DropdownMenuItem(value: 'ALL', child: Text('ทุกคลัง')),
+            DropdownMenuItem(value: 'WH001', child: Text('คลังหลัก')),
+            DropdownMenuItem(value: 'WH002', child: Text('คลังสยาม')),
+          ],
+          onChanged: (v) {
+            if (v != null) onChanged(v);
+          },
+        ),
+      ),
+    );
+  }
+}
+
 class _PRefreshBtn extends StatelessWidget {
   final VoidCallback onTap;
   const _PRefreshBtn({required this.onTap});
@@ -1326,11 +1546,18 @@ class _PManageGroupsBtn extends StatelessWidget {
   );
 }
 
+class _ProductStockSnapshot {
+  final double qty;
+
+  const _ProductStockSnapshot({this.qty = 0});
+}
+
 // ════════════════════════════════════════════════════════════════
 // _ProductTableRow — แยก widget เพื่อให้ rebuild เฉพาะ row ที่เปลี่ยน
 // ════════════════════════════════════════════════════════════════
 class _ProductTableRow extends StatefulWidget {
   final ProductModel product;
+  final _ProductStockSnapshot stock;
   final int no;
   final bool isEven;
   final List<double> colWidths; // ✅ รับ width จาก parent
@@ -1339,6 +1566,7 @@ class _ProductTableRow extends StatefulWidget {
 
   const _ProductTableRow({
     required this.product,
+    required this.stock,
     required this.no,
     required this.isEven,
     required this.colWidths,
@@ -1356,6 +1584,8 @@ class _ProductTableRowState extends State<_ProductTableRow> {
   @override
   Widget build(BuildContext context) {
     final p = widget.product;
+    final stock = widget.stock;
+    final stockValue = p.standardCost * stock.qty;
     final colors = _ProductListColors.of(context);
     final w = widget.colWidths;
     return MouseRegion(
@@ -1423,9 +1653,27 @@ class _ProductTableRowState extends State<_ProductTableRow> {
                   ),
                 ),
               ),
-              // หน่วย — w[2]
+              // คงเหลือ — w[2]
               SizedBox(
                 width: w[2],
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Text(
+                      NumberFormat('#,##0').format(stock.qty),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: colors.amountText,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              // หน่วย — w[3]
+              SizedBox(
+                width: w[3],
                 child: Center(
                   child: Text(
                     p.baseUnit,
@@ -1433,9 +1681,9 @@ class _ProductTableRowState extends State<_ProductTableRow> {
                   ),
                 ),
               ),
-              // ราคาขาย — w[3]
+              // ราคาขาย — w[4]
               SizedBox(
-                width: w[3],
+                width: w[4],
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   child: Align(
@@ -1451,9 +1699,9 @@ class _ProductTableRowState extends State<_ProductTableRow> {
                   ),
                 ),
               ),
-              // ต้นทุน — w[4]
+              // ต้นทุน — w[5]
               SizedBox(
-                width: w[4],
+                width: w[5],
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   child: Align(
@@ -1465,25 +1713,28 @@ class _ProductTableRowState extends State<_ProductTableRow> {
                   ),
                 ),
               ),
-              // สต๊อก — w[5]
+              // มูลค่า — w[6]
               SizedBox(
-                width: w[5],
-                child: Center(
-                  child: Icon(
-                    p.isStockControl ? Icons.inventory_2 : Icons.remove,
-                    size: 16,
-                    color: p.isStockControl ? AppTheme.success : colors.subtext,
+                width: w[6],
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Text(
+                      '฿${NumberFormat('#,##0.00').format(stockValue)}',
+                      style: TextStyle(fontSize: 12, color: colors.costText),
+                    ),
                   ),
                 ),
               ),
-              // สถานะ — w[6]
-              SizedBox(
-                width: w[6],
-                child: Center(child: _StatusBadge(active: p.isActive)),
-              ),
-              // Actions — w[7] fixed
+              // สถานะ — w[7]
               SizedBox(
                 width: w[7],
+                child: Center(child: _StatusBadge(active: p.isActive)),
+              ),
+              // Actions — w[8] fixed
+              SizedBox(
+                width: w[8],
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -1531,10 +1782,11 @@ class _ProductResizableHeader extends StatelessWidget {
   static const _cols = [
     ('รหัสสินค้า', 'productCode'),
     ('ชื่อสินค้า', 'productName'),
+    ('คงเหลือ', 'balance'),
     ('หน่วย', ''),
     ('ราคาขาย', 'priceLevel1'),
     ('ต้นทุน', 'standardCost'),
-    ('สต๊อก', ''),
+    ('มูลค่า', 'stockValue'),
     ('สถานะ', ''),
     ('', ''), // actions
   ];
@@ -1655,12 +1907,16 @@ class _ProductResizableCell extends StatefulWidget {
 
 class _ProductResizableCellState extends State<_ProductResizableCell> {
   bool _hovering = false;
+  bool _dragging = false;
 
   @override
   Widget build(BuildContext context) {
     final labelColor = widget.isActive
         ? const Color(0xFFFF9D45)
         : _ProductListColors.of(context).headerText;
+    final dividerColor = _dragging || _hovering
+        ? const Color(0xFFFF9D45)
+        : Colors.white24;
 
     return SizedBox(
       width: widget.width,
@@ -1717,22 +1973,30 @@ class _ProductResizableCellState extends State<_ProductResizableCell> {
             MouseRegion(
               cursor: SystemMouseCursors.resizeColumn,
               onEnter: (_) => setState(() => _hovering = true),
-              onExit: (_) => setState(() => _hovering = false),
+              onExit: (_) => setState(() {
+                _hovering = false;
+                _dragging = false;
+              }),
               child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
+                behavior: HitTestBehavior.translucent,
+                onHorizontalDragStart: (_) => setState(() => _dragging = true),
                 onHorizontalDragUpdate: (d) => widget.onResize(d.delta.dx),
+                onHorizontalDragEnd: (_) => setState(() => _dragging = false),
+                onHorizontalDragCancel: () => setState(() => _dragging = false),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 120),
-                  width: 8,
-                  height: 28,
+                  width: 14,
+                  height: 36,
                   alignment: Alignment.center,
                   child: Container(
-                    width: 2,
-                    height: _hovering ? 20 : 12,
+                    width: _dragging ? 3 : 2,
+                    height: _dragging
+                        ? 28
+                        : _hovering
+                        ? 24
+                        : 16,
                     decoration: BoxDecoration(
-                      color: _hovering
-                          ? const Color(0xFFFF9D45)
-                          : Colors.white24,
+                      color: dividerColor,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
