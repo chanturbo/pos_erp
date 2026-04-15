@@ -64,7 +64,9 @@ class CustomerPdfBuilder {
         'ทั้งหมด $total ราย   ใช้งาน $active ราย   สมาชิก $members ราย   เครดิต $creditCount ราย';
 
     // แบ่ง page (38 rows/page — portrait A4)
-    final rowsPerPage = await SettingsStorage.getReportRowsPerPage();
+    final rowsPerPage = await SettingsStorage.getPdfReportRowsPerPage(
+      PdfReportType.customerList,
+    );
     final pages = <List<CustomerModel>>[];
     for (var i = 0; i < customers.length; i += rowsPerPage) {
       pages.add(

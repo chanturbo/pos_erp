@@ -74,7 +74,9 @@ class ProductPdfBuilder {
         : null;
 
     // แบ่ง page (38 rows/page — portrait A4)
-    final rowsPerPage = await SettingsStorage.getReportRowsPerPage();
+    final rowsPerPage = await SettingsStorage.getPdfReportRowsPerPage(
+      PdfReportType.productList,
+    );
     final pages = <List<ProductModel>>[];
     for (var i = 0; i < products.length; i += rowsPerPage) {
       pages.add(

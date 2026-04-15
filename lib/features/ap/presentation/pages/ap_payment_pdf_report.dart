@@ -76,7 +76,9 @@ class ApPaymentPdfBuilder {
         .length;
     final cheque = payments.where((p) => p.paymentMethod == 'CHEQUE').length;
 
-    final rowsPerPage = await SettingsStorage.getReportRowsPerPage();
+    final rowsPerPage = await SettingsStorage.getPdfReportRowsPerPage(
+      PdfReportType.apPayment,
+    );
     final pages = <List<ApPaymentModel>>[];
     for (var i = 0; i < payments.length; i += rowsPerPage) {
       pages.add(

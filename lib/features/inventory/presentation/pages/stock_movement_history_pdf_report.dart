@@ -1,20 +1,11 @@
-// lib/features/suppliers/presentation/pages/supplier_pdf_report.dart
-//
-// SupplierPdfBuilder — สร้าง PDF รายการซัพพลายเออร์
-//
-// วิธีใช้งาน (ใน PdfReportButton):
-//   buildPdf: () => SupplierPdfBuilder.build(List<SupplierModel>.from(filtered))
-
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
-import '../../../settings/shared/settings_defaults.dart';
-import '../../data/models/supplier_model.dart';
 
-// ─────────────────────────────────────────────────────────────────
-// Standard color palette (ตรงกับ product_pdf_report)
-// ─────────────────────────────────────────────────────────────────
+import '../../../settings/shared/settings_defaults.dart';
+import '../../data/models/stock_movement_model.dart';
+
 const _kBorder = PdfColor.fromInt(0xFFBBBBBB);
 const _kHdrBg = PdfColor.fromInt(0xFFDDDDDD);
 const _kAltRow = PdfColor.fromInt(0xFFF5F5F5);
@@ -22,21 +13,64 @@ const _kText = PdfColors.black;
 const _kSub = PdfColor.fromInt(0xFF555555);
 const _kSuccess = PdfColor.fromInt(0xFF1B5E20);
 const _kError = PdfColor.fromInt(0xFFB71C1C);
+const _kWarning = PdfColor.fromInt(0xFFBF360C);
 
-// ─────────────────────────────────────────────────────────────────
-// SupplierPdfBuilder
-// ─────────────────────────────────────────────────────────────────
-class SupplierPdfBuilder {
-  static final _money = NumberFormat('#,##0.00');
+PdfColor _typeColor(String t) {
+  switch (t) {
+    case 'IN':
+      return _kSuccess;
+    case 'OUT':
+      return _kWarning;
+    case 'ADJUST':
+      return const PdfColor.fromInt(0xFF1565C0);
+    case 'TRANSFER_IN':
+    case 'TRANSFER_OUT':
+    case 'TRANSFER':
+      return const PdfColor.fromInt(0xFF4A148C);
+    case 'SALE':
+      return _kError;
+    default:
+      return _kSub;
+  }
+}
+
+String _typeLabel(String t) {
+  switch (t) {
+    case 'IN':
+      return 'รับเข้า';
+    case 'OUT':
+      return 'เบิกออก';
+    case 'ADJUST':
+      return 'ปรับสต๊อก';
+    case 'TRANSFER_IN':
+      return 'รับโอน';
+    case 'TRANSFER_OUT':
+      return 'โอนออก';
+    case 'TRANSFER':
+      return 'โอนย้าย';
+    case 'SALE':
+      return 'ขาย';
+    default:
+      return t;
+  }
+}
+
+class StockMovementHistoryPdfBuilder {
+  static final _moneyFmt = NumberFormat('#,##0.00', 'th');
+  static final _dateFmt = DateFormat('dd/MM/yyyy HH:mm');
+  static final _shortFmt = DateFormat('dd/MM/yyyy');
 
   static Future<pw.Document> build(
-    List<SupplierModel> suppliers, {
+    List<StockMovementModel> items, {
+    DateTime? dateFrom,
+    DateTime? dateTo,
+    String filterType = 'ALL',
     String? companyName,
   }) async {
     final effectiveCompanyName =
         companyName ?? await SettingsStorage.getCompanyName();
     final doc = pw.Document(
-      title: 'รายงานรายการซัพพลายเออร์',
+      title: 'รายงานประวัติการเคลื่อนไหวสต๊อก',
       author: effectiveCompanyName,
     );
 
@@ -44,30 +78,42 @@ class SupplierPdfBuilder {
     final ttfRegular = await PdfGoogleFonts.notoSansThaiRegular();
     final printedAt = DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now());
 
-    final activeCount = suppliers.where((s) => s.isActive).length;
-    final summaryLine =
-        'ทั้งหมด ${suppliers.length} ราย   ใช้งาน $activeCount ราย   ระงับ ${suppliers.length - activeCount} ราย';
+    String periodText = 'ทั้งหมด';
+    if (dateFrom != null && dateTo != null) {
+      periodText =
+          '${_shortFmt.format(dateFrom)} – ${_shortFmt.format(dateTo)}';
+    } else if (dateFrom != null) {
+      periodText = 'ตั้งแต่ ${_shortFmt.format(dateFrom)}';
+    } else if (dateTo != null) {
+      periodText = 'ถึง ${_shortFmt.format(dateTo)}';
+    }
 
-    // แบ่ง page (35 rows/page — portrait A4)
+    var subtitle = 'ช่วงเวลา: $periodText';
+    if (filterType != 'ALL') {
+      subtitle += '   ประเภท: ${_typeLabel(filterType)}';
+    }
+
+    final totalValue = items.fold<double>(0, (sum, m) => sum + m.lineValue);
+    final inCount = items.where((m) => m.movementType == 'IN').length;
+    final outCount = items.where((m) => m.movementType == 'OUT').length;
+    final summaryLine =
+        'ทั้งหมด ${items.length} รายการ   รับเข้า $inCount   เบิกออก $outCount   มูลค่ารวม ฿${_moneyFmt.format(totalValue)}';
+
     final rowsPerPage = await SettingsStorage.getPdfReportRowsPerPage(
-      PdfReportType.supplierList,
+      PdfReportType.stockMovementHistory,
     );
-    final pages = <List<SupplierModel>>[];
-    for (var i = 0; i < suppliers.length; i += rowsPerPage) {
-      pages.add(
-        suppliers.sublist(
-          i,
-          (i + rowsPerPage) > suppliers.length
-              ? suppliers.length
-              : i + rowsPerPage,
-        ),
-      );
+    final pages = <List<StockMovementModel>>[];
+    for (var i = 0; i < items.length; i += rowsPerPage) {
+      final end = (i + rowsPerPage) > items.length
+          ? items.length
+          : i + rowsPerPage;
+      pages.add(items.sublist(i, end));
     }
     if (pages.isEmpty) pages.add([]);
     final totalPages = pages.length;
 
     for (var pageIdx = 0; pageIdx < pages.length; pageIdx++) {
-      final pageSuppliers = pages[pageIdx];
+      final pageItems = pages[pageIdx];
       final startNo = pageIdx * rowsPerPage + 1;
 
       doc.addPage(
@@ -79,21 +125,22 @@ class SupplierPdfBuilder {
             children: [
               _buildPageHeader(
                 companyName: effectiveCompanyName,
-                reportTitle: 'รายงานรายการซัพพลายเออร์',
+                reportTitle: 'รายงานประวัติการเคลื่อนไหวสต๊อก',
                 printedAt: printedAt,
                 page: pageIdx + 1,
                 totalPages: totalPages,
                 ttf: ttf,
                 ttfRegular: ttfRegular,
+                subtitle: subtitle,
                 summaryLine: summaryLine,
               ),
               _buildTable(
-                pageSuppliers,
+                pageItems,
                 startNo: startNo,
                 ttf: ttf,
                 ttfRegular: ttfRegular,
               ),
-              pw.Spacer(),
+              pw.SizedBox(height: 8),
               _buildFooter(
                 companyName: effectiveCompanyName,
                 ttfRegular: ttfRegular,
@@ -107,7 +154,6 @@ class SupplierPdfBuilder {
     return doc;
   }
 
-  // ── Page Header ───────────────────────────────────────────────
   static pw.Widget _buildPageHeader({
     required String companyName,
     required String reportTitle,
@@ -116,6 +162,7 @@ class SupplierPdfBuilder {
     required int totalPages,
     required pw.Font ttf,
     required pw.Font ttfRegular,
+    String? subtitle,
     String? summaryLine,
   }) {
     return pw.Column(
@@ -148,6 +195,15 @@ class SupplierPdfBuilder {
             style: pw.TextStyle(font: ttf, fontSize: 14, color: _kText),
           ),
         ),
+        if (subtitle != null) ...[
+          pw.SizedBox(height: 3),
+          pw.Center(
+            child: pw.Text(
+              subtitle,
+              style: pw.TextStyle(font: ttfRegular, fontSize: 8, color: _kSub),
+            ),
+          ),
+        ],
         if (summaryLine != null) ...[
           pw.SizedBox(height: 2),
           pw.Center(
@@ -164,23 +220,21 @@ class SupplierPdfBuilder {
     );
   }
 
-  // ── Table ─────────────────────────────────────────────────────
   static pw.Widget _buildTable(
-    List<SupplierModel> suppliers, {
+    List<StockMovementModel> items, {
     required int startNo,
     required pw.Font ttf,
     required pw.Font ttfRegular,
   }) {
-    // portrait A4 usable ≈ 547pt
     const colWidths = {
-      0: pw.FixedColumnWidth(24), // #
-      1: pw.FixedColumnWidth(62), // รหัส
-      2: pw.FlexColumnWidth(1.6), // ชื่อซัพพลายเออร์
-      3: pw.FixedColumnWidth(72), // โทรศัพท์
-      4: pw.FlexColumnWidth(1.0), // ผู้ติดต่อ
-      5: pw.FixedColumnWidth(50), // เครดิต(วัน)
-      6: pw.FixedColumnWidth(65), // วงเงิน
-      7: pw.FixedColumnWidth(42), // สถานะ
+      0: pw.FixedColumnWidth(24),
+      1: pw.FixedColumnWidth(82),
+      2: pw.FixedColumnWidth(52),
+      3: pw.FixedColumnWidth(62),
+      4: pw.FixedColumnWidth(46),
+      5: pw.FixedColumnWidth(42),
+      6: pw.FlexColumnWidth(1),
+      7: pw.FlexColumnWidth(1.4),
     };
 
     pw.Widget cell(
@@ -192,15 +246,11 @@ class SupplierPdfBuilder {
     }) {
       return pw.Container(
         color: bgColor,
-        padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 5),
+        padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 5),
         alignment: align,
         child: pw.Text(
           text,
-          style: pw.TextStyle(
-            font: font,
-            fontSize: 8.5,
-            color: color ?? _kText,
-          ),
+          style: pw.TextStyle(font: font, fontSize: 8, color: color ?? _kText),
         ),
       );
     }
@@ -209,24 +259,23 @@ class SupplierPdfBuilder {
       columnWidths: colWidths,
       border: pw.TableBorder.all(color: _kBorder, width: 0.5),
       children: [
-        // Header row
         pw.TableRow(
-          decoration: pw.BoxDecoration(color: _kHdrBg),
+          decoration: const pw.BoxDecoration(color: _kHdrBg),
           children:
               [
                     '#',
-                    'รหัส',
-                    'ชื่อซัพพลายเออร์',
-                    'โทรศัพท์',
-                    'ผู้ติดต่อ',
-                    'เครดิต\n(วัน)',
-                    'วงเงิน',
-                    'สถานะ',
+                    'วันที่/เวลา',
+                    'ประเภท',
+                    'รหัสสินค้า',
+                    'คลัง',
+                    'จำนวน',
+                    'เลขอ้างอิง',
+                    'หมายเหตุ',
                   ]
                   .map(
                     (h) => pw.Container(
                       padding: const pw.EdgeInsets.symmetric(
-                        horizontal: 5,
+                        horizontal: 4,
                         vertical: 6,
                       ),
                       child: pw.Text(
@@ -241,41 +290,50 @@ class SupplierPdfBuilder {
                   )
                   .toList(),
         ),
-        // Data rows
-        ...suppliers.asMap().entries.map((e) {
+        ...items.asMap().entries.map((e) {
           final i = e.key;
-          final s = e.value;
+          final item = e.value;
           final rowBg = i.isEven ? _kAltRow : null;
-          final statusColor = s.isActive ? _kSuccess : _kError;
+          final isPositive = item.quantity >= 0;
           return pw.TableRow(
             children: [
               cell(
                 '${startNo + i}',
                 ttfRegular,
                 align: pw.Alignment.center,
+                color: _kSub,
                 bgColor: rowBg,
               ),
-              cell(s.supplierCode, ttfRegular, bgColor: rowBg),
-              cell(s.supplierName, ttf, bgColor: rowBg),
-              cell(s.phone ?? '-', ttfRegular, bgColor: rowBg),
-              cell(s.contactPerson ?? '-', ttfRegular, bgColor: rowBg),
               cell(
-                '${s.creditTerm}',
+                _dateFmt.format(item.movementDate),
                 ttfRegular,
-                align: pw.Alignment.center,
                 bgColor: rowBg,
               ),
               cell(
-                _money.format(s.creditLimit),
-                ttfRegular,
-                align: pw.Alignment.centerRight,
+                _typeLabel(item.movementType),
+                ttf,
+                color: _typeColor(item.movementType),
                 bgColor: rowBg,
               ),
+              cell(item.productId, ttfRegular, bgColor: rowBg),
+              cell(item.warehouseId, ttfRegular, bgColor: rowBg),
               cell(
-                s.isActive ? 'ใช้งาน' : 'ระงับ',
+                '${isPositive ? '+' : ''}${item.quantity.toStringAsFixed(0)}',
                 ttf,
                 align: pw.Alignment.center,
-                color: statusColor,
+                color: isPositive ? _kSuccess : _kError,
+                bgColor: rowBg,
+              ),
+              cell(
+                item.referenceNo ?? '—',
+                ttfRegular,
+                color: _kSub,
+                bgColor: rowBg,
+              ),
+              cell(
+                item.remark ?? '—',
+                ttfRegular,
+                color: _kSub,
                 bgColor: rowBg,
               ),
             ],
@@ -285,20 +343,20 @@ class SupplierPdfBuilder {
     );
   }
 
-  // ── Footer ────────────────────────────────────────────────────
   static pw.Widget _buildFooter({
     required String companyName,
     required pw.Font ttfRegular,
   }) {
-    return pw.Container(
-      padding: const pw.EdgeInsets.only(top: 6),
-      decoration: const pw.BoxDecoration(
-        border: pw.Border(top: pw.BorderSide(color: _kBorder, width: 0.5)),
-      ),
-      child: pw.Text(
-        '$companyName — รายงานรายการซัพพลายเออร์',
-        style: pw.TextStyle(font: ttfRegular, fontSize: 7, color: _kSub),
-      ),
+    return pw.Column(
+      children: [
+        pw.SizedBox(height: 8),
+        pw.Container(height: 0.5, color: _kBorder),
+        pw.SizedBox(height: 4),
+        pw.Text(
+          'พิมพ์จากระบบของ $companyName',
+          style: pw.TextStyle(font: ttfRegular, fontSize: 8, color: _kSub),
+        ),
+      ],
     );
   }
 }

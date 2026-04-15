@@ -131,9 +131,8 @@ class StockProductHistoryDialog extends ConsumerStatefulWidget {
 }
 
 class _StockProductHistoryDialogState
-    extends ConsumerState<StockProductHistoryDialog>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tabController;
+    extends ConsumerState<StockProductHistoryDialog> {
+  final _searchController = TextEditingController();
 
   static const _tabs = [
     ('ALL', 'ทั้งหมด', Icons.history, Colors.blueGrey),
@@ -143,35 +142,103 @@ class _StockProductHistoryDialogState
     ('SALE', 'ขาย', Icons.shopping_cart_rounded, Color(0xFFC62828)),
   ];
 
-  int _tabIndex = 0;
+  String _selectedType = 'ALL';
+  String _searchQuery = '';
+  DateTime? _dateFrom;
+  DateTime? _dateTo;
   int _currentPage = 1;
 
   @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: _tabs.length, vsync: this);
-    _tabController.addListener(() {
-      if (_tabController.indexIsChanging) return;
-      setState(() {
-        _tabIndex = _tabController.index;
-        _currentPage = 1; // reset หน้าเมื่อเปลี่ยน tab
-      });
-    });
-  }
-
-  @override
   void dispose() {
-    _tabController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
   List<_Movement> _filter(List<_Movement> all, String type) {
-    if (type == 'ALL') return all;
-    return all.where((m) => m.movementType == type).toList();
+    return all.where((m) {
+      if (type != 'ALL' && m.movementType != type) return false;
+
+      if (_searchQuery.isNotEmpty) {
+        final q = _searchQuery.toLowerCase();
+        final match =
+            _typeLabel(m.movementType).toLowerCase().contains(q) ||
+            m.warehouseName.toLowerCase().contains(q) ||
+            (m.referenceNo?.toLowerCase().contains(q) ?? false) ||
+            (m.remark?.toLowerCase().contains(q) ?? false);
+        if (!match) return false;
+      }
+
+      if (_dateFrom != null && m.movementDate.isBefore(_dateFrom!)) {
+        return false;
+      }
+      if (_dateTo != null) {
+        final endOfDay = DateTime(
+          _dateTo!.year,
+          _dateTo!.month,
+          _dateTo!.day,
+          23,
+          59,
+          59,
+        );
+        if (m.movementDate.isAfter(endOfDay)) return false;
+      }
+
+      return true;
+    }).toList()..sort((a, b) => b.movementDate.compareTo(a.movementDate));
   }
 
   int _countByType(List<_Movement> all, String type) =>
       _filter(all, type).length;
+
+  bool get _hasFilter =>
+      _selectedType != 'ALL' ||
+      _searchQuery.isNotEmpty ||
+      _dateFrom != null ||
+      _dateTo != null;
+
+  Future<void> _pickDate(bool isFrom) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: isFrom
+          ? (_dateFrom ?? DateTime.now())
+          : (_dateTo ?? _dateFrom ?? DateTime.now()),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030),
+    );
+    if (picked == null) return;
+    setState(() {
+      if (isFrom) {
+        _dateFrom = picked;
+        if (_dateTo != null && _dateTo!.isBefore(picked)) _dateTo = null;
+      } else {
+        _dateTo = picked;
+      }
+      _currentPage = 1;
+    });
+  }
+
+  void _clearFilters() {
+    _searchController.clear();
+    setState(() {
+      _selectedType = 'ALL';
+      _searchQuery = '';
+      _dateFrom = null;
+      _dateTo = null;
+      _currentPage = 1;
+    });
+  }
+
+  Map<String, dynamic> _calcSummary(List<_Movement> list) {
+    final inCount = list.where((m) => m.movementType == 'IN').length;
+    final outCount = list.where((m) => m.movementType == 'OUT').length;
+    final adjustCount = list.where((m) => m.movementType == 'ADJUST').length;
+    return {
+      'count': list.length,
+      'inCount': inCount,
+      'outCount': outCount,
+      'adjustCount': adjustCount,
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -192,7 +259,7 @@ class _StockProductHistoryDialogState
       backgroundColor: surface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 680, maxHeight: 620),
+        constraints: const BoxConstraints(maxWidth: 760, maxHeight: 700),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -278,131 +345,141 @@ class _StockProductHistoryDialogState
                 color: isDark ? AppTheme.darkTopBar : Colors.white,
                 border: Border(bottom: BorderSide(color: border)),
               ),
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: TabBar(
-                  controller: _tabController,
-                  isScrollable: true,
-                  tabAlignment: TabAlignment.start,
-                  indicatorColor: AppTheme.primaryColor,
-                  labelColor: AppTheme.primaryColor,
-                  unselectedLabelColor: subtextColor,
-                  dividerColor: Colors.transparent,
-                  overlayColor: WidgetStateProperty.all(Colors.transparent),
-                  labelStyle: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  tabs: _tabs.map((t) {
-                    final (type, label, icon, color) = t;
-                    return Tab(
-                      child: historyAsync.when(
-                        loading: () => Text(label),
-                        error: (_, _) => Text(label),
-                        data: (all) {
-                          final cnt = _countByType(all, type);
-                          return Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: _tabs[_tabIndex].$1 == type
-                                  ? color.withValues(alpha: 0.12)
-                                  : (isDark
-                                        ? const Color(0xFF2A2A2A)
-                                        : const Color(0xFFF0F0F0)),
-                              borderRadius: BorderRadius.circular(999),
-                              border: Border.all(
-                                color: _tabs[_tabIndex].$1 == type
-                                    ? color
-                                    : border,
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(icon, size: 13, color: color),
-                                const SizedBox(width: 4),
-                                Text(label),
-                                if (cnt > 0) ...[
-                                  const SizedBox(width: 5),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 5,
-                                      vertical: 1,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: color.withValues(alpha: 0.14),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: Text(
-                                      '$cnt',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        color: color,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          );
-                        },
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    height: 40,
+                    child: TextField(
+                      controller: _searchController,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: isDark ? Colors.white : null,
                       ),
-                    );
-                  }).toList(),
-                ),
+                      decoration: InputDecoration(
+                        hintText: 'ค้นหาคลัง, เลขอ้างอิง, หมายเหตุ...',
+                        hintStyle: TextStyle(fontSize: 13, color: subtextColor),
+                        prefixIcon: Icon(
+                          Icons.search,
+                          size: 17,
+                          color: subtextColor,
+                        ),
+                        suffixIcon: _searchQuery.isNotEmpty
+                            ? IconButton(
+                                icon: Icon(
+                                  Icons.clear,
+                                  size: 15,
+                                  color: subtextColor,
+                                ),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  setState(() {
+                                    _searchQuery = '';
+                                    _currentPage = 1;
+                                  });
+                                },
+                              )
+                            : null,
+                        contentPadding: EdgeInsets.zero,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: border),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: border),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(
+                            color: AppTheme.primary,
+                            width: 1.5,
+                          ),
+                        ),
+                        filled: true,
+                        fillColor: isDark ? AppTheme.darkElement : Colors.white,
+                      ),
+                      onChanged: (v) => setState(() {
+                        _searchQuery = v;
+                        _currentPage = 1;
+                      }),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      _HistoryDateChip(
+                        label: _dateFrom != null
+                            ? 'ตั้งแต่: ${DateFormat('dd/MM/yy').format(_dateFrom!)}'
+                            : 'ตั้งแต่วันที่',
+                        icon: Icons.calendar_today,
+                        active: _dateFrom != null,
+                        onTap: () => _pickDate(true),
+                        onClear: _dateFrom != null
+                            ? () => setState(() {
+                                _dateFrom = null;
+                                _currentPage = 1;
+                              })
+                            : null,
+                      ),
+                      _HistoryDateChip(
+                        label: _dateTo != null
+                            ? 'ถึง: ${DateFormat('dd/MM/yy').format(_dateTo!)}'
+                            : 'ถึงวันที่',
+                        icon: Icons.calendar_month,
+                        active: _dateTo != null,
+                        onTap: () => _pickDate(false),
+                        onClear: _dateTo != null
+                            ? () => setState(() {
+                                _dateTo = null;
+                                _currentPage = 1;
+                              })
+                            : null,
+                      ),
+                      ..._tabs.map((t) {
+                        final (type, label, icon, color) = t;
+                        return FilterChip(
+                          avatar: Icon(icon, size: 14, color: color),
+                          label: historyAsync.when(
+                            loading: () => Text(label),
+                            error: (_, _) => Text(label),
+                            data: (all) => Text(
+                              _countByType(all, type) > 0
+                                  ? '$label ${_countByType(all, type)}'
+                                  : label,
+                            ),
+                          ),
+                          selected: _selectedType == type,
+                          selectedColor: color.withValues(alpha: 0.12),
+                          checkmarkColor: color,
+                          side: BorderSide(
+                            color: _selectedType == type ? color : border,
+                          ),
+                          backgroundColor: isDark
+                              ? const Color(0xFF2A2A2A)
+                              : const Color(0xFFF0F0F0),
+                          onSelected: (_) => setState(() {
+                            _selectedType = type;
+                            _currentPage = 1;
+                          }),
+                        );
+                      }),
+                      if (_hasFilter)
+                        TextButton.icon(
+                          onPressed: _clearFilters,
+                          icon: const Icon(Icons.filter_alt_off, size: 16),
+                          label: const Text('ล้างตัวกรอง'),
+                        ),
+                    ],
+                  ),
+                ],
               ),
             ),
 
-            // ── Summary Bar ─────────────────────────────────────
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(color: summaryBg),
-              child: historyAsync.when(
-                loading: () => const SizedBox.shrink(),
-                error: (_, _) => const SizedBox.shrink(),
-                data: (all) => Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _HistorySummaryChip(
-                      icon: Icons.receipt_long,
-                      label: '${all.length} รายการ',
-                      color: AppTheme.info,
-                      bg: summaryChipBg,
-                      border: border,
-                    ),
-                    _HistorySummaryChip(
-                      icon: Icons.add_box_rounded,
-                      label: '${_countByType(all, 'IN')} รับเข้า',
-                      color: const Color(0xFF2E7D32),
-                      bg: summaryChipBg,
-                      border: border,
-                    ),
-                    _HistorySummaryChip(
-                      icon: Icons.remove_circle_rounded,
-                      label: '${_countByType(all, 'OUT')} เบิกออก',
-                      color: const Color(0xFFE65100),
-                      bg: summaryChipBg,
-                      border: border,
-                    ),
-                    _HistorySummaryChip(
-                      icon: Icons.tune_rounded,
-                      label: '${_countByType(all, 'ADJUST')} ปรับสต๊อก',
-                      color: const Color(0xFF1565C0),
-                      bg: summaryChipBg,
-                      border: border,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // ── Content + Pagination (เหมือน product list) ──────
             Expanded(
               child: historyAsync.when(
                 loading: () => const Center(child: CircularProgressIndicator()),
@@ -431,47 +508,84 @@ class _StockProductHistoryDialogState
                   ),
                 ),
                 data: (all) {
-                  final (tabType, tabLabel, _, _) = _tabs[_tabIndex];
-                  final filtered = _filter(all, tabType);
+                  final filtered = _filter(all, _selectedType);
+                  final summary = _calcSummary(filtered);
                   final totalPages = filtered.isEmpty
                       ? 1
                       : (filtered.length / dialogPageSize).ceil();
                   final safePage = _currentPage.clamp(1, totalPages);
+                  final pageStart = (safePage - 1) * dialogPageSize;
+                  final pageEnd = (pageStart + dialogPageSize).clamp(
+                    0,
+                    filtered.length,
+                  );
+                  final pageItems = filtered.isEmpty
+                      ? <_Movement>[]
+                      : filtered.sublist(pageStart, pageEnd);
 
                   return Column(
                     children: [
-                      Expanded(
-                        child: TabBarView(
-                          controller: _tabController,
-                          physics: const NeverScrollableScrollPhysics(),
-                          children: _tabs.map((t) {
-                            final (type, _, _, _) = t;
-                            final tabFiltered = _filter(all, type);
-
-                            // คำนวณ page เฉพาะ active tab เพื่อ performance
-                            final tStart = (safePage - 1) * dialogPageSize;
-                            final tEnd = (tStart + dialogPageSize).clamp(
-                              0,
-                              tabFiltered.length,
-                            );
-                            final pageItems = tabFiltered.isEmpty
-                                ? <_Movement>[]
-                                : tabFiltered.sublist(tStart, tEnd);
-
-                            if (tabFiltered.isEmpty) return _buildEmpty();
-                            return ListView.separated(
-                              padding: EdgeInsets.fromLTRB(12, 12, 12, 12),
-                              itemCount: pageItems.length,
-                              separatorBuilder: (_, _) =>
-                                  const SizedBox(height: 6),
-                              itemBuilder: (_, i) => _HistoryCard(
-                                movement: pageItems[i],
-                                baseUnit: widget.stock.baseUnit,
-                                isDark: isDark,
-                              ),
-                            );
-                          }).toList(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
                         ),
+                        decoration: BoxDecoration(color: summaryBg),
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            _HistorySummaryChip(
+                              icon: Icons.receipt_long,
+                              label: '${summary['count']} รายการ',
+                              color: AppTheme.info,
+                              bg: summaryChipBg,
+                              border: border,
+                            ),
+                            _HistorySummaryChip(
+                              icon: Icons.add_box_rounded,
+                              label: '${summary['inCount']} รับเข้า',
+                              color: const Color(0xFF2E7D32),
+                              bg: summaryChipBg,
+                              border: border,
+                            ),
+                            _HistorySummaryChip(
+                              icon: Icons.remove_circle_rounded,
+                              label: '${summary['outCount']} เบิกออก',
+                              color: const Color(0xFFE65100),
+                              bg: summaryChipBg,
+                              border: border,
+                            ),
+                            _HistorySummaryChip(
+                              icon: Icons.tune_rounded,
+                              label: '${summary['adjustCount']} ปรับสต๊อก',
+                              color: const Color(0xFF1565C0),
+                              bg: summaryChipBg,
+                              border: border,
+                            ),
+                          ],
+                        ),
+                      ),
+                      Divider(height: 1, color: border),
+                      Expanded(
+                        child: filtered.isEmpty
+                            ? _buildEmpty()
+                            : ListView.separated(
+                                padding: const EdgeInsets.fromLTRB(
+                                  12,
+                                  12,
+                                  12,
+                                  12,
+                                ),
+                                itemCount: pageItems.length,
+                                separatorBuilder: (_, _) =>
+                                    const SizedBox(height: 6),
+                                itemBuilder: (_, i) => _HistoryCard(
+                                  movement: pageItems[i],
+                                  baseUnit: widget.stock.baseUnit,
+                                  isDark: isDark,
+                                ),
+                              ),
                       ),
                       // ── PaginationBar (แบบเดียวกับ product list) ──
                       PaginationBar(
@@ -491,7 +605,9 @@ class _StockProductHistoryDialogState
                             productName: widget.stock.productName,
                             baseUnit: widget.stock.baseUnit,
                             currentBalance: widget.stock.balance,
-                            filterLabel: tabLabel,
+                            filterLabel: _tabs
+                                .firstWhere((t) => t.$1 == _selectedType)
+                                .$2,
                             items: filtered
                                 .map(
                                   (m) => StockHistoryPdfItem(
@@ -540,6 +656,73 @@ class _StockProductHistoryDialogState
       ],
     ),
   );
+}
+
+class _HistoryDateChip extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool active;
+  final VoidCallback onTap;
+  final VoidCallback? onClear;
+
+  const _HistoryDateChip({
+    required this.label,
+    required this.icon,
+    required this.active,
+    required this.onTap,
+    this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        decoration: BoxDecoration(
+          color: active
+              ? AppTheme.primaryColor.withValues(alpha: 0.10)
+              : (isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF0F0F0)),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: active ? AppTheme.primaryColor : AppTheme.border,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 14,
+              color: active ? AppTheme.primaryColor : AppTheme.textSub,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: active ? AppTheme.primaryColor : AppTheme.textSub,
+                fontWeight: active ? FontWeight.w600 : FontWeight.normal,
+              ),
+            ),
+            if (onClear != null) ...[
+              const SizedBox(width: 4),
+              InkWell(
+                onTap: onClear,
+                borderRadius: BorderRadius.circular(10),
+                child: const Padding(
+                  padding: EdgeInsets.all(2),
+                  child: Icon(Icons.close, size: 14, color: AppTheme.textSub),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _HistorySummaryChip extends StatelessWidget {

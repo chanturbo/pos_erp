@@ -61,7 +61,9 @@ class ApInvoicePdfBuilder {
       ttfR: ttfR,
     );
 
-    final rowsPerPage = await SettingsStorage.getReportRowsPerPage();
+    final rowsPerPage = await SettingsStorage.getPdfReportRowsPerPage(
+      PdfReportType.apInvoice,
+    );
     final pages = <List<ApInvoiceModel>>[];
     for (var i = 0; i < invoices.length; i += rowsPerPage) {
       pages.add(

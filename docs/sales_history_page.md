@@ -2,7 +2,7 @@
 
 > อ้างอิงจาก `lib/features/sales/presentation/pages/sales_history_page.dart`  
 > และ `lib/shared/theme/app_theme.dart`  
-> อัปเดตล่าสุด: 2026-04-15 (rev 2)
+> อัปเดตล่าสุด: 2026-04-15 (rev 3)
 
 ---
 
@@ -57,8 +57,16 @@
 
 | ความกว้าง | Layout |
 |---|---|
-| `>= 600px` (Tablet / Desktop) | Filter chips ย้ายเข้า Summary Bar (inline) — `_FilterBar` ถูกซ่อน |
-| `< 600px` (Mobile) | `_FilterBar` แยกแถวปกติใต้ Top Bar |
+| `>= 600px` (Tablet / Desktop) | Search อยู่ใน Top Bar, filter chips (`วันที่ / ประเภทชำระ / สถานะ`) แสดงแบบ inline ใน Summary Bar |
+| `< 600px` (Mobile) | Top Bar แสดง title + action + search, `_FilterBar` แยกแถวปกติใต้ Top Bar |
+
+### Current UX Notes
+
+- Search เป็น primary action และอยู่ใน Top Bar ทุก breakpoint
+- Date / Payment / Status filters เป็น secondary controls
+- Desktop ใช้แนวทาง "summary + inline filters" เพื่อประหยัด vertical space
+- Mobile แยก filter ออกมาเป็นอีกแถวเพื่อกดใช้งานง่ายและไม่อัด Top Bar เกินไป
+- Footer ใช้ `PaginationBar` ร่วมกับ `PdfReportButton`
 
 ---
 
@@ -108,6 +116,7 @@
 - ซ้าย: Summary chips (รายการ / สำเร็จ / จำนวนเงิน)
 - ขวา: Filter chips inline (ตั้งแต่วันที่ / ถึงวันที่ / ทุกประเภทชำระ / ทุกสถานะ)
 - ถ้าหน้าจอแคบกว่าความกว้าง chips รวม → เลื่อนแนวนอนได้ ไม่ overflow
+- Summary bar ยังคงเป็นพื้นที่ "ผลลัพธ์ + ตัวกรองรอง" ไม่ย้าย search ลงมา
 
 **Mobile (`< 600px`)**
 - ใช้ `Wrap` แสดงเฉพาะ summary chips — filter อยู่ใน `_FilterBar` แยกแถว

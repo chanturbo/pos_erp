@@ -49,7 +49,9 @@ class StockBalancePdfBuilder {
       summaryLine += '   สต๊อกต่ำกว่า $lowStockThreshold : $lowCount รายการ';
     }
 
-    final rowsPerPage = await SettingsStorage.getReportRowsPerPage();
+    final rowsPerPage = await SettingsStorage.getPdfReportRowsPerPage(
+      PdfReportType.stockBalance,
+    );
     final pages = <List<StockBalanceModel>>[];
     for (var i = 0; i < stocks.length; i += rowsPerPage) {
       pages.add(
@@ -185,8 +187,8 @@ class StockBalancePdfBuilder {
     const colWidths = {
       0: pw.FixedColumnWidth(26), // #
       1: pw.FixedColumnWidth(68), // รหัส
-      2: pw.FlexColumnWidth(2),   // ชื่อ  ≈ 149pt
-      3: pw.FlexColumnWidth(1),   // คลัง  ≈ 74pt
+      2: pw.FlexColumnWidth(2), // ชื่อ  ≈ 149pt
+      3: pw.FlexColumnWidth(1), // คลัง  ≈ 74pt
       4: pw.FixedColumnWidth(58), // คงเหลือ
       5: pw.FixedColumnWidth(38), // หน่วย
       6: pw.FixedColumnWidth(64), // ต้นทุน/หน่วย

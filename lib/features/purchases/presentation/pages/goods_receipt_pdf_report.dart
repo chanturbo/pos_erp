@@ -64,7 +64,9 @@ class GoodsReceiptPdfBuilder {
       ttfR: ttfRegular,
     );
 
-    final rowsPerPage = await SettingsStorage.getReportRowsPerPage();
+    final rowsPerPage = await SettingsStorage.getPdfReportRowsPerPage(
+      PdfReportType.goodsReceipt,
+    );
     final pages = <List<GoodsReceiptModel>>[];
     for (var i = 0; i < receipts.length; i += rowsPerPage) {
       pages.add(

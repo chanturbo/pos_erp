@@ -100,7 +100,9 @@ class StockProductHistoryPdfBuilder {
     final summaryLine =
         'หน่วย: $baseUnit   คงเหลือ: ${balanceFmt.format(currentBalance)} $baseUnit   รายการ: ${items.length}   ตัวกรอง: $filterLabel';
 
-    final rowsPerPage = await SettingsStorage.getReportRowsPerPage();
+    final rowsPerPage = await SettingsStorage.getPdfReportRowsPerPage(
+      PdfReportType.stockProductHistory,
+    );
     final pages = <List<StockHistoryPdfItem>>[];
     for (var i = 0; i < items.length; i += rowsPerPage) {
       pages.add(

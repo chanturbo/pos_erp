@@ -49,7 +49,9 @@ class PurchaseReturnPdfBuilder {
       ttfR: ttfR,
     );
 
-    final rowsPerPage = await SettingsStorage.getReportRowsPerPage();
+    final rowsPerPage = await SettingsStorage.getPdfReportRowsPerPage(
+      PdfReportType.purchaseReturn,
+    );
     final pages = <List<PurchaseReturnModel>>[];
     for (var i = 0; i < returns.length; i += rowsPerPage) {
       pages.add(

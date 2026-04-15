@@ -65,7 +65,9 @@ class PurchaseOrderPdfBuilder {
       ttfR: ttfRegular,
     );
 
-    final rowsPerPage = await SettingsStorage.getReportRowsPerPage();
+    final rowsPerPage = await SettingsStorage.getPdfReportRowsPerPage(
+      PdfReportType.purchaseOrder,
+    );
     final pages = <List<PurchaseOrderModel>>[];
     for (var i = 0; i < orders.length; i += rowsPerPage) {
       pages.add(

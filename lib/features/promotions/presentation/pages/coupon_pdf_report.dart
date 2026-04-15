@@ -60,7 +60,9 @@ class CouponPdfBuilder {
         'ทั้งหมด ${coupons.length} ใบ   ใช้ได้ $valid ใบ   ใช้แล้ว $used ใบ   หมดอายุ $expired ใบ';
 
     // แบ่ง page (30 rows/page — portrait A4)
-    final rowsPerPage = await SettingsStorage.getReportRowsPerPage();
+    final rowsPerPage = await SettingsStorage.getPdfReportRowsPerPage(
+      PdfReportType.couponList,
+    );
     final pages = <List<CouponModel>>[];
     for (var i = 0; i < coupons.length; i += rowsPerPage) {
       pages.add(

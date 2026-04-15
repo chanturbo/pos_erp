@@ -3,6 +3,7 @@
 // Shared PDF Preview Dialog — ใช้ร่วมกันได้ทุก module
 // รองรับ pinch-to-zoom, zoom buttons (+/-), zoom reset, ปริ้น, ปิด dialog
 
+import 'dart:math' as math;
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
@@ -29,18 +30,23 @@ class PdfPreviewDialog extends StatefulWidget {
 }
 
 class _PdfPreviewDialogState extends State<PdfPreviewDialog> {
-  final TransformationController _transform = TransformationController();
   double _scale = 1.0;
+  bool _loadingPages = true;
+  Object? _previewError;
+  List<_RasterizedPdfPage> _pages = const [];
 
   static const double _minScale = 0.5;
   static const double _maxScale = 4.0;
   static const double _scaleStep = 0.25;
 
   @override
-  void dispose() {
-    _transform.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
+    _rasterizePages();
   }
+
+  @override
+  void dispose() => super.dispose();
 
   void _zoomIn() =>
       _applyScale((_scale + _scaleStep).clamp(_minScale, _maxScale));
@@ -86,12 +92,45 @@ class _PdfPreviewDialogState extends State<PdfPreviewDialog> {
     );
   }
 
-  void _applyScale(double newScale) {
-    final center = _transform.value.getTranslation();
-    _transform.value = Matrix4.identity()
-      ..translateByDouble(center.x, center.y, 0.0, 1.0)
-      ..scaleByDouble(newScale, newScale, 1.0, 1.0);
-    setState(() => _scale = newScale);
+  void _applyScale(double newScale) => setState(() => _scale = newScale);
+
+  Future<void> _rasterizePages() async {
+    if (mounted) {
+      setState(() {
+        _loadingPages = true;
+        _previewError = null;
+        _pages = const [];
+      });
+    }
+
+    try {
+      final pages = <_RasterizedPdfPage>[];
+      await for (final page in Printing.raster(widget.bytes, dpi: 144)) {
+        pages.add(
+          _RasterizedPdfPage(
+            bytes: await page.toPng(),
+            width: page.width,
+            height: page.height,
+          ),
+        );
+      }
+
+      if (pages.isEmpty) {
+        throw StateError('ไม่พบหน้าของเอกสาร PDF สำหรับแสดงตัวอย่าง');
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _pages = pages;
+        _loadingPages = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _previewError = error;
+        _loadingPages = false;
+      });
+    }
   }
 
   @override
@@ -129,38 +168,63 @@ class _PdfPreviewDialogState extends State<PdfPreviewDialog> {
                 borderRadius: const BorderRadius.vertical(
                   bottom: Radius.circular(12),
                 ),
-                child: InteractiveViewer(
-                  transformationController: _transform,
-                  minScale: _minScale,
-                  maxScale: _maxScale,
-                  boundaryMargin: const EdgeInsets.all(40),
-                  onInteractionEnd: (details) {
-                    final s = _transform.value.getMaxScaleOnAxis();
-                    if (mounted) setState(() => _scale = s);
-                  },
-                  child: PdfPreview(
-                    build: (_) async => widget.bytes,
-                    allowPrinting: false,
-                    allowSharing: false,
-                    canChangeOrientation: false,
-                    canChangePageFormat: false,
-                    canDebug: false,
-                    pdfFileName: widget.filename,
-                    onError: (context, error) => _PreviewErrorState(
-                      filename: widget.filename,
-                      error: error,
-                      onSavePdf: _savePdf,
-                    ),
-                    scrollViewDecoration: const BoxDecoration(
-                      color: Color(0xFFF0F0F0),
-                    ),
-                  ),
+                child: Container(
+                  color: const Color(0xFFF0F0F0),
+                  child: _buildPreviewBody(),
                 ),
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildPreviewBody() {
+    if (_loadingPages) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_previewError != null) {
+      return _PreviewErrorState(
+        filename: widget.filename,
+        error: _previewError!,
+        onSavePdf: _savePdf,
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final basePageWidth = math
+            .min(constraints.maxWidth - 48, 860.0)
+            .clamp(280.0, 860.0);
+        final scaledPageWidth = basePageWidth * _scale;
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Center(
+              child: SizedBox(
+                width: scaledPageWidth,
+                child: Column(
+                  children: [
+                    for (var i = 0; i < _pages.length; i++) ...[
+                      _PreviewPageCard(
+                        page: _pages[i],
+                        width: scaledPageWidth,
+                        pageNumber: i + 1,
+                        totalPages: _pages.length,
+                      ),
+                      if (i != _pages.length - 1) const SizedBox(height: 20),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -362,6 +426,74 @@ class _PreviewErrorState extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _RasterizedPdfPage {
+  final Uint8List bytes;
+  final int width;
+  final int height;
+
+  const _RasterizedPdfPage({
+    required this.bytes,
+    required this.width,
+    required this.height,
+  });
+}
+
+class _PreviewPageCard extends StatelessWidget {
+  final _RasterizedPdfPage page;
+  final double width;
+  final int pageNumber;
+  final int totalPages;
+
+  const _PreviewPageCard({
+    required this.page,
+    required this.width,
+    required this.pageNumber,
+    required this.totalPages,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final ratio = page.width / page.height;
+
+    return Column(
+      children: [
+        Align(
+          alignment: Alignment.centerRight,
+          child: Text(
+            'หน้า $pageNumber / $totalPages',
+            style: const TextStyle(
+              fontSize: 12,
+              color: Colors.black54,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          width: width,
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFD7D7D7)),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x14000000),
+                blurRadius: 16,
+                offset: Offset(0, 6),
+              ),
+            ],
+          ),
+          child: AspectRatio(
+            aspectRatio: ratio,
+            child: Image.memory(page.bytes, fit: BoxFit.contain),
+          ),
+        ),
+      ],
     );
   }
 }

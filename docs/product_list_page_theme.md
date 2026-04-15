@@ -2,6 +2,7 @@
 
 > อ้างอิงจาก `lib/features/products/presentation/pages/product_list_page.dart`  
 > และ `lib/shared/theme/app_theme.dart`
+> อัปเดตล่าสุด: 2026-04-15 (rev 2)
 
 ---
 
@@ -98,6 +99,15 @@ Scaffold
     └── PaginationBar + PdfReportButton
 ```
 
+### Current UX Notes
+
+- Desktop default เป็น `table view`
+- Mobile default เป็น `card view`
+- Search, warehouse filter, active-only toggle, view toggle และ action หลักทั้งหมดอยู่ใน Top Bar
+- Summary bar ทำหน้าที่สรุปตัวเลขและมูลค่าหลักของสินค้า ไม่ใช้เป็น filter bar
+- Table view รองรับการลากปรับความกว้างคอลัมน์และ auto-fit ตามข้อมูลจริง
+- Footer ใช้ `PaginationBar` และมี `PdfReportButton` เป็น action ปลายแถว
+
 ---
 
 ## Top Bar (`_ProductListTopBar`)
@@ -114,6 +124,14 @@ Scaffold
 | Toggle active filter | `_PToggleBtn` | active → `AppTheme.success`, inactive → navButtonBg |
 | Toggle view (table/card) | `_PToggleBtn` | active → `AppTheme.primary` |
 | Refresh / Groups / Add | `_PToggleBtn` / FilledButton | แต่ละปุ่มสี info/primary |
+
+### Responsive Behavior
+
+- `didChangeDependencies()` กำหนดค่าเริ่มต้นให้:
+  - `desktop/tablet` → table
+  - `mobile` → card
+- ผู้ใช้ยังสลับ view ได้เองผ่านปุ่ม toggle
+- Search state, warehouse filter และ pagination ยังคงพฤติกรรมเดิมข้ามการสลับ view
 
 ### `_PToggleBtn` active styles (ตัวอย่าง)
 - **isActiveOnly ON**: bg `success` 10%, border `success` 30%
@@ -201,6 +219,11 @@ SizedBox(width)
 ```
 colWidth = textWidth + basePadding(16) + sortChrome(20 if sortable) + resizeHandle(14) + buffer(10)
 ```
+
+แนวคิดปัจจุบัน:
+- คอลัมน์ชื่อสินค้าเป็นคอลัมน์หลักที่ยืดหยุ่นที่สุด
+- คอลัมน์ตัวเลข (`คงเหลือ / ราคา / ต้นทุน / มูลค่า`) คงโทนอ่านค่าเร็วและชิดขวา
+- ถ้าผู้ใช้ resize เอง ระบบจะไม่ override ค่านั้นด้วย auto-adjust รอบถัดไป
 
 ### Data Row (`_ProductTableRow`)
 - Row height: text 13px + vertical padding 10 = ~46px

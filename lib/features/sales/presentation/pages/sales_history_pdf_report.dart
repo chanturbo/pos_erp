@@ -28,6 +28,7 @@ const _kWarning = PdfColor.fromInt(0xFFBF360C);
 // SalesHistoryPdfBuilder
 // ─────────────────────────────────────────────────────────────────
 class SalesHistoryPdfBuilder {
+  static const int _maxFirstPageRows = 16;
   static final _fmt = NumberFormat('#,##0.00', 'th');
   static final _dateFmt = DateFormat('dd/MM/yyyy HH:mm');
   static final _shortFmt = DateFormat('dd/MM/yyyy');
@@ -80,49 +81,66 @@ class SalesHistoryPdfBuilder {
     final summaryLine =
         'ทั้งหมด ${orders.length} ใบ   สำเร็จ ${completed.length} ใบ   รอดำเนิน ${pending.length} ใบ   ยกเลิก ${cancelled.length} ใบ   ยอดรวม ฿${_fmt.format(totalRevenue)}';
 
-    // แบ่งหน้า 38 rows / page (A4 แนวตั้ง)
-    final rowsPerPage = await SettingsStorage.getReportRowsPerPage();
+    final baseRowsPerPage = await SettingsStorage.getPdfReportRowsPerPage(
+      PdfReportType.salesHistory,
+    );
+    final firstPageRows = baseRowsPerPage.clamp(1, _maxFirstPageRows);
     final pages = <List<SalesOrderModel>>[];
-    for (var i = 0; i < orders.length; i += rowsPerPage) {
-      final end = (i + rowsPerPage) > orders.length
+    var index = 0;
+    var currentPageSize = firstPageRows;
+    while (index < orders.length) {
+      final end = (index + currentPageSize) > orders.length
           ? orders.length
-          : i + rowsPerPage;
-      pages.add(orders.sublist(i, end));
+          : index + currentPageSize;
+      pages.add(orders.sublist(index, end));
+      index = end;
+      currentPageSize = baseRowsPerPage;
     }
     if (pages.isEmpty) pages.add([]);
     final totalPages = pages.length;
 
-    // ใช้ MultiPage เพื่อหลีกเลี่ยง closure-capture bug ของ for-loop
-    doc.addPage(
-      pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(24),
-        header: (ctx) => _buildPageHeader(
-          companyName: effectiveCompanyName,
-          reportTitle: 'รายงานประวัติการขาย',
-          printedAt: printedAt,
-          page: ctx.pageNumber,
-          totalPages: totalPages,
-          ttf: ttf,
-          ttfRegular: ttfRegular,
-          subtitle: subtitle,
-          summaryLine: summaryLine,
+    var startNo = 1;
+
+    for (var pageIdx = 0; pageIdx < pages.length; pageIdx++) {
+      final pageOrders = pages[pageIdx];
+      final pageStartNo = startNo;
+
+      doc.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(24),
+          build: (ctx) => pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+            children: [
+              _buildPageHeader(
+                companyName: effectiveCompanyName,
+                reportTitle: 'รายงานประวัติการขาย',
+                printedAt: printedAt,
+                page: pageIdx + 1,
+                totalPages: totalPages,
+                ttf: ttf,
+                ttfRegular: ttfRegular,
+                subtitle: subtitle,
+                summaryLine: summaryLine,
+              ),
+              _buildTable(
+                pageOrders,
+                startNo: pageStartNo,
+                ttf: ttf,
+                ttfRegular: ttfRegular,
+              ),
+              pw.SizedBox(height: 8),
+              _buildFooter(
+                companyName: effectiveCompanyName,
+                ttfRegular: ttfRegular,
+              ),
+            ],
+          ),
         ),
-        footer: (ctx) => _buildFooter(
-          companyName: effectiveCompanyName,
-          ttfRegular: ttfRegular,
-        ),
-        build: (ctx) => [
-          for (var i = 0; i < pages.length; i++)
-            _buildTable(
-              pages[i],
-              startNo: i * rowsPerPage + 1,
-              ttf: ttf,
-              ttfRegular: ttfRegular,
-            ),
-        ],
-      ),
-    );
+      );
+
+      startNo += pageOrders.length;
+    }
 
     return doc;
   }

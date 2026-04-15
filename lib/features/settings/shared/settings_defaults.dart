@@ -3,6 +3,22 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 enum ResponsivePreset { mobile, tablet, desktop }
 
+enum PdfReportType {
+  apInvoice,
+  apPayment,
+  customerList,
+  productList,
+  supplierList,
+  stockBalance,
+  stockMovementHistory,
+  stockProductHistory,
+  salesHistory,
+  couponList,
+  goodsReceipt,
+  purchaseOrder,
+  purchaseReturn,
+}
+
 class ResponsiveSettings {
   ResponsiveSettings._();
 
@@ -112,5 +128,28 @@ class SettingsStorage {
           legacy ??
           SettingsDefaults.reportRowsPerPageDesktop,
     );
+  }
+
+  static Future<int> getPdfReportRowsPerPage(
+    PdfReportType report, {
+    double? width,
+  }) async {
+    final baseRows = await getReportRowsPerPage(width: width);
+    final maxSafeRows = switch (report) {
+      PdfReportType.apInvoice => 16,
+      PdfReportType.apPayment => 16,
+      PdfReportType.stockBalance => 18,
+      PdfReportType.stockMovementHistory => 18,
+      PdfReportType.stockProductHistory => 18,
+      PdfReportType.productList => 18,
+      PdfReportType.couponList => 18,
+      PdfReportType.goodsReceipt => 18,
+      PdfReportType.purchaseOrder => 18,
+      PdfReportType.purchaseReturn => 18,
+      PdfReportType.salesHistory => 20,
+      PdfReportType.customerList => 20,
+      PdfReportType.supplierList => 20,
+    };
+    return baseRows.clamp(1, maxSafeRows);
   }
 }
