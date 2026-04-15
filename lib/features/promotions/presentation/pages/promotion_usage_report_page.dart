@@ -714,221 +714,313 @@ class _PromotionUsageReportPageState
     final moneyFmt = NumberFormat('#,##0.00');
     final dateFmt = DateFormat('dd/MM/yy HH:mm');
     final isDark = Theme.of(ctx).brightness == Brightness.dark;
+    final cardBg = isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF8F8F8);
+    final borderColor = isDark ? const Color(0xFF3A3A3A) : AppTheme.border;
+
+    // fetch ครั้งเดียว ใช้ร่วมกันระหว่าง UI และ PDF
+    final ordersFuture = api
+        .get('/api/promotions/usage/${promo.promotionId}/orders')
+        .then((res) {
+          if (res.statusCode == 200 && res.data != null) {
+            final list = res.data['data'] as List;
+            return list
+                .map((j) => _PromoOrderUsage.fromJson(j as Map<String, dynamic>))
+                .toList();
+          }
+          return <_PromoOrderUsage>[];
+        });
 
     showModalBottomSheet(
       context: ctx,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => DraggableScrollableSheet(
-        initialChildSize: 0.65,
+        initialChildSize: 0.72,
         minChildSize: 0.4,
-        maxChildSize: 0.92,
+        maxChildSize: 0.95,
         builder: (_, scrollCtrl) => Container(
           decoration: BoxDecoration(
             color: isDark ? AppTheme.darkCard : Colors.white,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
-          child: Column(
-            children: [
-              // handle bar
-              Center(
-                child: Container(
-                  margin: const EdgeInsets.only(top: 10, bottom: 4),
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              // title
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 16, 12),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(7),
+          child: FutureBuilder<List<_PromoOrderUsage>>(
+            future: ordersFuture,
+            builder: (_, snap) {
+              final orders =
+                  snap.connectionState == ConnectionState.done &&
+                          !snap.hasError
+                      ? (snap.data ?? <_PromoOrderUsage>[])
+                      : <_PromoOrderUsage>[];
+              final loaded = snap.connectionState == ConnectionState.done;
+
+              // คำนวณ summary
+              final totalRevenue =
+                  orders.fold(0.0, (s, o) => s + o.totalAmount);
+              final totalDiscount =
+                  orders.fold(0.0, (s, o) => s + o.discountAmount);
+              final completedCount = orders.length;
+              final cancelledCount = promo.currentUses - completedCount;
+
+              return Column(
+                children: [
+                  // handle bar
+                  Center(
+                    child: Container(
+                      margin: const EdgeInsets.only(top: 10, bottom: 4),
+                      width: 40,
+                      height: 4,
                       decoration: BoxDecoration(
-                        color: AppTheme.infoContainer,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(
-                        Icons.receipt_long,
-                        color: AppTheme.infoColor,
-                        size: 18,
+                        color: Colors.grey.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(2),
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            promo.promotionName,
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            overflow: TextOverflow.ellipsis,
+                  ),
+                  // title
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 8, 12),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(7),
+                          decoration: BoxDecoration(
+                            color: AppTheme.infoContainer,
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                          Text(
-                            '${promo.promotionCode} · ${promo.currentUses} ครั้ง',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: AppTheme.textSub,
-                            ),
+                          child: const Icon(
+                            Icons.receipt_long,
+                            color: AppTheme.infoColor,
+                            size: 18,
                           ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close, size: 20),
-                      onPressed: () => Navigator.pop(ctx),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1, color: AppTheme.border),
-              // content
-              Expanded(
-                child: FutureBuilder<List<_PromoOrderUsage>>(
-                  future: api
-                      .get('/api/promotions/usage/${promo.promotionId}/orders')
-                      .then((res) {
-                        if (res.statusCode == 200 && res.data != null) {
-                          final list = res.data['data'] as List;
-                          return list
-                              .map(
-                                (j) => _PromoOrderUsage.fromJson(
-                                  j as Map<String, dynamic>,
-                                ),
-                              )
-                              .toList();
-                        }
-                        return <_PromoOrderUsage>[];
-                      }),
-                  builder: (_, snap) {
-                    if (snap.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    if (snap.hasError) {
-                      return Center(
-                        child: Text('เกิดข้อผิดพลาด: ${snap.error}'),
-                      );
-                    }
-                    final orders = snap.data ?? [];
-                    if (orders.isEmpty) {
-                      return Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.receipt_outlined,
-                              size: 48,
-                              color: isDark ? Colors.white24 : Colors.black26,
-                            ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              'ยังไม่มีการใช้งาน',
-                              style: TextStyle(color: AppTheme.textSub),
-                            ),
-                          ],
                         ),
-                      );
-                    }
-                    return ListView.separated(
-                      controller: scrollCtrl,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      itemCount: orders.length,
-                      separatorBuilder: (_, _) =>
-                          const Divider(height: 1, color: AppTheme.border),
-                      itemBuilder: (_, i) {
-                        final o = orders[i];
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          child: Row(
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // icon
-                              Container(
-                                width: 36,
-                                height: 36,
-                                decoration: BoxDecoration(
-                                  color: AppTheme.primaryColor.withValues(
-                                    alpha: 0.1,
-                                  ),
-                                  borderRadius: BorderRadius.circular(8),
+                              Text(
+                                promo.promotionName,
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
                                 ),
-                                child: const Icon(
-                                  Icons.receipt,
-                                  size: 18,
-                                  color: AppTheme.primaryColor,
-                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
-                              const SizedBox(width: 12),
-                              // order info
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      o.orderNo,
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      o.customerName,
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        color: AppTheme.textSub,
-                                      ),
-                                    ),
-                                    Text(
-                                      dateFmt.format(o.usedAt),
-                                      style: const TextStyle(
-                                        fontSize: 11,
-                                        color: AppTheme.textSub,
-                                      ),
-                                    ),
-                                  ],
+                              Text(
+                                promo.promotionCode,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: AppTheme.textSub,
                                 ),
-                              ),
-                              // amounts
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    '฿${moneyFmt.format(o.totalAmount)}',
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  if (o.discountAmount > 0)
-                                    Text(
-                                      'ลด ฿${moneyFmt.format(o.discountAmount)}',
-                                      style: const TextStyle(
-                                        fontSize: 11,
-                                        color: AppTheme.successColor,
-                                      ),
-                                    ),
-                                ],
                               ),
                             ],
                           ),
-                        );
-                      },
-                    );
-                  },
-                ),
-              ),
-            ],
+                        ),
+                        // ── ปุ่ม PDF ────────────────────────────
+                        PdfReportButton(
+                          emptyMessage: 'ไม่มีข้อมูลคำสั่งซื้อ',
+                          title: 'รายงาน: ${promo.promotionName}',
+                          filename: () => PdfFilename.generate(
+                            'promo_detail_${promo.promotionCode}',
+                          ),
+                          hasData: loaded && orders.isNotEmpty,
+                          buildPdf: () =>
+                              _PromoOrdersDetailPdfBuilder.build(
+                            promo: promo,
+                            orders: orders,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, size: 20),
+                          onPressed: () => Navigator.pop(ctx),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1, color: AppTheme.border),
+                  // content
+                  Expanded(
+                    child: !loaded
+                        ? snap.hasError
+                            ? Center(
+                                child: Text('เกิดข้อผิดพลาด: ${snap.error}'),
+                              )
+                            : const Center(child: CircularProgressIndicator())
+                        : ListView(
+                            controller: scrollCtrl,
+                            padding:
+                                const EdgeInsets.fromLTRB(16, 14, 16, 24),
+                            children: [
+                              // ── Summary cards ───────────────────
+                              Row(
+                                children: [
+                                  _SummaryTile(
+                                    label: 'ใช้งานทั้งหมด',
+                                    value: '${promo.currentUses} ครั้ง',
+                                    icon: Icons.confirmation_number_outlined,
+                                    color: AppTheme.infoColor,
+                                    isDark: isDark,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  _SummaryTile(
+                                    label: 'คำสั่งซื้อสำเร็จ',
+                                    value: '$completedCount รายการ',
+                                    icon: Icons.check_circle_outline,
+                                    color: AppTheme.successColor,
+                                    isDark: isDark,
+                                  ),
+                                  if (cancelledCount > 0) ...[
+                                    const SizedBox(width: 8),
+                                    _SummaryTile(
+                                      label: 'ยกเลิก/อื่นๆ',
+                                      value: '$cancelledCount ครั้ง',
+                                      icon: Icons.cancel_outlined,
+                                      color: AppTheme.errorColor,
+                                      isDark: isDark,
+                                    ),
+                                  ],
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  _SummaryTile(
+                                    label: 'ยอดขายรวม',
+                                    value: '฿${moneyFmt.format(totalRevenue)}',
+                                    icon: Icons.monetization_on_outlined,
+                                    color: isDark
+                                        ? Colors.white70
+                                        : Colors.black87,
+                                    isDark: isDark,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  _SummaryTile(
+                                    label: 'ส่วนลดรวม',
+                                    value:
+                                        '฿${moneyFmt.format(totalDiscount)}',
+                                    icon: Icons.discount_outlined,
+                                    color: AppTheme.successColor,
+                                    isDark: isDark,
+                                  ),
+                                ],
+                              ),
+
+                              // ── หมายเหตุ (เมื่อ count ต่างกัน) ─
+                              if (cancelledCount > 0) ...[
+                                const SizedBox(height: 10),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 8,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: isDark
+                                        ? const Color(0xFF2C2A1A)
+                                        : const Color(0xFFFFFBE6),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: isDark
+                                          ? const Color(0xFF6B5800)
+                                          : const Color(0xFFFFD666),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.info_outline,
+                                        size: 15,
+                                        color: Color(0xFFD48806),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          'แสดงเฉพาะคำสั่งซื้อที่สำเร็จ ($completedCount รายการ) '
+                                          'จากทั้งหมด ${promo.currentUses} ครั้ง '
+                                          '($cancelledCount ครั้งอาจถูกยกเลิกหรือใช้ผ่านคูปอง)',
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            color: Color(0xFFAD6800),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+
+                              // ── รายการ ──────────────────────────
+                              const SizedBox(height: 14),
+                              if (orders.isEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 40,
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      Icon(
+                                        Icons.receipt_outlined,
+                                        size: 48,
+                                        color: isDark
+                                            ? Colors.white24
+                                            : Colors.black26,
+                                      ),
+                                      const SizedBox(height: 8),
+                                      const Text(
+                                        'ยังไม่มีคำสั่งซื้อที่สำเร็จ',
+                                        style: TextStyle(
+                                          color: AppTheme.textSub,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              else ...[
+                                Text(
+                                  'รายการคำสั่งซื้อที่สำเร็จ',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: isDark
+                                        ? Colors.white54
+                                        : AppTheme.textSub,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Container(
+                                  decoration: BoxDecoration(
+                                    color: cardBg,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: borderColor),
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      for (var i = 0;
+                                          i < orders.length;
+                                          i++) ...[
+                                        if (i > 0)
+                                          Divider(
+                                            height: 1,
+                                            color: borderColor,
+                                            indent: 16,
+                                            endIndent: 16,
+                                          ),
+                                        _OrderTile(
+                                          order: orders[i],
+                                          index: i + 1,
+                                          moneyFmt: moneyFmt,
+                                          dateFmt: dateFmt,
+                                          isDark: isDark,
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                  ),
+                ],
+              );
+            },
           ),
         ),
       ),
@@ -1030,10 +1122,11 @@ class _PromotionUsageReportPageState
 // ─── PDF Builder ─────────────────────────────────────────────────────────────
 class _PromoUsageReportPdfBuilder {
   static const _kBorder = PdfColor.fromInt(0xFFBBBBBB);
-  static const _kHdrBg = PdfColor.fromInt(0xFF16213E);
+  static const _kHdrBg = PdfColor.fromInt(0xFFDDDDDD);
   static const _kAltRow = PdfColor.fromInt(0xFFF5F5F5);
+  static const _kText = PdfColors.black;
   static const _kPrimary = PdfColor.fromInt(0xFFE57200);
-  static const _kSuccess = PdfColor.fromInt(0xFF2E7D32);
+  static const _kSuccess = PdfColor.fromInt(0xFF1B5E20);
   static const _kSub = PdfColor.fromInt(0xFF555555);
 
   static Future<pw.Document> build(List<_PromoUsage> items) async {
@@ -1042,175 +1135,586 @@ class _PromoUsageReportPdfBuilder {
       title: 'รายงานการใช้งานโปรโมชั่น',
       author: companyName,
     );
-    final ttfBold = await PdfGoogleFonts.notoSansThaiBold();
-    final ttf = await PdfGoogleFonts.notoSansThaiRegular();
+    final ttf = await PdfGoogleFonts.notoSansThaiBold();
+    final ttfRegular = await PdfGoogleFonts.notoSansThaiRegular();
     final dateFmt = DateFormat('dd/MM/yy');
     final numFmt = NumberFormat('#,##0');
     final printedAt = DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now());
 
-    const rowsPerPage = 30;
-    final pages = (items.length / rowsPerPage).ceil().clamp(1, 9999);
+    // summary
+    final running = items.where((p) {
+      final now = DateTime.now();
+      return p.isActive && now.isAfter(p.startDate) && now.isBefore(p.endDate);
+    }).length;
+    final inactive = items.where((p) => !p.isActive).length;
+    final summaryLine =
+        'ทั้งหมด ${items.length} รายการ   กำลังใช้งาน $running   รอเวลา ${items.length - running - inactive}   ปิด $inactive';
 
-    for (int page = 0; page < pages; page++) {
-      final start = page * rowsPerPage;
-      final end = (start + rowsPerPage).clamp(0, items.length);
-      final pageItems = items.sublist(start, end);
+    final rowsPerPage = await SettingsStorage.getReportRowsPerPage();
+    final batches = <List<_PromoUsage>>[];
+    for (var i = 0; i < items.length; i += rowsPerPage) {
+      batches.add(items.sublist(
+        i,
+        (i + rowsPerPage) > items.length ? items.length : i + rowsPerPage,
+      ));
+    }
+    if (batches.isEmpty) batches.add([]);
+    final totalPages = batches.length;
 
-      doc.addPage(
-        pw.Page(
-          pageFormat: PdfPageFormat.a4,
-          margin: const pw.EdgeInsets.all(24),
-          build: (pw.Context ctx) => pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.stretch,
-            children: [
-              // ── Header ────────────────────────────────────────
-              pw.Container(
-                color: _kHdrBg,
-                padding: const pw.EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 10,
-                ),
-                child: pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                  children: [
-                    pw.Text(
-                      'รายงานการใช้งานโปรโมชั่น',
-                      style: pw.TextStyle(
-                        font: ttfBold,
-                        fontSize: 14,
-                        color: PdfColors.white,
-                      ),
-                    ),
-                    pw.Text(
-                      companyName,
-                      style: pw.TextStyle(
-                        font: ttf,
-                        fontSize: 10,
-                        color: const PdfColor(1, 1, 1, 0.7),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              pw.SizedBox(height: 8),
-              // ── Table ─────────────────────────────────────────
-              pw.Table(
-                border: pw.TableBorder.all(color: _kBorder, width: 0.5),
-                columnWidths: const {
-                  0: pw.FlexColumnWidth(2),
-                  1: pw.FlexColumnWidth(4),
-                  2: pw.FlexColumnWidth(2),
-                  3: pw.FlexColumnWidth(3),
-                  4: pw.FlexColumnWidth(2),
-                  5: pw.FlexColumnWidth(1.5),
-                  6: pw.FlexColumnWidth(1.5),
-                },
-                children: [
-                  // header row
-                  pw.TableRow(
-                    decoration: const pw.BoxDecoration(color: _kHdrBg),
-                    children: [
-                      'รหัส',
-                      'ชื่อโปรโมชั่น',
-                      'ประเภท',
-                      'ช่วงเวลา',
-                      'ใช้งานแล้ว',
-                      'สูงสุด',
-                      'สถานะ',
-                    ]
-                        .map(
-                          (h) => pw.Padding(
-                            padding: const pw.EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 5,
-                            ),
-                            child: pw.Text(
-                              h,
-                              style: pw.TextStyle(
-                                font: ttfBold,
-                                fontSize: 9,
-                                color: PdfColors.white,
-                              ),
-                            ),
-                          ),
-                        )
-                        .toList(),
-                  ),
-                  // data rows
-                  ...pageItems.asMap().entries.map((entry) {
-                    final i = entry.key;
-                    final p = entry.value;
-                    final now = DateTime.now();
-                    final isRunning = p.isActive &&
-                        now.isAfter(p.startDate) &&
-                        now.isBefore(p.endDate);
-                    final statusLabel = isRunning
-                        ? 'กำลังใช้งาน'
-                        : p.isActive
-                            ? 'รอเวลา'
-                            : 'ปิด';
-                    final statusColor = isRunning
-                        ? _kSuccess
-                        : p.isActive
-                            ? _kPrimary
-                            : _kSub;
-                    final bg =
-                        i.isEven ? PdfColors.white : _kAltRow;
-                    return pw.TableRow(
-                      decoration: pw.BoxDecoration(color: bg),
-                      children: [
-                        p.promotionCode,
-                        p.promotionName,
-                        _typeLabel(p.promotionType),
-                        '${dateFmt.format(p.startDate)}\n– ${dateFmt.format(p.endDate)}',
-                        '${numFmt.format(p.currentUses)} ครั้ง',
-                        p.maxUses != null
-                            ? numFmt.format(p.maxUses!)
-                            : '∞',
-                        statusLabel,
-                      ].asMap().entries.map((e) {
-                        final isStatus = e.key == 6;
-                        return pw.Padding(
-                          padding: const pw.EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 4,
-                          ),
-                          child: pw.Text(
-                            e.value,
-                            style: pw.TextStyle(
-                              font: isStatus ? ttfBold : ttf,
-                              fontSize: 9,
-                              color: isStatus ? statusColor : PdfColors.black,
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    );
-                  }),
-                ],
-              ),
-              pw.Spacer(),
-              // ── Footer ────────────────────────────────────────
-              pw.Divider(color: _kBorder, thickness: 0.5),
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Text(
-                    'พิมพ์เมื่อ $printedAt',
-                    style: pw.TextStyle(font: ttf, fontSize: 8, color: _kSub),
-                  ),
-                  pw.Text(
-                    'หน้า ${page + 1} / $pages',
-                    style: pw.TextStyle(font: ttf, fontSize: 8, color: _kSub),
-                  ),
-                ],
-              ),
-            ],
+    doc.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(24),
+        header: (ctx) => _buildPageHeader(
+          companyName: companyName,
+          reportTitle: 'รายงานการใช้งานโปรโมชั่น',
+          printedAt: printedAt,
+          page: ctx.pageNumber,
+          totalPages: totalPages,
+          ttf: ttf,
+          ttfRegular: ttfRegular,
+          summaryLine: summaryLine,
+        ),
+        footer: (ctx) => _buildFooter(
+          companyName: companyName,
+          ttfRegular: ttfRegular,
+        ),
+        build: (ctx) => [
+          for (var i = 0; i < batches.length; i++)
+            _buildTable(
+              batches[i],
+              startNo: i * rowsPerPage + 1,
+              ttf: ttf,
+              ttfRegular: ttfRegular,
+              dateFmt: dateFmt,
+              numFmt: numFmt,
+            ),
+        ],
+      ),
+    );
+
+    return doc;
+  }
+
+  // ── Page Header ──────────────────────────────────────────────────
+  static pw.Widget _buildPageHeader({
+    required String companyName,
+    required String reportTitle,
+    required String printedAt,
+    required int page,
+    required int totalPages,
+    required pw.Font ttf,
+    required pw.Font ttfRegular,
+    String? summaryLine,
+  }) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+      children: [
+        pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          children: [
+            pw.Text(
+              'พิมพ์เมื่อ $printedAt',
+              style: pw.TextStyle(font: ttfRegular, fontSize: 8, color: _kSub),
+            ),
+            pw.Text(
+              'หน้าที่ $page / $totalPages',
+              style: pw.TextStyle(font: ttfRegular, fontSize: 8, color: _kSub),
+            ),
+          ],
+        ),
+        pw.SizedBox(height: 3),
+        pw.Center(
+          child: pw.Text(
+            companyName,
+            style: pw.TextStyle(font: ttfRegular, fontSize: 9, color: _kSub),
+          ),
+        ),
+        pw.SizedBox(height: 2),
+        pw.Center(
+          child: pw.Text(
+            reportTitle,
+            style: pw.TextStyle(font: ttf, fontSize: 14, color: _kText),
+          ),
+        ),
+        if (summaryLine != null) ...[
+          pw.SizedBox(height: 2),
+          pw.Center(
+            child: pw.Text(
+              summaryLine,
+              style: pw.TextStyle(font: ttfRegular, fontSize: 8, color: _kSub),
+            ),
+          ),
+        ],
+        pw.SizedBox(height: 6),
+        pw.Container(height: 0.5, color: _kBorder),
+        pw.SizedBox(height: 6),
+      ],
+    );
+  }
+
+  // ── Table ────────────────────────────────────────────────────────
+  static pw.Widget _buildTable(
+    List<_PromoUsage> pageItems, {
+    required int startNo,
+    required pw.Font ttf,
+    required pw.Font ttfRegular,
+    required DateFormat dateFmt,
+    required NumberFormat numFmt,
+  }) {
+    pw.Widget cell(
+      String text,
+      pw.Font font, {
+      pw.Alignment align = pw.Alignment.centerLeft,
+      PdfColor? color,
+      PdfColor? bgColor,
+      double fontSize = 8.5,
+    }) {
+      return pw.Container(
+        color: bgColor,
+        padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 5),
+        alignment: align,
+        child: pw.Text(
+          text,
+          style: pw.TextStyle(
+            font: font,
+            fontSize: fontSize,
+            color: color ?? _kText,
           ),
         ),
       );
     }
+
+    return pw.Table(
+      border: pw.TableBorder.all(color: _kBorder, width: 0.5),
+      columnWidths: const {
+        0: pw.FixedColumnWidth(24),    // #
+        1: pw.FixedColumnWidth(70),    // รหัส
+        2: pw.FlexColumnWidth(1),      // ชื่อโปรโมชั่น
+        3: pw.FixedColumnWidth(55),    // ประเภท
+        4: pw.FixedColumnWidth(90),    // ช่วงเวลา
+        5: pw.FixedColumnWidth(50),    // ใช้งานแล้ว
+        6: pw.FixedColumnWidth(40),    // สูงสุด
+        7: pw.FixedColumnWidth(55),    // สถานะ
+      },
+      children: [
+        // header row
+        pw.TableRow(
+          decoration: const pw.BoxDecoration(color: _kHdrBg),
+          children: [
+            '#',
+            'รหัส',
+            'ชื่อโปรโมชั่น',
+            'ประเภท',
+            'ช่วงเวลา',
+            'ใช้แล้ว',
+            'สูงสุด',
+            'สถานะ',
+          ]
+              .map(
+                (h) => pw.Container(
+                  padding: const pw.EdgeInsets.symmetric(
+                    horizontal: 5,
+                    vertical: 6,
+                  ),
+                  child: pw.Text(
+                    h,
+                    style: pw.TextStyle(
+                      font: ttf,
+                      fontSize: 8,
+                      color: _kText,
+                    ),
+                  ),
+                ),
+              )
+              .toList(),
+        ),
+        // data rows
+        ...pageItems.asMap().entries.map((entry) {
+          final i = entry.key;
+          final p = entry.value;
+          final now = DateTime.now();
+          final isRunning = p.isActive &&
+              now.isAfter(p.startDate) &&
+              now.isBefore(p.endDate);
+          final statusLabel =
+              isRunning ? 'กำลังใช้งาน' : p.isActive ? 'รอเวลา' : 'ปิด';
+          final statusColor =
+              isRunning ? _kSuccess : p.isActive ? _kPrimary : _kSub;
+          final rowBg = i.isEven ? _kAltRow : null;
+
+          return pw.TableRow(
+            children: [
+              cell('${startNo + i}', ttfRegular,
+                  align: pw.Alignment.center, bgColor: rowBg),
+              cell(p.promotionCode, ttf, bgColor: rowBg, fontSize: 7.5),
+              cell(p.promotionName, ttfRegular, bgColor: rowBg),
+              cell(_typeLabel(p.promotionType), ttfRegular,
+                  bgColor: rowBg, color: _kSub, fontSize: 8),
+              cell(
+                '${dateFmt.format(p.startDate)}\n– ${dateFmt.format(p.endDate)}',
+                ttfRegular,
+                bgColor: rowBg,
+                color: _kSub,
+                fontSize: 7.5,
+              ),
+              cell(
+                '${numFmt.format(p.currentUses)} ครั้ง',
+                ttf,
+                align: pw.Alignment.center,
+                bgColor: rowBg,
+              ),
+              cell(
+                p.maxUses != null ? numFmt.format(p.maxUses!) : '∞',
+                ttfRegular,
+                align: pw.Alignment.center,
+                bgColor: rowBg,
+                color: _kSub,
+              ),
+              cell(
+                statusLabel,
+                ttf,
+                align: pw.Alignment.center,
+                color: statusColor,
+                bgColor: rowBg,
+              ),
+            ],
+          );
+        }),
+      ],
+    );
+  }
+
+  // ── Footer ───────────────────────────────────────────────────────
+  static pw.Widget _buildFooter({
+    required String companyName,
+    required pw.Font ttfRegular,
+  }) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.only(top: 6),
+      decoration: const pw.BoxDecoration(
+        border: pw.Border(top: pw.BorderSide(color: _kBorder, width: 0.5)),
+      ),
+      child: pw.Text(
+        '$companyName — รายงานการใช้งานโปรโมชั่น',
+        style: pw.TextStyle(font: ttfRegular, fontSize: 7, color: _kSub),
+      ),
+    );
+  }
+
+  static String _typeLabel(String type) => switch (type) {
+        'BUY_X_GET_Y' => 'ซื้อ X แถม Y',
+        'DISCOUNT_PERCENT' => 'ลด %',
+        'DISCOUNT_AMOUNT' => 'ลดเงิน',
+        'FREE_ITEM' => 'ของแถม',
+        _ => type,
+      };
+}
+
+// ─── PDF Builder: รายละเอียดการใช้โปรโมชั่น ─────────────────────────────────
+class _PromoOrdersDetailPdfBuilder {
+  static const _kBorder = PdfColor.fromInt(0xFFBBBBBB);
+  static const _kHdrBg = PdfColor.fromInt(0xFFDDDDDD);
+  static const _kAltRow = PdfColor.fromInt(0xFFF5F5F5);
+  static const _kText = PdfColors.black;
+  static const _kSub = PdfColor.fromInt(0xFF555555);
+  static const _kSuccess = PdfColor.fromInt(0xFF1B5E20);
+
+  static final _moneyFmt = NumberFormat('#,##0.00', 'th');
+  static final _dateFmt = DateFormat('dd/MM/yyyy HH:mm');
+
+  static Future<pw.Document> build({
+    required _PromoUsage promo,
+    required List<_PromoOrderUsage> orders,
+  }) async {
+    final companyName = await SettingsStorage.getCompanyName();
+    final doc = pw.Document(
+      title: 'รายงาน: ${promo.promotionName}',
+      author: companyName,
+    );
+
+    final ttf = await PdfGoogleFonts.notoSansThaiBold();
+    final ttfRegular = await PdfGoogleFonts.notoSansThaiRegular();
+    final printedAt = DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now());
+
+    final totalRevenue = orders.fold(0.0, (s, o) => s + o.totalAmount);
+    final totalDiscount = orders.fold(0.0, (s, o) => s + o.discountAmount);
+    final completedCount = orders.length;
+    final cancelledCount = promo.currentUses - completedCount;
+
+    final shortFmt = DateFormat('dd/MM/yyyy');
+    final subtitle =
+        '${promo.promotionCode}  ·  ${_typeLabel(promo.promotionType)}'
+        '  ·  ${shortFmt.format(promo.startDate)} – ${shortFmt.format(promo.endDate)}';
+    final summaryLine =
+        'ใช้งานทั้งหมด ${promo.currentUses} ครั้ง   '
+        'สำเร็จ $completedCount รายการ'
+        '${cancelledCount > 0 ? '   ยกเลิก/อื่นๆ $cancelledCount ครั้ง' : ''}   '
+        'ยอดขายรวม ฿${_moneyFmt.format(totalRevenue)}   '
+        'ส่วนลดรวม ฿${_moneyFmt.format(totalDiscount)}';
+
+    final rowsPerPage = await SettingsStorage.getReportRowsPerPage();
+    final batches = <List<_PromoOrderUsage>>[];
+    for (var i = 0; i < orders.length; i += rowsPerPage) {
+      batches.add(orders.sublist(
+        i,
+        (i + rowsPerPage) > orders.length ? orders.length : i + rowsPerPage,
+      ));
+    }
+    if (batches.isEmpty) batches.add([]);
+    final totalPages = batches.length;
+
+    doc.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(24),
+        header: (ctx) => _buildPageHeader(
+          companyName: companyName,
+          reportTitle: promo.promotionName,
+          printedAt: printedAt,
+          page: ctx.pageNumber,
+          totalPages: totalPages,
+          ttf: ttf,
+          ttfRegular: ttfRegular,
+          subtitle: subtitle,
+          summaryLine: summaryLine,
+        ),
+        footer: (ctx) => _buildFooter(
+          companyName: companyName,
+          promotionName: promo.promotionName,
+          ttfRegular: ttfRegular,
+        ),
+        build: (ctx) => [
+          for (var i = 0; i < batches.length; i++)
+            _buildTable(
+              batches[i],
+              startNo: i * rowsPerPage + 1,
+              ttf: ttf,
+              ttfRegular: ttfRegular,
+            ),
+        ],
+      ),
+    );
+
     return doc;
+  }
+
+  // ── Page Header ──────────────────────────────────────────────────
+  static pw.Widget _buildPageHeader({
+    required String companyName,
+    required String reportTitle,
+    required String printedAt,
+    required int page,
+    required int totalPages,
+    required pw.Font ttf,
+    required pw.Font ttfRegular,
+    String? subtitle,
+    String? summaryLine,
+  }) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+      children: [
+        pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          children: [
+            pw.Text(
+              'พิมพ์เมื่อ $printedAt',
+              style: pw.TextStyle(font: ttfRegular, fontSize: 8, color: _kSub),
+            ),
+            pw.Text(
+              'หน้าที่ $page / $totalPages',
+              style: pw.TextStyle(font: ttfRegular, fontSize: 8, color: _kSub),
+            ),
+          ],
+        ),
+        pw.SizedBox(height: 3),
+        pw.Center(
+          child: pw.Text(
+            companyName,
+            style: pw.TextStyle(font: ttfRegular, fontSize: 9, color: _kSub),
+          ),
+        ),
+        pw.SizedBox(height: 2),
+        pw.Center(
+          child: pw.Text(
+            reportTitle,
+            style: pw.TextStyle(font: ttf, fontSize: 14, color: _kText),
+          ),
+        ),
+        if (subtitle != null) ...[
+          pw.SizedBox(height: 3),
+          pw.Center(
+            child: pw.Text(
+              subtitle,
+              style: pw.TextStyle(font: ttfRegular, fontSize: 8, color: _kSub),
+            ),
+          ),
+        ],
+        if (summaryLine != null) ...[
+          pw.SizedBox(height: 2),
+          pw.Center(
+            child: pw.Text(
+              summaryLine,
+              style: pw.TextStyle(font: ttfRegular, fontSize: 8, color: _kSub),
+            ),
+          ),
+        ],
+        pw.SizedBox(height: 6),
+        pw.Container(height: 0.5, color: _kBorder),
+        pw.SizedBox(height: 6),
+      ],
+    );
+  }
+
+  // ── Table ────────────────────────────────────────────────────────
+  static pw.Widget _buildTable(
+    List<_PromoOrderUsage> orders, {
+    required int startNo,
+    required pw.Font ttf,
+    required pw.Font ttfRegular,
+  }) {
+    pw.Widget cell(
+      String text,
+      pw.Font font, {
+      pw.Alignment align = pw.Alignment.centerLeft,
+      PdfColor? color,
+      PdfColor? bgColor,
+      double fontSize = 8.5,
+    }) {
+      return pw.Container(
+        color: bgColor,
+        padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 5),
+        alignment: align,
+        child: pw.Text(
+          text,
+          style: pw.TextStyle(
+            font: font,
+            fontSize: fontSize,
+            color: color ?? _kText,
+          ),
+        ),
+      );
+    }
+
+    return pw.Table(
+      columnWidths: const {
+        0: pw.FixedColumnWidth(24),  // #
+        1: pw.FixedColumnWidth(80),  // วันที่
+        2: pw.FlexColumnWidth(1.5),  // เลขที่ใบขาย
+        3: pw.FlexColumnWidth(1),    // ลูกค้า
+        4: pw.FixedColumnWidth(75),  // ยอดรวม
+        5: pw.FixedColumnWidth(65),  // ส่วนลด
+      },
+      border: pw.TableBorder.all(color: _kBorder, width: 0.5),
+      children: [
+        // header row
+        pw.TableRow(
+          decoration: const pw.BoxDecoration(color: _kHdrBg),
+          children: ['#', 'วันที่-เวลา', 'เลขที่ใบขาย', 'ลูกค้า', 'ยอดรวม', 'ส่วนลด']
+              .map(
+                (h) => pw.Container(
+                  padding: const pw.EdgeInsets.symmetric(
+                    horizontal: 5,
+                    vertical: 6,
+                  ),
+                  child: pw.Text(
+                    h,
+                    style: pw.TextStyle(font: ttf, fontSize: 8, color: _kText),
+                  ),
+                ),
+              )
+              .toList(),
+        ),
+        // data rows
+        ...orders.asMap().entries.map((entry) {
+          final i = entry.key;
+          final o = entry.value;
+          final rowBg = i.isEven ? _kAltRow : null;
+
+          return pw.TableRow(
+            children: [
+              cell('${startNo + i}', ttfRegular,
+                  align: pw.Alignment.center, bgColor: rowBg),
+              cell(_dateFmt.format(o.usedAt), ttfRegular,
+                  fontSize: 7.5, color: _kSub, bgColor: rowBg),
+              cell(o.orderNo, ttf, bgColor: rowBg),
+              cell(o.customerName, ttfRegular, bgColor: rowBg),
+              cell('฿${_moneyFmt.format(o.totalAmount)}', ttf,
+                  align: pw.Alignment.centerRight, bgColor: rowBg),
+              cell(
+                o.discountAmount > 0
+                    ? '฿${_moneyFmt.format(o.discountAmount)}'
+                    : '-',
+                ttfRegular,
+                align: pw.Alignment.centerRight,
+                color: o.discountAmount > 0 ? _kSuccess : _kSub,
+                bgColor: rowBg,
+              ),
+            ],
+          );
+        }),
+        // total row
+        pw.TableRow(
+          decoration: const pw.BoxDecoration(color: _kHdrBg),
+          children: [
+            pw.Container(
+              padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 6),
+              child: pw.SizedBox(),
+            ),
+            pw.Container(
+              padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 6),
+              child: pw.SizedBox(),
+            ),
+            pw.Container(
+              padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 6),
+              child: pw.SizedBox(),
+            ),
+            pw.Container(
+              padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 6),
+              alignment: pw.Alignment.centerRight,
+              child: pw.Text(
+                'รวม',
+                style: pw.TextStyle(font: ttf, fontSize: 8, color: _kText),
+              ),
+            ),
+            pw.Container(
+              padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 6),
+              alignment: pw.Alignment.centerRight,
+              child: pw.Text(
+                '฿${_moneyFmt.format(orders.fold(0.0, (s, o) => s + o.totalAmount))}',
+                style: pw.TextStyle(font: ttf, fontSize: 8, color: _kText),
+              ),
+            ),
+            pw.Container(
+              padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 6),
+              alignment: pw.Alignment.centerRight,
+              child: pw.Text(
+                '฿${_moneyFmt.format(orders.fold(0.0, (s, o) => s + o.discountAmount))}',
+                style: pw.TextStyle(font: ttf, fontSize: 8, color: _kSuccess),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // ── Footer ───────────────────────────────────────────────────────
+  static pw.Widget _buildFooter({
+    required String companyName,
+    required String promotionName,
+    required pw.Font ttfRegular,
+  }) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.only(top: 6),
+      decoration: const pw.BoxDecoration(
+        border: pw.Border(top: pw.BorderSide(color: _kBorder, width: 0.5)),
+      ),
+      child: pw.Text(
+        '$companyName — $promotionName',
+        style: pw.TextStyle(font: ttfRegular, fontSize: 7, color: _kSub),
+      ),
+    );
   }
 
   static String _typeLabel(String type) => switch (type) {
@@ -1260,6 +1764,166 @@ class _HoverableRowState extends State<_HoverableRow> {
           color: _hovered ? hoverBg : normalBg,
           child: widget.child,
         ),
+      ),
+    );
+  }
+}
+
+// ─── Summary tile ────────────────────────────────────────────────────────────
+class _SummaryTile extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color color;
+  final bool isDark;
+
+  const _SummaryTile({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF8F8F8);
+    final border = isDark ? const Color(0xFF3A3A3A) : AppTheme.border;
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: border),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 16, color: color),
+            const SizedBox(width: 7),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    value,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: color,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: isDark ? Colors.white38 : AppTheme.textSub,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Order tile ──────────────────────────────────────────────────────────────
+class _OrderTile extends StatelessWidget {
+  final _PromoOrderUsage order;
+  final int index;
+  final NumberFormat moneyFmt;
+  final DateFormat dateFmt;
+  final bool isDark;
+
+  const _OrderTile({
+    required this.order,
+    required this.index,
+    required this.moneyFmt,
+    required this.dateFmt,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+      child: Row(
+        children: [
+          // ลำดับ
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: AppTheme.primaryColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              '$index',
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.primaryColor,
+              ),
+            ),
+          ),
+          const SizedBox(width: 11),
+          // order info
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  order.orderNo,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  order.customerName,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? Colors.white54 : AppTheme.textSub,
+                  ),
+                ),
+                Text(
+                  dateFmt.format(order.usedAt),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDark ? Colors.white38 : AppTheme.textSub,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // amounts
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '฿${moneyFmt.format(order.totalAmount)}',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              if (order.discountAmount > 0)
+                Text(
+                  'ลด ฿${moneyFmt.format(order.discountAmount)}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppTheme.successColor,
+                  ),
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }

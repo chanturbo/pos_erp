@@ -659,23 +659,20 @@ class _TopBar extends StatelessWidget {
         const SizedBox(width: 6),
         _RefreshBtn(onTap: onRefresh),
         const SizedBox(width: 6),
-        Tooltip(
-          message: 'รายงานการใช้งานโปรโมชั่น',
-          child: SizedBox(
-            width: 34,
-            height: 34,
-            child: Material(
-              color: colors.navButtonBg,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-                side: BorderSide(color: colors.navButtonBorder),
-              ),
-              child: InkWell(
-                onTap: onReport,
-                borderRadius: BorderRadius.circular(8),
-                child: const Center(
-                  child: Icon(Icons.bar_chart, size: 17, color: Colors.white70),
-                ),
+        SizedBox(
+          width: 34,
+          height: 34,
+          child: Material(
+            color: colors.navButtonBg,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+              side: BorderSide(color: colors.navButtonBorder),
+            ),
+            child: InkWell(
+              onTap: onReport,
+              borderRadius: BorderRadius.circular(8),
+              child: const Center(
+                child: Icon(Icons.bar_chart, size: 17, color: Colors.white70),
               ),
             ),
           ),

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/promotion_model.dart';
 import '../../../../core/client/api_client.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../settings/presentation/pages/settings_page.dart';
 
 // ─── Promotion List Provider ──────────────────────────────────────────────────
 final promotionListProvider =
@@ -165,9 +166,8 @@ final couponListProvider =
 );
 
 class CouponNotifier extends AsyncNotifier<CouponPageState> {
-  static const int _defaultLimit = 50;
-
   int    _page         = 1;
+  int    _limit        = 50;   // อัปเดตจาก settingsProvider ใน build()
   String _status       = 'ALL';
   String _search       = '';
   String _expiresFrom  = '';
@@ -183,6 +183,8 @@ class CouponNotifier extends AsyncNotifier<CouponPageState> {
     if (authState.isRestoring || !authState.isAuthenticated) {
       return CouponPageState.empty();
     }
+    // โหลดค่า listPageSize จาก Settings (reactive — rebuild เมื่อ settings เปลี่ยน)
+    _limit = ref.watch(settingsProvider).listPageSize;
     return _load();
   }
 
@@ -191,7 +193,7 @@ class CouponNotifier extends AsyncNotifier<CouponPageState> {
       final api = ref.read(apiClientProvider);
       final res = await api.get('/api/promotions/coupons', queryParameters: {
         'page':   _groupMode ? '1' : '$_page',
-        'limit':  _groupMode ? '9999' : '$_defaultLimit',
+        'limit':  _groupMode ? '9999' : '$_limit',
         'status': _status,
         'search': _search,
         if (_expiresFrom.isNotEmpty) 'expires_from': _expiresFrom,

@@ -117,7 +117,7 @@ class PaginationBar extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         // แบ่ง 2 แถวเมื่อหน้าจอแคบและมี trailing widget
-        final isNarrow = trailing != null && constraints.maxWidth < 480;
+        final isNarrow = trailing != null && constraints.maxWidth < 560;
 
         return Container(
           padding: EdgeInsets.symmetric(
@@ -154,7 +154,8 @@ class PaginationBar extends StatelessWidget {
               // ── หน้าจอกว้าง: แถวเดียว ──
               : Row(
                   children: [
-                    countText,
+                    Flexible(child: countText),
+                    const SizedBox(width: 8),
                     const Spacer(),
                     if (trailing != null) ...[
                       trailing!,
