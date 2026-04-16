@@ -20,6 +20,7 @@ import '../../../../shared/widgets/app_dialogs.dart';
 import '../../../../shared/widgets/cart_toast.dart';
 import '../../../promotions/data/models/promotion_model.dart';
 import '../../../promotions/presentation/providers/promotion_provider.dart';
+import '../../../inventory/presentation/providers/stock_provider.dart';
 
 class PosPage extends ConsumerStatefulWidget {
   /// isCashierMode = true  → Cashier login โดยตรง
@@ -225,17 +226,32 @@ class _PosPageState extends ConsumerState<PosPage> {
   }
 
   // ── Filter products ───────────────────────────────────────────
-  List<ProductModel> _filterProducts(List<ProductModel> src) {
-    if (_searchQuery.isEmpty) return src;
-    final q = _searchQuery.toLowerCase();
-    return src
-        .where(
-          (p) =>
-              p.productName.toLowerCase().contains(q) ||
-              p.productCode.toLowerCase().contains(q) ||
-              (p.barcode?.toLowerCase().contains(q) ?? false),
-        )
-        .toList();
+  List<ProductModel> _filterProducts(
+    List<ProductModel> src, {
+    Map<String, double> stockMap = const {},
+  }) {
+    // ซ่อนสินค้าหมด (เฉพาะสินค้าที่ควบคุม stock และไม่อนุญาต stock ติดลบ)
+    var result = src.where((p) {
+      if (p.isStockControl && !p.allowNegativeStock) {
+        final qty = stockMap[p.productId] ?? 0;
+        if (qty <= 0) return false;
+      }
+      return true;
+    }).toList();
+
+    if (_searchQuery.isNotEmpty) {
+      final q = _searchQuery.toLowerCase();
+      result = result
+          .where(
+            (p) =>
+                p.productName.toLowerCase().contains(q) ||
+                p.productCode.toLowerCase().contains(q) ||
+                (p.barcode?.toLowerCase().contains(q) ?? false),
+          )
+          .toList();
+    }
+
+    return result;
   }
 
   @override
@@ -266,6 +282,13 @@ class _PosPageState extends ConsumerState<PosPage> {
     final selectedBranch = ref.watch(selectedBranchProvider);
     final selectedWarehouse = ref.watch(selectedWarehouseProvider);
     final user = widget.isCashierMode ? ref.watch(authProvider).user : null;
+
+    // ── Stock map: productId → balance สำหรับ warehouse ที่เลือก ──
+    final warehouseId = selectedWarehouse?.warehouseId ?? '';
+    final stockMap = <String, double>{
+      for (final s in (ref.watch(stockBalanceProvider).asData?.value ?? []))
+        if (s.warehouseId == warehouseId) s.productId: s.balance,
+    };
 
     final hasCustomer =
         cartState.customerId != null && cartState.customerId != 'WALK_IN';
@@ -558,7 +581,7 @@ class _PosPageState extends ConsumerState<PosPage> {
           // Mobile (<768px): cart only
           body: Stack(
             children: [
-              _buildDesktopBody(productAsync, cartState),
+              _buildDesktopBody(productAsync, cartState, stockMap),
               const CartToastOverlay(),
             ],
           ),
@@ -574,10 +597,11 @@ class _PosPageState extends ConsumerState<PosPage> {
   Widget _buildDesktopBody(
     AsyncValue<List<ProductModel>> productAsync,
     CartState cartState,
+    Map<String, double> stockMap,
   ) {
     return Column(
       children: [
-        _buildSearchToolbar(cartState),
+        _buildSearchToolbar(cartState, stockMap: stockMap),
 
         // ── Main Content: Grid(60%) + Cart(40%) ───────────────
         Expanded(
@@ -588,7 +612,7 @@ class _PosPageState extends ConsumerState<PosPage> {
                 flex: 60,
                 child: productAsync.when(
                   data: (products) {
-                    final filtered = _filterProducts(products);
+                    final filtered = _filterProducts(products, stockMap: stockMap);
                     if (filtered.isEmpty) return _buildEmptyProducts();
                     return ProductGrid(products: filtered);
                   },
@@ -628,7 +652,7 @@ class _PosPageState extends ConsumerState<PosPage> {
     );
   }
 
-  Widget _buildSearchToolbar(CartState cartState, {bool compact = false}) {
+  Widget _buildSearchToolbar(CartState cartState, {bool compact = false, Map<String, double> stockMap = const {}}) {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
       decoration: BoxDecoration(
@@ -685,6 +709,7 @@ class _PosPageState extends ConsumerState<PosPage> {
                 }
                 if (_filterProducts(
                   ref.read(productListProvider).value ?? const <ProductModel>[],
+                  stockMap: stockMap,
                 ).isEmpty) {
                   _showDesktopScanError(value);
                 }
