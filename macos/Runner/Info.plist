@@ -30,5 +30,20 @@
 	<string>NSApplication</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Camera access for scanning QR codes</string>
+	<!-- Google Sign-In OAuth callback URL scheme (reversed client ID)
+	     ตั้งค่า REVERSED_CLIENT_ID จาก Google Cloud Console เช่น:
+	     com.googleusercontent.apps.XXXXXXXX-YYYYYYYYYYYYYYYYYYYYYYY
+	     แทนที่ REVERSED_CLIENT_ID ด้านล่างด้วยค่าจริงก่อน build -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>REVERSED_CLIENT_ID</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

@@ -1,11 +1,18 @@
 // ignore_for_file: avoid_print
 // lib/features/settings/presentation/pages/settings_page.dart
 
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
 import '../../../../shared/theme/theme_provider.dart';
+import '../../../../core/services/backup/backup_service.dart';
+import '../../../../core/services/backup/google_drive_backup_service.dart';
+import '../../../../core/services/backup/models/backup_result.dart';
 import '../../shared/settings_defaults.dart';
 
 // ─────────────────────────────────────────────────────────────────
@@ -374,7 +381,12 @@ class SettingsPage extends ConsumerStatefulWidget {
 }
 
 class _SettingsPageState extends ConsumerState<SettingsPage> {
+  static const _backupLastPathKey = 'backup_last_path';
+  static const _backupLastAtKey = 'backup_last_at';
+  static const _backupLastSizeKey = 'backup_last_size';
+
   final _formKey = GlobalKey<FormState>();
+  final _dateTimeFmt = DateFormat('dd/MM/yyyy HH:mm', 'th_TH');
 
   // Controllers
   late TextEditingController _companyNameController;
@@ -386,6 +398,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   late TextEditingController _pointsPerBahtController;
   late TextEditingController _pointValueController;
   late TextEditingController _promptPayController; // ✅
+  bool _isCreatingBackup = false;
+  bool _isPreparingRestore = false;
+  bool _isConnectingGoogleDrive = false;
+  bool _isUploadingGoogleDrive = false;
+  bool _isDriveListLoading = false;
+  bool _isRestoringFromDrive = false;
+  String? _lastBackupPath;
+  DateTime? _lastBackupAt;
+  int? _lastBackupSize;
+  String? _googleDriveEmail;
 
   @override
   void initState() {
@@ -400,11 +422,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     _pointsPerBahtController = TextEditingController();
     _pointValueController = TextEditingController();
     _promptPayController = TextEditingController();
-
     // ✅ รอ state โหลดเสร็จแล้วค่อย sync ค่าเข้า controllers
     Future.microtask(() {
       if (!mounted) return;
       _syncControllers(ref.read(settingsProvider));
+      _loadBackupMetadata();
+      _loadGoogleDriveConfig();
     });
   }
 
@@ -559,6 +582,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     icon: Icons.keyboard_outlined,
                     isDark: isDark,
                     child: _buildShortcutsSection(isDark),
+                  ),
+                  const SizedBox(height: 16),
+
+                  _SectionCard(
+                    title: 'สำรองข้อมูล',
+                    icon: Icons.backup_outlined,
+                    isDark: isDark,
+                    child: _buildBackupSection(settings, isDark),
                   ),
                   const SizedBox(height: 24),
                 ],
@@ -1413,6 +1444,366 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
   }
 
+  Widget _buildBackupSection(SettingsState settings, bool isDark) {
+    final captionColor = isDark ? Colors.white54 : AppTheme.textSub;
+    final boxColor = isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF8FAFC);
+    final borderColor = isDark ? Colors.white12 : AppTheme.border;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppTheme.primary.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppTheme.primary.withValues(alpha: 0.20)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(
+                    Icons.lock_outline,
+                    size: 18,
+                    color: AppTheme.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'ระบบจะรวมฐานข้อมูล, รูปสินค้า และ manifest ก่อนเข้ารหัสด้วย AES-256-GCM',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? Colors.white : Colors.black87,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'รอบนี้เป็น local encrypted backup ก่อน เพื่อให้ต่อ Google Drive หรือ OneDrive ได้ภายหลังโดยไม่ต้องเปลี่ยนรูปแบบไฟล์',
+                style: TextStyle(fontSize: 12, color: captionColor),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: boxColor,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: borderColor),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _backupInfoRow(
+                label: 'สถานะล่าสุด',
+                value: _isCreatingBackup
+                    ? 'กำลังสร้างไฟล์สำรองข้อมูล...'
+                    : (_lastBackupAt != null ? 'สำเร็จ' : 'ยังไม่เคยสำรอง'),
+                isDark: isDark,
+              ),
+              const SizedBox(height: 8),
+              _backupInfoRow(
+                label: 'เวลาล่าสุด',
+                value: _lastBackupAt != null
+                    ? _dateTimeFmt.format(_lastBackupAt!)
+                    : '-',
+                isDark: isDark,
+              ),
+              const SizedBox(height: 8),
+              _backupInfoRow(
+                label: 'ขนาดไฟล์ล่าสุด',
+                value: _lastBackupSize != null
+                    ? _formatBytes(_lastBackupSize!)
+                    : '-',
+                isDark: isDark,
+              ),
+              const SizedBox(height: 8),
+              _backupInfoRow(
+                label: 'ไฟล์ล่าสุด',
+                value: _lastBackupPath ?? '-',
+                isDark: isDark,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            SizedBox(
+              width: 220,
+              child: ElevatedButton.icon(
+                onPressed: _isCreatingBackup
+                    ? null
+                    : () => _createEncryptedBackup(settings),
+                icon: _isCreatingBackup
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.save_alt_outlined, size: 18),
+                label: Text(
+                  _isCreatingBackup ? 'กำลังสำรอง...' : 'สำรองข้อมูลตอนนี้',
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 14,
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(
+              width: 180,
+              child: OutlinedButton.icon(
+                onPressed: _isPreparingRestore || _isCreatingBackup
+                    ? null
+                    : _prepareRestoreFlow,
+                icon: const Icon(
+                  Icons.settings_backup_restore_outlined,
+                  size: 18,
+                ),
+                label: Text(
+                  _isPreparingRestore ? 'กำลังเตรียม...' : 'กู้คืนข้อมูล',
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'หมายเหตุ: เก็บรหัสเข้ารหัสไว้ให้ดี หากลืมจะไม่สามารถถอดไฟล์สำรองข้อมูลได้',
+          style: TextStyle(fontSize: 12, color: captionColor),
+        ),
+        const SizedBox(height: 18),
+        const Divider(height: 1),
+        const SizedBox(height: 18),
+        _buildGoogleDriveSection(isDark),
+      ],
+    );
+  }
+
+  Widget _buildGoogleDriveSection(bool isDark) {
+    final googleDrive = ref.read(googleDriveBackupServiceProvider);
+    final canUseGoogleDrive = googleDrive.isPlatformSupported;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              Icons.cloud_upload_outlined,
+              size: 18,
+              color: canUseGoogleDrive
+                  ? AppTheme.primary
+                  : (isDark ? Colors.white38 : Colors.grey),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Google Drive',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Text(
+          canUseGoogleDrive
+              ? 'อัปโหลดไฟล์สำรองข้อมูลที่เข้ารหัสแล้วขึ้น appDataFolder ของ Google Drive'
+              : 'รอบนี้รองรับ Google Drive บน Android, iOS และ macOS',
+          style: TextStyle(
+            fontSize: 12,
+            color: isDark ? Colors.white54 : AppTheme.textSub,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isDark ? Colors.white12 : AppTheme.border,
+            ),
+          ),
+          child: Text(
+            _googleDriveEmail == null
+                ? 'สถานะ: ยังไม่ได้เชื่อมต่อ'
+                : 'เชื่อมต่อแล้ว: $_googleDriveEmail',
+            style: TextStyle(
+              fontSize: 12,
+              color: isDark ? Colors.white70 : Colors.black87,
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            SizedBox(
+              width: 180,
+              child: ElevatedButton.icon(
+                onPressed: canUseGoogleDrive && !_isConnectingGoogleDrive
+                    ? _connectGoogleDrive
+                    : null,
+                icon: _isConnectingGoogleDrive
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.login_outlined, size: 18),
+                label: Text(
+                  _isConnectingGoogleDrive
+                      ? 'กำลังเชื่อมต่อ...'
+                      : 'เชื่อมต่อ Google',
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ),
+            SizedBox(
+              width: 180,
+              child: OutlinedButton.icon(
+                onPressed: canUseGoogleDrive && _googleDriveEmail != null
+                    ? _disconnectGoogleDrive
+                    : null,
+                icon: const Icon(Icons.logout_outlined, size: 18),
+                label: const Text('ยกเลิกการเชื่อมต่อ'),
+              ),
+            ),
+            SizedBox(
+              width: 220,
+              child: ElevatedButton.icon(
+                onPressed:
+                    canUseGoogleDrive &&
+                        !_isUploadingGoogleDrive &&
+                        _googleDriveEmail != null
+                    ? () => _backupAndUploadToGoogleDrive(
+                        settings: ref.read(settingsProvider),
+                      )
+                    : null,
+                icon: _isUploadingGoogleDrive
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.cloud_upload_outlined, size: 18),
+                label: Text(
+                  _isUploadingGoogleDrive
+                      ? 'กำลังอัปโหลด...'
+                      : 'สำรองและอัปโหลดขึ้น Drive',
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1A73E8),
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ),
+            SizedBox(
+              width: 220,
+              child: OutlinedButton.icon(
+                onPressed:
+                    canUseGoogleDrive &&
+                        !_isDriveListLoading &&
+                        !_isRestoringFromDrive &&
+                        _googleDriveEmail != null
+                    ? _browseAndRestoreFromDrive
+                    : null,
+                icon: _isDriveListLoading || _isRestoringFromDrive
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.cloud_download_outlined, size: 18),
+                label: Text(
+                  _isRestoringFromDrive
+                      ? 'กำลังดาวน์โหลด...'
+                      : _isDriveListLoading
+                      ? 'กำลังโหลด...'
+                      : 'ดูและกู้คืนจาก Drive',
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Text(
+          'ถ้าใช้ macOS/iOS ต้องแทนที่ REVERSED_CLIENT_ID ใน Info.plist ด้วยค่า Reversed Client ID '
+          'จาก Google Cloud Console เช่น com.googleusercontent.apps.XXXXX-YYYY',
+          style: TextStyle(
+            fontSize: 12,
+            color: isDark ? Colors.white54 : AppTheme.textSub,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _backupInfoRow({
+    required String label,
+    required String value,
+    required bool isDark,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 110,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: isDark ? Colors.white70 : Colors.black87,
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(
+              fontSize: 12,
+              color: isDark ? Colors.white54 : AppTheme.textSub,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _shortcutRow(String key, String desc, bool isDark) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -1530,6 +1921,589 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
+    );
+  }
+
+  void _showError(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.white, size: 18),
+            const SizedBox(width: 8),
+            Expanded(child: Text(msg)),
+          ],
+        ),
+        backgroundColor: Colors.red.shade700,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+    );
+  }
+
+  Future<void> _loadBackupMetadata() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _lastBackupPath = prefs.getString(_backupLastPathKey);
+      final rawAt = prefs.getString(_backupLastAtKey);
+      _lastBackupAt = rawAt == null ? null : DateTime.tryParse(rawAt);
+      _lastBackupSize = prefs.getInt(_backupLastSizeKey);
+    });
+  }
+
+  Future<void> _loadGoogleDriveConfig() async {
+    final googleDrive = ref.read(googleDriveBackupServiceProvider);
+    final lastEmail = await googleDrive.loadLastEmail();
+    final session = await googleDrive.tryRestoreSession();
+    if (!mounted) return;
+    setState(() {
+      _googleDriveEmail = session?.email ?? lastEmail;
+    });
+  }
+
+  Future<void> _persistBackupMetadata({
+    required String path,
+    required DateTime createdAt,
+    required int outputSize,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_backupLastPathKey, path);
+    await prefs.setString(_backupLastAtKey, createdAt.toIso8601String());
+    await prefs.setInt(_backupLastSizeKey, outputSize);
+    if (!mounted) return;
+    setState(() {
+      _lastBackupPath = path;
+      _lastBackupAt = createdAt;
+      _lastBackupSize = outputSize;
+    });
+  }
+
+  Future<void> _createEncryptedBackup(SettingsState settings) async {
+    final passphrase = await _promptBackupPassphrase();
+    if (passphrase == null || !mounted) return;
+
+    final backupService = ref.read(backupServiceProvider);
+    final suggestedPath = await backupService.pickBackupSavePath(
+      now: DateTime.now(),
+      companyName: settings.companyName,
+    );
+    if ((suggestedPath == null || suggestedPath.isEmpty) && mounted) {
+      return;
+    }
+
+    setState(() => _isCreatingBackup = true);
+    try {
+      final result = await backupService.createEncryptedBackup(
+        passphrase: passphrase,
+        companyName: settings.companyName,
+        outputPath: suggestedPath,
+      );
+      await _persistBackupMetadata(
+        path: result.outputPath,
+        createdAt: result.createdAt,
+        outputSize: result.outputSize,
+      );
+      if (mounted) {
+        _showSuccess('สำรองข้อมูลสำเร็จแล้ว: ${p.basename(result.outputPath)}');
+      }
+    } on BackupException catch (e) {
+      if (mounted) _showError(e.message);
+    } catch (e) {
+      if (mounted) _showError('ไม่สามารถสำรองข้อมูลได้: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isCreatingBackup = false);
+      }
+    }
+  }
+
+  Future<void> _connectGoogleDrive() async {
+    setState(() => _isConnectingGoogleDrive = true);
+    try {
+      final googleDrive = ref.read(googleDriveBackupServiceProvider);
+      final session = await googleDrive.signIn();
+      if (!mounted) return;
+      setState(() => _googleDriveEmail = session.email);
+      _showSuccess('เชื่อมต่อ Google Drive แล้ว: ${session.email}');
+    } on GoogleDriveBackupException catch (e) {
+      if (mounted) _showError(e.message);
+    } catch (e) {
+      if (mounted) _showError('เชื่อมต่อ Google Drive ไม่สำเร็จ: $e');
+    } finally {
+      if (mounted) setState(() => _isConnectingGoogleDrive = false);
+    }
+  }
+
+  Future<void> _disconnectGoogleDrive() async {
+    try {
+      final googleDrive = ref.read(googleDriveBackupServiceProvider);
+      await googleDrive.signOut();
+      if (!mounted) return;
+      setState(() => _googleDriveEmail = null);
+      _showSuccess('ยกเลิกการเชื่อมต่อ Google Drive แล้ว');
+    } catch (e) {
+      if (mounted) _showError('ยกเลิกการเชื่อมต่อไม่สำเร็จ: $e');
+    }
+  }
+
+  Future<void> _backupAndUploadToGoogleDrive({
+    required SettingsState settings,
+  }) async {
+    final passphrase = await _promptBackupPassphrase();
+    if (passphrase == null || !mounted) return;
+
+    setState(() => _isUploadingGoogleDrive = true);
+    try {
+      final backupService = ref.read(backupServiceProvider);
+      final result = await backupService.createEncryptedBackup(
+        passphrase: passphrase,
+        companyName: settings.companyName,
+      );
+      await _persistBackupMetadata(
+        path: result.outputPath,
+        createdAt: result.createdAt,
+        outputSize: result.outputSize,
+      );
+
+      final googleDrive = ref.read(googleDriveBackupServiceProvider);
+      final uploadResult = await googleDrive.uploadBackupFile(
+        encryptedBackupFile: File(result.outputPath),
+        manifest: result.manifest,
+      );
+      if (mounted) {
+        _showSuccess(
+          'อัปโหลดขึ้น Google Drive สำเร็จ: ${uploadResult.fileName}',
+        );
+      }
+    } on BackupException catch (e) {
+      if (mounted) _showError(e.message);
+    } on GoogleDriveBackupException catch (e) {
+      if (mounted) _showError(e.message);
+    } catch (e) {
+      if (mounted) _showError('ไม่สามารถอัปโหลดขึ้น Google Drive ได้: $e');
+    } finally {
+      if (mounted) setState(() => _isUploadingGoogleDrive = false);
+    }
+  }
+
+  Future<String?> _promptBackupPassphrase() async {
+    final passphraseCtrl = TextEditingController();
+    final confirmCtrl = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    bool obscure = true;
+
+    final result = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setLocalState) {
+            return AlertDialog(
+              title: const Text('ตั้งรหัสเข้ารหัสไฟล์สำรองข้อมูล'),
+              content: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextFormField(
+                      controller: passphraseCtrl,
+                      obscureText: obscure,
+                      decoration: InputDecoration(
+                        labelText: 'รหัสเข้ารหัส',
+                        hintText: 'อย่างน้อย 8 ตัวอักษร',
+                        suffixIcon: IconButton(
+                          onPressed: () =>
+                              setLocalState(() => obscure = !obscure),
+                          icon: Icon(
+                            obscure
+                                ? Icons.visibility_outlined
+                                : Icons.visibility_off_outlined,
+                          ),
+                        ),
+                      ),
+                      validator: (value) {
+                        final text = value?.trim() ?? '';
+                        if (text.length < 8) {
+                          return 'กรุณาตั้งรหัสอย่างน้อย 8 ตัวอักษร';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: confirmCtrl,
+                      obscureText: obscure,
+                      decoration: const InputDecoration(
+                        labelText: 'ยืนยันรหัสเข้ารหัส',
+                      ),
+                      validator: (value) {
+                        if ((value ?? '') != passphraseCtrl.text) {
+                          return 'รหัสเข้ารหัสไม่ตรงกัน';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      'รหัสนี้จะไม่ถูกเก็บอัตโนมัติในระบบ เพื่อความปลอดภัย กรุณาเก็บไว้เอง',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.white54
+                            : AppTheme.textSub,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('ยกเลิก'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    if (formKey.currentState!.validate()) {
+                      Navigator.of(context).pop(passphraseCtrl.text.trim());
+                    }
+                  },
+                  child: const Text('ถัดไป'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    passphraseCtrl.dispose();
+    confirmCtrl.dispose();
+    return result;
+  }
+
+  Future<void> _browseAndRestoreFromDrive() async {
+    setState(() => _isDriveListLoading = true);
+    List<DriveBackupItem> items = [];
+    try {
+      final googleDrive = ref.read(googleDriveBackupServiceProvider);
+      items = await googleDrive.listBackups();
+    } on GoogleDriveBackupException catch (e) {
+      if (mounted) _showError(e.message);
+      return;
+    } catch (e) {
+      if (mounted) _showError('โหลดรายการไฟล์สำรองไม่สำเร็จ: $e');
+      return;
+    } finally {
+      if (mounted) setState(() => _isDriveListLoading = false);
+    }
+
+    if (!mounted) return;
+
+    final selectedItem = await showDialog<DriveBackupItem>(
+      context: context,
+      builder: (context) => _DriveBackupListDialog(
+        items: items,
+        formatBytes: _formatBytes,
+        dateTimeFmt: _dateTimeFmt,
+      ),
+    );
+    if (selectedItem == null || !mounted) return;
+
+    final passphrase = await _promptRestorePassphrase();
+    if (passphrase == null || !mounted) return;
+
+    setState(() => _isRestoringFromDrive = true);
+    try {
+      final googleDrive = ref.read(googleDriveBackupServiceProvider);
+      final tempFile = await googleDrive.downloadBackup(
+        fileId: selectedItem.fileId,
+        fileName: selectedItem.fileName,
+      );
+
+      final backupService = ref.read(backupServiceProvider);
+      late RestorePreparationResult result;
+      try {
+        result = await backupService.prepareRestore(
+          encryptedBackupFile: tempFile,
+          passphrase: passphrase,
+        );
+      } finally {
+        if (tempFile.existsSync()) await tempFile.delete();
+      }
+
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('เตรียมกู้คืนข้อมูลสำเร็จ'),
+          content: Text(
+            'ระบบตรวจสอบไฟล์สำรองข้อมูลเรียบร้อยแล้ว\n\n'
+            'ชุดข้อมูล: ${result.manifest.companyName}\n'
+            'สร้างเมื่อ: ${result.manifest.createdAt}\n'
+            'จำนวนไฟล์: ${result.manifest.fileCount}\n\n'
+            'ข้อมูลจะถูกสลับใช้งานเมื่อเปิดแอปรอบถัดไป',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('ปิด'),
+            ),
+          ],
+        ),
+      );
+      if (mounted) {
+        _showSuccess('เตรียมกู้คืนข้อมูลแล้ว กรุณาปิดและเปิดแอปใหม่');
+      }
+    } on BackupException catch (e) {
+      if (mounted) _showError(e.message);
+    } on GoogleDriveBackupException catch (e) {
+      if (mounted) _showError(e.message);
+    } catch (e) {
+      if (mounted) _showError('กู้คืนข้อมูลจาก Drive ไม่สำเร็จ: $e');
+    } finally {
+      if (mounted) setState(() => _isRestoringFromDrive = false);
+    }
+  }
+
+  Future<String?> _promptRestorePassphrase() async {
+    final ctrl = TextEditingController();
+    bool obscure = true;
+    final result = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setLocalState) => AlertDialog(
+          title: const Text('ใส่รหัสเข้ารหัสไฟล์สำรองข้อมูล'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: ctrl,
+                obscureText: obscure,
+                autofocus: true,
+                decoration: InputDecoration(
+                  labelText: 'รหัสเข้ารหัส',
+                  suffixIcon: IconButton(
+                    onPressed: () => setLocalState(() => obscure = !obscure),
+                    icon: Icon(
+                      obscure
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'ใส่รหัสที่ใช้ตอนสร้างไฟล์สำรองข้อมูล',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.white54
+                      : AppTheme.textSub,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('ยกเลิก'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final text = ctrl.text.trim();
+                if (text.length >= 8) {
+                  Navigator.of(context).pop(text);
+                }
+              },
+              child: const Text('ถัดไป'),
+            ),
+          ],
+        ),
+      ),
+    );
+    ctrl.dispose();
+    return result;
+  }
+
+  Future<void> _prepareRestoreFlow() async {
+    final backupService = ref.read(backupServiceProvider);
+    final restorePath = await backupService.pickBackupRestorePath();
+    if (restorePath == null || restorePath.isEmpty || !mounted) return;
+
+    final passphrase = await _promptBackupPassphrase();
+    if (passphrase == null || !mounted) return;
+
+    setState(() => _isPreparingRestore = true);
+    try {
+      final result = await backupService.prepareRestore(
+        encryptedBackupFile: File(restorePath),
+        passphrase: passphrase,
+      );
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('เตรียมกู้คืนข้อมูลสำเร็จ'),
+          content: Text(
+            'ระบบตรวจสอบไฟล์สำรองข้อมูลเรียบร้อยแล้ว\n\n'
+            'ชุดข้อมูล: ${result.manifest.companyName}\n'
+            'สร้างเมื่อ: ${result.manifest.createdAt}\n'
+            'จำนวนไฟล์: ${result.manifest.fileCount}\n\n'
+            'ข้อมูลจะถูกสลับใช้งานเมื่อเปิดแอปรอบถัดไป',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('ปิด'),
+            ),
+          ],
+        ),
+      );
+      _showSuccess('เตรียมกู้คืนข้อมูลแล้ว กรุณาปิดและเปิดแอปใหม่');
+    } on BackupException catch (e) {
+      if (mounted) _showError(e.message);
+    } catch (e) {
+      if (mounted) _showError('ไม่สามารถเตรียมกู้คืนข้อมูลได้: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isPreparingRestore = false);
+      }
+    }
+  }
+
+  String _formatBytes(int bytes) {
+    const units = ['B', 'KB', 'MB', 'GB'];
+    var size = bytes.toDouble();
+    var unitIndex = 0;
+    while (size >= 1024 && unitIndex < units.length - 1) {
+      size /= 1024;
+      unitIndex++;
+    }
+    final decimals = unitIndex == 0 ? 0 : 2;
+    return '${size.toStringAsFixed(decimals)} ${units[unitIndex]}';
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// _DriveBackupListDialog — แสดงรายการไฟล์สำรองบน Drive
+// ─────────────────────────────────────────────────────────────────
+class _DriveBackupListDialog extends StatelessWidget {
+  final List<DriveBackupItem> items;
+  final String Function(int bytes) formatBytes;
+  final DateFormat dateTimeFmt;
+
+  const _DriveBackupListDialog({
+    required this.items,
+    required this.formatBytes,
+    required this.dateTimeFmt,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return AlertDialog(
+      title: Row(
+        children: const [
+          Icon(Icons.cloud_outlined, color: Color(0xFF1A73E8), size: 22),
+          SizedBox(width: 10),
+          Text('ไฟล์สำรองบน Google Drive'),
+        ],
+      ),
+      contentPadding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+      content: SizedBox(
+        width: 480,
+        child: items.isEmpty
+            ? const Padding(
+                padding: EdgeInsets.symmetric(vertical: 32),
+                child: Center(
+                  child: Text(
+                    'ไม่พบไฟล์สำรองข้อมูลบน Google Drive',
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              )
+            : ListView.separated(
+                shrinkWrap: true,
+                itemCount: items.length,
+                separatorBuilder: (_, _) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final item = items[index];
+                  DateTime? createdAt;
+                  if (item.createdAt != null) {
+                    createdAt = DateTime.tryParse(item.createdAt!);
+                  }
+                  return ListTile(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1A73E8).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.backup_outlined,
+                        color: Color(0xFF1A73E8),
+                        size: 20,
+                      ),
+                    ),
+                    title: Text(
+                      item.companyName?.isNotEmpty == true
+                          ? item.companyName!
+                          : item.fileName,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? Colors.white : Colors.black87,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (createdAt != null)
+                          Text(
+                            dateTimeFmt.format(createdAt.toLocal()),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isDark ? Colors.white54 : Colors.black54,
+                            ),
+                          ),
+                        Text(
+                          '${item.fileName}  •  ${formatBytes(item.fileSize)}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isDark ? Colors.white38 : Colors.black38,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                    trailing: TextButton(
+                      onPressed: () => Navigator.of(context).pop(item),
+                      child: const Text(
+                        'กู้คืน',
+                        style: TextStyle(color: Color(0xFF1A73E8)),
+                      ),
+                    ),
+                  );
+                },
+              ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('ปิด'),
+        ),
+      ],
     );
   }
 }

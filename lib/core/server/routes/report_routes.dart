@@ -353,15 +353,17 @@ class ReportRoutes {
         FROM customer_dividend_run_items i
         INNER JOIN customer_dividend_runs r ON r.run_id = i.run_id
         WHERE r.status != 'CANCELLED'
-          AND COALESCE(r.period_start, '') = COALESCE(?, '')
-          AND COALESCE(r.period_end, '') = COALESCE(?, '')
           AND ABS(COALESCE(r.dividend_percent, 0) - ?) < 0.0001
+          AND (? = '' OR r.period_start IS NULL OR r.period_start <= ?)
+          AND (? = '' OR r.period_end IS NULL OR r.period_end >= ?)
         ORDER BY COALESCE(r.updated_at, r.created_at) DESC
         ''',
         variables: [
-          Variable.withString(periodStartIso ?? ''),
-          Variable.withString(periodEndIso ?? ''),
           Variable.withReal(dividendPercent),
+          Variable.withString(periodEndIso ?? ''),
+          Variable.withString(periodEndIso ?? ''),
+          Variable.withString(periodStartIso ?? ''),
+          Variable.withString(periodStartIso ?? ''),
         ],
       ).get();
 

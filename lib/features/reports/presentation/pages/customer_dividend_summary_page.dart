@@ -269,6 +269,7 @@ class _CustomerDividendSummaryPageState
         _customEnd =
             DateTime(result.end.year, result.end.month, result.end.day);
         _currentPage = 1;
+        _selectedCustomerIds.clear();
       });
     }
   }
@@ -291,6 +292,7 @@ class _CustomerDividendSummaryPageState
       _dividendPercent = parsed == null || parsed < 0 ? 0 : parsed;
       _percentCtrl.text = _dividendPercent.toStringAsFixed(2);
       _currentPage = 1;
+      _selectedCustomerIds.clear();
     });
   }
 
@@ -426,6 +428,7 @@ class _CustomerDividendSummaryPageState
                   setState(() {
                     _preset = p;
                     _currentPage = 1;
+                    _selectedCustomerIds.clear();
                   });
                 }
               },

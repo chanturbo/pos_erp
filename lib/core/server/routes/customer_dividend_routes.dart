@@ -181,15 +181,17 @@ class CustomerDividendRoutes {
           FROM customer_dividend_run_items i
           INNER JOIN customer_dividend_runs r ON r.run_id = i.run_id
           WHERE r.status != 'CANCELLED'
-            AND COALESCE(r.period_start, '') = COALESCE(?, '')
-            AND COALESCE(r.period_end, '') = COALESCE(?, '')
             AND ABS(COALESCE(r.dividend_percent, 0) - ?) < 0.0001
+            AND (? = '' OR r.period_start IS NULL OR r.period_start <= ?)
+            AND (? = '' OR r.period_end IS NULL OR r.period_end >= ?)
             AND i.customer_id IN ($placeholders)
           ''',
           variables: [
-            Variable.withString(periodStart ?? ''),
-            Variable.withString(periodEnd ?? ''),
             Variable.withReal(dividendPercent),
+            Variable.withString(periodEnd ?? ''),
+            Variable.withString(periodEnd ?? ''),
+            Variable.withString(periodStart ?? ''),
+            Variable.withString(periodStart ?? ''),
             ...customerIds.map(Variable.withString),
           ],
         ).get();

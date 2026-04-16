@@ -14,12 +14,14 @@ import 'routes/app_router.dart';
 import 'core/database/app_database.dart';
 import 'core/server/api_server.dart';
 import 'core/services/master_discovery_service.dart';
+import 'core/services/backup/backup_service.dart';
 import 'core/utils/crypto_utils.dart';
 import 'core/database/seed_data.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('th_TH');
+  await BackupService.applyPendingRestoreIfAny();
 
   // Initialize App Mode
   await AppModeConfig.initialize();
@@ -42,8 +44,8 @@ void main() async {
 }
 
 // Global server instance
-ApiServer?    _serverInstance;
-AppDatabase?  _dbInstance;
+ApiServer? _serverInstance;
+AppDatabase? _dbInstance;
 
 /// เริ่ม Server ใน Background
 Future<void> _startServerInBackground() async {
@@ -78,26 +80,32 @@ Future<void> _createDefaultUser(AppDatabase db) async {
     }
 
     // สร้าง Role
-    await db.into(db.roles).insert(
-      RolesCompanion.insert(
-        roleId: 'ROLE001',
-        roleName: 'Administrator',
-        permissions: {'sales': {'create': true}},
-      ),
-      mode: InsertMode.insertOrIgnore,
-    );
+    await db
+        .into(db.roles)
+        .insert(
+          RolesCompanion.insert(
+            roleId: 'ROLE001',
+            roleName: 'Administrator',
+            permissions: {
+              'sales': {'create': true},
+            },
+          ),
+          mode: InsertMode.insertOrIgnore,
+        );
 
     // สร้าง User
-    await db.into(db.users).insert(
-      UsersCompanion.insert(
-        userId: 'USR001',
-        username: 'admin',
-        passwordHash: CryptoUtils.hashPassword('admin123'),
-        fullName: 'ผู้ดูแลระบบ',
-        roleId: const Value('ROLE001'),
-      ),
-      mode: InsertMode.insertOrIgnore,
-    );
+    await db
+        .into(db.users)
+        .insert(
+          UsersCompanion.insert(
+            userId: 'USR001',
+            username: 'admin',
+            passwordHash: CryptoUtils.hashPassword('admin123'),
+            fullName: 'ผู้ดูแลระบบ',
+            roleId: const Value('ROLE001'),
+          ),
+          mode: InsertMode.insertOrIgnore,
+        );
 
     print('✅ Default user created (admin/admin123)');
   } catch (e) {
@@ -120,7 +128,7 @@ class MyApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final themeMode    = ref.watch(themeModeProvider);   // 🌙
+    final themeMode = ref.watch(themeModeProvider); // 🌙
     final navigatorKey = ref.watch(navigatorKeyProvider);
 
     return ScreenUtilInit(
@@ -132,8 +140,8 @@ class MyApp extends ConsumerWidget {
           navigatorKey: navigatorKey,
           title: 'POS + ERP System',
           theme: AppTheme.lightTheme,
-          darkTheme: AppTheme.darkTheme,  // 🌙
-          themeMode: themeMode,           // 🌙
+          darkTheme: AppTheme.darkTheme, // 🌙
+          themeMode: themeMode, // 🌙
           debugShowCheckedModeBanner: false,
 
           // ✅ Localization — จำเป็นสำหรับ showDatePicker / DatePickerDialog
@@ -142,10 +150,7 @@ class MyApp extends ConsumerWidget {
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
           ],
-          supportedLocales: const [
-            Locale('th', 'TH'),
-            Locale('en', 'US'),
-          ],
+          supportedLocales: const [Locale('th', 'TH'), Locale('en', 'US')],
           locale: const Locale('th', 'TH'),
 
           initialRoute: AppRouter.root,

@@ -65,12 +65,11 @@ part 'app_database.g.dart';
     SalesOrderItems,
     OrderItemModifiers,
 
-    // 
+    //
     PurchaseOrders,
     PurchaseOrderItems,
     GoodsReceipts, // ✅ เพิ่ม
     GoodsReceiptItems, // ✅ เพิ่ม
-
     // Purchase Returns
     PurchaseReturns,
     PurchaseReturnItems,
@@ -85,7 +84,7 @@ part 'app_database.g.dart';
 
     // AR
     ArInvoices,
-    ArInvoiceItems,    // ✅ เพิ่มใหม่
+    ArInvoiceItems, // ✅ เพิ่มใหม่
     ArReceipts,
     ArReceiptAllocations,
 
@@ -105,6 +104,10 @@ part 'app_database.g.dart';
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
   AppDatabase.forTesting(super.e);
+
+  static const databaseFileName = 'pos_erp.db';
+  static const productImagesFolderName = 'product_images';
+  static const backupsFolderName = 'backups';
 
   static const _createCustomerDividendRunsTable = '''
     CREATE TABLE IF NOT EXISTS customer_dividend_runs (
@@ -198,13 +201,31 @@ class AppDatabase extends _$AppDatabase {
       },
     );
   }
+
+  static Future<Directory> resolveDocumentsDirectory() async {
+    return getApplicationDocumentsDirectory();
+  }
+
+  static Future<File> resolveDatabaseFile() async {
+    final dbFolder = await resolveDocumentsDirectory();
+    return File(p.join(dbFolder.path, databaseFileName));
+  }
+
+  static Future<Directory> resolveProductImagesDirectory() async {
+    final dbFolder = await resolveDocumentsDirectory();
+    return Directory(p.join(dbFolder.path, productImagesFolderName));
+  }
+
+  static Future<Directory> resolveBackupDirectory() async {
+    final dbFolder = await resolveDocumentsDirectory();
+    return Directory(p.join(dbFolder.path, backupsFolderName));
+  }
 }
 
 // เปิดการเชื่อมต่อ Database
 LazyDatabase _openConnection() {
   return LazyDatabase(() async {
-    final dbFolder = await getApplicationDocumentsDirectory();
-    final file = File(p.join(dbFolder.path, 'pos_erp.db'));
+    final file = await AppDatabase.resolveDatabaseFile();
     // ✅ เพิ่มบรรทัดนี้
     //print('📁 Database path: ${file.path}');
 
@@ -215,5 +236,6 @@ LazyDatabase _openConnection() {
 /// Provider สำหรับ AppDatabase (singleton) — override ด้วย instance จริงใน main.dart
 final appDatabaseProvider = Provider<AppDatabase>((ref) {
   throw UnimplementedError(
-      'appDatabaseProvider must be overridden with a real AppDatabase instance');
+    'appDatabaseProvider must be overridden with a real AppDatabase instance',
+  );
 });
