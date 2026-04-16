@@ -36,6 +36,7 @@ class _ArInvoiceFormPageState extends ConsumerState<ArInvoiceFormPage> {
 
   final List<ArInvoiceItemModel> _items = [];
   bool _isLoading = false;
+  bool _isLoadingItems = false;
   bool _isViewMode = false;
   bool _isCardView = false;
 
@@ -43,6 +44,28 @@ class _ArInvoiceFormPageState extends ConsumerState<ArInvoiceFormPage> {
   void initState() {
     super.initState();
     _initControllers();
+    // list API ไม่ return items — โหลดจาก detail endpoint เมื่อเปิดแก้ไข
+    if (widget.invoice != null && (widget.invoice!.items == null || widget.invoice!.items!.isEmpty)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _loadItemsFromDetail());
+    }
+  }
+
+  Future<void> _loadItemsFromDetail() async {
+    if (!mounted) return;
+    setState(() => _isLoadingItems = true);
+    try {
+      final detail = await ref.read(
+        arInvoiceDetailProvider(widget.invoice!.invoiceId).future,
+      );
+      if (mounted && detail?.items != null) {
+        setState(() {
+          _items.clear();
+          _items.addAll(detail!.items!);
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _isLoadingItems = false);
+    }
   }
 
   void _initControllers() {
@@ -365,6 +388,26 @@ class _ArInvoiceFormPageState extends ConsumerState<ArInvoiceFormPage> {
   }
 
   Widget _buildItemsSection(bool isDark) {
+    if (_isLoadingItems) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 32),
+        child: Center(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              SizedBox(width: 12),
+              Text('กำลังโหลดรายการสินค้า...', style: TextStyle(fontSize: 13)),
+            ],
+          ),
+        ),
+      );
+    }
+
     if (_items.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 24),
