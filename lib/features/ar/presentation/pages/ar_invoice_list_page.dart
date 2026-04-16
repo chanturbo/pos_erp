@@ -134,12 +134,66 @@ class _ArInvoiceListPageState extends ConsumerState<ArInvoiceListPage> {
         int countByStatus(String s) => all.where((i) => i.status == s).length;
         final overdueCount = all.where((i) => i.isOverdue).length;
 
+        // ── คำนวณยอดค้างจ่ายแยกประเภท ──────────────────────────
+        final now = DateTime.now();
+        final unpaidInvoices = all.where((i) => i.status != 'PAID');
+        final totalOutstanding = unpaidInvoices.fold<double>(0, (s, i) => s + i.remainingAmount);
+        final overdueAmount = unpaidInvoices
+            .where((i) => i.isOverdue)
+            .fold<double>(0, (s, i) => s + i.remainingAmount);
+        final dueSoonAmount = unpaidInvoices
+            .where((i) => !i.isOverdue && i.dueDate != null &&
+                i.dueDate!.difference(now).inDays <= 7)
+            .fold<double>(0, (s, i) => s + i.remainingAmount);
+
         return Container(
           color: isDark ? AppTheme.darkCard : Colors.white,
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // ── Summary cards ──────────────────────────────────
+              Row(
+                children: [
+                  Expanded(
+                    child: _ArOutstandingCard(
+                      label: 'ยอดค้างทั้งหมด',
+                      amount: totalOutstanding,
+                      count: unpaidInvoices.length,
+                      color: AppTheme.primaryDark,
+                      icon: Icons.account_balance_wallet_outlined,
+                      isDark: isDark,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _ArOutstandingCard(
+                      label: 'เลยกำหนด',
+                      amount: overdueAmount,
+                      count: overdueCount,
+                      color: AppTheme.error,
+                      icon: Icons.warning_amber_rounded,
+                      isDark: isDark,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _ArOutstandingCard(
+                      label: 'ครบใน 7 วัน',
+                      amount: dueSoonAmount,
+                      count: unpaidInvoices
+                          .where((i) => !i.isOverdue && i.dueDate != null &&
+                              i.dueDate!.difference(now).inDays <= 7)
+                          .length,
+                      color: AppTheme.warning,
+                      icon: Icons.schedule_outlined,
+                      isDark: isDark,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              // ── Filter chips ───────────────────────────────────
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
@@ -203,7 +257,7 @@ class _ArInvoiceListPageState extends ConsumerState<ArInvoiceListPage> {
                   ],
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Row(
                 children: [
                   _ArValueStat(
@@ -1488,6 +1542,75 @@ class _ArFilterChip extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ── ยอดค้างจ่ายแยกประเภท ──────────────────────────────────────────
+class _ArOutstandingCard extends StatelessWidget {
+  final String label;
+  final double amount;
+  final int count;
+  final Color color;
+  final IconData icon;
+  final bool isDark;
+
+  const _ArOutstandingCard({
+    required this.label,
+    required this.amount,
+    required this.count,
+    required this.color,
+    required this.icon,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final fmt = NumberFormat('#,##0.00', 'th_TH');
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: isDark ? 0.12 : 0.07),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 13, color: color),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: isDark ? Colors.white54 : AppTheme.textSub,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '฿${fmt.format(amount)}',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+          Text(
+            '$count ใบ',
+            style: TextStyle(
+              fontSize: 10,
+              color: isDark ? Colors.white38 : Colors.black38,
+            ),
+          ),
+        ],
       ),
     );
   }

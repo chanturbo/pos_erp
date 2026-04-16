@@ -16,6 +16,7 @@ class SalesOrderModel {
   final Map<String, String>? couponPromotionNames; // code → promotionName
   final double couponDiscount;               // ส่วนลดรวมจากคูปอง
   final int pointsUsed;                      // แต้มที่แลกในใบขายนี้
+  final DateTime? dueDate;                   // วันครบกำหนดชำระ (สำหรับการขายเครดิต)
 
   SalesOrderModel({
     required this.orderId,
@@ -35,6 +36,7 @@ class SalesOrderModel {
     this.couponPromotionNames,
     this.couponDiscount = 0.0,
     this.pointsUsed = 0,
+    this.dueDate,
   });
 
   factory SalesOrderModel.fromJson(Map<String, dynamic> json) {
@@ -62,6 +64,7 @@ class SalesOrderModel {
           ?.map((k, v) => MapEntry(k, v.toString())),
       couponDiscount: (json['coupon_discount'] as num?)?.toDouble() ?? 0.0,
       pointsUsed: (json['points_used'] as int?) ?? 0,
+      dueDate: json['due_date'] != null ? DateTime.parse(json['due_date'] as String) : null,
     );
   }
   
@@ -83,6 +86,7 @@ class SalesOrderModel {
       'coupon_codes': couponCodes,
       'coupon_discount': couponDiscount,
       'points_used': pointsUsed,
+      'due_date': dueDate?.toIso8601String(),
     };
   }
 }

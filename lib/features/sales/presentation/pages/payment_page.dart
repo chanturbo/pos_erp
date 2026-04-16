@@ -9,6 +9,7 @@ import '../../../../core/client/api_client.dart';
 import '../../../../core/utils/promptpay_utils.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../customers/presentation/providers/customer_provider.dart'; // ✅
+import '../../../ar/presentation/providers/ar_invoice_provider.dart';
 import '../../../settings/presentation/pages/settings_page.dart';
 import '../../../promotions/presentation/providers/promotion_provider.dart';
 import '../providers/cart_provider.dart';
@@ -47,6 +48,11 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
   int _pointsUsed = 0; // แต้มที่เลือกจะใช้ในบิลนี้
   bool _isLoadingPoints = false;
 
+  // ── Credit ───────────────────────────────────────────────────────
+  double _creditLimit = 0;
+  double _creditDays = 0;
+  double _currentBalance = 0; // ยอดค้างชำระปัจจุบัน
+
   @override
   void initState() {
     super.initState();
@@ -77,6 +83,24 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
     final pts = await ref
         .read(salesHistoryProvider.notifier)
         .getCustomerPoints(customerId);
+
+    // โหลดข้อมูลเครดิตของลูกค้า
+    try {
+      final customers = ref.read(customerListProvider).asData?.value ?? [];
+      for (final c in customers) {
+        if (c.customerId == customerId) {
+          if (mounted) {
+            setState(() {
+              _creditLimit = c.creditLimit;
+              _creditDays = c.creditDays.toDouble();
+              _currentBalance = c.currentBalance;
+            });
+          }
+          break;
+        }
+      }
+    } catch (_) {}
+
     if (mounted) {
       setState(() {
         _customerPoints = pts;
@@ -385,22 +409,31 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                   const SizedBox(height: 16),
 
                   SegmentedButton<String>(
-                    segments: const [
-                      ButtonSegment(
+                    segments: [
+                      const ButtonSegment(
                         value: 'CASH',
                         label: Text('เงินสด'),
                         icon: Icon(Icons.money),
                       ),
-                      ButtonSegment(
+                      const ButtonSegment(
                         value: 'CARD',
                         label: Text('บัตร'),
                         icon: Icon(Icons.credit_card),
                       ),
-                      ButtonSegment(
+                      const ButtonSegment(
                         value: 'TRANSFER',
                         label: Text('โอน'),
                         icon: Icon(Icons.qr_code),
                       ),
+                      if (cartState.customerId != null &&
+                          cartState.customerId != 'WALK_IN' &&
+                          cartState.customerId!.isNotEmpty &&
+                          _creditLimit > 0)
+                        const ButtonSegment(
+                          value: 'CREDIT',
+                          label: Text('เครดิต'),
+                          icon: Icon(Icons.account_balance_wallet_outlined),
+                        ),
                     ],
                     selected: {_paymentType},
                     onSelectionChanged: (Set<String> newSelection) {
@@ -410,6 +443,17 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                     },
                   ),
                   const SizedBox(height: 24),
+
+                  // ── เครดิต: แสดงข้อมูลวงเงินและวันครบกำหนด ──────
+                  if (_paymentType == 'CREDIT') ...[
+                    _CreditInfoPanel(
+                      creditLimit: _creditLimit,
+                      creditDays: _creditDays.toInt(),
+                      currentBalance: _currentBalance,
+                      orderAmount: _netTotal,
+                    ),
+                    const SizedBox(height: 16),
+                  ],
 
                   // จำนวนเงินที่รับ (สำหรับเงินสด)
                   if (_paymentType == 'CASH') ...[
@@ -747,8 +791,10 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                   // ── ปุ่มชำระเงิน ──────────────────────────────────
                   Builder(
                     builder: (context) {
+                      final availableCredit = _creditLimit - _currentBalance;
                       final isDisabled =
                           (_paymentType == 'CASH' && _change < 0) ||
+                          (_paymentType == 'CREDIT' && _netTotal > availableCredit) ||
                           _isProcessing;
                       final cartState = ref.watch(cartProvider);
 
@@ -907,8 +953,10 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
         'vat_amount': 0.0,
         'total_amount': _netTotal,
         'payment_type': _paymentType,
-        'paid_amount': _paymentType == 'CASH' ? _receivedAmount : _netTotal,
+        'paid_amount': _paymentType == 'CASH' ? _receivedAmount : (_paymentType == 'CREDIT' ? 0.0 : _netTotal),
         'change_amount': _paymentType == 'CASH' ? _change : 0.0,
+        if (_paymentType == 'CREDIT')
+          'due_date': DateTime.now().add(Duration(days: _creditDays.toInt())).toIso8601String(),
         if (cartState.appliedCoupons.isNotEmpty)
           'coupon_codes': cartState.appliedCoupons.map((c) => c.code).toList(),
         'items': cartState.items
@@ -960,6 +1008,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
             ? responseData['data'] as Map
             : {};
         final orderNo = dataMap['order_no'] as String? ?? '-';
+        final orderId = dataMap['order_id'] as String? ?? '';
         final earnedPoints = dataMap['earned_points'] as int? ?? 0;
 
         // ── Mark all coupons as used ──────────────────────────────
@@ -977,6 +1026,45 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
           ref.read(couponListProvider.notifier).refresh();
         }
 
+        // ── สร้าง AR Invoice อัตโนมัติเมื่อชำระแบบเครดิต ────────
+        if (_paymentType == 'CREDIT' &&
+            cartState.customerId != null &&
+            cartState.customerId != 'WALK_IN') {
+          try {
+            final dueDate = DateTime.now().add(
+              Duration(days: _creditDays.toInt()),
+            );
+            final arData = {
+              'customer_id': cartState.customerId,
+              'customer_name': cartState.customerName,
+              'invoice_date': DateTime.now().toIso8601String(),
+              'due_date': dueDate.toIso8601String(),
+              'total_amount': netTotal,
+              'paid_amount': 0,
+              'status': 'UNPAID',
+              'reference_type': 'SALE',
+              'reference_id': orderId.isNotEmpty ? orderId : orderNo,
+              'remark': 'ขายเชื่อ #$orderNo',
+              'items': cartState.items
+                  .map((item) => {
+                        'product_id': item.productId,
+                        'product_code': item.productCode,
+                        'product_name': item.productName,
+                        'unit': item.unit,
+                        'quantity': item.quantity,
+                        'unit_price': item.unitPrice,
+                        'discount_amount': 0.0,
+                        'amount': item.amount,
+                      })
+                  .toList(),
+            };
+            await apiClient.post('/api/ar-invoices', data: arData);
+            print('✅ AR Invoice created for CREDIT sale $orderNo');
+          } catch (e) {
+            print('⚠️ Could not create AR invoice: $e');
+          }
+        }
+
         ref.read(cartProvider.notifier).clear();
 
         // ✅ refresh sales list & dashboard หลังบันทึกออเดอร์สำเร็จ
@@ -988,6 +1076,11 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
 
         // ✅ refresh customer list เพื่อให้ points อัพเดททันที
         ref.read(customerListProvider.notifier).refresh();
+
+        // ✅ refresh AR invoices หากขายเครดิต
+        if (_paymentType == 'CREDIT') {
+          ref.invalidate(arInvoiceListProvider);
+        }
 
         // ✅ คำนวณค่าทั้งหมดก่อน navigate — ป้องกัน ref ถูกเรียกหลัง unmount
         final paidAmount = _paymentType == 'CASH' ? _receivedAmount : netTotal;
@@ -1065,8 +1158,10 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
             'vat_amount': 0.0,
             'total_amount': _netTotal,
             'payment_type': _paymentType,
-            'paid_amount': _paymentType == 'CASH' ? _receivedAmount : _netTotal,
+            'paid_amount': _paymentType == 'CASH' ? _receivedAmount : (_paymentType == 'CREDIT' ? 0.0 : _netTotal),
             'change_amount': _paymentType == 'CASH' ? _change : 0.0,
+            if (_paymentType == 'CREDIT')
+              'due_date': DateTime.now().add(Duration(days: _creditDays.toInt())).toIso8601String(),
             if (cartState.appliedCoupons.isNotEmpty)
               'coupon_codes': cartState.appliedCoupons
                   .map((c) => c.code)
@@ -1599,6 +1694,129 @@ class _PromptPayQrSection extends StatelessWidget {
 // ReceiptPage — หน้าใบเสร็จ thermal style
 // แสดงหลังชำระเงินสำเร็จ กดกลับไปหน้าขาย
 // ─────────────────────────────────────────────────────────────────
+// _CreditInfoPanel — แสดงวงเงินและวันครบกำหนด (เครดิต)
+// ─────────────────────────────────────────────────────────────────
+class _CreditInfoPanel extends StatelessWidget {
+  final double creditLimit;
+  final int creditDays;
+  final double currentBalance;
+  final double orderAmount;
+
+  const _CreditInfoPanel({
+    required this.creditLimit,
+    required this.creditDays,
+    required this.currentBalance,
+    required this.orderAmount,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final fmt = NumberFormat('#,##0.00', 'th_TH');
+    final availableCredit = creditLimit - currentBalance;
+    final isOverLimit = orderAmount > availableCredit;
+    final dueDate = DateTime.now().add(Duration(days: creditDays));
+    final dueDateStr = DateFormat('dd/MM/yyyy').format(dueDate);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isOverLimit
+            ? (isDark ? const Color(0xFF2A1A1A) : const Color(0xFFFFEBEE))
+            : (isDark ? const Color(0xFF0D2137) : const Color(0xFFE3F2FD)),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isOverLimit
+              ? const Color(0xFFEF5350).withValues(alpha: 0.5)
+              : const Color(0xFF1565C0).withValues(alpha: 0.4),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.account_balance_wallet_outlined,
+                size: 16,
+                color: isOverLimit ? const Color(0xFFEF5350) : const Color(0xFF1565C0),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'ข้อมูลเครดิต',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: isOverLimit ? const Color(0xFFEF5350) : const Color(0xFF1565C0),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _row('วงเงินเครดิต', '฿${fmt.format(creditLimit)}', isDark),
+          const SizedBox(height: 6),
+          _row('ยอดค้างชำระ', '฿${fmt.format(currentBalance)}', isDark,
+              valueColor: currentBalance > 0 ? const Color(0xFFEF5350) : null),
+          const SizedBox(height: 6),
+          _row('วงเงินคงเหลือ', '฿${fmt.format(availableCredit)}', isDark,
+              valueColor: availableCredit <= 0 ? const Color(0xFFEF5350) : const Color(0xFF4CAF50)),
+          const SizedBox(height: 6),
+          _row('ยอดบิลนี้', '฿${fmt.format(orderAmount)}', isDark,
+              valueColor: isOverLimit ? const Color(0xFFEF5350) : null),
+          const SizedBox(height: 6),
+          _row('วันครบกำหนด', '$dueDateStr ($creditDays วัน)', isDark),
+          if (isOverLimit) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEF5350).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.warning_amber_rounded, size: 16, color: Color(0xFFEF5350)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'วงเงินไม่เพียงพอ (ขาด ฿${fmt.format(orderAmount - availableCredit)})',
+                      style: const TextStyle(fontSize: 12, color: Color(0xFFEF5350)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _row(String label, String value, bool isDark, {Color? valueColor}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: isDark ? Colors.white54 : Colors.black54,
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: valueColor ?? (isDark ? Colors.white : Colors.black87),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
 class ReceiptPage extends ConsumerWidget {
   final String orderNo;
   final DateTime orderDate;
@@ -1639,6 +1857,7 @@ class ReceiptPage extends ConsumerWidget {
     'CASH' => 'เงินสด',
     'CARD' => 'บัตรเครดิต/เดบิต',
     'TRANSFER' => 'โอนเงิน',
+    'CREDIT' => 'เครดิต',
     _ => type,
   };
 

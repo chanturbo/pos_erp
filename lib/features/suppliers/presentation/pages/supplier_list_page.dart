@@ -4,7 +4,6 @@ import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/responsive_utils.dart';
 import '../../../../shared/widgets/app_dialogs.dart';
 import '../../../../shared/widgets/escape_pop_scope.dart';
-import '../../../../shared/widgets/mobile_home_button.dart';
 import '../../../../shared/widgets/pagination_bar.dart';
 import '../../../../shared/pdf/pdf_report_button.dart';
 import '../../../settings/presentation/pages/settings_page.dart';
@@ -62,41 +61,46 @@ class _SupplierListPageState extends ConsumerState<SupplierListPage> {
     return colors[name.codeUnitAt(0) % colors.length];
   }
 
+  Map<String, int> _calcSummary(List<SupplierModel> suppliers) {
+    final active = suppliers.where((s) => s.isActive).length;
+    final inactive = suppliers.length - active;
+    final withCredit = suppliers
+        .where((s) => s.creditLimit > 0 || s.creditTerm > 0)
+        .length;
+    final withContact = suppliers
+        .where(
+          (s) =>
+              (s.contactPerson?.isNotEmpty ?? false) ||
+              (s.phone?.isNotEmpty ?? false),
+        )
+        .length;
+    return {
+      'count': suppliers.length,
+      'active': active,
+      'inactive': inactive,
+      'credit': withCredit,
+      'contact': withContact,
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     final supplierAsync = ref.watch(supplierListProvider);
     final pageSize = ref.watch(settingsProvider).listPageSize;
     final canPop = Navigator.of(context).canPop();
+    final colors = _SupplierListColors.of(context);
 
     return EscapePopScope(
       child: Scaffold(
-        backgroundColor: AppTheme.surfaceColorOf(context),
-        appBar: AppBar(
-          leading: buildMobileHomeLeading(context),
-          automaticallyImplyLeading: canPop,
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('ซัพพลายเออร์'),
-              Text(
-                'ค้นหา จัดการ และติดตามข้อมูลซัพพลายเออร์ในระบบ',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.white.withValues(alpha: 0.65),
-                  fontWeight: FontWeight.normal,
-                ),
-              ),
-            ],
-          ),
-        ),
+        backgroundColor: colors.scaffoldBg,
         body: Align(
           alignment: Alignment.topCenter,
           child: ConstrainedBox(
             constraints: BoxConstraints(maxWidth: context.contentMaxWidth),
             child: Column(
               children: [
-                // ── Top Bar ───────────────────────────────────────────
                 _SupplierListTopBar(
+                  canPop: canPop,
                   searchController: _searchController,
                   searchQuery: _searchQuery,
                   activeOnly: _activeOnly,
@@ -155,6 +159,7 @@ class _SupplierListPageState extends ConsumerState<SupplierListPage> {
                             (s.contactPerson?.toLowerCase().contains(q) ??
                                 false);
                       }).toList();
+                      final summary = _calcSummary(filtered);
 
                       // ── Sort ──────────────────────────────────────
                       filtered.sort((a, b) {
@@ -197,6 +202,7 @@ class _SupplierListPageState extends ConsumerState<SupplierListPage> {
                       if (!_isTableView) {
                         return Column(
                           children: [
+                            _SupplierSummaryBar(summary: summary),
                             Expanded(child: _buildCardView(pageItems)),
                             PaginationBar(
                               currentPage: safePage,
@@ -221,7 +227,7 @@ class _SupplierListPageState extends ConsumerState<SupplierListPage> {
 
                       // ── Table View ───────────────────────────────
                       final screenW = MediaQuery.of(context).size.width - 32;
-                      if (!_userResized) _autoFitColWidths(filtered, screenW);
+                      if (!_userResized) _autoFitColWidths(filtered);
 
                       final totalW =
                           40.0 +
@@ -236,12 +242,24 @@ class _SupplierListPageState extends ConsumerState<SupplierListPage> {
                           Container(
                             margin: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
-                              color: Colors.white,
+                              color: colors.cardBg,
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: AppTheme.border),
+                              border: Border.all(color: colors.border),
+                              boxShadow: [
+                                if (!colors.isDark)
+                                  BoxShadow(
+                                    color: AppTheme.navy.withValues(
+                                      alpha: 0.04,
+                                    ),
+                                    blurRadius: 16,
+                                    offset: const Offset(0, 6),
+                                  ),
+                              ],
                             ),
                             child: Column(
                               children: [
+                                _SupplierSummaryBar(summary: summary),
+                                Divider(height: 1, color: colors.border),
                                 Expanded(
                                   child: Scrollbar(
                                     controller: _hScroll,
@@ -287,17 +305,17 @@ class _SupplierListPageState extends ConsumerState<SupplierListPage> {
                                                 _userResized = false;
                                               }),
                                             ),
-                                            const Divider(
+                                            Divider(
                                               height: 1,
-                                              color: AppTheme.border,
+                                              color: colors.border,
                                             ),
                                             Expanded(
                                               child: ListView.separated(
                                                 itemCount: pageItems.length,
                                                 separatorBuilder: (_, _) =>
-                                                    const Divider(
+                                                    Divider(
                                                       height: 1,
-                                                      color: AppTheme.border,
+                                                      color: colors.border,
                                                     ),
                                                 itemBuilder: (_, i) {
                                                   final s = pageItems[i];
@@ -373,6 +391,7 @@ class _SupplierListPageState extends ConsumerState<SupplierListPage> {
 
   // ── Card View ──────────────────────────────────────────────────
   Widget _buildCardView(List<SupplierModel> suppliers) {
+    final colors = _SupplierListColors.of(context);
     return ListView.separated(
       padding: const EdgeInsets.all(12),
       itemCount: suppliers.length,
@@ -388,12 +407,12 @@ class _SupplierListPageState extends ConsumerState<SupplierListPage> {
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
-            side: const BorderSide(color: AppTheme.border),
+            side: BorderSide(color: colors.border),
           ),
-          color: Colors.white,
+          color: colors.cardBg,
           child: InkWell(
             borderRadius: BorderRadius.circular(10),
-            hoverColor: AppTheme.primaryLight.withValues(alpha: 0.6),
+            hoverColor: colors.rowHoverBg,
             onTap: () => _showSupplierDetails(s),
             child: Padding(
               padding: const EdgeInsets.all(12),
@@ -424,10 +443,10 @@ class _SupplierListPageState extends ConsumerState<SupplierListPage> {
                             Expanded(
                               child: Text(
                                 s.supplierName,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
-                                  color: Color(0xFF1A1A1A),
+                                  color: colors.text,
                                 ),
                                 overflow: TextOverflow.ellipsis,
                                 maxLines: 1,
@@ -442,9 +461,16 @@ class _SupplierListPageState extends ConsumerState<SupplierListPage> {
                               ),
                               decoration: BoxDecoration(
                                 color: s.isActive
-                                    ? const Color(0xFFE8F5E9)
-                                    : const Color(0xFFFFEBEE),
+                                    ? AppTheme.successContainer
+                                    : AppTheme.errorContainer,
                                 borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color:
+                                      (s.isActive
+                                              ? AppTheme.success
+                                              : AppTheme.error)
+                                          .withValues(alpha: 0.18),
+                                ),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
@@ -525,7 +551,7 @@ class _SupplierListPageState extends ConsumerState<SupplierListPage> {
                             'เครดิต ${s.creditTerm} วัน  ·  วงเงิน ฿${s.creditLimit.toStringAsFixed(0)}',
                             style: const TextStyle(
                               fontSize: 11,
-                              color: Color(0xFF1565C0),
+                              color: AppTheme.info,
                             ),
                           ),
                       ],
@@ -571,58 +597,118 @@ class _SupplierListPageState extends ConsumerState<SupplierListPage> {
   }
 
   // ── Auto-fit columns ───────────────────────────────────────────
-  void _autoFitColWidths(List<SupplierModel> rows, double screenW) {
-    const hPad = 16.0;
-    const sortIcon = 16.0;
-    const hCharW = 7.5;
-    final labels = [
-      'ชื่อซัพพลายเออร์',
-      'รหัส',
-      'โทรศัพท์',
-      'ผู้ติดต่อ',
-      'เครดิต(วัน)',
-      'วงเงิน',
-      'สถานะ',
-      'จัดการ',
-    ];
-    final hasSort = [true, true, true, true, true, true, true, false];
+  double _measureTextWidth(
+    BuildContext context,
+    String text, {
+    required TextStyle style,
+  }) {
+    final painter = TextPainter(
+      text: TextSpan(text: text, style: style),
+      textDirection: Directionality.of(context),
+      maxLines: 1,
+    )..layout();
+    return painter.width;
+  }
 
-    final headerMinW = List<double>.generate(labels.length, (i) {
-      final lw = labels[i].length * hCharW + hPad;
-      return hasSort[i] ? lw + sortIcon : lw;
+  void _autoFitColWidths(List<SupplierModel> rows) {
+    const headers = [
+      ('ชื่อซัพพลายเออร์', true),
+      ('รหัส', true),
+      ('โทรศัพท์', true),
+      ('ผู้ติดต่อ', true),
+      ('เครดิต(วัน)', true),
+      ('วงเงิน', true),
+      ('สถานะ', true),
+      ('จัดการ', false),
+    ];
+
+    final headerStyle = const TextStyle(
+      fontSize: 12,
+      fontWeight: FontWeight.w600,
+    );
+    final colors = _SupplierListColors.of(context);
+    final cellStyle = TextStyle(fontSize: 13, color: colors.subtext);
+    final emphasisStyle = TextStyle(fontSize: 13, color: colors.amountText);
+    final nameStyle = TextStyle(
+      fontSize: 13,
+      fontWeight: FontWeight.w500,
+      color: colors.text,
+    );
+    const badgeStyle = TextStyle(fontSize: 11, fontWeight: FontWeight.w600);
+
+    // colWidth = labelW + basePadding(16) + sortChrome(20 if sortable)
+    //          + resizeHandle(14 if not last) + buffer(10)
+    const basePadding = 16.0;
+    const sortChrome = 20.0;
+    const resizeHandle = 14.0;
+    const headerBuffer = 10.0;
+
+    final maxW = List<double>.generate(headers.length, (i) {
+      final label = headers[i].$1;
+      final isSortable = headers[i].$2;
+      final isLast = i == headers.length - 1;
+      final labelW = _measureTextWidth(context, label, style: headerStyle);
+      return labelW +
+          basePadding +
+          (isSortable ? sortChrome : 0.0) +
+          (isLast ? 0.0 : resizeHandle) +
+          headerBuffer;
     });
 
-    final maxW = List<double>.from(headerMinW);
-    const charW = 7.2;
-    const cPad = 24.0;
-
     for (final s in rows) {
-      final nameW = s.supplierName.length * charW + 46 + cPad;
-      if (nameW > maxW[0]) maxW[0] = nameW.clamp(_colMinW[0], _colMaxW[0]);
-      final codeW = s.supplierCode.length * charW + cPad;
-      if (codeW > maxW[1]) maxW[1] = codeW.clamp(_colMinW[1], _colMaxW[1]);
-      final phoneW = (s.phone?.length ?? 1) * charW + cPad;
-      if (phoneW > maxW[2]) maxW[2] = phoneW.clamp(_colMinW[2], _colMaxW[2]);
-      final contactW = (s.contactPerson?.length ?? 1) * charW + cPad;
-      if (contactW > maxW[3]) {
-        maxW[3] = contactW.clamp(_colMinW[3], _colMaxW[3]);
-      }
+      // ชื่อ: CircleAvatar(radius 18 → 36px) + gap(10) + text + buffer(10) = +56
+      final nameW =
+          _measureTextWidth(context, s.supplierName, style: nameStyle) + 56;
+      if (nameW > maxW[0]) maxW[0] = nameW;
+
+      final codeW =
+          _measureTextWidth(context, s.supplierCode, style: cellStyle) + 20;
+      if (codeW > maxW[1]) maxW[1] = codeW;
+
+      final phoneW =
+          _measureTextWidth(context, s.phone ?? '-', style: cellStyle) + 20;
+      if (phoneW > maxW[2]) maxW[2] = phoneW;
+
+      final contactW =
+          _measureTextWidth(
+            context,
+            s.contactPerson ?? '-',
+            style: cellStyle,
+          ) +
+          20;
+      if (contactW > maxW[3]) maxW[3] = contactW;
+
+      // เครดิต(วัน): badge — horizontal padding 8×2=16 + center buffer = +32
+      final creditLabel = s.creditTerm > 0 ? '${s.creditTerm} วัน' : '-';
+      final creditW =
+          _measureTextWidth(context, creditLabel, style: badgeStyle) + 32;
+      if (creditW > maxW[4]) maxW[4] = creditW;
+
+      // วงเงิน: text + 20
+      final amtLabel =
+          s.creditLimit > 0 ? '฿${s.creditLimit.toStringAsFixed(0)}' : '-';
+      final amtW =
+          _measureTextWidth(
+            context,
+            amtLabel,
+            style: s.creditLimit > 0 ? emphasisStyle : cellStyle,
+          ) +
+          20;
+      if (amtW > maxW[5]) maxW[5] = amtW;
+
+      // สถานะ: badge = dot(6)+gap(5)+text + horizontal padding(10×2) + buffer = +41
+      final statusLabel = s.isActive ? 'ใช้งาน' : 'ระงับ';
+      final statusW =
+          _measureTextWidth(context, statusLabel, style: badgeStyle) + 41;
+      if (statusW > maxW[6]) maxW[6] = statusW;
+
+      maxW[7] = 100.0; // จัดการ — fixed
     }
 
     for (int i = 0; i < maxW.length; i++) {
       maxW[i] = maxW[i].clamp(_colMinW[i], _colMaxW[i]);
     }
-    maxW[7] = 100.0;
 
-    const totalFixed = 116.0;
-    final totalCols = maxW.fold(0.0, (s, w) => s + w);
-    final available = screenW - totalFixed;
-    if (totalCols < available) {
-      maxW[0] = (maxW[0] + (available - totalCols)).clamp(
-        _colMinW[0],
-        _colMaxW[0],
-      );
-    }
     for (int i = 0; i < _colWidths.length; i++) {
       _colWidths[i] = maxW[i];
     }
@@ -761,14 +847,15 @@ class _SupplierListPageState extends ConsumerState<SupplierListPage> {
   }
 
   Widget _buildEmpty() {
+    final colors = _SupplierListColors.of(context);
     return Center(
       child: Padding(
         padding: context.pagePadding,
-        child: Card(
-          elevation: 0,
-          shape: RoundedRectangleBorder(
+        child: Container(
+          decoration: BoxDecoration(
+            color: colors.cardBg,
             borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: AppTheme.borderColorOf(context)),
+            border: Border.all(color: colors.border),
           ),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 36),
@@ -778,7 +865,7 @@ class _SupplierListPageState extends ConsumerState<SupplierListPage> {
                 Icon(
                   Icons.business_outlined,
                   size: 72,
-                  color: Colors.grey[300],
+                  color: colors.emptyIcon,
                 ),
                 const SizedBox(height: 16),
                 Text(
@@ -786,7 +873,7 @@ class _SupplierListPageState extends ConsumerState<SupplierListPage> {
                       ? 'ยังไม่มีซัพพลายเออร์'
                       : 'ไม่พบซัพพลายเออร์ที่ค้นหา',
                   style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface,
+                    color: colors.text,
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
                   ),
@@ -794,10 +881,7 @@ class _SupplierListPageState extends ConsumerState<SupplierListPage> {
                 const SizedBox(height: 8),
                 Text(
                   'ลองเปลี่ยนคำค้นหา หรือเพิ่มซัพพลายเออร์ใหม่เพื่อเริ่มต้นใช้งาน',
-                  style: TextStyle(
-                    color: AppTheme.subtextColorOf(context),
-                    fontSize: 12,
-                  ),
+                  style: TextStyle(color: colors.subtext, fontSize: 12),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 20),
@@ -829,14 +913,15 @@ class _SupplierListPageState extends ConsumerState<SupplierListPage> {
   }
 
   Widget _buildError(Object e) {
+    final colors = _SupplierListColors.of(context);
     return Center(
       child: Padding(
         padding: context.pagePadding,
-        child: Card(
-          elevation: 0,
-          shape: RoundedRectangleBorder(
+        child: Container(
+          decoration: BoxDecoration(
+            color: colors.cardBg,
             borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: AppTheme.borderColorOf(context)),
+            border: Border.all(color: colors.border),
           ),
           child: Padding(
             padding: context.cardPadding,
@@ -892,6 +977,7 @@ class _DetailRow extends StatelessWidget {
 // Top Bar
 // ─────────────────────────────────────────────────────────────────
 class _SupplierListTopBar extends StatelessWidget {
+  final bool canPop;
   final TextEditingController searchController;
   final String searchQuery;
   final bool activeOnly;
@@ -904,6 +990,7 @@ class _SupplierListTopBar extends StatelessWidget {
   final VoidCallback onAdd;
 
   const _SupplierListTopBar({
+    required this.canPop,
     required this.searchController,
     required this.searchQuery,
     required this.activeOnly,
@@ -920,169 +1007,235 @@ class _SupplierListTopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: context.pagePadding,
+    final colors = _SupplierListColors.of(context);
+    return Container(
+      color: colors.topBarBg,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final isWide = constraints.maxWidth >= _kBreak;
-          return Card(
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: BorderSide(color: AppTheme.borderColorOf(context)),
-            ),
-            child: Padding(
-              padding: context.cardPadding,
-              child: isWide
-                  ? _buildSingleRow(context)
-                  : _buildDoubleRow(context),
-            ),
-          );
+          return isWide
+              ? _buildSingleRow(context, colors)
+              : _buildDoubleRow(context, colors);
         },
       ),
     );
   }
 
-  Widget _buildSingleRow(BuildContext context) => Row(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+  Widget _buildSingleRow(BuildContext context, _SupplierListColors colors) =>
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (canPop) ...[
+            _TopNavBtn(
+              icon: Icons.arrow_back,
+              tooltip: 'ย้อนกลับ',
+              onTap: () => Navigator.of(context).pop(),
+            ),
+            const SizedBox(width: 10),
+          ],
+          _SupplierPageIcon(),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _SupplierPageIcon(),
-                const SizedBox(width: 10),
-                Text(
-                  'ค้นหาและตัวกรอง',
+                const Text(
+                  'ซัพพลายเออร์',
                   style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: Theme.of(context).colorScheme.onSurface,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'ค้นหาซัพพลายเออร์ ดูเฉพาะที่ใช้งาน และสลับมุมมองรายการ',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.white.withValues(alpha: 0.7),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 4),
-            Text(
-              'ค้นหาซัพพลายเออร์ ดูเฉพาะที่ใช้งาน และสลับมุมมองรายการ',
-              style: TextStyle(
-                fontSize: 12,
-                color: AppTheme.subtextColorOf(context),
-              ),
-            ),
-          ],
-        ),
-      ),
-      const SizedBox(width: 16),
-      ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 280),
-        child: _SearchField(
-          controller: searchController,
-          query: searchQuery,
-          onChanged: onSearchChanged,
-          onCleared: onSearchCleared,
-        ),
-      ),
-      const SizedBox(width: 8),
-      _ActiveToggle(active: activeOnly, onTap: onToggleActive),
-      const SizedBox(width: 6),
-      Tooltip(
-        message: isTableView ? 'Card View' : 'Table View',
-        child: InkWell(
-          onTap: onToggleView,
-          borderRadius: BorderRadius.circular(8),
-          child: Container(
-            padding: const EdgeInsets.all(7),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF5F5F5),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppTheme.border),
-            ),
-            child: Icon(
-              isTableView
-                  ? Icons.view_agenda_outlined
-                  : Icons.table_rows_outlined,
-              size: 17,
-              color: AppTheme.textSub,
+          ),
+          const SizedBox(width: 16),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 280),
+            child: _SearchField(
+              controller: searchController,
+              query: searchQuery,
+              onChanged: onSearchChanged,
+              onCleared: onSearchCleared,
             ),
           ),
-        ),
-      ),
-      const SizedBox(width: 6),
-      _RefreshBtn(onTap: onRefresh),
-      const SizedBox(width: 6),
-      _AddBtn(onTap: onAdd),
-    ],
-  );
-
-  Widget _buildDoubleRow(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Row(
-        children: [
-          _SupplierPageIcon(),
           const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'ค้นหาและตัวกรอง',
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
-      const SizedBox(height: 10),
-      Text(
-        'ค้นหาซัพพลายเออร์ ดูเฉพาะที่ใช้งาน และสลับมุมมองรายการ',
-        style: TextStyle(fontSize: 12, color: AppTheme.subtextColorOf(context)),
-      ),
-      const SizedBox(height: 10),
-      Wrap(
-        spacing: 6,
-        runSpacing: 6,
-        children: [
           _ActiveToggle(active: activeOnly, onTap: onToggleActive),
-          Tooltip(
-            message: isTableView ? 'Card View' : 'Table View',
-            child: InkWell(
-              onTap: onToggleView,
-              borderRadius: BorderRadius.circular(8),
-              child: Container(
-                padding: const EdgeInsets.all(7),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF5F5F5),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppTheme.border),
+          const SizedBox(width: 6),
+          _TopNavBtn(
+            icon: isTableView
+                ? Icons.view_agenda_outlined
+                : Icons.table_rows_outlined,
+            tooltip: isTableView ? 'Card View' : 'Table View',
+            onTap: onToggleView,
+          ),
+          const SizedBox(width: 6),
+          _RefreshBtn(onTap: onRefresh),
+          const SizedBox(width: 6),
+          _AddBtn(onTap: onAdd),
+        ],
+      );
+
+  Widget _buildDoubleRow(BuildContext context, _SupplierListColors colors) =>
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              if (canPop) ...[
+                _TopNavBtn(
+                  icon: Icons.arrow_back,
+                  tooltip: 'ย้อนกลับ',
+                  onTap: () => Navigator.of(context).pop(),
                 ),
-                child: Icon(
-                  isTableView
-                      ? Icons.view_agenda_outlined
-                      : Icons.table_rows_outlined,
-                  size: 17,
-                  color: AppTheme.textSub,
+                const SizedBox(width: 8),
+              ],
+              _SupplierPageIcon(),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'ซัพพลายเออร์',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'ค้นหาซัพพลายเออร์ ดูเฉพาะที่ใช้งาน และสลับมุมมองรายการ',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.white.withValues(alpha: 0.7),
             ),
           ),
-          _RefreshBtn(onTap: onRefresh),
-          _AddBtn(onTap: onAdd, compact: true),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              _ActiveToggle(active: activeOnly, onTap: onToggleActive),
+              _TopNavBtn(
+                icon: isTableView
+                    ? Icons.view_agenda_outlined
+                    : Icons.table_rows_outlined,
+                tooltip: isTableView ? 'Card View' : 'Table View',
+                onTap: onToggleView,
+              ),
+              _RefreshBtn(onTap: onRefresh),
+              _AddBtn(onTap: onAdd, compact: true),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _SearchField(
+            controller: searchController,
+            query: searchQuery,
+            onChanged: onSearchChanged,
+            onCleared: onSearchCleared,
+          ),
+        ],
+      );
+}
+
+class _SupplierSummaryBar extends StatelessWidget {
+  final Map<String, int> summary;
+
+  const _SupplierSummaryBar({required this.summary});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = _SupplierListColors.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(color: colors.summaryBg),
+      child: Wrap(
+        spacing: 12,
+        runSpacing: 8,
+        children: [
+          _SummaryChip(
+            icon: Icons.receipt_long,
+            label: 'ทั้งหมด ${summary['count']}',
+            color: AppTheme.info,
+          ),
+          _SummaryChip(
+            icon: Icons.check_circle_outline,
+            label: 'ใช้งาน ${summary['active']}',
+            color: AppTheme.success,
+          ),
+          _SummaryChip(
+            icon: Icons.pause_circle_outline,
+            label: 'ระงับ ${summary['inactive']}',
+            color: AppTheme.error,
+          ),
+          _SummaryChip(
+            icon: Icons.credit_score_outlined,
+            label: 'เครดิต ${summary['credit']}',
+            color: AppTheme.primary,
+          ),
+          _SummaryChip(
+            icon: Icons.perm_contact_calendar_outlined,
+            label: 'มีผู้ติดต่อ ${summary['contact']}',
+            color: AppTheme.info,
+          ),
         ],
       ),
-      const SizedBox(height: 10),
-      _SearchField(
-        controller: searchController,
-        query: searchQuery,
-        onChanged: onSearchChanged,
-        onCleared: onSearchCleared,
+    );
+  }
+}
+
+class _SummaryChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _SummaryChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = _SupplierListColors.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: colors.summaryChipBg,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: colors.border),
       ),
-    ],
-  );
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -1122,8 +1275,9 @@ class _SupplierTableHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = _SupplierListColors.of(context);
     return Container(
-      color: AppTheme.navy,
+      color: colors.tableHeaderBg,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
       child: Row(
         children: [
@@ -1337,6 +1491,7 @@ class _SupplierRowState extends State<_SupplierRow> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = _SupplierListColors.of(context);
     final s = widget.supplier;
     final w = widget.colWidths;
     final initial = s.supplierName.isNotEmpty
@@ -1349,7 +1504,7 @@ class _SupplierRowState extends State<_SupplierRow> {
       onExit: (_) => setState(() => _hovered = false),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 120),
-        color: _hovered ? AppTheme.primaryLight : Colors.white,
+        color: _hovered ? colors.rowHoverBg : colors.cardBg,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Row(
           children: [
@@ -1360,7 +1515,7 @@ class _SupplierRowState extends State<_SupplierRow> {
                 s.supplierCode.length > 6
                     ? s.supplierCode.substring(s.supplierCode.length - 4)
                     : s.supplierCode,
-                style: const TextStyle(fontSize: 11, color: AppTheme.textSub),
+                style: TextStyle(fontSize: 11, color: colors.rowIndexText),
               ),
             ),
             const SizedBox(width: 16),
@@ -1386,10 +1541,10 @@ class _SupplierRowState extends State<_SupplierRow> {
                   Expanded(
                     child: Text(
                       s.supplierName,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
-                        color: Colors.black87,
+                        color: colors.text,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -1404,7 +1559,7 @@ class _SupplierRowState extends State<_SupplierRow> {
               child: Text(
                 s.supplierCode,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 13, color: AppTheme.textSub),
+                style: TextStyle(fontSize: 13, color: colors.subtext),
               ),
             ),
 
@@ -1414,7 +1569,7 @@ class _SupplierRowState extends State<_SupplierRow> {
               child: Text(
                 s.phone ?? '-',
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 13, color: AppTheme.textSub),
+                style: TextStyle(fontSize: 13, color: colors.subtext),
               ),
             ),
 
@@ -1424,7 +1579,7 @@ class _SupplierRowState extends State<_SupplierRow> {
               child: Text(
                 s.contactPerson ?? '-',
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 13, color: AppTheme.textSub),
+                style: TextStyle(fontSize: 13, color: colors.subtext),
               ),
             ),
 
@@ -1450,7 +1605,7 @@ class _SupplierRowState extends State<_SupplierRow> {
                       fontWeight: FontWeight.w600,
                       color: s.creditTerm > 0
                           ? const Color(0xFF1565C0)
-                          : AppTheme.textSub,
+                          : colors.subtext,
                     ),
                   ),
                 ),
@@ -1463,14 +1618,11 @@ class _SupplierRowState extends State<_SupplierRow> {
               child: s.creditLimit > 0
                   ? Text(
                       '฿${s.creditLimit.toStringAsFixed(0)}',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFF1565C0),
-                      ),
+                      style: TextStyle(fontSize: 13, color: colors.amountText),
                     )
-                  : const Text(
+                  : Text(
                       '-',
-                      style: TextStyle(fontSize: 13, color: AppTheme.textSub),
+                      style: TextStyle(fontSize: 13, color: colors.subtext),
                     ),
             ),
 
@@ -1557,11 +1709,48 @@ class _SupplierPageIcon extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(7),
     decoration: BoxDecoration(
-      color: AppTheme.successColor.withValues(alpha: 0.15),
+      color: AppTheme.primary.withValues(alpha: 0.18),
       borderRadius: BorderRadius.circular(8),
     ),
-    child: Icon(Icons.business, color: AppTheme.successColor, size: 18),
+    child: const Icon(
+      Icons.local_shipping_outlined,
+      color: AppTheme.primaryLight,
+      size: 18,
+    ),
   );
+}
+
+class _TopNavBtn extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  const _TopNavBtn({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = _SupplierListColors.of(context);
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.all(7),
+          decoration: BoxDecoration(
+            color: colors.navButtonBg,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: colors.navButtonBorder),
+          ),
+          child: Icon(icon, size: 17, color: Colors.white70),
+        ),
+      ),
+    );
+  }
 }
 
 class _SearchField extends StatelessWidget {
@@ -1577,40 +1766,43 @@ class _SearchField extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => SizedBox(
-    height: 38,
-    child: TextField(
-      controller: controller,
-      style: const TextStyle(fontSize: 13),
-      decoration: InputDecoration(
-        hintText: 'ค้นหาซัพพลายเออร์...',
-        hintStyle: const TextStyle(fontSize: 13, color: AppTheme.textSub),
-        prefixIcon: const Icon(Icons.search, size: 17, color: AppTheme.textSub),
-        suffixIcon: query.isNotEmpty
-            ? IconButton(
-                icon: const Icon(Icons.clear, size: 15),
-                onPressed: onCleared,
-              )
-            : null,
-        contentPadding: EdgeInsets.zero,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppTheme.border),
+  Widget build(BuildContext context) {
+    final colors = _SupplierListColors.of(context);
+    return SizedBox(
+      height: 38,
+      child: TextField(
+        controller: controller,
+        style: TextStyle(fontSize: 13, color: colors.text),
+        decoration: InputDecoration(
+          hintText: 'ค้นหาซัพพลายเออร์...',
+          hintStyle: TextStyle(fontSize: 13, color: colors.subtext),
+          prefixIcon: Icon(Icons.search, size: 17, color: colors.subtext),
+          suffixIcon: query.isNotEmpty
+              ? IconButton(
+                  icon: Icon(Icons.clear, size: 15, color: colors.subtext),
+                  onPressed: onCleared,
+                )
+              : null,
+          contentPadding: EdgeInsets.zero,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: colors.border),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: colors.border),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
+          ),
+          filled: true,
+          fillColor: colors.inputFill,
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppTheme.border),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
-        ),
-        filled: true,
-        fillColor: Colors.white,
+        onChanged: onChanged,
       ),
-      onChanged: onChanged,
-    ),
-  );
+    );
+  }
 }
 
 class _ActiveToggle extends StatelessWidget {
@@ -1627,16 +1819,20 @@ class _ActiveToggle extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(7),
         decoration: BoxDecoration(
-          color: active ? const Color(0xFFE8F5E9) : const Color(0xFFF5F5F5),
+          color: active
+              ? AppTheme.success.withValues(alpha: 0.10)
+              : _SupplierListColors.of(context).navButtonBg,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: active ? const Color(0xFF4CAF50) : AppTheme.border,
+            color: active
+                ? AppTheme.success.withValues(alpha: 0.30)
+                : _SupplierListColors.of(context).navButtonBorder,
           ),
         ),
         child: Icon(
           Icons.verified_outlined,
           size: 17,
-          color: active ? const Color(0xFF2E7D32) : AppTheme.textSub,
+          color: active ? AppTheme.success : Colors.white70,
         ),
       ),
     ),
@@ -1648,22 +1844,8 @@ class _RefreshBtn extends StatelessWidget {
   const _RefreshBtn({required this.onTap});
 
   @override
-  Widget build(BuildContext context) => Tooltip(
-    message: 'รีเฟรช',
-    child: InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.all(7),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF5F5F5),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppTheme.border),
-        ),
-        child: const Icon(Icons.refresh, size: 17, color: AppTheme.textSub),
-      ),
-    ),
-  );
+  Widget build(BuildContext context) =>
+      _TopNavBtn(icon: Icons.refresh, tooltip: 'รีเฟรช', onTap: onTap);
 }
 
 class _AddBtn extends StatelessWidget {
@@ -1719,9 +1901,77 @@ class _ActionIcon extends StatelessWidget {
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: color.withValues(alpha: 0.18)),
         ),
         child: Icon(icon, size: 15, color: color),
       ),
     ),
   );
+}
+
+class _SupplierListColors {
+  final bool isDark;
+  final Color scaffoldBg;
+  final Color cardBg;
+  final Color border;
+  final Color text;
+  final Color subtext;
+  final Color topBarBg;
+  final Color summaryBg;
+  final Color summaryChipBg;
+  final Color inputFill;
+  final Color emptyIcon;
+  final Color navButtonBg;
+  final Color navButtonBorder;
+  final Color rowHoverBg;
+  final Color tableHeaderBg;
+  final Color amountText;
+  final Color rowIndexText;
+
+  const _SupplierListColors({
+    required this.isDark,
+    required this.scaffoldBg,
+    required this.cardBg,
+    required this.border,
+    required this.text,
+    required this.subtext,
+    required this.topBarBg,
+    required this.summaryBg,
+    required this.summaryChipBg,
+    required this.inputFill,
+    required this.emptyIcon,
+    required this.navButtonBg,
+    required this.navButtonBorder,
+    required this.rowHoverBg,
+    required this.tableHeaderBg,
+    required this.amountText,
+    required this.rowIndexText,
+  });
+
+  factory _SupplierListColors.of(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return _SupplierListColors(
+      isDark: isDark,
+      scaffoldBg: isDark ? AppTheme.darkBg : AppTheme.surface,
+      cardBg: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+      border: isDark ? const Color(0xFF333333) : AppTheme.border,
+      text: isDark ? const Color(0xFFE0E0E0) : const Color(0xFF1A1A1A),
+      subtext: isDark ? const Color(0xFF9E9E9E) : AppTheme.textSub,
+      topBarBg: isDark ? AppTheme.navyDark : AppTheme.navy,
+      summaryBg: isDark ? const Color(0xFF181818) : const Color(0xFFFFF8F5),
+      summaryChipBg: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+      inputFill: isDark ? AppTheme.darkElement : Colors.white,
+      emptyIcon: isDark ? const Color(0xFF9E9E9E) : Colors.grey,
+      navButtonBg: isDark
+          ? Colors.white.withValues(alpha: 0.08)
+          : AppTheme.navyLight,
+      navButtonBorder: isDark ? Colors.white24 : AppTheme.navy,
+      rowHoverBg: isDark
+          ? AppTheme.primaryLight.withValues(alpha: 0.15)
+          : AppTheme.primaryLight.withValues(alpha: 0.60),
+      tableHeaderBg: isDark ? AppTheme.navyDark : AppTheme.navy,
+      amountText: isDark ? AppTheme.primaryLight : AppTheme.info,
+      rowIndexText: isDark ? const Color(0xFF8F8F8F) : const Color(0xFFBBBBBB),
+    );
+  }
 }

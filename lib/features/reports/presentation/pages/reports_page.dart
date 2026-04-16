@@ -320,118 +320,196 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
     final screenWidth = MediaQuery.sizeOf(context).width;
     final isCompactDesktop = context.isDesktopOrWider && screenWidth < 1180;
     final isTightDesktop = context.isDesktopOrWider && screenWidth < 1080;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final topBarBg = isDark ? AppTheme.navyDark : AppTheme.navy;
+    final tabFontSize = (context.isMobile || isTightDesktop) ? 12.0 : 13.0;
 
     return EscapePopScope(
       child: Scaffold(
         backgroundColor: AppTheme.surfaceColorOf(context),
-        appBar: AppBar(
-          leading: buildMobileHomeLeading(context),
-          automaticallyImplyLeading: canPop,
-          title: isCompactDesktop
-              ? const Text('รายงาน')
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('รายงาน'),
-                    Text(
-                      'ภาพรวมธุรกิจและการวิเคราะห์',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.white.withValues(alpha: 0.65),
-                        fontWeight: FontWeight.normal,
+        body: Column(
+          children: [
+            // ── Custom TopBar (product_list style) ─────────────
+            Container(
+              color: topBarBg,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  // Home button (mobile)
+                  if (context.isMobile) ...[
+                    InkWell(
+                      onTap: () => navigateToMobileHome(context),
+                      borderRadius: BorderRadius.circular(8),
+                      child: const Padding(
+                        padding: EdgeInsets.all(6),
+                        child: Icon(Icons.home_rounded, color: Colors.white, size: 20),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  // Back button (desktop, if can pop)
+                  if (!context.isMobile && canPop) ...[
+                    InkWell(
+                      onTap: () => Navigator.of(context).pop(),
+                      borderRadius: BorderRadius.circular(8),
+                      child: const Padding(
+                        padding: EdgeInsets.all(6),
+                        child: Icon(Icons.arrow_back, color: Colors.white, size: 20),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  // Page icon
+                  Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: AppTheme.primary.withValues(alpha: 0.28),
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.assessment_outlined,
+                      color: AppTheme.primaryLight,
+                      size: 18,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  // Title
+                  const Text(
+                    'รายงาน',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const Spacer(),
+                  // Action buttons
+                  if (!isCompactDesktop) ...[
+                    IconButton(
+                      icon: const Icon(Icons.bar_chart, color: Colors.white),
+                      tooltip: 'กราฟยอดขาย',
+                      onPressed: () => _openSalesChart(context),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.file_download, color: Colors.white),
+                      tooltip: 'Export CSV',
+                      onPressed: () => _exportReport(context),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.refresh, color: Colors.white),
+                      tooltip: 'รีเฟรชข้อมูล',
+                      onPressed: _refreshAll,
+                    ),
+                    _buildPdfAction(),
+                  ] else ...[
+                    PopupMenuButton<_ReportsAppBarAction>(
+                      tooltip: 'การทำงานเพิ่มเติม',
+                      iconSize: isTightDesktop ? 20 : 22,
+                      icon: const Icon(Icons.more_vert, color: Colors.white),
+                      onSelected: (action) =>
+                          _handleAppBarAction(context, action),
+                      itemBuilder: (context) => const [
+                        PopupMenuItem(
+                          value: _ReportsAppBarAction.salesChart,
+                          child: ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            leading: Icon(Icons.bar_chart),
+                            title: Text('กราฟยอดขาย'),
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: _ReportsAppBarAction.exportCsv,
+                          child: ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            leading: Icon(Icons.file_download),
+                            title: Text('Export CSV'),
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: _ReportsAppBarAction.exportPdf,
+                          child: ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            leading: Icon(Icons.picture_as_pdf_outlined),
+                            title: Text('Export PDF'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  // Badge (ท้ายสุด)
+                  if (!isCompactDesktop) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primary.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: AppTheme.primary.withValues(alpha: 0.5),
+                        ),
+                      ),
+                      child: const Text(
+                        'Reports',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.primaryLight,
+                        ),
                       ),
                     ),
                   ],
-                ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              tooltip: 'รีเฟรชข้อมูล',
-              onPressed: _refreshAll,
-            ),
-            if (!isCompactDesktop) ...[
-              IconButton(
-                icon: const Icon(Icons.bar_chart),
-                tooltip: 'กราฟยอดขาย',
-                onPressed: () => _openSalesChart(context),
-              ),
-              IconButton(
-                icon: const Icon(Icons.file_download),
-                tooltip: 'Export CSV',
-                onPressed: () => _exportReport(context),
-              ),
-              _buildPdfAction(),
-            ] else
-              PopupMenuButton<_ReportsAppBarAction>(
-                tooltip: 'การทำงานเพิ่มเติม',
-                iconSize: isTightDesktop ? 20 : 22,
-                onSelected: (action) => _handleAppBarAction(context, action),
-                itemBuilder: (context) => const [
-                  PopupMenuItem(
-                    value: _ReportsAppBarAction.salesChart,
-                    child: ListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(Icons.bar_chart),
-                      title: Text('กราฟยอดขาย'),
-                    ),
-                  ),
-                  PopupMenuItem(
-                    value: _ReportsAppBarAction.exportCsv,
-                    child: ListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(Icons.file_download),
-                      title: Text('Export CSV'),
-                    ),
-                  ),
-                  PopupMenuItem(
-                    value: _ReportsAppBarAction.exportPdf,
-                    child: ListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(Icons.picture_as_pdf_outlined),
-                      title: Text('Export PDF'),
-                    ),
-                  ),
                 ],
               ),
-          ],
-          bottom: TabBar(
-            controller: _tabController,
-            isScrollable: true,
-            tabAlignment: TabAlignment.start,
-            labelStyle: TextStyle(
-              fontSize: context.isMobile
-                  ? 12
-                  : isTightDesktop
-                  ? 12
-                  : 13,
-              fontWeight: FontWeight.w600,
             ),
-            unselectedLabelStyle: TextStyle(
-              fontSize: context.isMobile
-                  ? 12
-                  : isTightDesktop
-                  ? 12
-                  : 13,
-              fontWeight: FontWeight.w500,
+            // ── TabBar ────────────────────────────────────────
+            Container(
+              color: topBarBg,
+              child: TabBar(
+                controller: _tabController,
+                isScrollable: true,
+                tabAlignment: TabAlignment.start,
+                labelColor: Colors.white,
+                unselectedLabelColor: Colors.white54,
+                indicatorColor: AppTheme.primary,
+                indicatorWeight: 3,
+                dividerColor: Colors.transparent,
+                labelStyle: TextStyle(
+                  fontSize: tabFontSize,
+                  fontWeight: FontWeight.w600,
+                ),
+                unselectedLabelStyle: TextStyle(
+                  fontSize: tabFontSize,
+                  fontWeight: FontWeight.w500,
+                ),
+                tabs: const [
+                  Tab(icon: Icon(Icons.shopping_cart), text: 'การขาย'),
+                  Tab(icon: Icon(Icons.shopping_bag), text: 'การซื้อ'),
+                  Tab(icon: Icon(Icons.warehouse), text: 'สต๊อก'),
+                  Tab(icon: Icon(Icons.account_balance), text: 'การเงิน'),
+                ],
+              ),
             ),
-            tabs: const [
-              Tab(icon: Icon(Icons.shopping_cart), text: 'การขาย'),
-              Tab(icon: Icon(Icons.shopping_bag), text: 'การซื้อ'),
-              Tab(icon: Icon(Icons.warehouse), text: 'สต๊อก'),
-              Tab(icon: Icon(Icons.account_balance), text: 'การเงิน'),
-            ],
-          ),
-        ),
-        body: TabBarView(
-          controller: _tabController,
-          children: [
-            _tabShell(context, _buildSalesTab()),
-            _tabShell(context, _buildPurchaseTab()),
-            _tabShell(context, _buildInventoryTab()),
-            _tabShell(context, _buildFinancialTab()),
+            // ── Tab content ───────────────────────────────────
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _tabShell(context, _buildSalesTab()),
+                  _tabShell(context, _buildPurchaseTab()),
+                  _tabShell(context, _buildInventoryTab()),
+                  _tabShell(context, _buildFinancialTab()),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -638,58 +716,19 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
-        final isMobile = context.isMobile;
-        final cols = width >= 1360
-            ? 4
-            : width >= 1152
-            ? 3
-            : 2;
-        final aspectRatio = isMobile
-            ? 1.35
-            : width >= 1360
-            ? 2.6
-            : width >= 1152
-            ? 2.25
-            : 1.8;
-        final spacing = width < 1080
-            ? 10.0
-            : width < 1280
-            ? 12.0
-            : 14.0;
-
-        return GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: cols,
-          childAspectRatio: aspectRatio,
-          crossAxisSpacing: context.isMobile ? 10 : spacing,
-          mainAxisSpacing: context.isMobile ? 10 : spacing,
-          children: [
-            _summaryCard(
-              'ยอดขายรวม',
-              '฿${_fmt.format(s.totalSales)}',
-              Icons.attach_money,
-              Colors.green,
-            ),
-            _summaryCard(
-              'จำนวนออเดอร์',
-              _fmtInt.format(s.totalOrders),
-              Icons.shopping_cart,
-              Colors.blue,
-            ),
-            _summaryCard(
-              'เฉลี่ย/ออเดอร์',
-              '฿${_fmt.format(s.avgOrderValue)}',
-              Icons.analytics,
-              Colors.orange,
-            ),
-            _summaryCard(
-              'ส่วนลดรวม',
-              '฿${_fmt.format(s.totalDiscount)}',
-              Icons.discount,
-              Colors.red,
-            ),
-          ],
+        final cols = width >= 700 ? 4 : 2;
+        const spacing = 8.0;
+        final cardW = (width - spacing * (cols - 1)) / cols;
+        final cards = [
+          _summaryCard('ยอดขายรวม', '฿${_fmt.format(s.totalSales)}', Icons.attach_money, Colors.green),
+          _summaryCard('จำนวนออเดอร์', _fmtInt.format(s.totalOrders), Icons.shopping_cart, Colors.blue),
+          _summaryCard('เฉลี่ย/ออเดอร์', '฿${_fmt.format(s.avgOrderValue)}', Icons.analytics, Colors.orange),
+          _summaryCard('ส่วนลดรวม', '฿${_fmt.format(s.totalDiscount)}', Icons.discount, Colors.red),
+        ];
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: cards.map((c) => SizedBox(width: cardW, child: c)).toList(),
         );
       },
     );
@@ -766,49 +805,18 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
-        final cols = width >= 1280
-            ? 3
-            : width >= 1024
-            ? 2
-            : 1;
-        final aspectRatio = width >= 1280
-            ? 2.6
-            : width >= 1024
-            ? 2.05
-            : 2.8;
-        final spacing = width < 1080
-            ? 10.0
-            : width < 1280
-            ? 12.0
-            : 14.0;
-
-        return GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: cols,
-          childAspectRatio: aspectRatio,
-          crossAxisSpacing: context.isMobile ? 10 : spacing,
-          mainAxisSpacing: context.isMobile ? 10 : spacing,
-          children: [
-            _summaryCard(
-              'ใบสั่งซื้อทั้งหมด',
-              _fmtInt.format(data['total_po'] ?? 0),
-              Icons.receipt,
-              Colors.red,
-            ),
-            _summaryCard(
-              'มูลค่าสั่งซื้อรวม',
-              '฿${_fmt.format((data['total_po_amount'] ?? 0.0) as num)}',
-              Icons.payments,
-              Colors.orange,
-            ),
-            _summaryCard(
-              'ใบรับสินค้า',
-              _fmtInt.format(data['total_gr'] ?? 0),
-              Icons.inventory_2,
-              Colors.blue,
-            ),
-          ],
+        final cols = width >= 600 ? 3 : width >= 400 ? 2 : 1;
+        const spacing = 8.0;
+        final cardW = (width - spacing * (cols - 1)) / cols;
+        final cards = [
+          _summaryCard('ใบสั่งซื้อทั้งหมด', _fmtInt.format(data['total_po'] ?? 0), Icons.receipt, Colors.red),
+          _summaryCard('มูลค่าสั่งซื้อรวม', '฿${_fmt.format((data['total_po_amount'] ?? 0.0) as num)}', Icons.payments, Colors.orange),
+          _summaryCard('ใบรับสินค้า', _fmtInt.format(data['total_gr'] ?? 0), Icons.inventory_2, Colors.blue),
+        ];
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: cards.map((c) => SizedBox(width: cardW, child: c)).toList(),
         );
       },
     );
@@ -1339,70 +1347,167 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
     final outflow = data['outflow'] as Map<String, dynamic>? ?? {};
     final netCash = (data['net_cash_flow'] as num?)?.toDouble() ?? 0;
 
-    return _panelCard(
-      child: Padding(
-        padding: context.cardPadding,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'รายรับ (Inflow)',
-              style: TextStyle(
-                fontSize: 13,
-                color: AppTheme.successColor,
-                fontWeight: FontWeight.w700,
-              ),
+    // ยอดขายเครดิตที่ยังไม่รับเงิน — ไม่รวมในกระแสเงินสด
+    final creditPending = (data['credit_sales_pending'] as num?)?.toDouble() ?? 0;
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Column(
+      children: [
+        _panelCard(
+          child: Padding(
+            padding: context.cardPadding,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'รายรับ (Inflow)',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppTheme.successColor,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                _plRow(
+                  '  ยอดขาย POS (เงินสด/โอน/บัตร)',
+                  (inflow['pos_sales'] as num?) ?? 0,
+                  AppTheme.successColor,
+                ),
+                _plRow(
+                  '  รับชำระ AR',
+                  (inflow['ar_receipts'] as num?) ?? 0,
+                  AppTheme.successColor,
+                ),
+                _plRow(
+                  'รวมรายรับ',
+                  (inflow['total'] as num?) ?? 0,
+                  AppTheme.successColor,
+                  bold: true,
+                ),
+                const Divider(),
+                Text(
+                  'รายจ่าย (Outflow)',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppTheme.errorColor,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                _plRow(
+                  '  จ่ายชำระ AP',
+                  (outflow['ap_payments'] as num?) ?? 0,
+                  AppTheme.errorColor,
+                  isNegative: true,
+                ),
+                _plRow(
+                  'รวมรายจ่าย',
+                  (outflow['total'] as num?) ?? 0,
+                  AppTheme.errorColor,
+                  bold: true,
+                  isNegative: true,
+                ),
+                const Divider(),
+                _plRow(
+                  'กระแสเงินสดสุทธิ',
+                  netCash,
+                  netCash >= 0 ? AppTheme.successColor : AppTheme.errorColor,
+                  bold: true,
+                ),
+              ],
             ),
-            const SizedBox(height: 4),
-            _plRow(
-              '  ยอดขาย POS',
-              (inflow['pos_sales'] as num?) ?? 0,
-              AppTheme.successColor,
-            ),
-            _plRow(
-              '  รับชำระ AR',
-              (inflow['ar_receipts'] as num?) ?? 0,
-              AppTheme.successColor,
-            ),
-            _plRow(
-              'รวมรายรับ',
-              (inflow['total'] as num?) ?? 0,
-              AppTheme.successColor,
-              bold: true,
-            ),
-            const Divider(),
-            Text(
-              'รายจ่าย (Outflow)',
-              style: TextStyle(
-                fontSize: 13,
-                color: AppTheme.errorColor,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 4),
-            _plRow(
-              '  จ่ายชำระ AP',
-              (outflow['ap_payments'] as num?) ?? 0,
-              AppTheme.errorColor,
-              isNegative: true,
-            ),
-            _plRow(
-              'รวมรายจ่าย',
-              (outflow['total'] as num?) ?? 0,
-              AppTheme.errorColor,
-              bold: true,
-              isNegative: true,
-            ),
-            const Divider(),
-            _plRow(
-              'กระแสเงินสดสุทธิ',
-              netCash,
-              netCash >= 0 ? AppTheme.successColor : AppTheme.errorColor,
-              bold: true,
-            ),
-          ],
+          ),
         ),
-      ),
+        // ── ยอดขายเครดิตที่รอรับเงิน (ไม่รวมในกระแสเงินสด) ─────
+        if (creditPending > 0) ...[
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: isDark
+                  ? const Color(0xFF1A2535)
+                  : const Color(0xFFFFF8E1),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: AppTheme.warning.withValues(alpha: 0.4),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.account_balance_wallet_outlined,
+                  size: 18,
+                  color: AppTheme.warning,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'ยอดขายเครดิตที่รอรับเงิน',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? Colors.white70 : Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'ยอดนี้ยังไม่รวมในกระแสเงินสด จะรวมเมื่อลูกค้าชำระแล้ว',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: isDark ? Colors.white38 : Colors.black45,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Text(
+                  '฿${_fmt.format(creditPending)}',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.warning,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ] else ...[
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: isDark
+                  ? const Color(0xFF0F1E0F)
+                  : const Color(0xFFF1F8E9),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: AppTheme.success.withValues(alpha: 0.3),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.check_circle_outline,
+                  size: 16,
+                  color: AppTheme.success,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'ยอดขายเครดิตไม่รวมในกระแสเงินสด จนกว่าลูกค้าจะชำระ',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDark ? Colors.white54 : Colors.black54,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
     );
   }
 
@@ -1636,41 +1741,27 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
   Widget _sectionTitle(String title, IconData icon, Color color) {
     final width = MediaQuery.sizeOf(context).width;
     final isTightDesktop = context.isDesktopOrWider && width < 1080;
-    final isMediumDesktop =
-        context.isDesktopOrWider && width >= 1080 && width < 1280;
-    final iconBoxSize = isTightDesktop
-        ? 30.0
-        : isMediumDesktop
-        ? 32.0
-        : 34.0;
-    final iconSize = isTightDesktop
-        ? 16.0
-        : isMediumDesktop
-        ? 17.0
-        : 18.0;
-    final titleFontSize = isTightDesktop ? 14.0 : 15.0;
-    final bottomSpacing = isTightDesktop ? 10.0 : 12.0;
 
     return Padding(
-      padding: EdgeInsets.only(bottom: bottomSpacing),
+      padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         children: [
           Container(
-            width: iconBoxSize,
-            height: iconBoxSize,
+            width: 26,
+            height: 26,
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(icon, color: color, size: iconSize),
+            child: Icon(icon, color: color, size: 14),
           ),
-          SizedBox(width: isTightDesktop ? 8 : 10),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
               title,
               style: TextStyle(
-                fontSize: titleFontSize,
-                fontWeight: FontWeight.w700,
+                fontSize: isTightDesktop ? 12.5 : 13.0,
+                fontWeight: FontWeight.w600,
                 color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
@@ -1681,116 +1772,52 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
   }
 
   Widget _summaryCard(String title, String value, IconData icon, Color color) {
-    final width = MediaQuery.sizeOf(context).width;
-    final isMobile = context.isMobile;
-    final isTightDesktop = context.isDesktopOrWider && width < 1080;
-    final isMediumDesktop =
-        context.isDesktopOrWider && width >= 1080 && width < 1280;
-    final iconBoxSize = isMobile
-        ? 34.0
-        : isTightDesktop
-        ? 36.0
-        : isMediumDesktop
-        ? 40.0
-        : 42.0;
-    final valueFontSize = isMobile
-        ? 13.0
-        : isTightDesktop
-        ? 15.0
-        : isMediumDesktop
-        ? 16.5
-        : 18.0;
-
-    return _panelCard(
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final stacked = constraints.maxWidth < 220;
-
-          return Padding(
-            padding: EdgeInsets.all(isMobile ? 10 : context.cardPadding.left),
-            child: stacked
-                ? Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: iconBoxSize,
-                        height: iconBoxSize,
-                        decoration: BoxDecoration(
-                          color: color.withValues(alpha: 0.14),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Icon(icon, size: isMobile ? 18 : 20, color: color),
-                      ),
-                      SizedBox(height: isMobile ? 8 : (isTightDesktop ? 8 : 10)),
-                      Text(
-                        value,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: valueFontSize,
-                          fontWeight: FontWeight.w700,
-                          color: color,
-                          height: 1,
-                        ),
-                      ),
-                      SizedBox(height: isMobile ? 2 : 4),
-                      Text(
-                        title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: _cardSubtitleStyle(),
-                      ),
-                    ],
-                  )
-                : Row(
-                    children: [
-                      Container(
-                        width: iconBoxSize,
-                        height: iconBoxSize,
-                        decoration: BoxDecoration(
-                          color: color.withValues(alpha: 0.14),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Icon(icon, size: 20, color: color),
-                      ),
-                      SizedBox(
-                        width: context.isMobile
-                            ? 10
-                            : isTightDesktop
-                            ? 10
-                            : 12,
-                      ),
-                      Expanded(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              value,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: valueFontSize,
-                                fontWeight: FontWeight.w700,
-                                color: color,
-                                height: 1,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              title,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: _cardSubtitleStyle(),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        border: Border.all(color: AppTheme.borderColorOf(context)),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, size: 16, color: color),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: color,
+                    height: 1.1,
                   ),
-          );
-        },
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: _cardSubtitleStyle(),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

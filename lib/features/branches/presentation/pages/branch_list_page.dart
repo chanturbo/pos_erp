@@ -52,97 +52,12 @@ class _BranchListPageState extends ConsumerState<BranchListPage> {
     final syncAsync = ref.watch(syncStatusProvider);
     final canPop = Navigator.of(context).canPop();
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final topBarBg = isDark ? AppTheme.navyDark : AppTheme.navy;
+
     return EscapePopScope(
       child: Scaffold(
         backgroundColor: AppTheme.surfaceColorOf(context),
-        appBar: AppBar(
-          leading: buildMobileHomeLeading(context),
-          automaticallyImplyLeading: canPop,
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('จัดการสาขา'),
-              Text(
-                'ดูแลข้อมูลสาขา คลังสินค้า และสถานะการเชื่อมต่อ',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.white.withValues(alpha: 0.65),
-                  fontWeight: FontWeight.normal,
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            syncAsync.when(
-              data: (sync) => IconButton(
-                icon: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Icon(
-                      sync.isOnline ? Icons.sync_rounded : Icons.sync_disabled,
-                      color: sync.isOnline ? Colors.white : Colors.red.shade200,
-                    ),
-                    if (sync.hasPending)
-                      Positioned(
-                        right: -1,
-                        top: -1,
-                        child: Container(
-                          width: 10,
-                          height: 10,
-                          decoration: const BoxDecoration(
-                            color: Colors.orange,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                tooltip: sync.pendingCount > 0
-                    ? 'รอ Sync ${sync.pendingCount} รายการ'
-                    : 'สถานะการ Sync',
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const SyncStatusPage()),
-                ),
-              ),
-              loading: () => const SizedBox(
-                width: 48,
-                child: Center(
-                  child: SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 2,
-                    ),
-                  ),
-                ),
-              ),
-              error: (_, _) => IconButton(
-                icon: const Icon(Icons.sync_problem),
-                tooltip: 'สถานะการ Sync',
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const SyncStatusPage()),
-                ),
-              ),
-            ),
-            IconButton(
-              icon: Icon(
-                _isCardView ? Icons.view_list_rounded : Icons.grid_view,
-              ),
-              tooltip: _isCardView
-                  ? 'เปลี่ยนเป็น ListView'
-                  : 'เปลี่ยนเป็น CardView',
-              onPressed: () => setState(() => _isCardView = !_isCardView),
-            ),
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              tooltip: 'รีเฟรชข้อมูล',
-              onPressed: _refreshAll,
-            ),
-          ],
-        ),
         floatingActionButton: FloatingActionButton.extended(
           onPressed: () => _openForm(context, null),
           backgroundColor: AppTheme.primary,
@@ -150,16 +65,193 @@ class _BranchListPageState extends ConsumerState<BranchListPage> {
           icon: const Icon(Icons.add_business_outlined),
           label: const Text('เพิ่มสาขา'),
         ),
-        body: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: context.contentMaxWidth),
-            child: branchesAsync.when(
-              loading: () => _buildLoadingState(context),
-              error: (e, _) => _buildErrorState(context, '$e'),
-              data: (branches) => _buildContent(context, branches, syncAsync),
+        body: Column(
+          children: [
+            // ── Custom TopBar ──────────────────────────────────
+            Container(
+              color: topBarBg,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  // Home button (mobile)
+                  if (context.isMobile) ...[
+                    InkWell(
+                      onTap: () => navigateToMobileHome(context),
+                      borderRadius: BorderRadius.circular(8),
+                      child: const Padding(
+                        padding: EdgeInsets.all(6),
+                        child: Icon(Icons.home_rounded, color: Colors.white, size: 20),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  // Back button (desktop, if can pop)
+                  if (!context.isMobile && canPop) ...[
+                    InkWell(
+                      onTap: () => Navigator.of(context).pop(),
+                      borderRadius: BorderRadius.circular(8),
+                      child: const Padding(
+                        padding: EdgeInsets.all(6),
+                        child: Icon(Icons.arrow_back, color: Colors.white, size: 20),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  // Page icon
+                  Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: AppTheme.primary.withValues(alpha: 0.28),
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.store_outlined,
+                      color: AppTheme.primaryLight,
+                      size: 18,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  // Title
+                  const Text(
+                    'จัดการสาขา',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const Spacer(),
+                  // Sync status button
+                  syncAsync.when(
+                    data: (sync) => Tooltip(
+                      message: sync.pendingCount > 0
+                          ? 'รอ Sync ${sync.pendingCount} รายการ'
+                          : 'สถานะการ Sync',
+                      triggerMode: TooltipTriggerMode.longPress,
+                      child: IconButton(
+                        icon: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Icon(
+                              sync.isOnline
+                                  ? Icons.sync_rounded
+                                  : Icons.sync_disabled,
+                              color: sync.isOnline
+                                  ? Colors.white
+                                  : Colors.red.shade200,
+                            ),
+                            if (sync.hasPending)
+                              Positioned(
+                                right: -1,
+                                top: -1,
+                                child: Container(
+                                  width: 10,
+                                  height: 10,
+                                  decoration: const BoxDecoration(
+                                    color: Colors.orange,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const SyncStatusPage(),
+                          ),
+                        ),
+                      ),
+                    ),
+                    loading: () => const SizedBox(
+                      width: 48,
+                      child: Center(
+                        child: SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        ),
+                      ),
+                    ),
+                    error: (_, _) => Tooltip(
+                      message: 'สถานะการ Sync',
+                      triggerMode: TooltipTriggerMode.longPress,
+                      child: IconButton(
+                        icon: const Icon(Icons.sync_problem, color: Colors.white),
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const SyncStatusPage(),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Toggle view
+                  IconButton(
+                    icon: Icon(
+                      _isCardView ? Icons.view_list_rounded : Icons.grid_view,
+                      color: Colors.white,
+                    ),
+                    tooltip: _isCardView
+                        ? 'เปลี่ยนเป็น ListView'
+                        : 'เปลี่ยนเป็น CardView',
+                    onPressed: () => setState(() => _isCardView = !_isCardView),
+                  ),
+                  // Refresh
+                  IconButton(
+                    icon: const Icon(Icons.refresh, color: Colors.white),
+                    tooltip: 'รีเฟรชข้อมูล',
+                    onPressed: _refreshAll,
+                  ),
+                  // Badge
+                  const SizedBox(width: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: AppTheme.primary.withValues(alpha: 0.5),
+                      ),
+                    ),
+                    child: const Text(
+                      'Branches',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.primaryLight,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
+            // ── Content ───────────────────────────────────────
+            Expanded(
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: context.contentMaxWidth),
+                  child: branchesAsync.when(
+                    loading: () => _buildLoadingState(context),
+                    error: (e, _) => _buildErrorState(context, '$e'),
+                    data: (branches) =>
+                        _buildContent(context, branches, syncAsync),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

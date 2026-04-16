@@ -1525,12 +1525,13 @@ class _ItemDialogState extends State<_ItemDialog> {
   final _reasonCtrl = TextEditingController();
   ProductUnitOption? _selectedUnit;
 
-  dynamic get _product => _selectedProductId == null
-      ? null
-      : widget.products.firstWhere(
-          (p) => p.productId == _selectedProductId,
-          orElse: () => null,
-        );
+  ProductModel? get _product {
+    if (_selectedProductId == null) return null;
+    for (final p in widget.products) {
+      if (p.productId == _selectedProductId) return p;
+    }
+    return null;
+  }
 
   double get _baseQty {
     final qty = double.tryParse(_qtyCtrl.text) ?? 0;
