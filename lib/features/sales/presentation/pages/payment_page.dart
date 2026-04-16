@@ -1035,8 +1035,9 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
               Duration(days: _creditDays.toInt()),
             );
             final arData = {
+              'invoice_no': 'AR-$orderNo',
               'customer_id': cartState.customerId,
-              'customer_name': cartState.customerName,
+              'customer_name': cartState.customerName ?? 'ลูกค้าทั่วไป',
               'invoice_date': DateTime.now().toIso8601String(),
               'due_date': dueDate.toIso8601String(),
               'total_amount': netTotal,

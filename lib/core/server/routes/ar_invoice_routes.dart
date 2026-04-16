@@ -132,11 +132,13 @@ class ArInvoiceRoutes {
       final data = jsonDecode(payload) as Map<String, dynamic>;
 
       final invoiceId = 'ARINV${DateTime.now().millisecondsSinceEpoch}';
+      final invoiceNo = data['invoice_no'] as String? ??
+          'AR${DateTime.now().millisecondsSinceEpoch}';
 
       // สร้างใบแจ้งหนี้
       await db.into(db.arInvoices).insert(ArInvoicesCompanion(
             invoiceId: Value(invoiceId),
-            invoiceNo: Value(data['invoice_no'] as String),
+            invoiceNo: Value(invoiceNo),
             invoiceDate:
                 Value(DateTime.parse(data['invoice_date'] as String)),
             dueDate: Value(data['due_date'] != null
