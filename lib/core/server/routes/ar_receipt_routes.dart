@@ -43,6 +43,19 @@ class ArReceiptRoutes {
         'created_at': rec.createdAt.toIso8601String(),
       };
 
+  // ─── Helper: อัปเดตยอดค้างชำระในตาราง customers ────────────────────
+  Future<void> _updateCustomerBalance(String customerId, double delta) async {
+    final customer = await (db.select(db.customers)
+          ..where((c) => c.customerId.equals(customerId)))
+        .getSingleOrNull();
+    if (customer == null) return;
+    final newBalance = (customer.currentBalance + delta).clamp(0.0, double.infinity);
+    await (db.update(db.customers)
+          ..where((c) => c.customerId.equals(customerId)))
+        .write(CustomersCompanion(currentBalance: Value(newBalance)));
+    print('💰 Customer $customerId balance: ${customer.currentBalance} → $newBalance (delta: $delta)');
+  }
+
   // ─── GET / — รายการใบเสร็จรับเงินทั้งหมด ─────────────────────────────
   Future<Response> _getReceiptsHandler(Request request) async {
     try {
@@ -201,6 +214,11 @@ class ArReceiptRoutes {
         }
       }
 
+      // ── ลดยอดค้างชำระในตาราง customers ──────────────────────────
+      final customerId = data['customer_id'] as String;
+      final totalAmount = (data['total_amount'] as num).toDouble();
+      await _updateCustomerBalance(customerId, -totalAmount);
+
       print('✅ ArReceiptRoutes: Created receipt: $receiptId');
 
       return Response.ok(
@@ -265,6 +283,9 @@ class ArReceiptRoutes {
           ));
         }
       }
+
+      // ── คืนยอดค้างชำระในตาราง customers ─────────────────────────
+      await _updateCustomerBalance(receipt.customerId, receipt.totalAmount);
 
       // ลบ Allocations
       await (db.delete(db.arReceiptAllocations)

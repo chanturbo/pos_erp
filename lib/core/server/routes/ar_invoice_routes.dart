@@ -123,6 +123,19 @@ class ArInvoiceRoutes {
     }
   }
 
+  // ─── Helper: อัปเดตยอดค้างชำระในตาราง customers ────────────────────
+  Future<void> _updateCustomerBalance(String customerId, double delta) async {
+    final customer = await (db.select(db.customers)
+          ..where((c) => c.customerId.equals(customerId)))
+        .getSingleOrNull();
+    if (customer == null) return;
+    final newBalance = (customer.currentBalance + delta).clamp(0.0, double.infinity);
+    await (db.update(db.customers)
+          ..where((c) => c.customerId.equals(customerId)))
+        .write(CustomersCompanion(currentBalance: Value(newBalance)));
+    print('💰 Customer $customerId balance: ${customer.currentBalance} → $newBalance (delta: $delta)');
+  }
+
   // ─── POST / — สร้างใบแจ้งหนี้ ─────────────────────────────────────────
   Future<Response> _createInvoiceHandler(Request request) async {
     try {
@@ -180,6 +193,11 @@ class ArInvoiceRoutes {
               ));
         }
       }
+
+      // ── เพิ่มยอดค้างชำระในตาราง customers ──────────────────────
+      final customerId = data['customer_id'] as String;
+      final totalAmount = (data['total_amount'] as num).toDouble();
+      await _updateCustomerBalance(customerId, totalAmount);
 
       print('✅ ArInvoiceRoutes: Created invoice: $invoiceId');
 
@@ -266,6 +284,10 @@ class ArInvoiceRoutes {
           headers: {'Content-Type': 'application/json'},
         );
       }
+
+      // ── ลดยอดค้างชำระ (เฉพาะส่วนที่ยังค้างอยู่) ─────────────────
+      final remaining = invoice.totalAmount - invoice.paidAmount;
+      await _updateCustomerBalance(invoice.customerId, -remaining);
 
       // ลบรายการสินค้าก่อน
       await (db.delete(db.arInvoiceItems)
