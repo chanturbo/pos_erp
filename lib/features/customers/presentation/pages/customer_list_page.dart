@@ -1245,6 +1245,7 @@ class _CustomerTableHeader extends StatelessWidget {
               maxWidth: colMaxW[i],
               isActive: isActive,
               sortAsc: sortAsc,
+              rightAligned: sortKey == 'creditLimit',
               isLast: i == _cols.length - 1,
               onSort: sortKey.isNotEmpty ? () => onSort(sortKey) : null,
               onResize: (delta) {
@@ -1285,6 +1286,7 @@ class _ResizableHeaderCell extends StatefulWidget {
   final double maxWidth;
   final bool isActive;
   final bool sortAsc;
+  final bool rightAligned;
   final bool isLast;
   final VoidCallback? onSort;
   final void Function(double delta) onResize;
@@ -1296,6 +1298,7 @@ class _ResizableHeaderCell extends StatefulWidget {
     required this.maxWidth,
     required this.isActive,
     required this.sortAsc,
+    this.rightAligned = false,
     required this.isLast,
     required this.onSort,
     required this.onResize,
@@ -1332,15 +1335,20 @@ class _ResizableHeaderCellState extends State<_ResizableHeaderCell> {
                       ),
                       child: Row(
                         children: [
-                          Flexible(
-                            child: Text(
-                              widget.label,
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: labelColor,
+                          Expanded(
+                            child: Align(
+                              alignment: widget.rightAligned
+                                  ? Alignment.centerRight
+                                  : Alignment.centerLeft,
+                              child: Text(
+                                widget.label,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: labelColor,
+                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
-                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           const SizedBox(width: 3),
@@ -1361,14 +1369,19 @@ class _ResizableHeaderCellState extends State<_ResizableHeaderCell> {
                   )
                 : Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 2),
-                    child: Text(
-                      widget.label,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: inactiveColor,
+                    child: Align(
+                      alignment: widget.rightAligned
+                          ? Alignment.centerRight
+                          : Alignment.centerLeft,
+                      child: Text(
+                        widget.label,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: inactiveColor,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
           ),
@@ -1533,16 +1546,19 @@ class _CustomerRowState extends State<_CustomerRow> {
                 ),
                 SizedBox(
                   width: w[5],
-                  child: Text(
-                    customer.creditLimit > 0
-                        ? '฿${NumberFormat('#,##0').format(customer.creditLimit)}'
-                        : '-',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: customer.creditLimit > 0
-                          ? colors.amountText
-                          : colors.subtext,
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Text(
+                      customer.creditLimit > 0
+                          ? '฿${NumberFormat('#,##0').format(customer.creditLimit)}'
+                          : '-',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: customer.creditLimit > 0
+                            ? colors.amountText
+                            : colors.subtext,
+                      ),
                     ),
                   ),
                 ),

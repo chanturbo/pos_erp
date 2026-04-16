@@ -295,9 +295,12 @@ class SupplierPdfBuilder {
       decoration: const pw.BoxDecoration(
         border: pw.Border(top: pw.BorderSide(color: _kBorder, width: 0.5)),
       ),
-      child: pw.Text(
-        '$companyName — รายงานรายการซัพพลายเออร์',
-        style: pw.TextStyle(font: ttfRegular, fontSize: 7, color: _kSub),
+      child: pw.Align(
+        alignment: pw.Alignment.centerRight,
+        child: pw.Text(
+          companyName,
+          style: pw.TextStyle(font: ttfRegular, fontSize: 7, color: _kSub),
+        ),
       ),
     );
   }

@@ -352,9 +352,12 @@ class StockMovementHistoryPdfBuilder {
         pw.SizedBox(height: 8),
         pw.Container(height: 0.5, color: _kBorder),
         pw.SizedBox(height: 4),
-        pw.Text(
-          'พิมพ์จากระบบของ $companyName',
-          style: pw.TextStyle(font: ttfRegular, fontSize: 8, color: _kSub),
+        pw.Align(
+          alignment: pw.Alignment.centerRight,
+          child: pw.Text(
+            companyName,
+            style: pw.TextStyle(font: ttfRegular, fontSize: 8, color: _kSub),
+          ),
         ),
       ],
     );

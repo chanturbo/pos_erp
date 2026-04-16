@@ -1745,7 +1745,7 @@ class _ItemDialogState extends State<_ItemDialog> {
                             vertical: 10,
                           ),
                         ),
-                        items: (_product!.allUnits as List<ProductUnitOption>)
+                        items: _product!.allUnits
                             .map<DropdownMenuItem<String>>(
                               (u) => DropdownMenuItem(
                                 value: u.unit,
@@ -1765,9 +1765,9 @@ class _ItemDialogState extends State<_ItemDialog> {
                             )
                             .toList(),
                         onChanged: (v) => setState(() {
-                          _selectedUnit =
-                              (_product!.allUnits as List<ProductUnitOption>)
-                                  .firstWhere((u) => u.unit == v);
+                          _selectedUnit = _product!.allUnits.firstWhere(
+                            (u) => u.unit == v,
+                          );
                         }),
                       ),
                       const SizedBox(height: 12),

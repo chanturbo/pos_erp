@@ -350,9 +350,9 @@ class ApPaymentPdfBuilder {
     final methodBg = _methodBg(p.paymentMethod);
 
     return pw.Container(
-      color: isEven ? _kAltRow : PdfColors.white,
       padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: pw.BoxDecoration(
+        color: isEven ? _kAltRow : PdfColors.white,
         border: const pw.Border(
           bottom: pw.BorderSide(color: _kBorder, width: 0.3),
         ),

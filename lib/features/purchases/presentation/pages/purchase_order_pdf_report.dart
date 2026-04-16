@@ -16,6 +16,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import '../../../settings/shared/settings_defaults.dart';
+import '../../data/models/purchase_order_item_model.dart';
 import '../../data/models/purchase_order_model.dart';
 
 const _kBorder = PdfColor.fromInt(0xFFBBBBBB);
@@ -65,6 +66,34 @@ class PurchaseOrderPdfBuilder {
       ttfR: ttfRegular,
     );
 
+    if (orders.length == 1) {
+      final order = orders.first;
+      doc.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(24),
+          build: (_) => [
+            _buildHeader(
+              companyName: effectiveCompanyName,
+              printedAt: printedAt,
+              page: 1,
+              totalPages: 1,
+              summaryLine: summaryLine,
+              summaryRow: summaryRow,
+              ttf: ttf,
+              ttfR: ttfRegular,
+            ),
+            _buildSingleOrderSection(order, ttf: ttf, ttfR: ttfRegular),
+          ],
+          footer: (_) => _buildFooter(
+            companyName: effectiveCompanyName,
+            ttfR: ttfRegular,
+          ),
+        ),
+      );
+      return doc;
+    }
+
     final rowsPerPage = await SettingsStorage.getPdfReportRowsPerPage(
       PdfReportType.purchaseOrder,
     );
@@ -113,6 +142,245 @@ class PurchaseOrderPdfBuilder {
     }
 
     return doc;
+  }
+
+  static pw.Widget _buildSingleOrderSection(
+    PurchaseOrderModel order, {
+    required pw.Font ttf,
+    required pw.Font ttfR,
+  }) {
+    pw.Widget metaCell(String label, String value) => pw.Expanded(
+      child: pw.Container(
+        padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: pw.BoxDecoration(
+          color: const PdfColor.fromInt(0xFFF8F8F8),
+          border: pw.Border.all(color: _kBorder, width: 0.5),
+          borderRadius: const pw.BorderRadius.all(pw.Radius.circular(3)),
+        ),
+        child: pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Text(
+              label,
+              style: pw.TextStyle(font: ttfR, fontSize: 8, color: _kSub),
+            ),
+            pw.SizedBox(height: 2),
+            pw.Text(
+              value,
+              style: pw.TextStyle(font: ttf, fontSize: 9, color: _kText),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+      children: [
+        pw.Text(
+          'รายละเอียดใบสั่งซื้อ ${order.poNo}',
+          style: pw.TextStyle(font: ttf, fontSize: 12, color: _kNavy),
+        ),
+        pw.SizedBox(height: 8),
+        pw.Row(
+          children: [
+            metaCell('เลขที่ PO', order.poNo),
+            pw.SizedBox(width: 8),
+            metaCell('วันที่สั่งซื้อ', _date.format(order.poDate)),
+            pw.SizedBox(width: 8),
+            metaCell(
+              'วันกำหนดส่ง',
+              order.deliveryDate != null ? _date.format(order.deliveryDate!) : '-',
+            ),
+          ],
+        ),
+        pw.SizedBox(height: 8),
+        pw.Row(
+          children: [
+            metaCell('ผู้จัดจำหน่าย', order.supplierName ?? '-'),
+            pw.SizedBox(width: 8),
+            metaCell('คลัง', order.warehouseName ?? '-'),
+            pw.SizedBox(width: 8),
+            metaCell('สถานะ', _statusLabel(order.status)),
+          ],
+        ),
+        if (order.remark != null && order.remark!.trim().isNotEmpty) ...[
+          pw.SizedBox(height: 8),
+          pw.Container(
+            padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            decoration: pw.BoxDecoration(
+              color: const PdfColor.fromInt(0xFFF8F8F8),
+              border: pw.Border.all(color: _kBorder, width: 0.5),
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(3)),
+            ),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  'หมายเหตุ',
+                  style: pw.TextStyle(font: ttfR, fontSize: 8, color: _kSub),
+                ),
+                pw.SizedBox(height: 2),
+                pw.Text(
+                  order.remark!,
+                  style: pw.TextStyle(font: ttfR, fontSize: 9, color: _kText),
+                ),
+              ],
+            ),
+          ),
+        ],
+        pw.SizedBox(height: 10),
+        _buildItemsTable(order.items ?? const [], ttf: ttf, ttfR: ttfR),
+        pw.SizedBox(height: 10),
+        pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.end,
+          children: [
+            pw.Container(
+              width: 210,
+              padding: const pw.EdgeInsets.all(8),
+              decoration: pw.BoxDecoration(
+                color: const PdfColor.fromInt(0xFFF8F8F8),
+                border: pw.Border.all(color: _kBorder, width: 0.5),
+                borderRadius: const pw.BorderRadius.all(pw.Radius.circular(3)),
+              ),
+              child: pw.Column(
+                children: [
+                  _buildAmountRow('ยอดก่อนส่วนลด', '฿${_money.format(order.subtotal)}', ttfR),
+                  _buildAmountRow(
+                    'ส่วนลด',
+                    order.discountAmount > 0
+                        ? '-฿${_money.format(order.discountAmount)}'
+                        : '-',
+                    ttfR,
+                  ),
+                  _buildAmountRow('VAT', '฿${_money.format(order.vatAmount)}', ttfR),
+                  pw.Divider(color: _kBorder, height: 8),
+                  _buildAmountRow(
+                    'ยอดรวมสุทธิ',
+                    '฿${_money.format(order.totalAmount)}',
+                    ttf,
+                    color: _kDone,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  static pw.Widget _buildItemsTable(
+    List<PurchaseOrderItemModel> items, {
+    required pw.Font ttf,
+    required pw.Font ttfR,
+  }) {
+    if (items.isEmpty) {
+      return pw.Container(
+        padding: const pw.EdgeInsets.all(12),
+        decoration: pw.BoxDecoration(
+          border: pw.Border.all(color: _kBorder, width: 0.5),
+          borderRadius: const pw.BorderRadius.all(pw.Radius.circular(3)),
+        ),
+        child: pw.Text(
+          'ไม่พบรายการสินค้าในใบสั่งซื้อนี้',
+          style: pw.TextStyle(font: ttfR, fontSize: 9, color: _kSub),
+        ),
+      );
+    }
+
+    pw.Widget cell(
+      String text,
+      pw.Font font, {
+      pw.Alignment align = pw.Alignment.centerLeft,
+      PdfColor? color,
+      PdfColor? bgColor,
+    }) => pw.Container(
+      color: bgColor,
+      padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 5),
+      alignment: align,
+      child: pw.Text(
+        text,
+        style: pw.TextStyle(font: font, fontSize: 8, color: color ?? _kText),
+      ),
+    );
+
+    return pw.Table(
+      columnWidths: const {
+        0: pw.FixedColumnWidth(24),
+        1: pw.FixedColumnWidth(64),
+        2: pw.FlexColumnWidth(1),
+        3: pw.FixedColumnWidth(64),
+        4: pw.FixedColumnWidth(64),
+        5: pw.FixedColumnWidth(72),
+      },
+      border: pw.TableBorder.all(color: _kBorder, width: 0.5),
+      children: [
+        pw.TableRow(
+          decoration: const pw.BoxDecoration(color: _kHdrBg),
+          children: [
+            cell('#', ttf, align: pw.Alignment.center),
+            cell('รหัสสินค้า', ttf),
+            cell('สินค้า', ttf),
+            cell('จำนวน', ttf, align: pw.Alignment.center),
+            cell('ราคา/หน่วย', ttf, align: pw.Alignment.centerRight),
+            cell('รวม', ttf, align: pw.Alignment.centerRight),
+          ],
+        ),
+        ...items.asMap().entries.map((entry) {
+          final index = entry.key;
+          final item = entry.value;
+          final bg = index.isEven ? _kAltRow : null;
+          final qty = item.quantity % 1 == 0
+              ? item.quantity.toStringAsFixed(0)
+              : item.quantity.toStringAsFixed(2);
+          return pw.TableRow(
+            children: [
+              cell('${index + 1}', ttfR, align: pw.Alignment.center, bgColor: bg),
+              cell(item.productCode ?? '-', ttfR, bgColor: bg),
+              cell(item.productName ?? '-', ttfR, bgColor: bg),
+              cell('$qty ${item.unit ?? ''}', ttfR, align: pw.Alignment.center, bgColor: bg),
+              cell(
+                _money.format(item.unitPrice),
+                ttfR,
+                align: pw.Alignment.centerRight,
+                bgColor: bg,
+              ),
+              cell(
+                _money.format(item.amount),
+                ttfR,
+                align: pw.Alignment.centerRight,
+                bgColor: bg,
+              ),
+            ],
+          );
+        }),
+      ],
+    );
+  }
+
+  static pw.Widget _buildAmountRow(
+    String label,
+    String value,
+    pw.Font font, {
+    PdfColor color = _kText,
+  }) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(vertical: 2),
+      child: pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        children: [
+          pw.Text(
+            label,
+            style: pw.TextStyle(font: font, fontSize: 8, color: _kSub),
+          ),
+          pw.Text(
+            value,
+            style: pw.TextStyle(font: font, fontSize: 8.5, color: color),
+          ),
+        ],
+      ),
+    );
   }
 
   // ── helpers ──────────────────────────────────────────────────────
@@ -371,9 +639,12 @@ class PurchaseOrderPdfBuilder {
     decoration: const pw.BoxDecoration(
       border: pw.Border(top: pw.BorderSide(color: _kBorder, width: 0.5)),
     ),
-    child: pw.Text(
-      '$companyName — รายงานใบสั่งซื้อ',
-      style: pw.TextStyle(font: ttfR, fontSize: 7, color: _kSub),
+    child: pw.Align(
+      alignment: pw.Alignment.centerRight,
+      child: pw.Text(
+        companyName,
+        style: pw.TextStyle(font: ttfR, fontSize: 7, color: _kSub),
+      ),
     ),
   );
 }

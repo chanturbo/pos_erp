@@ -55,7 +55,7 @@ class _ApInvoiceFormPageState extends ConsumerState<ApInvoiceFormPage> {
       _supplierName = inv.supplierName;
       _referenceType = inv.referenceType;
       _referenceId = inv.referenceId;
-      _isViewMode = inv.status == 'PAID';
+      _isViewMode = inv.status == 'PAID' || inv.status == 'PARTIAL';
       if (inv.items != null) _items.addAll(inv.items!);
     } else {
       final ts = DateTime.now().millisecondsSinceEpoch;
@@ -203,39 +203,37 @@ class _ApInvoiceFormPageState extends ConsumerState<ApInvoiceFormPage> {
             ),
 
             // ── Bottom Action Bar ─────────────────────────────────
-            if (!_isViewMode)
-              Container(
-                color: isDark ? AppTheme.darkTopBar : Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 14,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    OutlinedButton(
-                      onPressed: _isLoading
-                          ? null
-                          : () => Navigator.pop(context),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 12,
-                        ),
-                        side: BorderSide(
-                          color: isDark ? Colors.white24 : AppTheme.border,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
+            Container(
+              color: isDark ? AppTheme.darkTopBar : Colors.white,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 14,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  OutlinedButton(
+                    onPressed: _isLoading ? null : () => Navigator.pop(context),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
                       ),
-                      child: Text(
-                        'ยกเลิก',
-                        style: TextStyle(
-                          color: isDark ? Colors.white60 : AppTheme.textSub,
-                        ),
+                      side: BorderSide(
+                        color: isDark ? Colors.white24 : AppTheme.border,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
                       ),
                     ),
+                    child: Text(
+                      _isViewMode ? 'ปิด' : 'ยกเลิก',
+                      style: TextStyle(
+                        color: isDark ? Colors.white60 : AppTheme.textSub,
+                      ),
+                    ),
+                  ),
+                  if (!_isViewMode) ...[
                     const SizedBox(width: 12),
                     ElevatedButton.icon(
                       onPressed: _isLoading ? null : _saveInvoice,
@@ -267,8 +265,9 @@ class _ApInvoiceFormPageState extends ConsumerState<ApInvoiceFormPage> {
                       ),
                     ),
                   ],
-                ),
+                ],
               ),
+            ),
           ],
         ),
       ),

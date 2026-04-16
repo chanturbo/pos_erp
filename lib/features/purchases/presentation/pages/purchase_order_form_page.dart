@@ -19,6 +19,11 @@ class PurchaseOrderFormPage extends ConsumerStatefulWidget {
   final PurchaseOrderModel? order;
   const PurchaseOrderFormPage({super.key, this.order});
 
+  bool get readOnly {
+    final s = order?.status;
+    return s != null && s != 'DRAFT';
+  }
+
   @override
   ConsumerState<PurchaseOrderFormPage> createState() =>
       _PurchaseOrderFormPageState();
@@ -94,6 +99,7 @@ class _PurchaseOrderFormPageState extends ConsumerState<PurchaseOrderFormPage> {
   @override
   Widget build(BuildContext context) {
     final isEdit = widget.order != null;
+    final readOnly = widget.readOnly;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     // Preload products so the dialog opens immediately on first tap
     ref.watch(productListProvider);
@@ -104,7 +110,7 @@ class _PurchaseOrderFormPageState extends ConsumerState<PurchaseOrderFormPage> {
         child: Column(
           children: [
             // ── Title Bar ─────────────────────────────────────────
-            _POFormTitleBar(isEdit: isEdit),
+            _POFormTitleBar(isEdit: isEdit, readOnly: readOnly),
 
             // ── Form Body ─────────────────────────────────────────
             Expanded(
@@ -119,7 +125,7 @@ class _PurchaseOrderFormPageState extends ConsumerState<PurchaseOrderFormPage> {
                         icon: Icons.receipt_long_outlined,
                         iconColor: AppTheme.primaryDark,
                         title: 'ข้อมูลทั่วไป',
-                        child: _buildGeneralSection(),
+                        child: _buildGeneralSection(readOnly: readOnly),
                       ),
                       const SizedBox(height: 14),
 
@@ -141,33 +147,36 @@ class _PurchaseOrderFormPageState extends ConsumerState<PurchaseOrderFormPage> {
                               onTap: () =>
                                   setState(() => _isCardView = !_isCardView),
                             ),
-                            const SizedBox(width: 6),
-                            // Add item
-                            ElevatedButton.icon(
-                              onPressed: _addItem,
-                              icon: const Icon(Icons.add, size: 16),
-                              label: const Text(
-                                'เพิ่ม',
-                                style: TextStyle(fontSize: 13),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppTheme.info,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 14,
+                            if (!readOnly) ...[
+                              const SizedBox(width: 6),
+                              // Add item
+                              ElevatedButton.icon(
+                                onPressed: _addItem,
+                                icon: const Icon(Icons.add, size: 16),
+                                label: const Text(
+                                  'เพิ่ม',
+                                  style: TextStyle(fontSize: 13),
                                 ),
-                                minimumSize: Size.zero,
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppTheme.info,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 14,
+                                  ),
+                                  minimumSize: Size.zero,
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  elevation: 0,
                                 ),
-                                elevation: 0,
                               ),
-                            ),
+                            ],
                           ],
                         ),
-                        child: _buildItemsSection(),
+                        child: _buildItemsSection(readOnly: readOnly),
                       ),
                       const SizedBox(height: 14),
 
@@ -177,7 +186,7 @@ class _PurchaseOrderFormPageState extends ConsumerState<PurchaseOrderFormPage> {
                           icon: Icons.calculate_outlined,
                           iconColor: AppTheme.success,
                           title: 'สรุปยอด',
-                          child: _buildSummarySection(),
+                          child: _buildSummarySection(readOnly: readOnly),
                         ),
                         const SizedBox(height: 14),
                       ],
@@ -193,7 +202,8 @@ class _PurchaseOrderFormPageState extends ConsumerState<PurchaseOrderFormPage> {
                           icon: Icons.edit_note,
                           maxLines: 3,
                           isDark: isDark,
-                          onChanged: (v) => _remark = v,
+                          readOnly: readOnly,
+                          onChanged: readOnly ? null : (v) => _remark = v,
                         ),
                       ),
                       const SizedBox(height: 80), // pad for bottom bar
@@ -225,42 +235,44 @@ class _PurchaseOrderFormPageState extends ConsumerState<PurchaseOrderFormPage> {
                       ),
                     ),
                     child: Text(
-                      'ยกเลิก',
+                      readOnly ? 'ปิด' : 'ยกเลิก',
                       style: TextStyle(
                         color: isDark ? Colors.white60 : AppTheme.textSub,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  ElevatedButton.icon(
-                    onPressed: _isLoading ? null : _savePurchaseOrder,
-                    icon: _isLoading
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Icon(Icons.save_outlined, size: 18),
-                    label: Text(
-                      isEdit ? 'บันทึก' : 'สร้างใบสั่งซื้อ',
-                      style: const TextStyle(fontSize: 14),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 12,
+                  if (!readOnly) ...[
+                    const SizedBox(width: 12),
+                    ElevatedButton.icon(
+                      onPressed: _isLoading ? null : _savePurchaseOrder,
+                      icon: _isLoading
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.save_outlined, size: 18),
+                      label: Text(
+                        isEdit ? 'บันทึก' : 'สร้างใบสั่งซื้อ',
+                        style: const TextStyle(fontSize: 14),
                       ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        elevation: 0,
                       ),
-                      elevation: 0,
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
@@ -273,7 +285,7 @@ class _PurchaseOrderFormPageState extends ConsumerState<PurchaseOrderFormPage> {
   // ─────────────────────────────────────────────────────────────
   // General Section
   // ─────────────────────────────────────────────────────────────
-  Widget _buildGeneralSection() {
+  Widget _buildGeneralSection({required bool readOnly}) {
     final suppliersAsync = ref.watch(supplierListProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -285,15 +297,17 @@ class _PurchaseOrderFormPageState extends ConsumerState<PurchaseOrderFormPage> {
         const SizedBox(height: 6),
         InkWell(
           borderRadius: BorderRadius.circular(8),
-          onTap: () async {
-            final date = await showDatePicker(
-              context: context,
-              initialDate: _poDate,
-              firstDate: DateTime(2020),
-              lastDate: DateTime(2030),
-            );
-            if (date != null) setState(() => _poDate = date);
-          },
+          onTap: readOnly
+              ? null
+              : () async {
+                  final date = await showDatePicker(
+                    context: context,
+                    initialDate: _poDate,
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime(2030),
+                  );
+                  if (date != null) setState(() => _poDate = date);
+                },
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             decoration: BoxDecoration(
@@ -339,6 +353,7 @@ class _PurchaseOrderFormPageState extends ConsumerState<PurchaseOrderFormPage> {
             hint: 'เลือกซัพพลายเออร์',
             icon: Icons.business_outlined,
             isDark: isDark,
+            readOnly: readOnly,
             items: suppliers
                 .map(
                   (s) => DropdownMenuItem(
@@ -353,14 +368,18 @@ class _PurchaseOrderFormPageState extends ConsumerState<PurchaseOrderFormPage> {
                   ),
                 )
                 .toList(),
-            onChanged: (v) {
-              final s = suppliers.firstWhere((s) => s.supplierId == v);
-              setState(() {
-                _supplierId = v;
-                _supplierName = s.supplierName;
-              });
-            },
-            validator: (v) => v == null ? 'กรุณาเลือกซัพพลายเออร์' : null,
+            onChanged: readOnly
+                ? null
+                : (v) {
+                    final s = suppliers.firstWhere((s) => s.supplierId == v);
+                    setState(() {
+                      _supplierId = v;
+                      _supplierName = s.supplierName;
+                    });
+                  },
+            validator: readOnly
+                ? null
+                : (v) => v == null ? 'กรุณาเลือกซัพพลายเออร์' : null,
           ),
           loading: () => LinearProgressIndicator(
             color: AppTheme.primary,
@@ -394,6 +413,7 @@ class _PurchaseOrderFormPageState extends ConsumerState<PurchaseOrderFormPage> {
                   hint: 'เลือกคลังสินค้า',
                   icon: Icons.warehouse_outlined,
                   isDark: isDark,
+                  readOnly: readOnly,
                   items: warehouses
                       .map(
                         (w) => DropdownMenuItem(
@@ -408,13 +428,15 @@ class _PurchaseOrderFormPageState extends ConsumerState<PurchaseOrderFormPage> {
                         ),
                       )
                       .toList(),
-                  onChanged: (v) {
-                    final w = warehouses.firstWhere((w) => w['id'] == v);
-                    setState(() {
-                      _warehouseId = v!;
-                      _warehouseName = w['name']!;
-                    });
-                  },
+                  onChanged: readOnly
+                      ? null
+                      : (v) {
+                          final w = warehouses.firstWhere((w) => w['id'] == v);
+                          setState(() {
+                            _warehouseId = v!;
+                            _warehouseName = w['name']!;
+                          });
+                        },
                 );
               },
               loading: () => LinearProgressIndicator(
@@ -450,7 +472,7 @@ class _PurchaseOrderFormPageState extends ConsumerState<PurchaseOrderFormPage> {
   // ─────────────────────────────────────────────────────────────
   // Items Section
   // ─────────────────────────────────────────────────────────────
-  Widget _buildItemsSection() {
+  Widget _buildItemsSection({required bool readOnly}) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     if (_isLoadingItems) {
@@ -491,14 +513,14 @@ class _PurchaseOrderFormPageState extends ConsumerState<PurchaseOrderFormPage> {
         final i = entry.key;
         final item = entry.value;
         return _isCardView
-            ? _buildItemCard(item, i, isDark)
-            : _buildItemRow(item, i, isDark);
+            ? _buildItemCard(item, i, isDark, readOnly: readOnly)
+            : _buildItemRow(item, i, isDark, readOnly: readOnly);
       }).toList(),
     );
   }
 
   // Card view item
-  Widget _buildItemCard(PurchaseOrderItemModel item, int index, bool isDark) {
+  Widget _buildItemCard(PurchaseOrderItemModel item, int index, bool isDark, {bool readOnly = false}) {
     final fmt = NumberFormat('#,##0.00', 'th_TH');
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -555,22 +577,23 @@ class _PurchaseOrderFormPageState extends ConsumerState<PurchaseOrderFormPage> {
                   ),
                 ),
                 // Delete
-                InkWell(
-                  borderRadius: BorderRadius.circular(6),
-                  onTap: () => setState(() => _items.removeAt(index)),
-                  child: Container(
-                    padding: const EdgeInsets.all(5),
-                    decoration: BoxDecoration(
-                      color: AppTheme.error.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: const Icon(
-                      Icons.delete_outline,
-                      size: 16,
-                      color: AppTheme.error,
+                if (!readOnly)
+                  InkWell(
+                    borderRadius: BorderRadius.circular(6),
+                    onTap: () => setState(() => _items.removeAt(index)),
+                    child: Container(
+                      padding: const EdgeInsets.all(5),
+                      decoration: BoxDecoration(
+                        color: AppTheme.error.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Icon(
+                        Icons.delete_outline,
+                        size: 16,
+                        color: AppTheme.error,
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
             const SizedBox(height: 10),
@@ -614,7 +637,7 @@ class _PurchaseOrderFormPageState extends ConsumerState<PurchaseOrderFormPage> {
   }
 
   // List view item (compact)
-  Widget _buildItemRow(PurchaseOrderItemModel item, int index, bool isDark) {
+  Widget _buildItemRow(PurchaseOrderItemModel item, int index, bool isDark, {bool readOnly = false}) {
     final fmt = NumberFormat('#,##0.00', 'th_TH');
     final isEven = index.isEven;
     return Container(
@@ -692,20 +715,22 @@ class _PurchaseOrderFormPageState extends ConsumerState<PurchaseOrderFormPage> {
               textAlign: TextAlign.right,
             ),
           ),
-          const SizedBox(width: 4),
-          // Delete
-          InkWell(
-            borderRadius: BorderRadius.circular(4),
-            onTap: () => setState(() => _items.removeAt(index)),
-            child: Padding(
-              padding: const EdgeInsets.all(4),
-              child: Icon(
-                Icons.close,
-                size: 15,
-                color: isDark ? Colors.white38 : AppTheme.textSub,
+          if (!readOnly) ...[
+            const SizedBox(width: 4),
+            // Delete
+            InkWell(
+              borderRadius: BorderRadius.circular(4),
+              onTap: () => setState(() => _items.removeAt(index)),
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: Icon(
+                  Icons.close,
+                  size: 15,
+                  color: isDark ? Colors.white38 : AppTheme.textSub,
+                ),
               ),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -714,7 +739,7 @@ class _PurchaseOrderFormPageState extends ConsumerState<PurchaseOrderFormPage> {
   // ─────────────────────────────────────────────────────────────
   // Summary Section
   // ─────────────────────────────────────────────────────────────
-  Widget _buildSummarySection() {
+  Widget _buildSummarySection({required bool readOnly}) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final subtotal = _items.fold<double>(0, (s, item) => s + item.amount);
     final vat = _includeVat ? subtotal * 0.07 : 0.0;
@@ -738,7 +763,7 @@ class _PurchaseOrderFormPageState extends ConsumerState<PurchaseOrderFormPage> {
               value: _includeVat,
               activeThumbColor: AppTheme.info,
               activeTrackColor: AppTheme.info.withValues(alpha: 0.4),
-              onChanged: (v) => setState(() => _includeVat = v),
+              onChanged: readOnly ? null : (v) => setState(() => _includeVat = v),
             ),
           ],
         ),
@@ -889,7 +914,8 @@ class _PurchaseOrderFormPageState extends ConsumerState<PurchaseOrderFormPage> {
 // ════════════════════════════════════════════════════════════════
 class _POFormTitleBar extends StatelessWidget {
   final bool isEdit;
-  const _POFormTitleBar({required this.isEdit});
+  final bool readOnly;
+  const _POFormTitleBar({required this.isEdit, required this.readOnly});
 
   @override
   Widget build(BuildContext context) {
@@ -932,7 +958,7 @@ class _POFormTitleBar extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           Text(
-            isEdit ? 'แก้ไขใบสั่งซื้อ' : 'สร้างใบสั่งซื้อ',
+            readOnly ? 'ดูใบสั่งซื้อ' : (isEdit ? 'แก้ไขใบสั่งซื้อ' : 'สร้างใบสั่งซื้อ'),
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
@@ -1061,6 +1087,7 @@ class _POTextField extends StatelessWidget {
   final IconData icon;
   final int maxLines;
   final bool isDark;
+  final bool readOnly;
   final ValueChanged<String>? onChanged;
 
   const _POTextField({
@@ -1069,6 +1096,7 @@ class _POTextField extends StatelessWidget {
     required this.icon,
     required this.isDark,
     this.maxLines = 1,
+    this.readOnly = false,
     this.onChanged,
   });
 
@@ -1076,6 +1104,7 @@ class _POTextField extends StatelessWidget {
   Widget build(BuildContext context) => TextFormField(
     controller: controller,
     maxLines: maxLines,
+    readOnly: readOnly,
     style: TextStyle(
       fontSize: 13,
       color: isDark ? Colors.white : Colors.black87,
@@ -1120,6 +1149,7 @@ class _PODropdown<T> extends StatelessWidget {
   final String hint;
   final IconData icon;
   final bool isDark;
+  final bool readOnly;
   final List<DropdownMenuItem<T>> items;
   final ValueChanged<T?>? onChanged;
   final String? Function(T?)? validator;
@@ -1130,6 +1160,7 @@ class _PODropdown<T> extends StatelessWidget {
     required this.icon,
     required this.isDark,
     required this.items,
+    this.readOnly = false,
     this.onChanged,
     this.validator,
   });
@@ -1137,6 +1168,8 @@ class _PODropdown<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) => DropdownButtonFormField<T>(
     initialValue: value,
+    onChanged: readOnly ? null : onChanged,
+    validator: readOnly ? null : validator,
     decoration: InputDecoration(
       hintText: hint,
       hintStyle: TextStyle(
@@ -1178,8 +1211,6 @@ class _PODropdown<T> extends StatelessWidget {
       color: isDark ? Colors.white : Colors.black87,
     ),
     items: items,
-    onChanged: onChanged,
-    validator: validator,
   );
 }
 

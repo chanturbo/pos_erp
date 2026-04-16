@@ -45,6 +45,7 @@ class CartPanel extends ConsumerStatefulWidget {
 class _CartPanelState extends ConsumerState<CartPanel> {
   final _scrollController = ScrollController();
   int _prevItemCount = 0;
+  int _scanRowSession = 0;
 
   @override
   void dispose() {
@@ -103,6 +104,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
               // ── Scan Row ─────────────────────────────────────────
               if (widget.showScanRow)
                 _ScanRow(
+                  key: ValueKey(_scanRowSession),
                   ref: ref,
                   autofocus: widget.autofocusScan,
                   compact: density.compact,
@@ -154,6 +156,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                 showCheckoutButton: widget.showCheckoutButton,
                 showHoldButton: widget.showHoldButton,
                 onHold: widget.onHold,
+                onOpenNewBill: () => setState(() => _scanRowSession++),
               ),
             ],
           ),
@@ -340,6 +343,7 @@ class _ScanRow extends ConsumerStatefulWidget {
   final bool compact;
 
   const _ScanRow({
+    super.key,
     required this.ref,
     this.autofocus = true,
     this.compact = false,
@@ -1177,6 +1181,7 @@ class _CartSummary extends StatelessWidget {
   final bool showCheckoutButton;
   final bool showHoldButton;
   final VoidCallback? onHold;
+  final VoidCallback? onOpenNewBill;
 
   const _CartSummary({
     required this.cartState,
@@ -1184,6 +1189,7 @@ class _CartSummary extends StatelessWidget {
     required this.showCheckoutButton,
     required this.showHoldButton,
     required this.onHold,
+    this.onOpenNewBill,
   });
 
   @override
@@ -1409,12 +1415,18 @@ class _CartSummary extends StatelessWidget {
                           ),
                           onPressed: cartState.items.isEmpty
                               ? null
-                              : () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const PaymentPage(),
-                                  ),
-                                ),
+                              : () async {
+                                  final result =
+                                      await Navigator.push<ReceiptExitAction>(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => const PaymentPage(),
+                                        ),
+                                      );
+                                  if (result == ReceiptExitAction.openNewBill) {
+                                    onOpenNewBill?.call();
+                                  }
+                                },
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [

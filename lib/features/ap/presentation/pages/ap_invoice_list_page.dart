@@ -644,11 +644,20 @@ class _ApInvoiceListPageState extends ConsumerState<ApInvoiceListPage> {
   // ─────────────────────────────────────────────────────────────
   // Actions
   // ─────────────────────────────────────────────────────────────
-  void _openForm(ApInvoiceModel invoice) {
-    Navigator.push(
+  Future<void> _openForm(ApInvoiceModel invoice) async {
+    final fullInvoice =
+        await ref.read(apInvoiceListProvider.notifier).getInvoiceDetails(
+          invoice.invoiceId,
+        );
+    if (!mounted) return;
+    await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => ApInvoiceFormPage(invoice: invoice)),
-    ).then((_) => ref.read(apInvoiceListProvider.notifier).refresh());
+      MaterialPageRoute(
+        builder: (_) => ApInvoiceFormPage(invoice: fullInvoice ?? invoice),
+      ),
+    );
+    if (!mounted) return;
+    ref.read(apInvoiceListProvider.notifier).refresh();
   }
 
   Future<void> _deleteInvoice(ApInvoiceModel invoice) async {

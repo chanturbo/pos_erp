@@ -3,10 +3,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:pos_erp/shared/pdf/pdf_report_button.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
 import 'package:pos_erp/shared/utils/responsive_utils.dart';
 import 'package:pos_erp/shared/widgets/mobile_home_button.dart';
+import 'package:printing/printing.dart';
 import '../../../../core/client/api_client.dart';
+import '../../../settings/shared/settings_defaults.dart';
 import '../../data/models/customer_model.dart';
 import 'customer_form_page.dart';
 import 'points_history_page.dart';
@@ -105,6 +110,7 @@ class _CustomerDetailPageState extends ConsumerState<CustomerDetailPage> {
   final _dateFmt = DateFormat('dd/MM/yyyy HH:mm', 'th_TH');
   final _numFmt  = NumberFormat('#,##0.00');
   final _numFmtInt = NumberFormat('#,##0');
+  int _ordersPage = 1;
 
   // expanded order IDs
   final Set<String> _expanded = {};
@@ -131,6 +137,7 @@ class _CustomerDetailPageState extends ConsumerState<CustomerDetailPage> {
               .toList();
           _totalOrders = d['total_orders'] as int;
           _totalSpent  = (d['total_spent'] as num).toDouble();
+          _ordersPage = 1;
           _isLoading   = false;
         });
       }
@@ -177,6 +184,13 @@ class _CustomerDetailPageState extends ConsumerState<CustomerDetailPage> {
       case 5: return const Color(0xFFC62828);
       default: return const Color(0xFF1565C0);
     }
+  }
+
+  int _ordersPerPage(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    if (width >= 1200) return 8;
+    if (width >= 768) return 6;
+    return 4;
   }
 
   @override
@@ -559,6 +573,17 @@ class _CustomerDetailPageState extends ConsumerState<CustomerDetailPage> {
 
   // ── Orders Section ────────────────────────────────────────────
   Widget _buildOrdersSection(bool isDark) {
+    final pageSize = _ordersPerPage(context);
+    final totalPages = _orders.isEmpty ? 1 : (_orders.length / pageSize).ceil();
+    final currentPage = _ordersPage.clamp(1, totalPages);
+    final start = _orders.isEmpty ? 0 : (currentPage - 1) * pageSize;
+    final end = _orders.isEmpty
+        ? 0
+        : ((start + pageSize) > _orders.length
+              ? _orders.length
+              : start + pageSize);
+    final visibleOrders = _orders.isEmpty ? const <_Order>[] : _orders.sublist(start, end);
+
     if (_isLoading) {
       return const Center(
           child: Padding(
@@ -606,6 +631,20 @@ class _CustomerDetailPageState extends ConsumerState<CustomerDetailPage> {
             ),
             const Spacer(),
             if (_orders.isNotEmpty)
+              PdfReportButton(
+                emptyMessage: 'ยังไม่มีประวัติการซื้อ',
+                title: 'ประวัติรายการสั่งซื้อของลูกค้า',
+                filename: () => PdfFilename.generate(
+                  'customer_order_history_${_customer.customerCode}',
+                ),
+                buildPdf: () => _CustomerOrderHistoryPdfBuilder.build(
+                  customer: _customer,
+                  orders: _orders,
+                ),
+                hasData: _orders.isNotEmpty,
+              ),
+            if (_orders.isNotEmpty) const SizedBox(width: 10),
+            if (_orders.isNotEmpty)
               Text(
                 '$_totalOrders รายการ',
                 style: TextStyle(
@@ -642,14 +681,88 @@ class _CustomerDetailPageState extends ConsumerState<CustomerDetailPage> {
             ),
           )
         else
-          ..._orders
-              .map((order) => _buildOrderCard(isDark, order)),
+          ...visibleOrders.map((order) => _buildOrderListCard(isDark, order)),
+
+        if (_orders.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _buildOrderPagination(
+            isDark,
+            currentPage: currentPage,
+            totalPages: totalPages,
+            start: start,
+            end: end,
+          ),
+        ],
       ],
     );
   }
 
-  // ── Order Card (expandable) ───────────────────────────────────
-  Widget _buildOrderCard(bool isDark, _Order order) {
+  Widget _buildOrderPagination(
+    bool isDark, {
+    required int currentPage,
+    required int totalPages,
+    required int start,
+    required int end,
+  }) {
+    final textColor = isDark ? Colors.white70 : AppTheme.textSub;
+    final canPrev = currentPage > 1;
+    final canNext = currentPage < totalPages;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkCard : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark ? Colors.white12 : AppTheme.borderColor,
+        ),
+      ),
+      child: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        runSpacing: 10,
+        children: [
+          Text(
+            'แสดง ${start + 1}-$end จาก ${_orders.length} รายการ',
+            style: TextStyle(fontSize: 12, color: textColor),
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              OutlinedButton.icon(
+                onPressed: canPrev
+                    ? () => setState(() => _ordersPage = currentPage - 1)
+                    : null,
+                icon: const Icon(Icons.chevron_left, size: 18),
+                label: const Text('ก่อนหน้า'),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text(
+                  'หน้า $currentPage / $totalPages',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+                  ),
+                ),
+              ),
+              OutlinedButton.icon(
+                onPressed: canNext
+                    ? () => setState(() => _ordersPage = currentPage + 1)
+                    : null,
+                icon: const Icon(Icons.chevron_right, size: 18),
+                label: const Text('ถัดไป'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Order List Card (expandable) ──────────────────────────────
+  Widget _buildOrderListCard(bool isDark, _Order order) {
     final isExpanded = _expanded.contains(order.orderId);
 
     return Container(
@@ -922,5 +1035,412 @@ class _CustomerDetailPageState extends ConsumerState<CustomerDetailPage> {
         ],
       ),
     );
+  }
+}
+
+const _pdfBorder = PdfColor.fromInt(0xFFBBBBBB);
+const _pdfHeaderBg = PdfColor.fromInt(0xFFDDDDDD);
+const _pdfAltRow = PdfColor.fromInt(0xFFF5F5F5);
+const _pdfText = PdfColors.black;
+const _pdfSub = PdfColor.fromInt(0xFF555555);
+const _pdfSuccess = PdfColor.fromInt(0xFF1B5E20);
+const _pdfError = PdfColor.fromInt(0xFFB71C1C);
+
+class _CustomerOrderHistoryPdfBuilder {
+  static final _moneyFmt = NumberFormat('#,##0.00', 'th');
+  static final _dateFmt = DateFormat('dd/MM/yyyy HH:mm');
+
+  static Future<pw.Document> build({
+    required CustomerModel customer,
+    required List<_Order> orders,
+    String? companyName,
+  }) async {
+    final effectiveCompanyName =
+        companyName ?? await SettingsStorage.getCompanyName();
+    final doc = pw.Document(
+      title: 'ประวัติรายการสั่งซื้อของลูกค้า',
+      author: effectiveCompanyName,
+    );
+
+    final ttf = await PdfGoogleFonts.notoSansThaiBold();
+    final ttfRegular = await PdfGoogleFonts.notoSansThaiRegular();
+    final printedAt = _dateFmt.format(DateTime.now());
+    final totalSpent = orders.fold<double>(
+      0,
+      (sum, order) => sum + order.totalAmount,
+    );
+
+    doc.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(24),
+        header: (context) => _buildPdfHeader(
+          companyName: effectiveCompanyName,
+          printedAt: printedAt,
+          page: context.pageNumber,
+          totalPages: context.pagesCount,
+          customer: customer,
+          orders: orders,
+          totalSpent: totalSpent,
+          ttf: ttf,
+          ttfRegular: ttfRegular,
+        ),
+        footer: (_) => pw.Align(
+          alignment: pw.Alignment.centerRight,
+          child: pw.Text(
+            effectiveCompanyName,
+            style: pw.TextStyle(
+              font: ttfRegular,
+              fontSize: 8,
+              color: _pdfSub,
+            ),
+          ),
+        ),
+        build: (_) => [
+          if (orders.isEmpty)
+            pw.Container(
+              padding: const pw.EdgeInsets.all(18),
+              decoration: pw.BoxDecoration(
+                border: pw.Border.all(color: _pdfBorder, width: 0.5),
+                borderRadius: pw.BorderRadius.circular(8),
+              ),
+              child: pw.Text(
+                'ยังไม่มีประวัติการซื้อ',
+                style: pw.TextStyle(font: ttfRegular, fontSize: 10),
+              ),
+            )
+          else
+            ...orders.asMap().entries.map(
+              (entry) => _buildOrderBlock(
+                orderNo: entry.key + 1,
+                order: entry.value,
+                ttf: ttf,
+                ttfRegular: ttfRegular,
+              ),
+            ),
+        ],
+      ),
+    );
+
+    return doc;
+  }
+
+  static pw.Widget _buildPdfHeader({
+    required String companyName,
+    required String printedAt,
+    required int page,
+    required int totalPages,
+    required CustomerModel customer,
+    required List<_Order> orders,
+    required double totalSpent,
+    required pw.Font ttf,
+    required pw.Font ttfRegular,
+  }) {
+    final memberLabel =
+        customer.memberNo == null || customer.memberNo!.trim().isEmpty
+        ? 'ไม่เป็นสมาชิก'
+        : customer.memberNo!;
+
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+      children: [
+        pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          children: [
+            pw.Text(
+              'พิมพ์เมื่อ $printedAt',
+              style: pw.TextStyle(font: ttfRegular, fontSize: 8, color: _pdfSub),
+            ),
+            pw.Text(
+              'หน้าที่ $page / $totalPages',
+              style: pw.TextStyle(font: ttfRegular, fontSize: 8, color: _pdfSub),
+            ),
+          ],
+        ),
+        pw.SizedBox(height: 3),
+        pw.Center(
+          child: pw.Text(
+            companyName,
+            style: pw.TextStyle(font: ttfRegular, fontSize: 9, color: _pdfSub),
+          ),
+        ),
+        pw.SizedBox(height: 2),
+        pw.Center(
+          child: pw.Text(
+            'ประวัติรายการสั่งซื้อของลูกค้า',
+            style: pw.TextStyle(font: ttf, fontSize: 14, color: _pdfText),
+          ),
+        ),
+        pw.SizedBox(height: 3),
+        pw.Center(
+          child: pw.Text(
+            'ลูกค้า: ${customer.customerName} (${customer.customerCode})   สมาชิก: $memberLabel',
+            style: pw.TextStyle(font: ttfRegular, fontSize: 8, color: _pdfSub),
+          ),
+        ),
+        pw.SizedBox(height: 2),
+        pw.Center(
+          child: pw.Text(
+            'จำนวนออเดอร์ ${orders.length} รายการ   ยอดซื้อรวม ฿${_moneyFmt.format(totalSpent)}',
+            style: pw.TextStyle(font: ttfRegular, fontSize: 8, color: _pdfSub),
+          ),
+        ),
+        pw.SizedBox(height: 6),
+        pw.Container(height: 0.5, color: _pdfBorder),
+        pw.SizedBox(height: 6),
+      ],
+    );
+  }
+
+  static pw.Widget _buildOrderBlock({
+    required int orderNo,
+    required _Order order,
+    required pw.Font ttf,
+    required pw.Font ttfRegular,
+  }) {
+    final itemTable = order.items.isEmpty
+        ? pw.Padding(
+            padding: const pw.EdgeInsets.symmetric(vertical: 8),
+            child: pw.Text(
+              'ไม่มีรายการสินค้า',
+              style: pw.TextStyle(font: ttfRegular, fontSize: 9, color: _pdfSub),
+            ),
+          )
+        : pw.Table(
+            columnWidths: const {
+              0: pw.FlexColumnWidth(4),
+              1: pw.FlexColumnWidth(1.6),
+              2: pw.FlexColumnWidth(1.8),
+              3: pw.FlexColumnWidth(1.8),
+            },
+            border: pw.TableBorder.all(color: _pdfBorder, width: 0.4),
+            children: [
+              pw.TableRow(
+                decoration: const pw.BoxDecoration(color: _pdfHeaderBg),
+                children: [
+                  _pdfCell('สินค้า', font: ttf),
+                  _pdfCell('จำนวน', font: ttf, align: pw.Alignment.center),
+                  _pdfCell('ราคา/หน่วย', font: ttf, align: pw.Alignment.centerRight),
+                  _pdfCell('รวม', font: ttf, align: pw.Alignment.centerRight),
+                ],
+              ),
+              ...order.items.asMap().entries.map((entry) {
+                final index = entry.key;
+                final item = entry.value;
+                final bg = index.isEven ? _pdfAltRow : PdfColors.white;
+                final quantityText = item.quantity % 1 == 0
+                    ? item.quantity.toStringAsFixed(0)
+                    : item.quantity.toStringAsFixed(2);
+                return pw.TableRow(
+                  children: [
+                    _pdfCell(item.productName, font: ttfRegular, bg: bg),
+                    _pdfCell(
+                      '$quantityText ${item.unit}',
+                      font: ttfRegular,
+                      align: pw.Alignment.center,
+                      bg: bg,
+                    ),
+                    _pdfCell(
+                      '฿${_moneyFmt.format(item.unitPrice)}',
+                      font: ttfRegular,
+                      align: pw.Alignment.centerRight,
+                      bg: bg,
+                    ),
+                    _pdfCell(
+                      '฿${_moneyFmt.format(item.amount)}',
+                      font: ttfRegular,
+                      align: pw.Alignment.centerRight,
+                      bg: bg,
+                    ),
+                  ],
+                );
+              }),
+            ],
+          );
+
+    return pw.Container(
+      margin: const pw.EdgeInsets.only(bottom: 12),
+      padding: const pw.EdgeInsets.all(10),
+      decoration: pw.BoxDecoration(
+        border: pw.Border.all(color: _pdfBorder, width: 0.6),
+        borderRadius: pw.BorderRadius.circular(8),
+      ),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+        children: [
+          pw.Row(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Expanded(
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text(
+                      '$orderNo. ${order.orderNo}',
+                      style: pw.TextStyle(font: ttf, fontSize: 11, color: _pdfText),
+                    ),
+                    pw.SizedBox(height: 2),
+                    pw.Text(
+                      'วันที่ ${_dateFmt.format(order.orderDate)}',
+                      style: pw.TextStyle(font: ttfRegular, fontSize: 9, color: _pdfSub),
+                    ),
+                  ],
+                ),
+              ),
+              pw.Container(
+                padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: pw.BoxDecoration(
+                  color: PdfColors.white,
+                  border: pw.Border.all(color: _statusColor(order.status), width: 0.5),
+                  borderRadius: pw.BorderRadius.circular(10),
+                ),
+                child: pw.Text(
+                  _statusLabel(order.status),
+                  style: pw.TextStyle(
+                    font: ttfRegular,
+                    fontSize: 8,
+                    color: _statusColor(order.status),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          pw.SizedBox(height: 8),
+          pw.Wrap(
+            spacing: 14,
+            runSpacing: 4,
+            children: [
+              pw.Text(
+                'ชำระเงิน: ${_paymentLabel(order.paymentType)}',
+                style: pw.TextStyle(font: ttfRegular, fontSize: 9),
+              ),
+              pw.Text(
+                'จำนวนสินค้า: ${order.items.length} รายการ',
+                style: pw.TextStyle(font: ttfRegular, fontSize: 9),
+              ),
+            ],
+          ),
+          pw.SizedBox(height: 8),
+          itemTable,
+          pw.SizedBox(height: 8),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.end,
+            children: [
+              pw.Container(
+                width: 220,
+                child: pw.Column(
+                  children: [
+                    _pdfSummaryRow('ยอดก่อนส่วนลด', '฿${_moneyFmt.format(order.subtotal)}', ttfRegular),
+                    _pdfSummaryRow(
+                      'ส่วนลด',
+                      order.discountAmount > 0
+                          ? '-฿${_moneyFmt.format(order.discountAmount)}'
+                          : '-',
+                      ttfRegular,
+                      valueColor: order.discountAmount > 0 ? _pdfError : _pdfSub,
+                    ),
+                    _pdfSummaryRow(
+                      'ยอดรวมสุทธิ',
+                      '฿${_moneyFmt.format(order.totalAmount)}',
+                      ttf,
+                      valueColor: _pdfSuccess,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  static pw.Widget _pdfCell(
+    String text, {
+    required pw.Font font,
+    pw.Alignment align = pw.Alignment.centerLeft,
+    PdfColor? color,
+    PdfColor? bg,
+  }) {
+    return pw.Container(
+      alignment: align,
+      color: bg,
+      padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 5),
+      child: pw.Text(
+        text,
+        style: pw.TextStyle(
+          font: font,
+          fontSize: 8.5,
+          color: color ?? _pdfText,
+        ),
+      ),
+    );
+  }
+
+  static pw.Widget _pdfSummaryRow(
+    String label,
+    String value,
+    pw.Font font, {
+    PdfColor? valueColor,
+  }) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(vertical: 2),
+      child: pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        children: [
+          pw.Text(
+            label,
+            style: pw.TextStyle(font: font, fontSize: 8.5, color: _pdfSub),
+          ),
+          pw.Text(
+            value,
+            style: pw.TextStyle(
+              font: font,
+              fontSize: 8.5,
+              color: valueColor ?? _pdfText,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _paymentLabel(String paymentType) {
+    switch (paymentType) {
+      case 'CASH':
+        return 'เงินสด';
+      case 'CARD':
+        return 'บัตร';
+      case 'TRANSFER':
+        return 'โอน';
+      case 'CREDIT':
+        return 'เครดิต';
+      default:
+        return paymentType;
+    }
+  }
+
+  static String _statusLabel(String status) {
+    switch (status) {
+      case 'COMPLETED':
+        return 'สำเร็จ';
+      case 'CANCELLED':
+        return 'ยกเลิก';
+      case 'PENDING':
+        return 'รอดำเนินการ';
+      default:
+        return status.isEmpty ? '-' : status;
+    }
+  }
+
+  static PdfColor _statusColor(String status) {
+    switch (status) {
+      case 'COMPLETED':
+        return _pdfSuccess;
+      case 'CANCELLED':
+        return _pdfError;
+      default:
+        return _pdfSub;
+    }
   }
 }

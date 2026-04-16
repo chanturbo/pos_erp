@@ -6,6 +6,7 @@ import 'package:pos_erp/shared/utils/responsive_utils.dart';
 import 'package:pos_erp/shared/widgets/app_dialogs.dart';
 import 'package:pos_erp/shared/widgets/pagination_bar.dart';
 import 'package:pos_erp/shared/widgets/escape_pop_scope.dart';
+import 'package:pos_erp/shared/pdf/pdf_export_service.dart';
 import 'package:pos_erp/shared/pdf/pdf_report_button.dart';
 import 'package:pos_erp/shared/widgets/mobile_home_button.dart';
 import '../../../settings/presentation/pages/settings_page.dart';
@@ -239,14 +240,10 @@ class _PurchaseOrderListPageState extends ConsumerState<PurchaseOrderListPage> {
       separatorBuilder: (_, _) => const SizedBox(height: 8),
       itemBuilder: (context, i) => _POCard(
         order: orders[i],
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => PurchaseOrderFormPage(order: orders[i]),
-          ),
-        ),
+        onTap: () => _openPurchaseOrderForm(orders[i]),
         onDelete: () => _deletePurchaseOrder(orders[i]),
         onApprove: () => _approvePurchaseOrder(orders[i]),
+        onPrintPdf: () => _openPurchaseOrderPdf(orders[i]),
       ),
     );
   }
@@ -323,12 +320,7 @@ class _PurchaseOrderListPageState extends ConsumerState<PurchaseOrderListPage> {
               final isEven = i.isEven;
               final isDraft = order.status == 'DRAFT';
               return InkWell(
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => PurchaseOrderFormPage(order: order),
-                  ),
-                ),
+                onTap: () => _openPurchaseOrderForm(order),
                 child: Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16,
@@ -441,6 +433,26 @@ class _PurchaseOrderListPageState extends ConsumerState<PurchaseOrderListPage> {
                               width: 52,
                               height: 34,
                               child: OutlinedButton(
+                                onPressed: () => _openPurchaseOrderPdf(order),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppTheme.info,
+                                  side: const BorderSide(color: AppTheme.info),
+                                  padding: EdgeInsets.zero,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                child: const Icon(
+                                  Icons.picture_as_pdf_outlined,
+                                  size: 18,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            SizedBox(
+                              width: 52,
+                              height: 34,
+                              child: OutlinedButton(
                                 onPressed: () =>
                                     _deletePurchaseOrder(orders[i]),
                                 style: OutlinedButton.styleFrom(
@@ -479,6 +491,32 @@ class _PurchaseOrderListPageState extends ConsumerState<PurchaseOrderListPage> {
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(8),
                                   ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ] else ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            SizedBox(
+                              width: 52,
+                              height: 34,
+                              child: OutlinedButton(
+                                onPressed: () => _openPurchaseOrderPdf(order),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppTheme.info,
+                                  side: const BorderSide(color: AppTheme.info),
+                                  padding: EdgeInsets.zero,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                child: const Icon(
+                                  Icons.picture_as_pdf_outlined,
+                                  size: 18,
                                 ),
                               ),
                             ),
@@ -697,6 +735,35 @@ class _PurchaseOrderListPageState extends ConsumerState<PurchaseOrderListPage> {
       ),
     );
   }
+
+  Future<void> _openPurchaseOrderPdf(PurchaseOrderModel order) async {
+    final fullOrder =
+        await ref.read(purchaseListProvider.notifier).getPurchaseOrderDetails(
+          order.poId,
+        );
+    final pdfOrder = fullOrder ?? order;
+    if (!mounted) return;
+    await PdfExportService.showPreview(
+      context,
+      title: 'ใบสั่งซื้อ ${pdfOrder.poNo}',
+      filename: PdfFilename.generate('purchase_order_${pdfOrder.poNo}'),
+      buildPdf: () => PurchaseOrderPdfBuilder.build([pdfOrder]),
+    );
+  }
+
+  Future<void> _openPurchaseOrderForm(PurchaseOrderModel order) async {
+    final fullOrder =
+        await ref.read(purchaseListProvider.notifier).getPurchaseOrderDetails(
+          order.poId,
+        );
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PurchaseOrderFormPage(order: fullOrder ?? order),
+      ),
+    );
+  }
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -707,12 +774,14 @@ class _POCard extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onDelete;
   final VoidCallback onApprove;
+  final VoidCallback onPrintPdf;
 
   const _POCard({
     required this.order,
     required this.onTap,
     required this.onDelete,
     required this.onApprove,
+    required this.onPrintPdf,
   });
 
   Color get _statusColor {
@@ -932,6 +1001,26 @@ class _POCard extends StatelessWidget {
                       width: 52,
                       height: 34,
                       child: OutlinedButton(
+                        onPressed: onPrintPdf,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppTheme.info,
+                          side: const BorderSide(color: AppTheme.info),
+                          padding: EdgeInsets.zero,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.picture_as_pdf_outlined,
+                          size: 18,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      width: 52,
+                      height: 34,
+                      child: OutlinedButton(
                         onPressed: onDelete,
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppTheme.error,
@@ -963,6 +1052,32 @@ class _POCard extends StatelessWidget {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ] else ...[
+                const SizedBox(height: 10),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    SizedBox(
+                      width: 52,
+                      height: 34,
+                      child: OutlinedButton(
+                        onPressed: onPrintPdf,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppTheme.info,
+                          side: const BorderSide(color: AppTheme.info),
+                          padding: EdgeInsets.zero,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.picture_as_pdf_outlined,
+                          size: 18,
                         ),
                       ),
                     ),

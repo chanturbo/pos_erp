@@ -24,6 +24,8 @@ import '../../../../shared/services/mobile_scanner_service.dart';
 import '../../../../shared/widgets/mobile_home_button.dart';
 import '../../../../shared/widgets/thermal_receipt.dart';
 
+enum ReceiptExitAction { openNewBill }
+
 class PaymentPage extends ConsumerStatefulWidget {
   const PaymentPage({super.key});
 
@@ -1874,16 +1876,6 @@ class ReceiptPage extends ConsumerWidget {
         leading: buildMobileHomeLeading(context),
         automaticallyImplyLeading: false,
         title: const Text('ใบเสร็จรับเงิน'),
-        actions: [
-          TextButton.icon(
-            onPressed: () => Navigator.of(context).pop(),
-            icon: const Icon(Icons.storefront, color: Colors.white),
-            label: const Text(
-              'กลับหน้าขาย',
-              style: TextStyle(color: Colors.white),
-            ),
-          ),
-        ],
       ),
       body: Center(
         child: SingleChildScrollView(
@@ -1942,35 +1934,17 @@ class ReceiptPage extends ConsumerWidget {
 
               const SizedBox(height: 32),
 
-              // ── ปุ่มกลับ ─────────────────────────────────────────
+              // ── ปุ่มเปิดบิลใหม่ ──────────────────────────────────
               SizedBox(
                 width: 340,
                 height: 52,
                 child: FilledButton.icon(
-                  onPressed: () => Navigator.of(context).pop(),
+                  onPressed: () =>
+                      Navigator.of(context).pop(ReceiptExitAction.openNewBill),
                   icon: const Icon(Icons.add_shopping_cart, size: 20),
                   label: const Text(
                     'เปิดบิลใหม่',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: 340,
-                height: 52,
-                child: ElevatedButton.icon(
-                  onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.storefront, size: 20),
-                  label: const Text(
-                    'กลับหน้าขาย',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 0,
                   ),
                 ),
               ),
