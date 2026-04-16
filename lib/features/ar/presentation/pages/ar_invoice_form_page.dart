@@ -7,6 +7,7 @@ import 'package:pos_erp/shared/widgets/escape_pop_scope.dart';
 import 'package:pos_erp/shared/widgets/mobile_home_button.dart';
 import '../../../customers/presentation/providers/customer_provider.dart';
 import '../../../products/presentation/providers/product_provider.dart';
+import '../../../../core/client/api_client.dart';
 import '../../data/models/ar_invoice_model.dart';
 import '../providers/ar_invoice_provider.dart';
 import '../providers/ar_receipt_provider.dart';
@@ -54,15 +55,25 @@ class _ArInvoiceFormPageState extends ConsumerState<ArInvoiceFormPage> {
     if (!mounted) return;
     setState(() => _isLoadingItems = true);
     try {
-      final detail = await ref.read(
-        arInvoiceDetailProvider(widget.invoice!.invoiceId).future,
+      // เรียก API โดยตรง — ไม่ใช้ cached provider เพื่อให้ได้ข้อมูลล่าสุดเสมอ
+      final apiClient = ref.read(apiClientProvider);
+      final res = await apiClient.get(
+        '/api/ar-invoices/${widget.invoice!.invoiceId}',
       );
-      if (mounted && detail?.items != null) {
-        setState(() {
-          _items.clear();
-          _items.addAll(detail!.items!);
-        });
+      if (mounted && res.statusCode == 200 && res.data['data'] != null) {
+        final detail = ArInvoiceModel.fromJson(
+          res.data['data'] as Map<String, dynamic>,
+        );
+        if (detail.items != null && detail.items!.isNotEmpty) {
+          setState(() {
+            _items.clear();
+            _items.addAll(detail.items!);
+          });
+        }
       }
+    } catch (e) {
+      // ไม่ขึ้น error ใน UI — items จะเป็น [] และผู้ใช้สามารถเพิ่มเองได้
+      debugPrint('⚠️ _loadItemsFromDetail: $e');
     } finally {
       if (mounted) setState(() => _isLoadingItems = false);
     }

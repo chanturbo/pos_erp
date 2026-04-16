@@ -218,7 +218,7 @@ class ArInvoiceRoutes {
     }
   }
 
-  // ─── PUT /:id — แก้ไขใบแจ้งหนี้ ─────────────────────────────────────
+  // ─── PUT /:id — แก้ไขใบแจ้งหนี้ + items ────────────────────────────
   Future<Response> _updateInvoiceHandler(Request request, String id) async {
     try {
       print('📡 ArInvoiceRoutes: PUT /$id');
@@ -226,6 +226,7 @@ class ArInvoiceRoutes {
       final payload = await request.readAsString();
       final data = jsonDecode(payload) as Map<String, dynamic>;
 
+      // อัพเดท header
       await (db.update(db.arInvoices)
             ..where((inv) => inv.invoiceId.equals(id)))
           .write(ArInvoicesCompanion(
@@ -243,6 +244,36 @@ class ArInvoiceRoutes {
         remark: Value(data['remark'] as String?),
         updatedAt: Value(DateTime.now()),
       ));
+
+      // อัพเดท items: ลบของเก่า แล้ว insert ใหม่ทั้งหมด
+      if (data['items'] != null) {
+        await (db.delete(db.arInvoiceItems)
+              ..where((item) => item.invoiceId.equals(id)))
+            .go();
+
+        final items = data['items'] as List;
+        for (var i = 0; i < items.length; i++) {
+          final item = items[i] as Map<String, dynamic>;
+          final itemId = 'ARINVITEM${DateTime.now().millisecondsSinceEpoch}$i';
+
+          await db.into(db.arInvoiceItems).insert(ArInvoiceItemsCompanion(
+                itemId: Value(itemId),
+                invoiceId: Value(id),
+                lineNo: Value(item['line_no'] as int? ?? i + 1),
+                productId: Value(item['product_id'] as String),
+                productCode: Value(item['product_code'] as String),
+                productName: Value(item['product_name'] as String),
+                unit: Value(item['unit'] as String? ?? ''),
+                quantity: Value((item['quantity'] as num).toDouble()),
+                unitPrice: Value((item['unit_price'] as num).toDouble()),
+                discountAmount: Value(
+                    (item['discount_amount'] as num?)?.toDouble() ?? 0),
+                amount: Value((item['amount'] as num).toDouble()),
+                remark: Value(item['remark'] as String?),
+              ));
+        }
+        print('✅ ArInvoiceRoutes: Updated ${items.length} items for $id');
+      }
 
       print('✅ ArInvoiceRoutes: Updated invoice: $id');
 
