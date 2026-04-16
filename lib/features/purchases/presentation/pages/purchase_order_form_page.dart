@@ -1344,12 +1344,13 @@ class _ProductSelectionDialogState
   String _productSearch = '';
   ProductUnitOption? _selectedUnit;
 
-  dynamic get _product => _selectedProductId == null
-      ? null
-      : widget.products.firstWhere(
-          (p) => p.productId == _selectedProductId,
-          orElse: () => null,
-        );
+  ProductModel? get _product {
+    if (_selectedProductId == null) return null;
+    final matches = widget.products.where(
+      (p) => p.productId == _selectedProductId,
+    );
+    return matches.isEmpty ? null : matches.first;
+  }
 
   double get _baseQty {
     final qty = double.tryParse(_quantityController.text) ?? 0;
@@ -1505,7 +1506,7 @@ class _ProductSelectionDialogState
                 hint: 'หน่วย',
                 icon: Icons.straighten_outlined,
                 isDark: isDark,
-                items: (_product!.allUnits as List<ProductUnitOption>)
+                items: _product!.allUnits
                     .map<DropdownMenuItem<String>>(
                       (u) => DropdownMenuItem(
                         value: u.unit,
@@ -1523,9 +1524,9 @@ class _ProductSelectionDialogState
                     )
                     .toList(),
                 onChanged: (v) => setState(() {
-                  _selectedUnit =
-                      (_product!.allUnits as List<ProductUnitOption>)
-                          .firstWhere((u) => u.unit == v);
+                  _selectedUnit = _product!.allUnits.firstWhere(
+                    (u) => u.unit == v,
+                  );
                 }),
               ),
               const SizedBox(height: 12),

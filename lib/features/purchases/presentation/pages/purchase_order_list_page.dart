@@ -155,72 +155,76 @@ class _PurchaseOrderListPageState extends ConsumerState<PurchaseOrderListPage> {
         return Container(
           color: isDark ? AppTheme.darkCard : Colors.white,
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // แถว 1 — Status Filter Chips
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    _POFilterChip(
-                      label: 'ทั้งหมด',
-                      count: all.length,
-                      color: AppTheme.navy,
-                      selected: _statusFilter == 'ALL',
-                      onTap: () => setState(() => _statusFilter = 'ALL'),
-                    ),
-                    const SizedBox(width: 6),
-                    _POFilterChip(
-                      label: 'ร่าง',
-                      count: countByStatus('DRAFT'),
-                      color: AppTheme.textSub,
-                      selected: _statusFilter == 'DRAFT',
-                      onTap: () => setState(() => _statusFilter = 'DRAFT'),
-                    ),
-                    const SizedBox(width: 6),
-                    _POFilterChip(
-                      label: 'อนุมัติแล้ว',
-                      count: countByStatus('APPROVED'),
-                      color: AppTheme.info,
-                      selected: _statusFilter == 'APPROVED',
-                      onTap: () => setState(() => _statusFilter = 'APPROVED'),
-                    ),
-                    const SizedBox(width: 6),
-                    _POFilterChip(
-                      label: 'รับบางส่วน',
-                      count: countByStatus('PARTIAL'),
-                      color: AppTheme.warning,
-                      selected: _statusFilter == 'PARTIAL',
-                      onTap: () => setState(() => _statusFilter = 'PARTIAL'),
-                    ),
-                    const SizedBox(width: 6),
-                    _POFilterChip(
-                      label: 'เสร็จสิ้น',
-                      count: countByStatus('COMPLETED'),
-                      color: AppTheme.success,
-                      selected: _statusFilter == 'COMPLETED',
-                      onTap: () => setState(() => _statusFilter = 'COMPLETED'),
-                    ),
-                  ],
+              // Chips — scroll ได้บนหน้าจอแคบ
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _POFilterChip(
+                        label: 'ทั้งหมด',
+                        count: all.length,
+                        color: AppTheme.navy,
+                        selected: _statusFilter == 'ALL',
+                        onTap: () => setState(() => _statusFilter = 'ALL'),
+                      ),
+                      const SizedBox(width: 6),
+                      _POFilterChip(
+                        label: 'ร่าง',
+                        count: countByStatus('DRAFT'),
+                        color: AppTheme.textSub,
+                        selected: _statusFilter == 'DRAFT',
+                        onTap: () => setState(() => _statusFilter = 'DRAFT'),
+                      ),
+                      const SizedBox(width: 6),
+                      _POFilterChip(
+                        label: 'อนุมัติแล้ว',
+                        count: countByStatus('APPROVED'),
+                        color: AppTheme.info,
+                        selected: _statusFilter == 'APPROVED',
+                        onTap: () => setState(
+                          () => _statusFilter = 'APPROVED',
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      _POFilterChip(
+                        label: 'รับบางส่วน',
+                        count: countByStatus('PARTIAL'),
+                        color: AppTheme.warning,
+                        selected: _statusFilter == 'PARTIAL',
+                        onTap: () => setState(
+                          () => _statusFilter = 'PARTIAL',
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      _POFilterChip(
+                        label: 'เสร็จสิ้น',
+                        count: countByStatus('COMPLETED'),
+                        color: AppTheme.success,
+                        selected: _statusFilter == 'COMPLETED',
+                        onTap: () => setState(
+                          () => _statusFilter = 'COMPLETED',
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 8),
-              // แถว 2 — Financial summary
-              Row(
-                children: [
-                  _POValueStat(
-                    label: 'กรองแล้ว',
-                    value: '${filtered.length} ใบ',
-                    color: AppTheme.primaryDark,
-                  ),
-                  const SizedBox(width: 8),
-                  _POValueStat(
-                    label: 'ยอดรวม',
-                    value: '฿${fmt.format(total)}',
-                    color: AppTheme.info,
-                  ),
-                ],
+              const SizedBox(width: 8),
+              // Stats — ขวามือ
+              _POValueStat(
+                label: 'กรองแล้ว',
+                value: '${filtered.length} ใบ',
+                color: AppTheme.primaryDark,
+              ),
+              const SizedBox(width: 6),
+              _POValueStat(
+                label: 'ยอดรวม',
+                value: '฿${fmt.format(total)}',
+                color: AppTheme.info,
               ),
             ],
           ),

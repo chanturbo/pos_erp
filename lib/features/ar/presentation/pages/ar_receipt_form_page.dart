@@ -40,6 +40,7 @@ class _ArReceiptFormPageState extends ConsumerState<ArReceiptFormPage> {
 
   List<ArInvoiceModel> _unpaidInvoices = [];
   final Map<String, double> _allocations = {};
+  final Map<String, TextEditingController> _allocationControllers = {};
   bool _isLoading = false;
   bool _isLoadingInvoices = false;
 
@@ -74,6 +75,9 @@ class _ArReceiptFormPageState extends ConsumerState<ArReceiptFormPage> {
     _referenceNoController.dispose();
     _bankNameController.dispose();
     _remarkController.dispose();
+    for (final c in _allocationControllers.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -296,10 +300,7 @@ class _ArReceiptFormPageState extends ConsumerState<ArReceiptFormPage> {
   }
 
   Widget _buildAllocationRow(ArInvoiceModel invoice, bool isDark) {
-    final currentAlloc = _allocations[invoice.invoiceId] ?? 0;
-    final controller = TextEditingController(
-      text: currentAlloc > 0 ? currentAlloc.toStringAsFixed(2) : '',
-    );
+    final controller = _allocationControllers[invoice.invoiceId]!;
     final fmt = NumberFormat('#,##0.00', 'th_TH');
 
     return Container(
@@ -541,56 +542,51 @@ class _ArReceiptFormPageState extends ConsumerState<ArReceiptFormPage> {
         ],
       ),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          Expanded(
-            child: OutlinedButton(
-              onPressed: () => Navigator.pop(context),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: isDark ? Colors.white70 : AppTheme.textSub,
-                side: BorderSide(
-                  color: isDark ? const Color(0xFF444444) : AppTheme.border,
-                ),
-                padding: const EdgeInsets.symmetric(vertical: 13),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
+          OutlinedButton(
+            onPressed: _isLoading ? null : () => Navigator.pop(context),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              side: BorderSide(
+                color: isDark ? Colors.white24 : AppTheme.border,
               ),
-              child: const Text(
-                'ยกเลิก',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: Text(
+              'ยกเลิก',
+              style: TextStyle(
+                color: isDark ? Colors.white60 : AppTheme.textSub,
               ),
             ),
           ),
           const SizedBox(width: 12),
-          Expanded(
-            flex: 2,
-            child: ElevatedButton(
-              onPressed: _isLoading ? null : _saveReceipt,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _accentColor,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(vertical: 13),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              child: _isLoading
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Text(
-                      'บันทึกรับเงิน',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                      ),
+          ElevatedButton.icon(
+            onPressed: _isLoading ? null : _saveReceipt,
+            icon: _isLoading
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
                     ),
+                  )
+                : const Icon(Icons.save_outlined, size: 18),
+            label: const Text(
+              'บันทึกรับเงิน',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _accentColor,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
           ),
         ],
@@ -757,16 +753,31 @@ class _ArReceiptFormPageState extends ConsumerState<ArReceiptFormPage> {
             .where((inv) => inv.status != 'PAID')
             .toList();
 
-        setState(() {
-          _unpaidInvoices = invoices;
-          if (preselectInvoice != null) {
-            _allocations.clear();
-            for (final inv in invoices) {
-              if (inv.invoiceId == preselectInvoice.invoiceId) {
-                _allocations[inv.invoiceId] = inv.remainingAmount;
-              }
+        // Dispose old controllers
+        for (final c in _allocationControllers.values) {
+          c.dispose();
+        }
+        _allocationControllers.clear();
+
+        if (preselectInvoice != null) {
+          _allocations.clear();
+          for (final inv in invoices) {
+            if (inv.invoiceId == preselectInvoice.invoiceId) {
+              _allocations[inv.invoiceId] = inv.remainingAmount;
             }
           }
+        }
+
+        // Create one controller per invoice (persists across rebuilds)
+        for (final inv in invoices) {
+          final amount = _allocations[inv.invoiceId] ?? 0;
+          _allocationControllers[inv.invoiceId] = TextEditingController(
+            text: amount > 0 ? amount.toStringAsFixed(2) : '',
+          );
+        }
+
+        setState(() {
+          _unpaidInvoices = invoices;
         });
       }
     } finally {
@@ -779,6 +790,8 @@ class _ArReceiptFormPageState extends ConsumerState<ArReceiptFormPage> {
       _allocations.clear();
       for (final inv in _unpaidInvoices) {
         _allocations[inv.invoiceId] = inv.remainingAmount;
+        _allocationControllers[inv.invoiceId]?.text =
+            inv.remainingAmount.toStringAsFixed(2);
       }
     });
   }
@@ -866,7 +879,7 @@ class _ArReceiptFormPageState extends ConsumerState<ArReceiptFormPage> {
     if (success) {
       ref.read(arInvoiceListProvider.notifier).refresh();
       ref.read(customerListProvider.notifier).refresh();
-      Navigator.pop(context);
+      Navigator.pop(context, true);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('บันทึกรับเงินสำเร็จ'),

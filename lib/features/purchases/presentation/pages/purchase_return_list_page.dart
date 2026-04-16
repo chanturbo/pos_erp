@@ -5,6 +5,7 @@ import 'package:pos_erp/shared/theme/app_theme.dart';
 import 'package:pos_erp/shared/widgets/app_dialogs.dart';
 import 'package:pos_erp/shared/widgets/pagination_bar.dart';
 import 'package:pos_erp/shared/widgets/escape_pop_scope.dart';
+import 'package:pos_erp/shared/pdf/pdf_export_service.dart';
 import 'package:pos_erp/shared/pdf/pdf_report_button.dart';
 import '../../../settings/presentation/pages/settings_page.dart';
 import '../providers/purchase_return_provider.dart';
@@ -154,72 +155,70 @@ class _PurchaseReturnListPageState
         return Container(
           color: isDark ? AppTheme.darkCard : Colors.white,
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Status Filter Chips
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    _PRFilterChip(
-                      label: 'ทั้งหมด',
-                      count: all.length,
-                      color: AppTheme.navy,
-                      selected: _statusFilter == 'ALL',
-                      onTap: () => setState(() {
-                        _statusFilter = 'ALL';
-                        _currentPage = 1;
-                      }),
-                    ),
-                    const SizedBox(width: 6),
-                    _PRFilterChip(
-                      label: 'ร่าง',
-                      count: countByStatus('DRAFT'),
-                      color: AppTheme.warning,
-                      selected: _statusFilter == 'DRAFT',
-                      onTap: () => setState(() {
-                        _statusFilter = 'DRAFT';
-                        _currentPage = 1;
-                      }),
-                    ),
-                    const SizedBox(width: 6),
-                    _PRFilterChip(
-                      label: 'ยืนยันแล้ว',
-                      count: countByStatus('CONFIRMED'),
-                      color: AppTheme.success,
-                      selected: _statusFilter == 'CONFIRMED',
-                      onTap: () => setState(() {
-                        _statusFilter = 'CONFIRMED';
-                        _currentPage = 1;
-                      }),
-                    ),
-                  ],
+              // Chips — scroll ได้บนหน้าจอแคบ
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _PRFilterChip(
+                        label: 'ทั้งหมด',
+                        count: all.length,
+                        color: AppTheme.navy,
+                        selected: _statusFilter == 'ALL',
+                        onTap: () => setState(() {
+                          _statusFilter = 'ALL';
+                          _currentPage = 1;
+                        }),
+                      ),
+                      const SizedBox(width: 6),
+                      _PRFilterChip(
+                        label: 'ร่าง',
+                        count: countByStatus('DRAFT'),
+                        color: AppTheme.warning,
+                        selected: _statusFilter == 'DRAFT',
+                        onTap: () => setState(() {
+                          _statusFilter = 'DRAFT';
+                          _currentPage = 1;
+                        }),
+                      ),
+                      const SizedBox(width: 6),
+                      _PRFilterChip(
+                        label: 'ยืนยันแล้ว',
+                        count: countByStatus('CONFIRMED'),
+                        color: AppTheme.success,
+                        selected: _statusFilter == 'CONFIRMED',
+                        onTap: () => setState(() {
+                          _statusFilter = 'CONFIRMED';
+                          _currentPage = 1;
+                        }),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 8),
-              // Summary stats
-              Row(
-                children: [
-                  _PRValueStat(
-                    label: 'กรองแล้ว',
-                    value: '${filtered.length} ใบ',
-                    color: AppTheme.primaryDark,
-                  ),
-                  const SizedBox(width: 8),
-                  _PRValueStat(
-                    label: 'ยอดรวม',
-                    value: '฿${fmt.format(totalAmt)}',
-                    color: AppTheme.error,
-                  ),
-                  const SizedBox(width: 8),
-                  _PRValueStat(
-                    label: 'รายการสินค้า',
-                    value:
-                        '${filtered.fold(0, (s, r) => s + (r.items?.length ?? 0))} รายการ',
-                    color: AppTheme.info,
-                  ),
-                ],
+              const SizedBox(width: 8),
+              // Stats — ขวามือ
+              _PRValueStat(
+                label: 'กรองแล้ว',
+                value: '${filtered.length} ใบ',
+                color: AppTheme.primaryDark,
+              ),
+              const SizedBox(width: 6),
+              _PRValueStat(
+                label: 'ยอดรวม',
+                value: '฿${fmt.format(totalAmt)}',
+                color: AppTheme.error,
+              ),
+              const SizedBox(width: 6),
+              _PRValueStat(
+                label: 'รายการสินค้า',
+                value:
+                    '${filtered.fold(0, (s, r) => s + (r.items?.length ?? 0))} รายการ',
+                color: AppTheme.info,
               ),
             ],
           ),
@@ -242,6 +241,7 @@ class _PurchaseReturnListPageState
         onTap: () => _openForm(items[i]),
         onConfirm: () => _confirmReturn(items[i]),
         onDelete: () => _deleteReturn(items[i]),
+        onPrintPdf: () => _openReturnPdf(items[i]),
       ),
     );
   }
@@ -341,75 +341,185 @@ class _PurchaseReturnListPageState
                       ),
                     ),
                   ),
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        width: 4,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: statusColor,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        flex: 3,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              r.returnNo,
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: isDark ? Colors.white : Colors.black87,
-                              ),
-                              overflow: TextOverflow.ellipsis,
+                      // ── แถว 1: ข้อมูลหลัก ──────────────────
+                      Row(
+                        children: [
+                          Container(
+                            width: 4,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: statusColor,
+                              borderRadius: BorderRadius.circular(2),
                             ),
-                            Text(
-                              r.supplierName,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            flex: 3,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  r.returnNo,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: isDark
+                                        ? Colors.white
+                                        : Colors.black87,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Text(
+                                  r.supplierName,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: isDark
+                                        ? const Color(0xFFAAAAAA)
+                                        : AppTheme.textSub,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                          SizedBox(
+                            width: 72,
+                            child: Text(
+                              DateFormat('dd/MM/yy').format(r.returnDate),
                               style: TextStyle(
                                 fontSize: 11,
                                 color: isDark
                                     ? const Color(0xFFAAAAAA)
                                     : AppTheme.textSub,
                               ),
-                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                          SizedBox(
+                            width: 80,
+                            child: Center(
+                              child: _PRStatusBadge(status: r.status),
+                            ),
+                          ),
+                          SizedBox(
+                            width: 86,
+                            child: Text(
+                              '฿${NumberFormat('#,##0.00', 'th_TH').format(r.totalAmount)}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: isDark
+                                    ? const Color(0xFFEF9A9A)
+                                    : AppTheme.error,
+                              ),
+                              textAlign: TextAlign.right,
+                            ),
+                          ),
+                        ],
+                      ),
+                      // ── แถว 2: ปุ่ม action ──────────────────
+                      const SizedBox(height: 8),
+                      if (r.status == 'DRAFT') ...[
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            SizedBox(
+                              width: 52,
+                              height: 34,
+                              child: OutlinedButton(
+                                onPressed: () => _openReturnPdf(r),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppTheme.info,
+                                  side: const BorderSide(color: AppTheme.info),
+                                  padding: EdgeInsets.zero,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                child: const Icon(
+                                  Icons.picture_as_pdf_outlined,
+                                  size: 18,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            SizedBox(
+                              width: 52,
+                              height: 34,
+                              child: OutlinedButton(
+                                onPressed: () => _deleteReturn(items[i]),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppTheme.error,
+                                  side: const BorderSide(color: AppTheme.error),
+                                  padding: EdgeInsets.zero,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                child: const Icon(
+                                  Icons.delete_outline,
+                                  size: 18,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            SizedBox(
+                              width: 96,
+                              height: 34,
+                              child: ElevatedButton.icon(
+                                onPressed: () => _confirmReturn(items[i]),
+                                icon: const Icon(
+                                  Icons.check_circle_outline,
+                                  size: 14,
+                                ),
+                                label: const Text(
+                                  'ยืนยัน',
+                                  style: TextStyle(fontSize: 12),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppTheme.success,
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                              ),
                             ),
                           ],
                         ),
-                      ),
-                      SizedBox(
-                        width: 72,
-                        child: Text(
-                          DateFormat('dd/MM/yy').format(r.returnDate),
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: isDark
-                                ? const Color(0xFFAAAAAA)
-                                : AppTheme.textSub,
-                          ),
-                          textAlign: TextAlign.center,
+                      ] else ...[
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            SizedBox(
+                              width: 52,
+                              height: 34,
+                              child: OutlinedButton(
+                                onPressed: () => _openReturnPdf(r),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppTheme.info,
+                                  side: const BorderSide(color: AppTheme.info),
+                                  padding: EdgeInsets.zero,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                child: const Icon(
+                                  Icons.picture_as_pdf_outlined,
+                                  size: 18,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                      SizedBox(
-                        width: 80,
-                        child: Center(child: _PRStatusBadge(status: r.status)),
-                      ),
-                      SizedBox(
-                        width: 86,
-                        child: Text(
-                          '฿${NumberFormat('#,##0.00', 'th_TH').format(r.totalAmount)}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: isDark
-                                ? const Color(0xFFEF9A9A)
-                                : AppTheme.error,
-                          ),
-                          textAlign: TextAlign.right,
-                        ),
-                      ),
+                      ],
                     ],
                   ),
                 ),
@@ -488,11 +598,33 @@ class _PurchaseReturnListPageState
   // ─────────────────────────────────────────────────────────────
   // Actions
   // ─────────────────────────────────────────────────────────────
-  void _openForm(PurchaseReturnModel r) {
-    Navigator.push(
+  Future<void> _openReturnPdf(PurchaseReturnModel r) async {
+    final full = await ref
+        .read(purchaseReturnListProvider.notifier)
+        .getReturnDetails(r.returnId);
+    final pdfReturn = full ?? r;
+    if (!mounted) return;
+    await PdfExportService.showPreview(
       context,
-      MaterialPageRoute(builder: (_) => PurchaseReturnFormPage(returnDoc: r)),
-    ).then((_) => ref.read(purchaseReturnListProvider.notifier).refresh());
+      title: 'ใบคืนสินค้า ${pdfReturn.returnNo}',
+      filename: PdfFilename.generate('purchase_return_${pdfReturn.returnNo}'),
+      buildPdf: () => PurchaseReturnPdfBuilder.build([pdfReturn]),
+    );
+  }
+
+  Future<void> _openForm(PurchaseReturnModel r) async {
+    final full = await ref
+        .read(purchaseReturnListProvider.notifier)
+        .getReturnDetails(r.returnId);
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PurchaseReturnFormPage(returnDoc: full ?? r),
+      ),
+    );
+    if (!mounted) return;
+    ref.read(purchaseReturnListProvider.notifier).refresh();
   }
 
   Future<void> _confirmReturn(PurchaseReturnModel r) async {
@@ -775,12 +907,14 @@ class _PRCard extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onConfirm;
   final VoidCallback onDelete;
+  final VoidCallback onPrintPdf;
 
   const _PRCard({
     required this.returnDoc,
     required this.onTap,
     required this.onConfirm,
     required this.onDelete,
+    required this.onPrintPdf,
   });
 
   @override
@@ -929,11 +1063,31 @@ class _PRCard extends StatelessWidget {
                       ),
                     ],
                   ),
-                  // Draft actions
+                  // Action buttons — all statuses
+                  const SizedBox(height: 10),
                   if (returnDoc.isDraft) ...[
-                    const SizedBox(height: 10),
                     Row(
                       children: [
+                        SizedBox(
+                          width: 52,
+                          height: 34,
+                          child: OutlinedButton(
+                            onPressed: onPrintPdf,
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppTheme.info,
+                              side: const BorderSide(color: AppTheme.info),
+                              padding: EdgeInsets.zero,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            child: const Icon(
+                              Icons.picture_as_pdf_outlined,
+                              size: 18,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: OutlinedButton.icon(
                             onPressed: onConfirm,
@@ -974,6 +1128,31 @@ class _PRCard extends StatelessWidget {
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(8),
                               ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ] else ...[
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        SizedBox(
+                          width: 52,
+                          height: 34,
+                          child: OutlinedButton(
+                            onPressed: onPrintPdf,
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppTheme.info,
+                              side: const BorderSide(color: AppTheme.info),
+                              padding: EdgeInsets.zero,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            child: const Icon(
+                              Icons.picture_as_pdf_outlined,
+                              size: 18,
                             ),
                           ),
                         ),

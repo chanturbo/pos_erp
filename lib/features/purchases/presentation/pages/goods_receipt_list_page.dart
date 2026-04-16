@@ -6,6 +6,7 @@ import 'package:pos_erp/shared/utils/responsive_utils.dart';
 import 'package:pos_erp/shared/widgets/app_dialogs.dart';
 import 'package:pos_erp/shared/widgets/pagination_bar.dart';
 import 'package:pos_erp/shared/widgets/escape_pop_scope.dart';
+import 'package:pos_erp/shared/pdf/pdf_export_service.dart';
 import 'package:pos_erp/shared/pdf/pdf_report_button.dart';
 import 'package:pos_erp/shared/widgets/mobile_home_button.dart';
 import '../../../settings/presentation/pages/settings_page.dart';
@@ -148,66 +149,63 @@ class _GoodsReceiptListPageState extends ConsumerState<GoodsReceiptListPage> {
         return Container(
           color: isDark ? AppTheme.darkCard : Colors.white,
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Status Filter Chips
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    _GRFilterChip(
-                      label: 'ทั้งหมด',
-                      count: all.length,
-                      color: AppTheme.navy,
-                      selected: _statusFilter == 'ALL',
-                      onTap: () => setState(() {
-                        _statusFilter = 'ALL';
-                        _currentPage = 1;
-                      }),
-                    ),
-                    const SizedBox(width: 6),
-                    _GRFilterChip(
-                      label: 'ร่าง',
-                      count: countByStatus('DRAFT'),
-                      color: AppTheme.warning,
-                      selected: _statusFilter == 'DRAFT',
-                      onTap: () => setState(() {
-                        _statusFilter = 'DRAFT';
-                        _currentPage = 1;
-                      }),
-                    ),
-                    const SizedBox(width: 6),
-                    _GRFilterChip(
-                      label: 'ยืนยันแล้ว',
-                      count: countByStatus('CONFIRMED'),
-                      color: AppTheme.success,
-                      selected: _statusFilter == 'CONFIRMED',
-                      onTap: () => setState(() {
-                        _statusFilter = 'CONFIRMED';
-                        _currentPage = 1;
-                      }),
-                    ),
-                  ],
+              // Chips — scroll ได้บนหน้าจอแคบ
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _GRFilterChip(
+                        label: 'ทั้งหมด',
+                        count: all.length,
+                        color: AppTheme.navy,
+                        selected: _statusFilter == 'ALL',
+                        onTap: () => setState(() {
+                          _statusFilter = 'ALL';
+                          _currentPage = 1;
+                        }),
+                      ),
+                      const SizedBox(width: 6),
+                      _GRFilterChip(
+                        label: 'ร่าง',
+                        count: countByStatus('DRAFT'),
+                        color: AppTheme.warning,
+                        selected: _statusFilter == 'DRAFT',
+                        onTap: () => setState(() {
+                          _statusFilter = 'DRAFT';
+                          _currentPage = 1;
+                        }),
+                      ),
+                      const SizedBox(width: 6),
+                      _GRFilterChip(
+                        label: 'ยืนยันแล้ว',
+                        count: countByStatus('CONFIRMED'),
+                        color: AppTheme.success,
+                        selected: _statusFilter == 'CONFIRMED',
+                        onTap: () => setState(() {
+                          _statusFilter = 'CONFIRMED';
+                          _currentPage = 1;
+                        }),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 8),
-              // Summary stats
-              Row(
-                children: [
-                  _GRValueStat(
-                    label: 'กรองแล้ว',
-                    value: '${filtered.length} ใบ',
-                    color: AppTheme.primaryDark,
-                  ),
-                  const SizedBox(width: 8),
-                  _GRValueStat(
-                    label: 'รายการสินค้า',
-                    value:
-                        '${filtered.fold(0, (s, r) => s + r.itemCount)} รายการ',
-                    color: AppTheme.info,
-                  ),
-                ],
+              const SizedBox(width: 8),
+              // Stats — ขวามือ
+              _GRValueStat(
+                label: 'กรองแล้ว',
+                value: '${filtered.length} ใบ',
+                color: AppTheme.primaryDark,
+              ),
+              const SizedBox(width: 6),
+              _GRValueStat(
+                label: 'รายการสินค้า',
+                value: '${filtered.fold(0, (s, r) => s + r.itemCount)} รายการ',
+                color: AppTheme.info,
               ),
             ],
           ),
@@ -235,6 +233,7 @@ class _GoodsReceiptListPageState extends ConsumerState<GoodsReceiptListPage> {
         ),
         onDelete: () => _deleteReceipt(receipts[i]),
         onConfirm: () => _confirmReceipt(receipts[i]),
+        onPrintPdf: () => _openGoodsReceiptPdf(receipts[i]),
       ),
     );
   }
@@ -417,12 +416,32 @@ class _GoodsReceiptListPageState extends ConsumerState<GoodsReceiptListPage> {
                           ),
                         ],
                       ),
-                      // ── แถว 2: ปุ่ม DRAFT ────────────────────
+                      // ── แถว 2: ปุ่ม action ────────────────────
+                      const SizedBox(height: 8),
                       if (r.status == 'DRAFT') ...[
-                        const SizedBox(height: 8),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
+                            SizedBox(
+                              width: 52,
+                              height: 34,
+                              child: OutlinedButton(
+                                onPressed: () => _openGoodsReceiptPdf(r),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppTheme.info,
+                                  side: const BorderSide(color: AppTheme.info),
+                                  padding: EdgeInsets.zero,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                child: const Icon(
+                                  Icons.picture_as_pdf_outlined,
+                                  size: 18,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
                             SizedBox(
                               width: 52,
                               height: 34,
@@ -466,6 +485,31 @@ class _GoodsReceiptListPageState extends ConsumerState<GoodsReceiptListPage> {
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(8),
                                   ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ] else ...[
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            SizedBox(
+                              width: 52,
+                              height: 34,
+                              child: OutlinedButton(
+                                onPressed: () => _openGoodsReceiptPdf(r),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppTheme.info,
+                                  side: const BorderSide(color: AppTheme.info),
+                                  padding: EdgeInsets.zero,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                child: const Icon(
+                                  Icons.picture_as_pdf_outlined,
+                                  size: 18,
                                 ),
                               ),
                             ),
@@ -637,6 +681,20 @@ class _GoodsReceiptListPageState extends ConsumerState<GoodsReceiptListPage> {
     );
   }
 
+  Future<void> _openGoodsReceiptPdf(GoodsReceiptModel receipt) async {
+    final full = await ref
+        .read(goodsReceiptListProvider.notifier)
+        .getGoodsReceiptDetails(receipt.grId);
+    final pdfReceipt = full ?? receipt;
+    if (!mounted) return;
+    await PdfExportService.showPreview(
+      context,
+      title: 'ใบรับสินค้า ${pdfReceipt.grNo}',
+      filename: PdfFilename.generate('goods_receipt_${pdfReceipt.grNo}'),
+      buildPdf: () => GoodsReceiptPdfBuilder.build([pdfReceipt]),
+    );
+  }
+
   Future<void> _deleteReceipt(GoodsReceiptModel receipt) async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -712,12 +770,14 @@ class _GRCard extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onDelete;
   final VoidCallback onConfirm;
+  final VoidCallback onPrintPdf;
 
   const _GRCard({
     required this.receipt,
     required this.onTap,
     required this.onDelete,
     required this.onConfirm,
+    required this.onPrintPdf,
   });
 
   @override
@@ -880,12 +940,32 @@ class _GRCard extends StatelessWidget {
                 ],
               ),
 
-              // ── Row 4: Action buttons (DRAFT only) ─────────────
+              // ── Row 4: Action buttons ───────────────────────────
+              const SizedBox(height: 10),
               if (receipt.status == 'DRAFT') ...[
-                const SizedBox(height: 10),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
+                    SizedBox(
+                      width: 52,
+                      height: 34,
+                      child: OutlinedButton(
+                        onPressed: onPrintPdf,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppTheme.info,
+                          side: const BorderSide(color: AppTheme.info),
+                          padding: EdgeInsets.zero,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.picture_as_pdf_outlined,
+                          size: 18,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     SizedBox(
                       width: 52,
                       height: 34,
@@ -921,6 +1001,31 @@ class _GRCard extends StatelessWidget {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ] else ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    SizedBox(
+                      width: 52,
+                      height: 34,
+                      child: OutlinedButton(
+                        onPressed: onPrintPdf,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppTheme.info,
+                          side: const BorderSide(color: AppTheme.info),
+                          padding: EdgeInsets.zero,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.picture_as_pdf_outlined,
+                          size: 18,
                         ),
                       ),
                     ),

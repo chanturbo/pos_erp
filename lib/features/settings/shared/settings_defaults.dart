@@ -6,6 +6,8 @@ enum ResponsivePreset { mobile, tablet, desktop }
 enum PdfReportType {
   apInvoice,
   apPayment,
+  arInvoice,
+  arReceipt,
   customerList,
   productList,
   supplierList,
@@ -138,6 +140,8 @@ class SettingsStorage {
     final maxSafeRows = switch (report) {
       PdfReportType.apInvoice => 16,
       PdfReportType.apPayment => 16,
+      PdfReportType.arInvoice => 16,
+      PdfReportType.arReceipt => 16,
       PdfReportType.stockBalance => 18,
       PdfReportType.stockMovementHistory => 18,
       PdfReportType.stockProductHistory => 18,

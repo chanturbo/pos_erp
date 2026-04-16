@@ -302,8 +302,12 @@ class ApInvoiceRoutes {
             'supplier_name': inv.supplierName,
             'total_amount': inv.totalAmount,
             'paid_amount': inv.paidAmount,
+            'reference_type': inv.referenceType,
+            'reference_id': inv.referenceId,
             'status': inv.status,
+            'remark': inv.remark,
             'created_at': inv.createdAt.toIso8601String(),
+            'updated_at': inv.updatedAt.toIso8601String(),
           }).toList();
 
       print('✅ ApInvoiceRoutes: Found ${invoices.length} invoices');

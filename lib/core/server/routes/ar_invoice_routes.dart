@@ -105,9 +105,29 @@ class ArInvoiceRoutes {
             ..orderBy([(item) => OrderingTerm(expression: item.lineNo)]))
           .get();
 
+      // ดึงประวัติการรับเงินของใบแจ้งหนี้นี้
+      final allocations = await (db.select(db.arReceiptAllocations)
+            ..where((alloc) => alloc.invoiceId.equals(id)))
+          .get();
+
+      final receiptData = <Map<String, dynamic>>[];
+      for (final alloc in allocations) {
+        final rec = await (db.select(db.arReceipts)
+              ..where((r) => r.receiptId.equals(alloc.receiptId)))
+            .getSingleOrNull();
+        if (rec != null) {
+          receiptData.add({
+            'receipt_no': rec.receiptNo,
+            'receipt_date': rec.receiptDate.toIso8601String(),
+            'allocated_amount': alloc.allocatedAmount,
+          });
+        }
+      }
+
       final data = {
         ..._invoiceToMap(invoice),
         'items': items.map(_itemToMap).toList(),
+        'receipts': receiptData,
       };
 
       return Response.ok(

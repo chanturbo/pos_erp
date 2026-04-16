@@ -17,6 +17,7 @@ class ArInvoiceModel {
   final DateTime createdAt;
   final DateTime updatedAt;
   final List<ArInvoiceItemModel>? items;
+  final List<ArInvoiceReceiptModel>? receipts;
 
   ArInvoiceModel({
     required this.invoiceId,
@@ -34,6 +35,7 @@ class ArInvoiceModel {
     required this.createdAt,
     required this.updatedAt,
     this.items,
+    this.receipts,
   });
 
   double get remainingAmount => totalAmount - paidAmount;
@@ -64,6 +66,12 @@ class ArInvoiceModel {
           ? (json['items'] as List)
               .map((i) =>
                   ArInvoiceItemModel.fromJson(i as Map<String, dynamic>))
+              .toList()
+          : null,
+      receipts: json['receipts'] != null
+          ? (json['receipts'] as List)
+              .map((r) =>
+                  ArInvoiceReceiptModel.fromJson(r as Map<String, dynamic>))
               .toList()
           : null,
     );
@@ -105,6 +113,7 @@ class ArInvoiceModel {
     DateTime? createdAt,
     DateTime? updatedAt,
     List<ArInvoiceItemModel>? items,
+    List<ArInvoiceReceiptModel>? receipts,
   }) {
     return ArInvoiceModel(
       invoiceId: invoiceId ?? this.invoiceId,
@@ -122,6 +131,30 @@ class ArInvoiceModel {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       items: items ?? this.items,
+      receipts: receipts ?? this.receipts,
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// ArInvoiceReceiptModel — ประวัติการรับเงินของใบแจ้งหนี้
+// ─────────────────────────────────────────────────────────────────
+class ArInvoiceReceiptModel {
+  final String receiptNo;
+  final DateTime receiptDate;
+  final double allocatedAmount;
+
+  ArInvoiceReceiptModel({
+    required this.receiptNo,
+    required this.receiptDate,
+    required this.allocatedAmount,
+  });
+
+  factory ArInvoiceReceiptModel.fromJson(Map<String, dynamic> json) {
+    return ArInvoiceReceiptModel(
+      receiptNo: json['receipt_no'] as String,
+      receiptDate: DateTime.parse(json['receipt_date'] as String),
+      allocatedAmount: (json['allocated_amount'] as num).toDouble(),
     );
   }
 }

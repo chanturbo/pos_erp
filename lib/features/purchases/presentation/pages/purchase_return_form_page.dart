@@ -5,12 +5,13 @@ import 'package:pos_erp/shared/theme/app_theme.dart';
 import 'package:pos_erp/shared/utils/responsive_utils.dart';
 import 'package:pos_erp/shared/widgets/escape_pop_scope.dart';
 import 'package:pos_erp/shared/widgets/mobile_home_button.dart';
+import '../../data/models/goods_receipt_item_model.dart';
+import '../../data/models/goods_receipt_model.dart';
 import '../../data/models/purchase_return_model.dart';
 import '../../data/models/purchase_return_item_model.dart';
+import '../providers/goods_receipt_provider.dart';
 import '../providers/purchase_return_provider.dart';
 import '../../../suppliers/presentation/providers/supplier_provider.dart';
-import '../../../products/data/models/product_model.dart';
-import '../../../products/presentation/providers/product_provider.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 
 class PurchaseReturnFormPage extends ConsumerStatefulWidget {
@@ -33,11 +34,16 @@ class _PurchaseReturnFormPageState
   DateTime _returnDate = DateTime.now();
   String? _supplierId;
   String? _supplierName;
+  String? _referenceType;
+  String? _referenceId;
+  GoodsReceiptModel? _sourceReceipt;
+  Map<String, double> _confirmedReturnedQtyByProduct = {};
 
   final List<PurchaseReturnItemModel> _items = [];
   bool _isLoading = false;
   bool _isViewMode = false;
   bool _isCardView = false;
+  bool _isLoadingReference = false;
 
   @override
   void initState() {
@@ -54,8 +60,16 @@ class _PurchaseReturnFormPageState
       _returnDate = d.returnDate;
       _supplierId = d.supplierId;
       _supplierName = d.supplierName;
+      _referenceType = d.referenceType;
+      _referenceId = d.referenceId;
       _isViewMode = d.isConfirmed;
       if (d.items != null) _items.addAll(d.items!);
+      if (_referenceType == 'GOODS_RECEIPT' && _referenceId != null) {
+        _isLoadingReference = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _loadSourceReceipt(_referenceId!);
+        });
+      }
     } else {
       final ts = DateTime.now().millisecondsSinceEpoch;
       _returnNoController = TextEditingController(
@@ -81,8 +95,8 @@ class _PurchaseReturnFormPageState
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     // Preload data so dialogs open immediately on first tap
-    ref.watch(productListProvider);
     ref.watch(supplierListProvider);
+    ref.watch(goodsReceiptListProvider);
 
     return Scaffold(
       backgroundColor: isDark ? AppTheme.darkBg : const Color(0xFFF5F5F5),
@@ -155,7 +169,7 @@ class _PurchaseReturnFormPageState
                                   ),
                                   const SizedBox(width: 8),
                                   // Add button
-                                  if (_supplierId != null)
+                                  if (_sourceReceipt != null)
                                     GestureDetector(
                                       onTap: _addItem,
                                       child: Container(
@@ -358,6 +372,88 @@ class _PurchaseReturnFormPageState
             ),
           ),
         ),
+        const SizedBox(height: 12),
+
+        _PRFieldLabel('ใบรับสินค้าอ้างอิง'),
+        const SizedBox(height: 4),
+        GestureDetector(
+          onTap: _isViewMode ? null : _selectReferenceReceipt,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: isDark ? AppTheme.darkElement : Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: _referenceId == null
+                    ? AppTheme.warning.withValues(alpha: 0.5)
+                    : isDark
+                    ? const Color(0xFF3A3A3A)
+                    : AppTheme.border,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.inventory_outlined,
+                  size: 16,
+                  color: _referenceId != null
+                      ? AppTheme.info
+                      : AppTheme.textSub,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _sourceReceipt != null
+                        ? '${_sourceReceipt!.grNo} • ${_sourceReceipt!.warehouseName}'
+                        : _referenceId != null
+                        ? 'อ้างอิง ${_referenceId!}'
+                        : _supplierId == null
+                        ? 'เลือกซัพพลายเออร์ก่อน'
+                        : _isLoadingReference
+                        ? 'กำลังโหลดใบรับสินค้า...'
+                        : 'แตะเพื่อเลือกใบรับสินค้าอ้างอิง',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: _sourceReceipt != null
+                          ? (isDark ? Colors.white : Colors.black87)
+                          : AppTheme.textSub,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (!_isViewMode)
+                  Icon(
+                    Icons.chevron_right,
+                    size: 18,
+                    color: isDark ? const Color(0xFF888888) : AppTheme.textSub,
+                  ),
+              ],
+            ),
+          ),
+        ),
+        if (_sourceReceipt != null) ...[
+          const SizedBox(height: 8),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppTheme.info.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: AppTheme.info.withValues(alpha: 0.25),
+              ),
+            ),
+            child: Text(
+              'คืนสินค้าได้เฉพาะรายการจาก ${_sourceReceipt!.grNo}'
+              ' เข้าคลัง ${_sourceReceipt!.warehouseName}',
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppTheme.info,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -377,6 +473,31 @@ class _PurchaseReturnFormPageState
               const SizedBox(height: 8),
               Text(
                 'กรุณาเลือกซัพพลายเออร์ก่อน',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: isDark ? const Color(0xFF888888) : AppTheme.textSub,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_sourceReceipt == null && _items.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        child: Center(
+          child: Column(
+            children: [
+              Icon(
+                Icons.inventory_outlined,
+                size: 40,
+                color: isDark ? const Color(0xFF555555) : Colors.grey[300],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'กรุณาเลือกใบรับสินค้าอ้างอิงก่อน',
                 style: TextStyle(
                   fontSize: 13,
                   color: isDark ? const Color(0xFF888888) : AppTheme.textSub,
@@ -786,56 +907,51 @@ class _PurchaseReturnFormPageState
         ],
       ),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          Expanded(
-            child: OutlinedButton(
-              onPressed: () => Navigator.pop(context),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                side: BorderSide(
-                  color: isDark ? const Color(0xFF3A3A3A) : AppTheme.border,
-                ),
-                foregroundColor: isDark ? Colors.white70 : Colors.black87,
+          OutlinedButton(
+            onPressed: _isLoading ? null : () => Navigator.pop(context),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
               ),
-              child: const Text(
-                'ยกเลิก',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+              side: BorderSide(
+                color: isDark ? Colors.white24 : AppTheme.border,
+              ),
+            ),
+            child: Text(
+              'ยกเลิก',
+              style: TextStyle(
+                color: isDark ? Colors.white60 : AppTheme.textSub,
               ),
             ),
           ),
           const SizedBox(width: 12),
-          Expanded(
-            flex: 2,
-            child: ElevatedButton(
-              onPressed: _isLoading ? null : _save,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.error,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                elevation: 0,
-              ),
-              child: _isLoading
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Text(
-                      'บันทึกใบคืนสินค้า',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
+          ElevatedButton.icon(
+            onPressed: _isLoading ? null : _save,
+            icon: _isLoading
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
                     ),
+                  )
+                : const Icon(Icons.save_outlined, size: 18),
+            label: const Text(
+              'บันทึกใบคืนสินค้า',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.error,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              elevation: 0,
             ),
           ),
         ],
@@ -866,29 +982,102 @@ class _PurchaseReturnFormPageState
           _SupplierSelectionDialog(suppliers: suppliers, isDark: isDark),
     );
     if (selected != null && mounted) {
+      final supplierChanged = _supplierId != null && _supplierId != selected['id'];
       setState(() {
         _supplierId = selected['id'];
         _supplierName = selected['name'];
+        if (supplierChanged) {
+          _referenceType = null;
+          _referenceId = null;
+          _sourceReceipt = null;
+          _confirmedReturnedQtyByProduct = {};
+          _items.clear();
+        }
       });
     }
   }
 
-  Future<void> _addItem() async {
-    final products = ref.read(productListProvider).value;
-    if (products == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('กำลังโหลดข้อมูลสินค้า...'),
-          duration: Duration(seconds: 1),
-        ),
-      );
+  Future<void> _selectReferenceReceipt() async {
+    if (_supplierId == null) {
+      _showSnack('กรุณาเลือกซัพพลายเออร์ก่อน');
       return;
     }
+
+    final receiptsAsync = ref.read(goodsReceiptListProvider);
+    final receipts = receiptsAsync.value;
+    if (receipts == null) {
+      _showSnack('กำลังโหลดใบรับสินค้า...');
+      return;
+    }
+
+    final candidateReceipts = receipts
+        .where(
+          (receipt) =>
+              receipt.supplierId == _supplierId && receipt.status == 'CONFIRMED',
+        )
+        .toList()
+      ..sort((a, b) => b.grDate.compareTo(a.grDate));
+
+    if (candidateReceipts.isEmpty) {
+      _showSnack('ไม่พบใบรับสินค้าที่ยืนยันแล้วของซัพพลายเออร์นี้');
+      return;
+    }
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final selected = await showDialog<GoodsReceiptModel>(
+      context: context,
+      builder: (ctx) => _ReceiptSelectionDialog(
+        receipts: candidateReceipts,
+        isDark: isDark,
+      ),
+    );
+
+    if (selected == null || !mounted) return;
+    await _loadSourceReceipt(selected.grId, clearItems: true);
+  }
+
+  Future<void> _loadSourceReceipt(
+    String grId, {
+    bool clearItems = false,
+  }) async {
+    setState(() => _isLoadingReference = true);
+
+    final receipt = await ref
+        .read(goodsReceiptListProvider.notifier)
+        .getGoodsReceiptDetails(grId);
+    final confirmedReturnedQtyByProduct = receipt == null
+        ? <String, double>{}
+        : await _loadConfirmedReturnedQtyByProduct(grId);
+
+    if (!mounted) return;
+
+    setState(() {
+      _isLoadingReference = false;
+      _referenceType = receipt == null ? null : 'GOODS_RECEIPT';
+      _referenceId = receipt?.grId;
+      _sourceReceipt = receipt;
+      _confirmedReturnedQtyByProduct = confirmedReturnedQtyByProduct;
+      if (clearItems) _items.clear();
+    });
+
+    if (receipt == null) {
+      _showSnack('โหลดรายละเอียดใบรับสินค้าไม่สำเร็จ');
+    }
+  }
+
+  Future<void> _addItem() async {
+    if (_sourceReceipt == null) {
+      _showSnack('กรุณาเลือกใบรับสินค้าอ้างอิงก่อน');
+      return;
+    }
+
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final result = await showDialog<PurchaseReturnItemModel>(
       context: context,
       builder: (ctx) => _ItemDialog(
-        products: products,
+        receipt: _sourceReceipt!,
+        confirmedReturnedQtyByProduct: _confirmedReturnedQtyByProduct,
+        existingItems: _items,
         lineNo: _items.length + 1,
         isDark: isDark,
       ),
@@ -898,23 +1087,15 @@ class _PurchaseReturnFormPageState
 
   Future<void> _save() async {
     if (_supplierId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('กรุณาเลือกซัพพลายเออร์'),
-          backgroundColor: AppTheme.error,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      _showSnack('กรุณาเลือกซัพพลายเออร์');
+      return;
+    }
+    if (_referenceId == null || _referenceType != 'GOODS_RECEIPT') {
+      _showSnack('กรุณาเลือกใบรับสินค้าอ้างอิง');
       return;
     }
     if (_items.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('กรุณาเพิ่มรายการสินค้าอย่างน้อย 1 รายการ'),
-          backgroundColor: AppTheme.error,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      _showSnack('กรุณาเพิ่มรายการสินค้าอย่างน้อย 1 รายการ');
       return;
     }
 
@@ -929,6 +1110,8 @@ class _PurchaseReturnFormPageState
       returnDate: _returnDate,
       supplierId: _supplierId!,
       supplierName: _supplierName!,
+      referenceType: _referenceType,
+      referenceId: _referenceId,
       totalAmount: total,
       status: 'DRAFT',
       reason: _reasonController.text.trim().isEmpty
@@ -943,9 +1126,9 @@ class _PurchaseReturnFormPageState
       items: _items,
     );
 
-    final success = await ref
-        .read(purchaseReturnListProvider.notifier)
-        .createReturn(doc);
+    final success = widget.returnDoc == null
+        ? await ref.read(purchaseReturnListProvider.notifier).createReturn(doc)
+        : await ref.read(purchaseReturnListProvider.notifier).updateReturn(doc);
 
     setState(() => _isLoading = false);
 
@@ -953,8 +1136,12 @@ class _PurchaseReturnFormPageState
       if (success) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('บันทึกใบคืนสินค้าสำเร็จ'),
+          SnackBar(
+            content: Text(
+              widget.returnDoc == null
+                  ? 'บันทึกใบคืนสินค้าสำเร็จ'
+                  : 'แก้ไขใบคืนสินค้าสำเร็จ',
+            ),
             backgroundColor: AppTheme.success,
             behavior: SnackBarBehavior.floating,
           ),
@@ -969,6 +1156,44 @@ class _PurchaseReturnFormPageState
         );
       }
     }
+  }
+
+  void _showSnack(String message, {Color backgroundColor = AppTheme.error}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: backgroundColor,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Future<Map<String, double>> _loadConfirmedReturnedQtyByProduct(
+    String grId,
+  ) async {
+    final returns = ref.read(purchaseReturnListProvider).value ?? const <PurchaseReturnModel>[];
+    final confirmedReturns = returns
+        .where(
+          (doc) =>
+              doc.status == 'CONFIRMED' &&
+              doc.referenceType == 'GOODS_RECEIPT' &&
+              doc.referenceId == grId,
+        )
+        .toList();
+
+    final qtyByProduct = <String, double>{};
+
+    for (final doc in confirmedReturns) {
+      final fullDoc = await ref
+          .read(purchaseReturnListProvider.notifier)
+          .getReturnDetails(doc.returnId);
+      for (final item in fullDoc?.items ?? const <PurchaseReturnItemModel>[]) {
+        qtyByProduct[item.productId] =
+            (qtyByProduct[item.productId] ?? 0) + item.quantity;
+      }
+    }
+
+    return qtyByProduct;
   }
 }
 
@@ -1500,15 +1725,192 @@ class _SupplierSelectionDialogState extends State<_SupplierSelectionDialog> {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// RECEIPT SELECTION DIALOG
+// ═══════════════════════════════════════════════════════════════
+class _ReceiptSelectionDialog extends StatefulWidget {
+  final List<GoodsReceiptModel> receipts;
+  final bool isDark;
+
+  const _ReceiptSelectionDialog({
+    required this.receipts,
+    required this.isDark,
+  });
+
+  @override
+  State<_ReceiptSelectionDialog> createState() => _ReceiptSelectionDialogState();
+}
+
+class _ReceiptSelectionDialogState extends State<_ReceiptSelectionDialog> {
+  String _search = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = widget.receipts
+        .where(
+          (receipt) =>
+              receipt.grNo.toLowerCase().contains(_search) ||
+              receipt.warehouseName.toLowerCase().contains(_search),
+        )
+        .toList();
+    final dateFmt = DateFormat('dd/MM/yyyy');
+
+    return Dialog(
+      backgroundColor: widget.isDark ? AppTheme.darkCard : Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520, maxHeight: 560),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 14, 8, 14),
+              decoration: BoxDecoration(
+                color: AppTheme.info.withValues(
+                  alpha: widget.isDark ? 0.10 : 0.06,
+                ),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(14),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.inventory_2_outlined,
+                    size: 18,
+                    color: AppTheme.info,
+                  ),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'เลือกใบรับสินค้าอ้างอิง',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.info,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      Icons.close,
+                      size: 18,
+                      color: widget.isDark ? Colors.white54 : AppTheme.textSub,
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+              child: TextField(
+                autofocus: true,
+                onChanged: (v) => setState(() => _search = v.toLowerCase()),
+                style: TextStyle(
+                  fontSize: 13,
+                  color: widget.isDark ? Colors.white : Colors.black87,
+                ),
+                decoration: InputDecoration(
+                  hintText: 'ค้นหาเลขที่ใบรับสินค้า หรือคลัง...',
+                  hintStyle: const TextStyle(fontSize: 12),
+                  prefixIcon: const Icon(Icons.search, size: 18),
+                  filled: true,
+                  fillColor: widget.isDark
+                      ? AppTheme.darkElement
+                      : const Color(0xFFF5F5F5),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 0,
+                  ),
+                ),
+              ),
+            ),
+            Expanded(
+              child: ListView.separated(
+                padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
+                itemCount: filtered.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 6),
+                itemBuilder: (ctx, i) {
+                  final receipt = filtered[i];
+                  return InkWell(
+                    borderRadius: BorderRadius.circular(10),
+                    onTap: () => Navigator.pop(ctx, receipt),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: widget.isDark
+                            ? AppTheme.darkElement
+                            : const Color(0xFFF9FAFB),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: widget.isDark
+                              ? Colors.white12
+                              : AppTheme.border,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            receipt.grNo,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: widget.isDark
+                                  ? Colors.white
+                                  : Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'วันที่ ${dateFmt.format(receipt.grDate)} • ${receipt.warehouseName}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: widget.isDark
+                                  ? const Color(0xFFAAAAAA)
+                                  : AppTheme.textSub,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${receipt.itemCount} รายการ',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppTheme.info,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
 // ITEM DIALOG
 // ═══════════════════════════════════════════════════════════════
 class _ItemDialog extends StatefulWidget {
-  final List products;
+  final GoodsReceiptModel receipt;
+  final Map<String, double> confirmedReturnedQtyByProduct;
+  final List<PurchaseReturnItemModel> existingItems;
   final int lineNo;
   final bool isDark;
 
   const _ItemDialog({
-    required this.products,
+    required this.receipt,
+    required this.confirmedReturnedQtyByProduct,
+    required this.existingItems,
     required this.lineNo,
     required this.isDark,
   });
@@ -1521,33 +1923,55 @@ class _ItemDialogState extends State<_ItemDialog> {
   String? _selectedProductId;
   String _search = '';
   final _qtyCtrl = TextEditingController(text: '1');
-  final _priceCtrl = TextEditingController(text: '0');
   final _reasonCtrl = TextEditingController();
-  ProductUnitOption? _selectedUnit;
 
-  ProductModel? get _product {
+  List<_ReturnableReceiptItemOption> get _options {
+    final source = <String, _ReturnableReceiptItemOption>{};
+    for (final item in widget.receipt.items ?? <GoodsReceiptItemModel>[]) {
+      final current = source[item.productId];
+      source[item.productId] = current == null
+          ? _ReturnableReceiptItemOption.fromReceiptItem(item)
+          : current.accumulate(item);
+    }
+
+    widget.confirmedReturnedQtyByProduct.forEach((productId, qty) {
+      final current = source[productId];
+      if (current != null) {
+        source[productId] = current.take(qty);
+      }
+    });
+
+    for (final existing in widget.existingItems) {
+      final current = source[existing.productId];
+      if (current != null) {
+        source[existing.productId] = current.take(existing.quantity);
+      }
+    }
+
+    return source.values
+        .where((item) => item.remainingQty > 0)
+        .where(
+          (item) =>
+              item.productName.toLowerCase().contains(_search) ||
+              item.productCode.toLowerCase().contains(_search),
+        )
+        .toList()
+      ..sort((a, b) => a.productCode.compareTo(b.productCode));
+  }
+
+  _ReturnableReceiptItemOption? get _selectedOption {
     if (_selectedProductId == null) return null;
-    for (final p in widget.products) {
-      if (p.productId == _selectedProductId) return p;
+    for (final option in _options) {
+      if (option.productId == _selectedProductId) return option;
     }
     return null;
   }
 
-  double get _baseQty {
-    final qty = double.tryParse(_qtyCtrl.text) ?? 0;
-    return qty * (_selectedUnit?.factor ?? 1);
-  }
-
-  double get _baseCost {
-    final price = double.tryParse(_priceCtrl.text) ?? 0;
-    final factor = _selectedUnit?.factor ?? 1;
-    return factor == 0 ? price : price / factor;
-  }
+  double get _qty => double.tryParse(_qtyCtrl.text) ?? 0;
 
   @override
   void dispose() {
     _qtyCtrl.dispose();
-    _priceCtrl.dispose();
     _reasonCtrl.dispose();
     super.dispose();
   }
@@ -1555,22 +1979,15 @@ class _ItemDialogState extends State<_ItemDialog> {
   @override
   Widget build(BuildContext context) {
     final isDark = widget.isDark;
-    final filtered = widget.products
-        .where(
-          (p) =>
-              p.productName.toLowerCase().contains(_search) ||
-              p.productCode.toLowerCase().contains(_search),
-        )
-        .toList();
+    final selected = _selectedOption;
 
     return Dialog(
       backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 460, maxHeight: 580),
+        constraints: const BoxConstraints(maxWidth: 500, maxHeight: 620),
         child: Column(
           children: [
-            // Header
             Container(
               padding: const EdgeInsets.fromLTRB(16, 14, 8, 14),
               decoration: BoxDecoration(
@@ -1587,10 +2004,10 @@ class _ItemDialogState extends State<_ItemDialog> {
                     color: AppTheme.info,
                   ),
                   const SizedBox(width: 8),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'เพิ่มรายการสินค้า',
-                      style: TextStyle(
+                      'เพิ่มจาก ${widget.receipt.grNo}',
+                      style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
                         color: AppTheme.info,
@@ -1614,8 +2031,7 @@ class _ItemDialogState extends State<_ItemDialog> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Search + Product selector
-                    _DialogFieldLabel('สินค้า', isDark: isDark),
+                    _DialogFieldLabel('สินค้าในใบรับสินค้า', isDark: isDark),
                     const SizedBox(height: 4),
                     TextField(
                       onChanged: (v) =>
@@ -1644,7 +2060,7 @@ class _ItemDialogState extends State<_ItemDialog> {
                     ),
                     const SizedBox(height: 6),
                     Container(
-                      height: 160,
+                      height: 180,
                       decoration: BoxDecoration(
                         border: Border.all(
                           color: isDark
@@ -1653,218 +2069,157 @@ class _ItemDialogState extends State<_ItemDialog> {
                         ),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: ListView.builder(
-                        itemCount: filtered.length,
-                        itemBuilder: (ctx, i) {
-                          final p = filtered[i];
-                          final isSelected = _selectedProductId == p.productId;
-                          return InkWell(
-                            onTap: () => setState(() {
-                              _selectedProductId = p.productId;
-                              _selectedUnit = null;
-                            }),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 8,
-                              ),
-                              color: isSelected
-                                  ? AppTheme.info.withValues(alpha: 0.12)
-                                  : null,
-                              child: Row(
-                                children: [
-                                  if (isSelected)
-                                    const Icon(
-                                      Icons.check_circle,
-                                      size: 14,
-                                      color: AppTheme.info,
-                                    )
-                                  else
-                                    const SizedBox(width: 14),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      '${p.productCode} - ${p.productName}',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: isDark
-                                            ? Colors.white
-                                            : Colors.black87,
-                                        fontWeight: isSelected
-                                            ? FontWeight.w600
-                                            : FontWeight.normal,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Unit dropdown
-                    if (_product != null) ...[
-                      _DialogFieldLabel('หน่วย', isDark: isDark),
-                      const SizedBox(height: 4),
-                      DropdownButtonFormField<String>(
-                        initialValue: _selectedUnit?.unit,
-                        decoration: InputDecoration(
-                          filled: true,
-                          fillColor: isDark
-                              ? AppTheme.darkElement
-                              : Colors.white,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(
-                              color: isDark
-                                  ? const Color(0xFF3A3A3A)
-                                  : AppTheme.border,
-                            ),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(
-                              color: isDark
-                                  ? const Color(0xFF3A3A3A)
-                                  : AppTheme.border,
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(
-                              color: AppTheme.error,
-                              width: 1.5,
-                            ),
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 10,
-                          ),
-                        ),
-                        items: _product!.allUnits
-                            .map<DropdownMenuItem<String>>(
-                              (u) => DropdownMenuItem(
-                                value: u.unit,
-                                child: Text(
-                                  u.factor == 1
-                                      ? u.unit
-                                      : '${u.unit}  (1 ${u.unit} = ${u.factor.toStringAsFixed(0)} ${_product!.baseUnit})',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: isDark
-                                        ? Colors.white
-                                        : Colors.black87,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
+                      child: _options.isEmpty
+                          ? Center(
+                              child: Text(
+                                'ไม่มีรายการที่คืนได้เพิ่มเติม',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isDark
+                                      ? const Color(0xFFAAAAAA)
+                                      : AppTheme.textSub,
                                 ),
                               ),
                             )
-                            .toList(),
-                        onChanged: (v) => setState(() {
-                          _selectedUnit = _product!.allUnits.firstWhere(
-                            (u) => u.unit == v,
-                          );
-                        }),
-                      ),
-                      const SizedBox(height: 12),
-                    ],
-
-                    // Qty + Price
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _DialogFieldLabel('จำนวน', isDark: isDark),
-                              const SizedBox(height: 4),
-                              _DialogTextField(
-                                controller: _qtyCtrl,
-                                keyboardType: TextInputType.number,
-                                isDark: isDark,
-                                onChanged: (_) => setState(() {}),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _DialogFieldLabel('ราคา/หน่วย', isDark: isDark),
-                              const SizedBox(height: 4),
-                              _DialogTextField(
-                                controller: _priceCtrl,
-                                keyboardType: TextInputType.number,
-                                isDark: isDark,
-                                onChanged: (_) => setState(() {}),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                          : ListView.builder(
+                              itemCount: _options.length,
+                              itemBuilder: (ctx, i) {
+                                final option = _options[i];
+                                final isSelected =
+                                    _selectedProductId == option.productId;
+                                return InkWell(
+                                  onTap: () => setState(() {
+                                    _selectedProductId = option.productId;
+                                  }),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 8,
+                                    ),
+                                    color: isSelected
+                                        ? AppTheme.info.withValues(alpha: 0.12)
+                                        : null,
+                                    child: Row(
+                                      children: [
+                                        if (isSelected)
+                                          const Icon(
+                                            Icons.check_circle,
+                                            size: 14,
+                                            color: AppTheme.info,
+                                          )
+                                        else
+                                          const SizedBox(width: 14),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                '${option.productCode} - ${option.productName}',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: isDark
+                                                      ? Colors.white
+                                                      : Colors.black87,
+                                                  fontWeight: isSelected
+                                                      ? FontWeight.w600
+                                                      : FontWeight.normal,
+                                                ),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              Text(
+                                                'คงเหลือให้คืน ${NumberFormat('#,##0.##').format(option.remainingQty)} ${option.unit}',
+                                                style: const TextStyle(
+                                                  fontSize: 11,
+                                                  color: AppTheme.info,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
                     ),
-
-                    // Conversion preview card
-                    if (_product != null &&
-                        _selectedUnit != null &&
-                        _selectedUnit!.factor != 1) ...[
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
+                    if (selected != null) ...[
+                      const SizedBox(height: 14),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _ReadOnlyInfoField(
+                              label: 'คลังต้นทาง',
+                              value: widget.receipt.warehouseName,
+                              isDark: isDark,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _ReadOnlyInfoField(
+                              label: 'ราคา/หน่วย',
+                              value:
+                                  '฿${NumberFormat('#,##0.00').format(selected.unitPrice)}',
+                              isDark: isDark,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      _DialogFieldLabel('จำนวนคืน', isDark: isDark),
+                      const SizedBox(height: 4),
+                      _DialogTextField(
+                        controller: _qtyCtrl,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
                         ),
+                        isDark: isDark,
+                        onChanged: (_) => setState(() {}),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'คืนได้สูงสุด ${NumberFormat('#,##0.##').format(selected.remainingQty)} ${selected.unit}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.warning,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
                           color: AppTheme.error.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: AppTheme.error.withValues(alpha: 0.3),
+                            color: AppTheme.error.withValues(alpha: 0.25),
                           ),
                         ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.swap_horiz,
-                              size: 14,
-                              color: AppTheme.error,
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                'คืนจริง ${_baseQty.toStringAsFixed(0)} ${_product!.baseUnit}'
-                                '  •  ต้นทุน/ฐาน ${_baseCost.toStringAsFixed(2)} บาท',
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: AppTheme.error,
-                                ),
-                              ),
-                            ),
-                          ],
+                        child: Text(
+                          'รวมเป็นเงิน ฿${NumberFormat('#,##0.00').format((_qty > 0 ? _qty : 0) * selected.unitPrice)}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.error,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
+                      const SizedBox(height: 12),
+                      _DialogFieldLabel('เหตุผลการคืน', isDark: isDark),
+                      const SizedBox(height: 4),
+                      _DialogTextField(
+                        controller: _reasonCtrl,
+                        hintText: 'สินค้าชำรุด, ส่งผิด, ฯลฯ',
+                        maxLines: 2,
+                        isDark: isDark,
+                      ),
                     ],
-                    const SizedBox(height: 12),
-
-                    // Reason
-                    _DialogFieldLabel('เหตุผลการคืน', isDark: isDark),
-                    const SizedBox(height: 4),
-                    _DialogTextField(
-                      controller: _reasonCtrl,
-                      hintText: 'สินค้าชำรุด, ส่งผิด, ฯลฯ',
-                      maxLines: 2,
-                      isDark: isDark,
-                    ),
                   ],
                 ),
               ),
             ),
-            // Actions
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
               child: Row(
@@ -1906,50 +2261,109 @@ class _ItemDialogState extends State<_ItemDialog> {
   }
 
   void _submit() {
-    if (_selectedProductId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('กรุณาเลือกสินค้า'),
-          backgroundColor: AppTheme.error,
-          behavior: SnackBarBehavior.floating,
-        ),
+    final selected = _selectedOption;
+    if (selected == null) {
+      _snack('กรุณาเลือกรายการสินค้า');
+      return;
+    }
+
+    final quantity = _qty;
+    if (quantity <= 0) {
+      _snack('กรุณาระบุจำนวนคืนที่ถูกต้อง');
+      return;
+    }
+    if (quantity > selected.remainingQty) {
+      _snack(
+        'จำนวนคืนเกินยอดคงเหลือ (${selected.remainingQty.toStringAsFixed(2)} ${selected.unit})',
       );
       return;
     }
-    final baseQty = _baseQty;
-    final baseCost = _baseCost;
-    if (baseQty <= 0 || baseCost <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('กรุณาระบุจำนวนและราคาที่ถูกต้อง'),
-          backgroundColor: AppTheme.error,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-    final product = widget.products.firstWhere(
-      (p) => p.productId == _selectedProductId,
-    );
+
     Navigator.pop(
       context,
       PurchaseReturnItemModel(
         itemId: '',
         returnId: '',
         lineNo: widget.lineNo,
-        productId: product.productId,
-        productCode: product.productCode,
-        productName: product.productName,
-        unit: product.baseUnit,
-        warehouseId: 'WH001',
-        warehouseName: 'คลังหลัก',
-        quantity: baseQty,
-        unitPrice: baseCost,
-        amount: baseCost * baseQty,
+        productId: selected.productId,
+        productCode: selected.productCode,
+        productName: selected.productName,
+        unit: selected.unit,
+        warehouseId: widget.receipt.warehouseId,
+        warehouseName: widget.receipt.warehouseName,
+        quantity: quantity,
+        unitPrice: selected.unitPrice,
+        amount: quantity * selected.unitPrice,
         reason: _reasonCtrl.text.trim().isEmpty
             ? null
             : _reasonCtrl.text.trim(),
       ),
+    );
+  }
+
+  void _snack(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppTheme.error,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+}
+
+class _ReturnableReceiptItemOption {
+  final String productId;
+  final String productCode;
+  final String productName;
+  final String unit;
+  final double remainingQty;
+  final double unitPrice;
+
+  const _ReturnableReceiptItemOption({
+    required this.productId,
+    required this.productCode,
+    required this.productName,
+    required this.unit,
+    required this.remainingQty,
+    required this.unitPrice,
+  });
+
+  factory _ReturnableReceiptItemOption.fromReceiptItem(GoodsReceiptItemModel item) {
+    final receivedQty = item.receivedQuantity;
+    final unitPrice = receivedQty <= 0 ? item.unitPrice : item.amount / receivedQty;
+    return _ReturnableReceiptItemOption(
+      productId: item.productId,
+      productCode: item.productCode,
+      productName: item.productName,
+      unit: item.unit,
+      remainingQty: receivedQty,
+      unitPrice: unitPrice,
+    );
+  }
+
+  _ReturnableReceiptItemOption accumulate(GoodsReceiptItemModel item) {
+    final nextQty = remainingQty + item.receivedQuantity;
+    final nextAmount = (remainingQty * unitPrice) + item.amount;
+    return _ReturnableReceiptItemOption(
+      productId: productId,
+      productCode: productCode,
+      productName: productName,
+      unit: unit,
+      remainingQty: nextQty,
+      unitPrice: nextQty <= 0 ? unitPrice : nextAmount / nextQty,
+    );
+  }
+
+  _ReturnableReceiptItemOption take(double usedQty) {
+    return _ReturnableReceiptItemOption(
+      productId: productId,
+      productCode: productCode,
+      productName: productName,
+      unit: unit,
+      remainingQty:
+          (remainingQty - usedQty).clamp(0, double.infinity).toDouble(),
+      unitPrice: unitPrice,
     );
   }
 }
@@ -2040,6 +2454,45 @@ class _DialogTextField extends StatelessWidget {
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
     ),
+  );
+}
+
+class _ReadOnlyInfoField extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool isDark;
+
+  const _ReadOnlyInfoField({
+    required this.label,
+    required this.value,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      _DialogFieldLabel(label, isDark: isDark),
+      const SizedBox(height: 4),
+      Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: isDark ? AppTheme.darkElement : const Color(0xFFF5F5F5),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isDark ? const Color(0xFF3A3A3A) : AppTheme.border,
+          ),
+        ),
+        child: Text(
+          value,
+          style: TextStyle(
+            fontSize: 12,
+            color: isDark ? Colors.white70 : Colors.black87,
+          ),
+        ),
+      ),
+    ],
   );
 }
 

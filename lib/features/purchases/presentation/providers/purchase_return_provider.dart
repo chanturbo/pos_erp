@@ -73,6 +73,29 @@ class PurchaseReturnNotifier extends AsyncNotifier<List<PurchaseReturnModel>> {
     }
   }
 
+  /// แก้ไขใบคืนสินค้า (DRAFT เท่านั้น)
+  Future<bool> updateReturn(PurchaseReturnModel returnDoc) async {
+    try {
+      print('📝 Updating purchase return: ${returnDoc.returnNo}');
+
+      final apiClient = ref.read(apiClientProvider);
+      final response = await apiClient.put(
+        '/api/purchase-returns/${returnDoc.returnId}',
+        data: returnDoc.toJson(),
+      );
+
+      if (response.statusCode == 200) {
+        print('✅ Return updated successfully');
+        await refresh();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      print('❌ Error updating return: $e');
+      return false;
+    }
+  }
+
   /// ยืนยันใบคืนสินค้า (ลดสต๊อก)
   Future<bool> confirmReturn(String returnId) async {
     try {

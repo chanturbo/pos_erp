@@ -41,23 +41,36 @@ class ApInvoiceModel {
   bool get isOverdue => dueDate != null && DateTime.now().isAfter(dueDate!) && !isFullyPaid;
 
   factory ApInvoiceModel.fromJson(Map<String, dynamic> json) {
+    final createdAtRaw = json['created_at'] as String?;
+    final updatedAtRaw = json['updated_at'] as String?;
+
     return ApInvoiceModel(
-      invoiceId: json['invoice_id'] as String,
-      invoiceNo: json['invoice_no'] as String,
-      invoiceDate: DateTime.parse(json['invoice_date'] as String),
-      dueDate: json['due_date'] != null ? DateTime.parse(json['due_date'] as String) : null,
-      supplierId: json['supplier_id'] as String,
-      supplierName: json['supplier_name'] as String,
+      invoiceId: json['invoice_id'] as String? ?? '',
+      invoiceNo: json['invoice_no'] as String? ?? '',
+      invoiceDate: DateTime.parse(
+        json['invoice_date'] as String? ?? DateTime.now().toIso8601String(),
+      ),
+      dueDate: json['due_date'] != null
+          ? DateTime.parse(json['due_date'] as String)
+          : null,
+      supplierId: json['supplier_id'] as String? ?? '',
+      supplierName: json['supplier_name'] as String? ?? '',
       totalAmount: (json['total_amount'] as num).toDouble(),
       paidAmount: (json['paid_amount'] as num?)?.toDouble() ?? 0,
       referenceType: json['reference_type'] as String?,
       referenceId: json['reference_id'] as String?,
       status: json['status'] as String? ?? 'UNPAID',
       remark: json['remark'] as String?,
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
+      createdAt: DateTime.parse(
+        createdAtRaw ?? updatedAtRaw ?? DateTime.now().toIso8601String(),
+      ),
+      updatedAt: DateTime.parse(
+        updatedAtRaw ?? createdAtRaw ?? DateTime.now().toIso8601String(),
+      ),
       items: json['items'] != null
-          ? (json['items'] as List).map((i) => ApInvoiceItemModel.fromJson(i as Map<String, dynamic>)).toList()
+          ? (json['items'] as List)
+              .map((i) => ApInvoiceItemModel.fromJson(i as Map<String, dynamic>))
+              .toList()
           : null,
     );
   }

@@ -6,11 +6,14 @@ import 'package:pos_erp/shared/utils/responsive_utils.dart';
 import 'package:pos_erp/shared/widgets/app_dialogs.dart';
 import 'package:pos_erp/shared/widgets/pagination_bar.dart';
 import 'package:pos_erp/shared/widgets/escape_pop_scope.dart';
+import 'package:pos_erp/shared/pdf/pdf_export_service.dart';
+import 'package:pos_erp/shared/pdf/pdf_report_button.dart';
 import 'package:pos_erp/shared/widgets/mobile_home_button.dart';
 import '../../../settings/presentation/pages/settings_page.dart';
 import '../../data/models/ar_receipt_model.dart';
 import '../providers/ar_receipt_provider.dart';
 import 'ar_receipt_form_page.dart';
+import 'ar_receipt_pdf_report.dart';
 
 class ArReceiptListPage extends ConsumerStatefulWidget {
   const ArReceiptListPage({super.key});
@@ -23,6 +26,9 @@ class _ArReceiptListPageState extends ConsumerState<ArReceiptListPage> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   String _methodFilter = 'ALL';
+  String? _customerFilter;
+  String _dateFilter = 'ALL';
+  DateTimeRange? _customDateRange;
   bool _isCardView = false;
   int _currentPage = 1;
 
@@ -39,8 +45,152 @@ class _ArReceiptListPageState extends ConsumerState<ArReceiptListPage> {
           r.customerName.toLowerCase().contains(_searchQuery);
       final matchMethod =
           _methodFilter == 'ALL' || r.paymentMethod == _methodFilter;
-      return matchSearch && matchMethod;
+      final matchCustomer =
+          _customerFilter == null || r.customerName == _customerFilter;
+      final matchDate = _matchesDateFilter(r.receiptDate);
+      return matchSearch && matchMethod && matchCustomer && matchDate;
     }).toList()..sort((a, b) => b.receiptDate.compareTo(a.receiptDate));
+  }
+
+  bool _matchesDateFilter(DateTime date) {
+    final value = DateTime(date.year, date.month, date.day);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    switch (_dateFilter) {
+      case 'TODAY':
+        return value == today;
+      case 'THIS_MONTH':
+        return value.year == today.year && value.month == today.month;
+      case 'CUSTOM':
+        final range = _customDateRange;
+        if (range == null) return true;
+        final start = DateTime(
+          range.start.year,
+          range.start.month,
+          range.start.day,
+        );
+        final end = DateTime(range.end.year, range.end.month, range.end.day);
+        return !value.isBefore(start) && !value.isAfter(end);
+      default:
+        return true;
+    }
+  }
+
+  String get _dateFilterLabel {
+    switch (_dateFilter) {
+      case 'TODAY':
+        return 'วันนี้';
+      case 'THIS_MONTH':
+        return 'เดือนนี้';
+      case 'CUSTOM':
+        final range = _customDateRange;
+        if (range == null) return 'ช่วงวันที่';
+        final fmt = DateFormat('dd/MM/yy');
+        return '${fmt.format(range.start)} - ${fmt.format(range.end)}';
+      default:
+        return 'วันที่';
+    }
+  }
+
+  Future<void> _selectCustomerFilter(List<ArReceiptModel> items) async {
+    final customers = items
+        .map((e) => e.customerName.trim())
+        .where((e) => e.isNotEmpty)
+        .toSet()
+        .toList()
+      ..sort();
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.clear_all),
+              title: const Text('ทุกลูกค้า'),
+              onTap: () => Navigator.pop(context, ''),
+            ),
+            ...customers.map(
+              (name) => ListTile(
+                leading: Icon(
+                  Icons.person_outline,
+                  color: name == _customerFilter ? AppTheme.tealColor : null,
+                ),
+                title: Text(name),
+                onTap: () => Navigator.pop(context, name),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || selected == null) return;
+    setState(() {
+      _customerFilter = selected.isEmpty ? null : selected;
+      _currentPage = 1;
+    });
+  }
+
+  Future<void> _selectDateFilter() async {
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.date_range_outlined),
+              title: const Text('ทุกวันที่'),
+              onTap: () => Navigator.pop(context, 'ALL'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.today_outlined),
+              title: const Text('วันนี้'),
+              onTap: () => Navigator.pop(context, 'TODAY'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.calendar_month_outlined),
+              title: const Text('เดือนนี้'),
+              onTap: () => Navigator.pop(context, 'THIS_MONTH'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.edit_calendar_outlined),
+              title: const Text('เลือกช่วงวันที่'),
+              onTap: () => Navigator.pop(context, 'CUSTOM'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || selected == null) return;
+    if (selected == 'CUSTOM') {
+      final now = DateTime.now();
+      final picked = await showDateRangePicker(
+        context: context,
+        firstDate: DateTime(now.year - 5),
+        lastDate: DateTime(now.year + 5),
+        initialDateRange:
+            _customDateRange ??
+            DateTimeRange(
+              start: DateTime(now.year, now.month, 1),
+              end: now,
+            ),
+      );
+      if (!mounted || picked == null) return;
+      setState(() {
+        _dateFilter = 'CUSTOM';
+        _customDateRange = picked;
+        _currentPage = 1;
+      });
+      return;
+    }
+    setState(() {
+      _dateFilter = selected;
+      if (selected != 'CUSTOM') _customDateRange = null;
+      _currentPage = 1;
+    });
   }
 
   @override
@@ -102,6 +252,14 @@ class _ArReceiptListPageState extends ConsumerState<ArReceiptListPage> {
                         totalItems: filtered.length,
                         pageSize: pageSize,
                         onPageChanged: (p) => setState(() => _currentPage = p),
+                        trailing: PdfReportButton(
+                          emptyMessage: 'ไม่มีข้อมูลการรับเงิน',
+                          title: 'รายงานการรับเงิน',
+                          filename: () =>
+                              PdfFilename.generate('ar_receipt_report'),
+                          buildPdf: () => ArReceiptPdfBuilder.build(filtered),
+                          hasData: filtered.isNotEmpty,
+                        ),
                       ),
                     ],
                   );
@@ -128,87 +286,126 @@ class _ArReceiptListPageState extends ConsumerState<ArReceiptListPage> {
         return Container(
           color: isDark ? AppTheme.darkCard : Colors.white,
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    _RecFilterChip(
-                      label: 'ทั้งหมด',
-                      count: all.length,
-                      color: AppTheme.tealColor,
-                      selected: _methodFilter == 'ALL',
-                      onTap: () => setState(() {
-                        _methodFilter = 'ALL';
-                        _currentPage = 1;
-                      }),
-                    ),
-                    const SizedBox(width: 6),
-                    _RecFilterChip(
-                      label: 'เงินสด',
-                      count: countMethod('CASH'),
-                      color: AppTheme.success,
-                      selected: _methodFilter == 'CASH',
-                      onTap: () => setState(() {
-                        _methodFilter = 'CASH';
-                        _currentPage = 1;
-                      }),
-                    ),
-                    const SizedBox(width: 6),
-                    _RecFilterChip(
-                      label: 'โอนเงิน',
-                      count: countMethod('TRANSFER'),
-                      color: AppTheme.info,
-                      selected: _methodFilter == 'TRANSFER',
-                      onTap: () => setState(() {
-                        _methodFilter = 'TRANSFER';
-                        _currentPage = 1;
-                      }),
-                    ),
-                    const SizedBox(width: 6),
-                    _RecFilterChip(
-                      label: 'เช็ค',
-                      count: countMethod('CHEQUE'),
-                      color: AppTheme.warning,
-                      selected: _methodFilter == 'CHEQUE',
-                      onTap: () => setState(() {
-                        _methodFilter = 'CHEQUE';
-                        _currentPage = 1;
-                      }),
-                    ),
-                    const SizedBox(width: 6),
-                    _RecFilterChip(
-                      label: 'บัตรเครดิต',
-                      count: countMethod('CREDIT_CARD'),
-                      color: AppTheme.primary,
-                      selected: _methodFilter == 'CREDIT_CARD',
-                      onTap: () => setState(() {
-                        _methodFilter = 'CREDIT_CARD';
-                        _currentPage = 1;
-                      }),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 8),
-              Row(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final filterWrap = Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  _RecActionChip(
+                    label: _customerFilter ?? 'ลูกค้า',
+                    icon: Icons.person_outline,
+                    active: _customerFilter != null,
+                    color: AppTheme.tealColor,
+                    onTap: () => _selectCustomerFilter(all),
+                  ),
+                  _RecActionChip(
+                    label: _dateFilterLabel,
+                    icon: Icons.calendar_today_outlined,
+                    active: _dateFilter != 'ALL',
+                    color: AppTheme.info,
+                    onTap: _selectDateFilter,
+                  ),
+                  _RecFilterChip(
+                    label: 'ทั้งหมด',
+                    count: all.length,
+                    color: AppTheme.tealColor,
+                    selected: _methodFilter == 'ALL',
+                    onTap: () => setState(() {
+                      _methodFilter = 'ALL';
+                      _currentPage = 1;
+                    }),
+                  ),
+                  _RecFilterChip(
+                    label: 'เงินสด',
+                    count: countMethod('CASH'),
+                    color: AppTheme.success,
+                    selected: _methodFilter == 'CASH',
+                    onTap: () => setState(() {
+                      _methodFilter = 'CASH';
+                      _currentPage = 1;
+                    }),
+                  ),
+                  _RecFilterChip(
+                    label: 'โอนเงิน',
+                    count: countMethod('TRANSFER'),
+                    color: AppTheme.info,
+                    selected: _methodFilter == 'TRANSFER',
+                    onTap: () => setState(() {
+                      _methodFilter = 'TRANSFER';
+                      _currentPage = 1;
+                    }),
+                  ),
+                  _RecFilterChip(
+                    label: 'เช็ค',
+                    count: countMethod('CHEQUE'),
+                    color: AppTheme.warning,
+                    selected: _methodFilter == 'CHEQUE',
+                    onTap: () => setState(() {
+                      _methodFilter = 'CHEQUE';
+                      _currentPage = 1;
+                    }),
+                  ),
+                  _RecFilterChip(
+                    label: 'บัตรเครดิต',
+                    count: countMethod('CREDIT_CARD'),
+                    color: AppTheme.primary,
+                    selected: _methodFilter == 'CREDIT_CARD',
+                    onTap: () => setState(() {
+                      _methodFilter = 'CREDIT_CARD';
+                      _currentPage = 1;
+                    }),
+                  ),
+                ],
+              );
+
+              final statsWrap = Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                alignment: WrapAlignment.end,
                 children: [
                   _RecValueStat(
                     label: 'กรองแล้ว',
                     value: '${filtered.length} รายการ',
                     color: AppTheme.tealColor,
                   ),
-                  const SizedBox(width: 8),
                   _RecValueStat(
                     label: 'ยอดรับรวม',
                     value: '฿${fmt.format(totalAmt)}',
                     color: AppTheme.success,
                   ),
                 ],
-              ),
-            ],
+              );
+
+              final isCompact = constraints.maxWidth < 900;
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (isCompact) ...[
+                    filterWrap,
+                    const SizedBox(height: 8),
+                    Align(alignment: Alignment.centerRight, child: statsWrap),
+                  ] else
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: filterWrap),
+                        const SizedBox(width: 12),
+                        ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxWidth: constraints.maxWidth * 0.42,
+                          ),
+                          child: Align(
+                            alignment: Alignment.topRight,
+                            child: statsWrap,
+                          ),
+                        ),
+                      ],
+                    ),
+                ],
+              );
+            },
           ),
         );
       },
@@ -225,6 +422,7 @@ class _ArReceiptListPageState extends ConsumerState<ArReceiptListPage> {
         receipt: items[i],
         onTap: () => _viewDetails(items[i]),
         onDelete: () => _deleteReceipt(items[i]),
+        onPrintPdf: () => _openReceiptPdf(items[i]),
       ),
     );
   }
@@ -318,77 +516,104 @@ class _ArReceiptListPageState extends ConsumerState<ArReceiptListPage> {
                       ),
                     ),
                   ),
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        width: 4,
-                        height: 34,
-                        decoration: BoxDecoration(
-                          color: methodColor,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        flex: 3,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              r.receiptNo,
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: isDark
-                                    ? Colors.white
-                                    : const Color(0xFF1A1A1A),
-                              ),
-                              overflow: TextOverflow.ellipsis,
+                      Row(
+                        children: [
+                          Container(
+                            width: 4,
+                            height: 34,
+                            decoration: BoxDecoration(
+                              color: methodColor,
+                              borderRadius: BorderRadius.circular(2),
                             ),
-                            Text(
-                              r.customerName,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            flex: 3,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  r.receiptNo,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: isDark
+                                        ? Colors.white
+                                        : const Color(0xFF1A1A1A),
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Text(
+                                  r.customerName,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: isDark
+                                        ? const Color(0xFFAAAAAA)
+                                        : AppTheme.textSub,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                          SizedBox(
+                            width: 68,
+                            child: Text(
+                              DateFormat('dd/MM/yy').format(r.receiptDate),
                               style: TextStyle(
                                 fontSize: 11,
                                 color: isDark
                                     ? const Color(0xFFAAAAAA)
                                     : AppTheme.textSub,
                               ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                          SizedBox(
+                            width: 76,
+                            child: Center(
+                              child: _buildMethodBadge(r.paymentMethod, isDark),
+                            ),
+                          ),
+                          SizedBox(
+                            width: 90,
+                            child: Text(
+                              '฿${NumberFormat('#,##0.00', 'th_TH').format(r.totalAmount)}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: AppTheme.tealColor,
+                              ),
+                              textAlign: TextAlign.right,
                               overflow: TextOverflow.ellipsis,
                             ),
-                          ],
-                        ),
-                      ),
-                      SizedBox(
-                        width: 68,
-                        child: Text(
-                          DateFormat('dd/MM/yy').format(r.receiptDate),
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: isDark
-                                ? const Color(0xFFAAAAAA)
-                                : AppTheme.textSub,
                           ),
-                          textAlign: TextAlign.center,
-                        ),
+                        ],
                       ),
-                      SizedBox(
-                        width: 76,
-                        child: Center(
-                          child: _buildMethodBadge(r.paymentMethod, isDark),
-                        ),
-                      ),
-                      SizedBox(
-                        width: 90,
-                        child: Text(
-                          '฿${NumberFormat('#,##0.00', 'th_TH').format(r.totalAmount)}',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: AppTheme.tealColor,
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          SizedBox(
+                            width: 52,
+                            height: 34,
+                            child: OutlinedButton(
+                              onPressed: () => _openReceiptPdf(r),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppTheme.primaryDark,
+                                side: const BorderSide(color: AppTheme.primaryDark),
+                                padding: EdgeInsets.zero,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              child: const Icon(Icons.picture_as_pdf_outlined, size: 18),
+                            ),
                           ),
-                          textAlign: TextAlign.right,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                        ],
                       ),
                     ],
                   ),
@@ -504,6 +729,20 @@ class _ArReceiptListPageState extends ConsumerState<ArReceiptListPage> {
       ],
     ),
   );
+
+  Future<void> _openReceiptPdf(ArReceiptModel receipt) async {
+    final full = await ref.read(
+      arReceiptDetailProvider(receipt.receiptId).future,
+    );
+    final pdfReceipt = full ?? receipt;
+    if (!mounted) return;
+    await PdfExportService.showPreview(
+      context,
+      title: 'ใบรับเงิน ${pdfReceipt.receiptNo}',
+      filename: PdfFilename.generate('ar_receipt_${pdfReceipt.receiptNo}'),
+      buildPdf: () => ArReceiptPdfBuilder.build([pdfReceipt]),
+    );
+  }
 
   Future<void> _createNewReceipt() async {
     await Navigator.push(
@@ -772,11 +1011,13 @@ class _RecCard extends StatelessWidget {
   final ArReceiptModel receipt;
   final VoidCallback onTap;
   final VoidCallback onDelete;
+  final VoidCallback onPrintPdf;
 
   const _RecCard({
     required this.receipt,
     required this.onTap,
     required this.onDelete,
+    required this.onPrintPdf,
   });
 
   Color get _methodColor {
@@ -951,6 +1192,23 @@ class _RecCard extends StatelessWidget {
                       ],
                     ),
                   ),
+                  SizedBox(
+                    width: 52,
+                    height: 34,
+                    child: OutlinedButton(
+                      onPressed: onPrintPdf,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.primaryDark,
+                        side: const BorderSide(color: AppTheme.primaryDark),
+                        padding: EdgeInsets.zero,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Icon(Icons.picture_as_pdf_outlined, size: 18),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   SizedBox(
                     width: 52,
                     height: 34,
@@ -1563,6 +1821,62 @@ class _RecValueStat extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _RecActionChip extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool active;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _RecActionChip({
+    required this.label,
+    required this.icon,
+    required this.active,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: active
+              ? color.withValues(alpha: isDark ? 0.22 : 0.10)
+              : (isDark ? AppTheme.darkElement : const Color(0xFFF7F7F7)),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: active
+                ? color.withValues(alpha: 0.45)
+                : (isDark ? const Color(0xFF333333) : AppTheme.border),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 15, color: active ? color : AppTheme.textSub),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: active
+                    ? color
+                    : (isDark ? Colors.white70 : const Color(0xFF1A1A1A)),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

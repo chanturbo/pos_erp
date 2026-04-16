@@ -7,6 +7,7 @@ import 'package:pos_erp/shared/widgets/app_dialogs.dart';
 import 'package:pos_erp/shared/widgets/pagination_bar.dart';
 import 'package:pos_erp/shared/widgets/escape_pop_scope.dart';
 import 'package:pos_erp/shared/pdf/pdf_report_button.dart';
+import 'package:pos_erp/shared/pdf/pdf_export_service.dart';
 import 'package:pos_erp/shared/widgets/mobile_home_button.dart';
 import '../../../settings/presentation/pages/settings_page.dart';
 import '../providers/ap_invoice_provider.dart';
@@ -25,6 +26,9 @@ class _ApInvoiceListPageState extends ConsumerState<ApInvoiceListPage> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   String _statusFilter = 'ALL';
+  String? _supplierFilter;
+  String _dateFilter = 'ALL';
+  DateTimeRange? _customDateRange;
   bool _isCardView = false;
   int _currentPage = 1;
 
@@ -44,8 +48,152 @@ class _ApInvoiceListPageState extends ConsumerState<ApInvoiceListPage> {
           (_statusFilter == 'OVERDUE'
               ? inv.isOverdue
               : inv.status == _statusFilter);
-      return matchesSearch && matchesStatus;
+      final matchesSupplier =
+          _supplierFilter == null || inv.supplierName == _supplierFilter;
+      final matchesDate = _matchesDateFilter(inv.invoiceDate);
+      return matchesSearch && matchesStatus && matchesSupplier && matchesDate;
     }).toList()..sort((a, b) => b.invoiceDate.compareTo(a.invoiceDate));
+  }
+
+  bool _matchesDateFilter(DateTime date) {
+    final value = DateTime(date.year, date.month, date.day);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    switch (_dateFilter) {
+      case 'TODAY':
+        return value == today;
+      case 'THIS_MONTH':
+        return value.year == today.year && value.month == today.month;
+      case 'CUSTOM':
+        final range = _customDateRange;
+        if (range == null) return true;
+        final start = DateTime(
+          range.start.year,
+          range.start.month,
+          range.start.day,
+        );
+        final end = DateTime(range.end.year, range.end.month, range.end.day);
+        return !value.isBefore(start) && !value.isAfter(end);
+      default:
+        return true;
+    }
+  }
+
+  String get _dateFilterLabel {
+    switch (_dateFilter) {
+      case 'TODAY':
+        return 'วันนี้';
+      case 'THIS_MONTH':
+        return 'เดือนนี้';
+      case 'CUSTOM':
+        final range = _customDateRange;
+        if (range == null) return 'ช่วงวันที่';
+        final fmt = DateFormat('dd/MM/yy');
+        return '${fmt.format(range.start)} - ${fmt.format(range.end)}';
+      default:
+        return 'วันที่';
+    }
+  }
+
+  Future<void> _selectSupplierFilter(List<ApInvoiceModel> items) async {
+    final suppliers = items
+        .map((e) => e.supplierName.trim())
+        .where((e) => e.isNotEmpty)
+        .toSet()
+        .toList()
+      ..sort();
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.clear_all),
+              title: const Text('ทุกซัพพลายเออร์'),
+              onTap: () => Navigator.pop(context, ''),
+            ),
+            ...suppliers.map(
+              (name) => ListTile(
+                leading: Icon(
+                  Icons.business_outlined,
+                  color: name == _supplierFilter ? AppTheme.error : null,
+                ),
+                title: Text(name),
+                onTap: () => Navigator.pop(context, name),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || selected == null) return;
+    setState(() {
+      _supplierFilter = selected.isEmpty ? null : selected;
+      _currentPage = 1;
+    });
+  }
+
+  Future<void> _selectDateFilter() async {
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.date_range_outlined),
+              title: const Text('ทุกวันที่'),
+              onTap: () => Navigator.pop(context, 'ALL'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.today_outlined),
+              title: const Text('วันนี้'),
+              onTap: () => Navigator.pop(context, 'TODAY'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.calendar_month_outlined),
+              title: const Text('เดือนนี้'),
+              onTap: () => Navigator.pop(context, 'THIS_MONTH'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.edit_calendar_outlined),
+              title: const Text('เลือกช่วงวันที่'),
+              onTap: () => Navigator.pop(context, 'CUSTOM'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || selected == null) return;
+    if (selected == 'CUSTOM') {
+      final now = DateTime.now();
+      final picked = await showDateRangePicker(
+        context: context,
+        firstDate: DateTime(now.year - 5),
+        lastDate: DateTime(now.year + 5),
+        initialDateRange:
+            _customDateRange ??
+            DateTimeRange(
+              start: DateTime(now.year, now.month, 1),
+              end: now,
+            ),
+      );
+      if (!mounted || picked == null) return;
+      setState(() {
+        _dateFilter = 'CUSTOM';
+        _customDateRange = picked;
+        _currentPage = 1;
+      });
+      return;
+    }
+    setState(() {
+      _dateFilter = selected;
+      if (selected != 'CUSTOM') _customDateRange = null;
+      _currentPage = 1;
+    });
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -158,91 +306,127 @@ class _ApInvoiceListPageState extends ConsumerState<ApInvoiceListPage> {
         return Container(
           color: isDark ? AppTheme.darkCard : Colors.white,
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // แถว 1 — Status Filter Chips
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final filterWrap = Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  _APActionChip(
+                    label: _supplierFilter ?? 'ซัพพลายเออร์',
+                    icon: Icons.business_outlined,
+                    active: _supplierFilter != null,
+                    color: AppTheme.error,
+                    onTap: () => _selectSupplierFilter(all),
+                  ),
+                  _APActionChip(
+                    label: _dateFilterLabel,
+                    icon: Icons.calendar_today_outlined,
+                    active: _dateFilter != 'ALL',
+                    color: AppTheme.primaryDark,
+                    onTap: _selectDateFilter,
+                  ),
+                  _APFilterChip(
+                    label: 'ทั้งหมด',
+                    count: all.length,
+                    color: AppTheme.navy,
+                    selected: _statusFilter == 'ALL',
+                    onTap: () => setState(() {
+                      _statusFilter = 'ALL';
+                      _currentPage = 1;
+                    }),
+                  ),
+                  _APFilterChip(
+                    label: 'ยังไม่จ่าย',
+                    count: countByStatus('UNPAID'),
+                    color: AppTheme.error,
+                    selected: _statusFilter == 'UNPAID',
+                    onTap: () => setState(() {
+                      _statusFilter = 'UNPAID';
+                      _currentPage = 1;
+                    }),
+                  ),
+                  _APFilterChip(
+                    label: 'บางส่วน',
+                    count: countByStatus('PARTIAL'),
+                    color: AppTheme.warning,
+                    selected: _statusFilter == 'PARTIAL',
+                    onTap: () => setState(() {
+                      _statusFilter = 'PARTIAL';
+                      _currentPage = 1;
+                    }),
+                  ),
+                  _APFilterChip(
+                    label: 'จ่ายแล้ว',
+                    count: countByStatus('PAID'),
+                    color: AppTheme.success,
+                    selected: _statusFilter == 'PAID',
+                    onTap: () => setState(() {
+                      _statusFilter = 'PAID';
+                      _currentPage = 1;
+                    }),
+                  ),
+                  if (overdueCount > 0)
                     _APFilterChip(
-                      label: 'ทั้งหมด',
-                      count: all.length,
-                      color: AppTheme.navy,
-                      selected: _statusFilter == 'ALL',
-                      onTap: () => setState(() {
-                        _statusFilter = 'ALL';
-                        _currentPage = 1;
-                      }),
-                    ),
-                    const SizedBox(width: 6),
-                    _APFilterChip(
-                      label: 'ยังไม่จ่าย',
-                      count: countByStatus('UNPAID'),
+                      label: 'เลยกำหนด',
+                      count: overdueCount,
                       color: AppTheme.error,
-                      selected: _statusFilter == 'UNPAID',
+                      selected: _statusFilter == 'OVERDUE',
                       onTap: () => setState(() {
-                        _statusFilter = 'UNPAID';
+                        _statusFilter = 'OVERDUE';
                         _currentPage = 1;
                       }),
                     ),
-                    const SizedBox(width: 6),
-                    _APFilterChip(
-                      label: 'บางส่วน',
-                      count: countByStatus('PARTIAL'),
-                      color: AppTheme.warning,
-                      selected: _statusFilter == 'PARTIAL',
-                      onTap: () => setState(() {
-                        _statusFilter = 'PARTIAL';
-                        _currentPage = 1;
-                      }),
-                    ),
-                    const SizedBox(width: 6),
-                    _APFilterChip(
-                      label: 'จ่ายแล้ว',
-                      count: countByStatus('PAID'),
-                      color: AppTheme.success,
-                      selected: _statusFilter == 'PAID',
-                      onTap: () => setState(() {
-                        _statusFilter = 'PAID';
-                        _currentPage = 1;
-                      }),
-                    ),
-                    if (overdueCount > 0) ...[
-                      const SizedBox(width: 6),
-                      _APFilterChip(
-                        label: 'เลยกำหนด',
-                        count: overdueCount,
-                        color: AppTheme.error,
-                        selected: _statusFilter == 'OVERDUE',
-                        onTap: () => setState(() {
-                          _statusFilter = 'OVERDUE';
-                          _currentPage = 1;
-                        }),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(height: 8),
-              // แถว 2 — Financial summary
-              Row(
+                ],
+              );
+
+              final statsWrap = Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                alignment: WrapAlignment.end,
                 children: [
                   _APValueStat(
                     label: 'กรองแล้ว',
                     value: '${filtered.length} ใบ',
                     color: AppTheme.primaryDark,
                   ),
-                  const SizedBox(width: 8),
                   _APValueStat(
                     label: 'ยอดค้างชำระ',
                     value: '฿${fmt.format(totalRemaining)}',
                     color: AppTheme.error,
                   ),
                 ],
-              ),
-            ],
+              );
+
+              final isCompact = constraints.maxWidth < 900;
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (isCompact) ...[
+                    filterWrap,
+                    const SizedBox(height: 8),
+                    Align(alignment: Alignment.centerRight, child: statsWrap),
+                  ] else
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: filterWrap),
+                        const SizedBox(width: 12),
+                        ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxWidth: constraints.maxWidth * 0.42,
+                          ),
+                          child: Align(
+                            alignment: Alignment.topRight,
+                            child: statsWrap,
+                          ),
+                        ),
+                      ],
+                    ),
+                ],
+              );
+            },
           ),
         );
       },
@@ -262,6 +446,7 @@ class _ApInvoiceListPageState extends ConsumerState<ApInvoiceListPage> {
         invoice: items[i],
         onTap: () => _openForm(items[i]),
         onDelete: () => _deleteInvoice(items[i]),
+        onPrintPdf: () => _openInvoicePdf(items[i]),
       ),
     );
   }
@@ -473,11 +658,28 @@ class _ApInvoiceListPageState extends ConsumerState<ApInvoiceListPage> {
                         ],
                       ),
                       // ── แถว 2: ปุ่ม action ─────────────────
-                      if (canAct) ...[
-                        const SizedBox(height: 8),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          SizedBox(
+                            width: 52,
+                            height: 34,
+                            child: OutlinedButton(
+                              onPressed: () => _openInvoicePdf(inv),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppTheme.primaryDark,
+                                side: const BorderSide(color: AppTheme.primaryDark),
+                                padding: EdgeInsets.zero,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              child: const Icon(Icons.picture_as_pdf_outlined, size: 18),
+                            ),
+                          ),
+                          if (canAct) ...[
+                            const SizedBox(width: 8),
                             if (inv.status == 'UNPAID') ...[
                               SizedBox(
                                 width: 52,
@@ -486,18 +688,13 @@ class _ApInvoiceListPageState extends ConsumerState<ApInvoiceListPage> {
                                   onPressed: () => _deleteInvoice(inv),
                                   style: OutlinedButton.styleFrom(
                                     foregroundColor: AppTheme.error,
-                                    side: const BorderSide(
-                                      color: AppTheme.error,
-                                    ),
+                                    side: const BorderSide(color: AppTheme.error),
                                     padding: EdgeInsets.zero,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                   ),
-                                  child: const Icon(
-                                    Icons.delete_outline,
-                                    size: 18,
-                                  ),
+                                  child: const Icon(Icons.delete_outline, size: 18),
                                 ),
                               ),
                               const SizedBox(width: 8),
@@ -516,9 +713,7 @@ class _ApInvoiceListPageState extends ConsumerState<ApInvoiceListPage> {
                                   backgroundColor: AppTheme.info,
                                   foregroundColor: Colors.white,
                                   elevation: 0,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                  ),
+                                  padding: const EdgeInsets.symmetric(horizontal: 8),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(8),
                                   ),
@@ -526,8 +721,8 @@ class _ApInvoiceListPageState extends ConsumerState<ApInvoiceListPage> {
                               ),
                             ),
                           ],
-                        ),
-                      ],
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -660,6 +855,20 @@ class _ApInvoiceListPageState extends ConsumerState<ApInvoiceListPage> {
     ref.read(apInvoiceListProvider.notifier).refresh();
   }
 
+  Future<void> _openInvoicePdf(ApInvoiceModel invoice) async {
+    final full = await ref
+        .read(apInvoiceListProvider.notifier)
+        .getInvoiceDetails(invoice.invoiceId);
+    final pdfInvoice = full ?? invoice;
+    if (!mounted) return;
+    await PdfExportService.showPreview(
+      context,
+      title: 'ใบแจ้งหนี้ ${pdfInvoice.invoiceNo}',
+      filename: PdfFilename.generate('ap_invoice_${pdfInvoice.invoiceNo}'),
+      buildPdf: () => ApInvoicePdfBuilder.build([pdfInvoice]),
+    );
+  }
+
   Future<void> _deleteInvoice(ApInvoiceModel invoice) async {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final confirm = await showDialog<bool>(
@@ -728,11 +937,13 @@ class _APCard extends StatelessWidget {
   final ApInvoiceModel invoice;
   final VoidCallback onTap;
   final VoidCallback onDelete;
+  final VoidCallback onPrintPdf;
 
   const _APCard({
     required this.invoice,
     required this.onTap,
     required this.onDelete,
+    required this.onPrintPdf,
   });
 
   Color get _statusColor {
@@ -929,12 +1140,29 @@ class _APCard extends StatelessWidget {
                 ],
               ),
 
-              // ── Row 4: Action buttons (not PAID) ───────────────
-              if (invoice.status != 'PAID') ...[
-                const SizedBox(height: 10),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
+              // ── Row 4: Action buttons ───────────────────────────
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  SizedBox(
+                    width: 52,
+                    height: 34,
+                    child: OutlinedButton(
+                      onPressed: onPrintPdf,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.primaryDark,
+                        side: const BorderSide(color: AppTheme.primaryDark),
+                        padding: EdgeInsets.zero,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Icon(Icons.picture_as_pdf_outlined, size: 18),
+                    ),
+                  ),
+                  if (invoice.status != 'PAID') ...[
+                    const SizedBox(width: 8),
                     if (invoice.status == 'UNPAID') ...[
                       SizedBox(
                         width: 52,
@@ -976,8 +1204,8 @@ class _APCard extends StatelessWidget {
                       ),
                     ),
                   ],
-                ),
-              ],
+                ],
+              ),
             ],
           ),
         ),
@@ -1562,6 +1790,62 @@ class _APValueStat extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _APActionChip extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool active;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _APActionChip({
+    required this.label,
+    required this.icon,
+    required this.active,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: active
+              ? color.withValues(alpha: isDark ? 0.22 : 0.10)
+              : (isDark ? AppTheme.darkElement : const Color(0xFFF7F7F7)),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: active
+                ? color.withValues(alpha: 0.45)
+                : (isDark ? const Color(0xFF333333) : AppTheme.border),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 15, color: active ? color : AppTheme.textSub),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: active
+                    ? color
+                    : (isDark ? Colors.white70 : const Color(0xFF1A1A1A)),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

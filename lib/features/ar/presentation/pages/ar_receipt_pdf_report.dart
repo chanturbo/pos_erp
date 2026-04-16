@@ -1,13 +1,13 @@
-// lib/features/ap/presentation/pages/ap_payment_pdf_report.dart
+// lib/features/ar/presentation/pages/ar_receipt_pdf_report.dart
 //
-// ApPaymentPdfBuilder — สร้างรายงาน PDF ประวัติการจ่ายเงิน AP
+// ArReceiptPdfBuilder — สร้างรายงาน PDF ประวัติการรับเงิน AR
 
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import '../../../settings/shared/settings_defaults.dart';
-import '../../data/models/ap_payment_model.dart';
+import '../../data/models/ar_receipt_model.dart';
 
 const _kBorder = PdfColor.fromInt(0xFFBBBBBB);
 const _kHdrBg = PdfColor.fromInt(0xFFDDDDDD);
@@ -18,13 +18,16 @@ const _kNavy = PdfColor.fromInt(0xFF16213E);
 const _kCash = PdfColor.fromInt(0xFF1B5E20);
 const _kTransfer = PdfColor.fromInt(0xFF0D47A1);
 const _kCheque = PdfColor.fromInt(0xFFE65100);
+const _kCard = PdfColor.fromInt(0xFF4A148C);
 const _kTeal = PdfColor.fromInt(0xFF00695C);
 const _kCashBg = PdfColor.fromInt(0xFFE8F5E9);
 const _kTransferBg = PdfColor.fromInt(0xFFE3F2FD);
 const _kChequeBg = PdfColor.fromInt(0xFFFFF3E0);
+const _kCardBg = PdfColor.fromInt(0xFFF3E5F5);
 const _kTealLight = PdfColor.fromInt(0xFFE0F2F1);
+const _kTealBorder = PdfColor.fromInt(0xFF80CBC4);
 
-class ApPaymentPdfBuilder {
+class ArReceiptPdfBuilder {
   static final _money = NumberFormat('#,##0.00');
   static final _date = DateFormat('dd/MM/yy');
 
@@ -36,6 +39,8 @@ class ApPaymentPdfBuilder {
         return 'โอนเงิน';
       case 'CHEQUE':
         return 'เช็ค';
+      case 'CREDIT_CARD':
+        return 'บัตร';
       default:
         return m;
     }
@@ -49,38 +54,55 @@ class ApPaymentPdfBuilder {
         return _kTransfer;
       case 'CHEQUE':
         return _kCheque;
+      case 'CREDIT_CARD':
+        return _kCard;
       default:
         return _kTeal;
     }
   }
 
+  static PdfColor _methodBg(String m) {
+    switch (m) {
+      case 'CASH':
+        return _kCashBg;
+      case 'TRANSFER':
+        return _kTransferBg;
+      case 'CHEQUE':
+        return _kChequeBg;
+      case 'CREDIT_CARD':
+        return _kCardBg;
+      default:
+        return _kTealLight;
+    }
+  }
+
   static Future<pw.Document> build(
-    List<ApPaymentModel> payments, {
+    List<ArReceiptModel> receipts, {
     String? companyName,
   }) async {
     final effectiveCompanyName =
         companyName ?? await SettingsStorage.getCompanyName();
     final doc = pw.Document(
-      title: 'รายงานการจ่ายเงิน',
+      title: 'รายงานการรับเงิน',
       author: effectiveCompanyName,
     );
     final ttf = await PdfGoogleFonts.notoSansThaiBold();
     final ttfR = await PdfGoogleFonts.notoSansThaiRegular();
     final printedAt = DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now());
 
-    final totalAmt = payments.fold<double>(0, (s, p) => s + p.totalAmount);
-    final cash = payments.where((p) => p.paymentMethod == 'CASH').length;
-    final transfer = payments
-        .where((p) => p.paymentMethod == 'TRANSFER')
-        .length;
-    final cheque = payments.where((p) => p.paymentMethod == 'CHEQUE').length;
+    final totalAmt = receipts.fold<double>(0, (s, r) => s + r.totalAmount);
+    final cash = receipts.where((r) => r.paymentMethod == 'CASH').length;
+    final transfer = receipts.where((r) => r.paymentMethod == 'TRANSFER').length;
+    final cheque = receipts.where((r) => r.paymentMethod == 'CHEQUE').length;
+    final card = receipts.where((r) => r.paymentMethod == 'CREDIT_CARD').length;
     final summaryLine =
-        'ทั้งหมด ${payments.length} ใบ   '
+        'ทั้งหมด ${receipts.length} ใบ   '
         'เงินสด $cash ใบ   '
         'โอนเงิน $transfer ใบ   '
-        'เช็ค $cheque ใบ';
+        'เช็ค $cheque ใบ'
+        '${card > 0 ? '   บัตร $card ใบ' : ''}';
     final summaryRow = _buildSummaryRow(
-      count: payments.length,
+      count: receipts.length,
       cash: cash,
       transfer: transfer,
       totalAmt: totalAmt,
@@ -89,16 +111,14 @@ class ApPaymentPdfBuilder {
     );
 
     final rowsPerPage = await SettingsStorage.getPdfReportRowsPerPage(
-      PdfReportType.apPayment,
+      PdfReportType.arReceipt,
     );
-    final pages = <List<ApPaymentModel>>[];
-    for (var i = 0; i < payments.length; i += rowsPerPage) {
+    final pages = <List<ArReceiptModel>>[];
+    for (var i = 0; i < receipts.length; i += rowsPerPage) {
       pages.add(
-        payments.sublist(
+        receipts.sublist(
           i,
-          (i + rowsPerPage) > payments.length
-              ? payments.length
-              : i + rowsPerPage,
+          (i + rowsPerPage) > receipts.length ? receipts.length : i + rowsPerPage,
         ),
       );
     }
@@ -141,7 +161,6 @@ class ApPaymentPdfBuilder {
     return doc;
   }
 
-  // ── Header ─────────────────────────────────────────────────────────────────
   static pw.Widget _buildHeader({
     required String companyName,
     required String printedAt,
@@ -177,7 +196,7 @@ class ApPaymentPdfBuilder {
       pw.SizedBox(height: 2),
       pw.Center(
         child: pw.Text(
-          'รายงานการจ่ายเงินซัพพลายเออร์',
+          'รายงานการรับเงินลูกหนี้',
           style: pw.TextStyle(font: ttf, fontSize: 14, color: _kText),
         ),
       ),
@@ -196,7 +215,6 @@ class ApPaymentPdfBuilder {
     ],
   );
 
-  // ── Summary Row ────────────────────────────────────────────────────────────
   static pw.Widget _buildSummaryRow({
     required int count,
     required int cash,
@@ -231,19 +249,18 @@ class ApPaymentPdfBuilder {
       ),
       child: pw.Row(
         children: [
-          cell('จำนวนใบจ่าย', '$count ใบ', _kNavy),
+          cell('จำนวนใบรับ', '$count ใบ', _kNavy),
           pw.Container(width: 0.5, height: 28, color: _kBorder),
           cell('เงินสด', '$cash ใบ', _kCash),
           pw.Container(width: 0.5, height: 28, color: _kBorder),
           cell('โอนเงิน', '$transfer ใบ', _kTransfer),
           pw.Container(width: 0.5, height: 28, color: _kBorder),
-          cell('ยอดจ่ายรวม', '฿${_money.format(totalAmt)}', _kTeal),
+          cell('ยอดรับรวม', '฿${_money.format(totalAmt)}', _kTeal),
         ],
       ),
     );
   }
 
-  // ── Table Header ───────────────────────────────────────────────────────────
   static pw.Widget _buildTableHeader({required pw.Font ttf}) {
     cell(String t, {pw.TextAlign align = pw.TextAlign.left, int flex = 1}) =>
         pw.Expanded(
@@ -262,122 +279,148 @@ class ApPaymentPdfBuilder {
         children: [
           pw.SizedBox(
             width: 22,
-            child: pw.Text(
-              '#',
-              style: pw.TextStyle(font: ttf, fontSize: 9),
-              textAlign: pw.TextAlign.center,
-            ),
+            child: pw.Text('#', style: pw.TextStyle(font: ttf, fontSize: 9), textAlign: pw.TextAlign.center),
           ),
-          cell('เลขที่ใบจ่ายเงิน', flex: 3),
-          cell('ซัพพลายเออร์', flex: 3),
+          cell('เลขที่ใบรับเงิน', flex: 3),
+          cell('ลูกค้า', flex: 3),
           cell('วันที่', flex: 2),
-          cell('วิธีจ่าย', flex: 2),
-          cell('ยอดจ่าย', flex: 2, align: pw.TextAlign.right),
+          cell('วิธีรับ', flex: 2),
+          cell('ยอดรับ', flex: 2, align: pw.TextAlign.right),
         ],
       ),
     );
-  }
-
-  // ── Data Row ───────────────────────────────────────────────────────────────
-  static PdfColor _methodBg(String m) {
-    switch (m) {
-      case 'CASH':
-        return _kCashBg;
-      case 'TRANSFER':
-        return _kTransferBg;
-      case 'CHEQUE':
-        return _kChequeBg;
-      default:
-        return _kTealLight;
-    }
   }
 
   static pw.Widget _buildRow(
-    ApPaymentModel p,
+    ArReceiptModel r,
     bool isEven, {
     required pw.Font ttfR,
   }) {
-    rcell(
-      String t, {
-      pw.TextAlign align = pw.TextAlign.left,
-      int flex = 1,
-      PdfColor? color,
-    }) => pw.Expanded(
-      flex: flex,
-      child: pw.Text(
-        t,
-        style: pw.TextStyle(font: ttfR, fontSize: 8.5, color: color ?? _kText),
-        textAlign: align,
-        overflow: pw.TextOverflow.clip,
-      ),
+    rcell(String t, {pw.TextAlign align = pw.TextAlign.left, int flex = 1, PdfColor? color}) =>
+        pw.Expanded(
+          flex: flex,
+          child: pw.Text(
+            t,
+            style: pw.TextStyle(font: ttfR, fontSize: 8.5, color: color ?? _kText),
+            textAlign: align,
+            overflow: pw.TextOverflow.clip,
+          ),
+        );
+
+    final methodColor = _methodColor(r.paymentMethod);
+    final methodLabel = _methodLabel(r.paymentMethod);
+    final methodBg = _methodBg(r.paymentMethod);
+    final allocs = r.allocations;
+    final hasAllocs = allocs != null && allocs.isNotEmpty;
+
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+      children: [
+        pw.Container(
+          padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+          decoration: pw.BoxDecoration(
+            color: isEven ? _kAltRow : PdfColors.white,
+            border: hasAllocs
+                ? null
+                : const pw.Border(
+                    bottom: pw.BorderSide(color: _kBorder, width: 0.3),
+                  ),
+          ),
+          child: pw.Row(
+            children: [
+              pw.SizedBox(
+                width: 22,
+                child: pw.Text(
+                  '${r.receiptNo.hashCode % 9999}',
+                  style: pw.TextStyle(font: ttfR, fontSize: 8, color: _kSub),
+                  textAlign: pw.TextAlign.center,
+                ),
+              ),
+              rcell(r.receiptNo, flex: 3),
+              rcell(r.customerName, flex: 3, color: _kSub),
+              rcell(_date.format(r.receiptDate), flex: 2, color: _kSub),
+              pw.Expanded(
+                flex: 2,
+                child: pw.Container(
+                  padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                  decoration: pw.BoxDecoration(
+                    color: methodBg,
+                    borderRadius: pw.BorderRadius.circular(3),
+                  ),
+                  child: pw.Text(
+                    methodLabel,
+                    style: pw.TextStyle(font: ttfR, fontSize: 8, color: methodColor),
+                    textAlign: pw.TextAlign.center,
+                  ),
+                ),
+              ),
+              pw.Expanded(
+                flex: 2,
+                child: pw.Text(
+                  '฿${_money.format(r.totalAmount)}',
+                  style: pw.TextStyle(font: ttfR, fontSize: 8.5, color: _kTeal),
+                  textAlign: pw.TextAlign.right,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (hasAllocs)
+          _buildAllocationDetail(allocs, isEven: isEven, ttfR: ttfR),
+      ],
     );
+  }
 
-    final methodColor = _methodColor(p.paymentMethod);
-    final methodLabel = _methodLabel(p.paymentMethod);
-    final methodBg = _methodBg(p.paymentMethod);
-
+  static pw.Widget _buildAllocationDetail(
+    List allocs, {
+    required bool isEven,
+    required pw.Font ttfR,
+  }) {
     return pw.Container(
-      padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      margin: const pw.EdgeInsets.only(left: 22, right: 0),
+      padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: pw.BoxDecoration(
         color: isEven ? _kAltRow : PdfColors.white,
         border: const pw.Border(
+          left: pw.BorderSide(color: _kTealBorder, width: 2),
           bottom: pw.BorderSide(color: _kBorder, width: 0.3),
         ),
       ),
-      child: pw.Row(
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.stretch,
         children: [
-          pw.SizedBox(
-            width: 22,
-            child: pw.Text(
-              '${p.paymentNo.hashCode % 9999}',
-              style: pw.TextStyle(font: ttfR, fontSize: 8, color: _kSub),
-              textAlign: pw.TextAlign.center,
-            ),
+          pw.Text(
+            'รายละเอียดการจัดสรร',
+            style: pw.TextStyle(font: ttfR, fontSize: 7.5, color: _kTeal),
           ),
-          rcell(p.paymentNo, flex: 3),
-          rcell(p.supplierName, flex: 3, color: _kSub),
-          rcell(_date.format(p.paymentDate), flex: 2, color: _kSub),
-          pw.Expanded(
-            flex: 2,
-            child: pw.Container(
-              padding: const pw.EdgeInsets.symmetric(
-                horizontal: 5,
-                vertical: 2,
-              ),
-              decoration: pw.BoxDecoration(
-                color: methodBg,
-                borderRadius: pw.BorderRadius.circular(3),
-              ),
-              child: pw.Text(
-                methodLabel,
-                style: pw.TextStyle(
-                  font: ttfR,
-                  fontSize: 8,
-                  color: methodColor,
+          pw.SizedBox(height: 2),
+          ...allocs.map((a) => pw.Padding(
+            padding: const pw.EdgeInsets.only(top: 1),
+            child: pw.Row(
+              children: [
+                pw.Expanded(
+                  flex: 4,
+                  child: pw.Text(
+                    '• ${a.invoiceNo}',
+                    style: pw.TextStyle(font: ttfR, fontSize: 7.5, color: _kSub),
+                  ),
                 ),
-                textAlign: pw.TextAlign.center,
-              ),
+                pw.Text(
+                  '฿${_money.format(a.allocatedAmount)}',
+                  style: pw.TextStyle(font: ttfR, fontSize: 7.5, color: _kTeal),
+                ),
+              ],
             ),
-          ),
-          pw.Expanded(
-            flex: 2,
-            child: pw.Text(
-              '฿${_money.format(p.totalAmount)}',
-              style: pw.TextStyle(font: ttfR, fontSize: 8.5, color: _kTeal),
-              textAlign: pw.TextAlign.right,
-            ),
-          ),
+          )),
         ],
       ),
     );
   }
 
-  // ── Totals Row ─────────────────────────────────────────────────────────────
   static pw.Widget _buildTotalsRow({
     required double totalAmt,
     required pw.Font ttf,
-  }) {
-    return pw.Container(
+  }) => pw.Container(
       margin: const pw.EdgeInsets.only(top: 4),
       padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: pw.BoxDecoration(
@@ -388,9 +431,9 @@ class ApPaymentPdfBuilder {
       child: pw.Row(
         mainAxisAlignment: pw.MainAxisAlignment.end,
         children: [
-          pw.Text(
-            'ยอดจ่ายรวมทั้งหมด  ',
-            style: pw.TextStyle(font: ttf, fontSize: 10, color: _kSub),
+        pw.Text(
+          'ยอดรับรวมทั้งหมด  ',
+          style: pw.TextStyle(font: ttf, fontSize: 10, color: _kSub),
           ),
           pw.Text(
             '฿${_money.format(totalAmt)}',
@@ -399,7 +442,6 @@ class ApPaymentPdfBuilder {
         ],
       ),
     );
-  }
 
   static pw.Widget _buildFooter({
     required String companyName,

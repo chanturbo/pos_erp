@@ -933,14 +933,18 @@ class _ArInvoiceFormPageState extends ConsumerState<ArInvoiceFormPage> {
   }
 
   Future<void> _createReceipt(ArInvoiceModel invoice) async {
-    await Navigator.push(
+    final receiptSaved = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
         builder: (ctx) => ArReceiptFormPage(preselectedInvoice: invoice),
       ),
     );
+    if (!mounted) return;
     ref.read(arInvoiceListProvider.notifier).refresh();
     ref.read(arReceiptListProvider.notifier).refresh();
+    if (receiptSaved == true) {
+      Navigator.pop(context, true);
+    }
   }
 }
 

@@ -1,13 +1,13 @@
-// lib/features/ap/presentation/pages/ap_invoice_pdf_report.dart
+// lib/features/ar/presentation/pages/ar_invoice_pdf_report.dart
 //
-// ApInvoicePdfBuilder — สร้างรายงาน PDF ใบแจ้งหนี้ค้างชำระ (AP)
+// ArInvoicePdfBuilder — สร้างรายงาน PDF ใบแจ้งหนี้ลูกหนี้ (AR)
 
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import '../../../settings/shared/settings_defaults.dart';
-import '../../data/models/ap_invoice_model.dart';
+import '../../data/models/ar_invoice_model.dart';
 
 const _kBorder = PdfColor.fromInt(0xFFBBBBBB);
 const _kHdrBg = PdfColor.fromInt(0xFFDDDDDD);
@@ -20,18 +20,18 @@ const _kPaid = PdfColor.fromInt(0xFF1B5E20);
 const _kNavy = PdfColor.fromInt(0xFF16213E);
 const _kOverdue = PdfColor.fromInt(0xFFC62828);
 
-class ApInvoicePdfBuilder {
+class ArInvoicePdfBuilder {
   static final _money = NumberFormat('#,##0.00');
   static final _date = DateFormat('dd/MM/yy');
 
   static Future<pw.Document> build(
-    List<ApInvoiceModel> invoices, {
+    List<ArInvoiceModel> invoices, {
     String? companyName,
   }) async {
     final effectiveCompanyName =
         companyName ?? await SettingsStorage.getCompanyName();
     final doc = pw.Document(
-      title: 'รายงานใบแจ้งหนี้ค้างชำระ',
+      title: 'รายงานใบแจ้งหนี้ลูกหนี้',
       author: effectiveCompanyName,
     );
     final ttf = await PdfGoogleFonts.notoSansThaiBold();
@@ -49,11 +49,10 @@ class ApInvoicePdfBuilder {
     final overdue = invoices.where((i) => i.isOverdue).length;
     final summaryLine =
         'ทั้งหมด ${invoices.length} ใบ   '
-        'ยังไม่จ่าย $unpaid ใบ   '
-        'จ่ายบางส่วน $partial ใบ   '
-        'จ่ายแล้ว $paid ใบ'
+        'ยังไม่รับ $unpaid ใบ   '
+        'รับบางส่วน $partial ใบ   '
+        'รับแล้ว $paid ใบ'
         '${overdue > 0 ? '   เลยกำหนด $overdue ใบ' : ''}';
-
     final summaryRow = _buildSummaryRow(
       count: invoices.length,
       unpaid: unpaid,
@@ -64,16 +63,14 @@ class ApInvoicePdfBuilder {
     );
 
     final rowsPerPage = await SettingsStorage.getPdfReportRowsPerPage(
-      PdfReportType.apInvoice,
+      PdfReportType.arInvoice,
     );
-    final pages = <List<ApInvoiceModel>>[];
+    final pages = <List<ArInvoiceModel>>[];
     for (var i = 0; i < invoices.length; i += rowsPerPage) {
       pages.add(
         invoices.sublist(
           i,
-          (i + rowsPerPage) > invoices.length
-              ? invoices.length
-              : i + rowsPerPage,
+          (i + rowsPerPage) > invoices.length ? invoices.length : i + rowsPerPage,
         ),
       );
     }
@@ -120,7 +117,6 @@ class ApInvoicePdfBuilder {
     return doc;
   }
 
-  // ── Header ────────────────────────────────────────────────────
   static pw.Widget _buildHeader({
     required String companyName,
     required String printedAt,
@@ -156,7 +152,7 @@ class ApInvoicePdfBuilder {
       pw.SizedBox(height: 2),
       pw.Center(
         child: pw.Text(
-          'รายงานใบแจ้งหนี้เจ้าหนี้',
+          'รายงานใบแจ้งหนี้ลูกหนี้',
           style: pw.TextStyle(font: ttf, fontSize: 14, color: _kText),
         ),
       ),
@@ -175,7 +171,6 @@ class ApInvoicePdfBuilder {
     ],
   );
 
-  // ── Summary Row ───────────────────────────────────────────────
   static pw.Widget _buildSummaryRow({
     required int count,
     required int unpaid,
@@ -212,17 +207,16 @@ class ApInvoicePdfBuilder {
         children: [
           cell('จำนวนใบแจ้งหนี้', '$count ใบ', _kNavy),
           pw.Container(width: 0.5, height: 28, color: _kBorder),
-          cell('ยังไม่จ่าย', '$unpaid ใบ', _kUnpaid),
+          cell('ยังไม่รับ', '$unpaid ใบ', _kUnpaid),
           pw.Container(width: 0.5, height: 28, color: _kBorder),
-          cell('จ่ายบางส่วน', '$partial ใบ', _kPartial),
+          cell('รับบางส่วน', '$partial ใบ', _kPartial),
           pw.Container(width: 0.5, height: 28, color: _kBorder),
-          cell('ค้างชำระรวม', '฿${_money.format(remainingAmt)}', _kUnpaid),
+          cell('คงค้างรวม', '฿${_money.format(remainingAmt)}', _kUnpaid),
         ],
       ),
     );
   }
 
-  // ── Table header ──────────────────────────────────────────────
   static pw.Widget _buildTableHeader({required pw.Font ttf}) => pw.Container(
     color: _kHdrBg,
     padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
@@ -230,12 +224,12 @@ class ApInvoicePdfBuilder {
       children: [
         pw.SizedBox(width: 28, child: _hcell('#', ttf)),
         pw.Expanded(flex: 3, child: _hcell('เลขที่ใบแจ้งหนี้', ttf)),
-        pw.Expanded(flex: 3, child: _hcell('ซัพพลายเออร์', ttf)),
+        pw.Expanded(flex: 3, child: _hcell('ลูกค้า', ttf)),
         pw.SizedBox(width: 60, child: _hcell('วันที่', ttf, right: true)),
         pw.SizedBox(width: 60, child: _hcell('ครบกำหนด', ttf, right: true)),
         pw.SizedBox(width: 52, child: _hcell('สถานะ', ttf, center: true)),
         pw.SizedBox(width: 72, child: _hcell('ยอดรวม', ttf, right: true)),
-        pw.SizedBox(width: 72, child: _hcell('ค้างชำระ', ttf, right: true)),
+        pw.SizedBox(width: 72, child: _hcell('คงค้าง', ttf, right: true)),
       ],
     ),
   );
@@ -255,9 +249,8 @@ class ApInvoicePdfBuilder {
         : pw.TextAlign.left,
   );
 
-  // ── Data Row ──────────────────────────────────────────────────
   static pw.Widget _buildRow(
-    ApInvoiceModel inv,
+    ArInvoiceModel inv,
     bool alt, {
     required pw.Font ttfR,
   }) {
@@ -267,124 +260,176 @@ class ApInvoicePdfBuilder {
         ? _kPartial
         : _kUnpaid;
     final statusLabel = inv.status == 'PAID'
-        ? 'จ่ายแล้ว'
+        ? 'รับแล้ว'
         : inv.status == 'PARTIAL'
         ? 'บางส่วน'
-        : 'ยังไม่จ่าย';
+        : 'ยังไม่รับ';
 
-    return pw.Container(
-      color: alt ? _kAltRow : PdfColors.white,
-      padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-      child: pw.Row(
-        crossAxisAlignment: pw.CrossAxisAlignment.center,
-        children: [
-          pw.SizedBox(
-            width: 28,
-            child: pw.Text('', style: pw.TextStyle(font: ttfR, fontSize: 8)),
-          ),
-          pw.Expanded(
-            flex: 3,
-            child: pw.Row(
-              children: [
-                if (inv.isOverdue)
-                  pw.Container(
-                    width: 4,
-                    height: 4,
-                    decoration: const pw.BoxDecoration(
-                      color: _kOverdue,
-                      shape: pw.BoxShape.circle,
-                    ),
-                    margin: const pw.EdgeInsets.only(right: 3),
-                  ),
-                pw.Expanded(
-                  child: pw.Text(
-                    inv.invoiceNo,
-                    style: pw.TextStyle(
-                      font: ttfR,
-                      fontSize: 8.5,
-                      color: _kText,
-                    ),
-                    overflow: pw.TextOverflow.clip,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          pw.Expanded(
-            flex: 3,
-            child: pw.Text(
-              inv.supplierName,
-              style: pw.TextStyle(font: ttfR, fontSize: 8, color: _kSub),
-              overflow: pw.TextOverflow.clip,
-            ),
-          ),
-          pw.SizedBox(
-            width: 60,
-            child: pw.Text(
-              _date.format(inv.invoiceDate),
-              style: pw.TextStyle(font: ttfR, fontSize: 8, color: _kSub),
-              textAlign: pw.TextAlign.right,
-            ),
-          ),
-          pw.SizedBox(
-            width: 60,
-            child: pw.Text(
-              inv.dueDate != null ? _date.format(inv.dueDate!) : '-',
-              style: pw.TextStyle(
-                font: ttfR,
-                fontSize: 8,
-                color: inv.isOverdue ? _kOverdue : _kSub,
+    final receipts = inv.receipts;
+    final hasReceipts = receipts != null && receipts.isNotEmpty;
+
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+      children: [
+        pw.Container(
+          color: alt ? _kAltRow : PdfColors.white,
+          padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+          child: pw.Row(
+            crossAxisAlignment: pw.CrossAxisAlignment.center,
+            children: [
+              pw.SizedBox(
+                width: 28,
+                child: pw.Text('', style: pw.TextStyle(font: ttfR, fontSize: 8)),
               ),
-              textAlign: pw.TextAlign.right,
-            ),
-          ),
-          pw.SizedBox(
-            width: 52,
-            child: pw.Center(
-              child: pw.Container(
-                padding: const pw.EdgeInsets.symmetric(
-                  horizontal: 4,
-                  vertical: 2,
+              pw.Expanded(
+                flex: 3,
+                child: pw.Row(
+                  children: [
+                    if (inv.isOverdue)
+                      pw.Container(
+                        width: 4,
+                        height: 4,
+                        decoration: const pw.BoxDecoration(
+                          color: _kOverdue,
+                          shape: pw.BoxShape.circle,
+                        ),
+                        margin: const pw.EdgeInsets.only(right: 3),
+                      ),
+                    pw.Expanded(
+                      child: pw.Text(
+                        inv.invoiceNo,
+                        style: pw.TextStyle(font: ttfR, fontSize: 8.5, color: _kText),
+                        overflow: pw.TextOverflow.clip,
+                      ),
+                    ),
+                  ],
                 ),
-                decoration: pw.BoxDecoration(
-                  color: PdfColor(
-                    statusColor.red,
-                    statusColor.green,
-                    statusColor.blue,
-                    0.12,
-                  ),
-                  borderRadius: pw.BorderRadius.circular(6),
-                ),
+              ),
+              pw.Expanded(
+                flex: 3,
                 child: pw.Text(
-                  statusLabel,
+                  inv.customerName,
+                  style: pw.TextStyle(font: ttfR, fontSize: 8, color: _kSub),
+                  overflow: pw.TextOverflow.clip,
+                ),
+              ),
+              pw.SizedBox(
+                width: 60,
+                child: pw.Text(
+                  _date.format(inv.invoiceDate),
+                  style: pw.TextStyle(font: ttfR, fontSize: 8, color: _kSub),
+                  textAlign: pw.TextAlign.right,
+                ),
+              ),
+              pw.SizedBox(
+                width: 60,
+                child: pw.Text(
+                  inv.dueDate != null ? _date.format(inv.dueDate!) : '-',
                   style: pw.TextStyle(
                     font: ttfR,
-                    fontSize: 7.5,
-                    color: statusColor,
+                    fontSize: 8,
+                    color: inv.isOverdue ? _kOverdue : _kSub,
                   ),
-                  textAlign: pw.TextAlign.center,
+                  textAlign: pw.TextAlign.right,
                 ),
               ),
-            ),
-          ),
-          pw.SizedBox(
-            width: 72,
-            child: pw.Text(
-              '฿${_money.format(inv.totalAmount)}',
-              style: pw.TextStyle(font: ttfR, fontSize: 8.5, color: _kText),
-              textAlign: pw.TextAlign.right,
-            ),
-          ),
-          pw.SizedBox(
-            width: 72,
-            child: pw.Text(
-              '฿${_money.format(inv.remainingAmount)}',
-              style: pw.TextStyle(
-                font: ttfR,
-                fontSize: 8.5,
-                color: inv.remainingAmount > 0 ? _kUnpaid : _kSub,
+              pw.SizedBox(
+                width: 52,
+                child: pw.Center(
+                  child: pw.Container(
+                    padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    decoration: pw.BoxDecoration(
+                      color: PdfColor(
+                        statusColor.red,
+                        statusColor.green,
+                        statusColor.blue,
+                        0.12,
+                      ),
+                      borderRadius: pw.BorderRadius.circular(6),
+                    ),
+                    child: pw.Text(
+                      statusLabel,
+                      style: pw.TextStyle(font: ttfR, fontSize: 7.5, color: statusColor),
+                      textAlign: pw.TextAlign.center,
+                    ),
+                  ),
+                ),
               ),
-              textAlign: pw.TextAlign.right,
+              pw.SizedBox(
+                width: 72,
+                child: pw.Text(
+                  '฿${_money.format(inv.totalAmount)}',
+                  style: pw.TextStyle(font: ttfR, fontSize: 8.5, color: _kText),
+                  textAlign: pw.TextAlign.right,
+                ),
+              ),
+              pw.SizedBox(
+                width: 72,
+                child: pw.Text(
+                  '฿${_money.format(inv.remainingAmount)}',
+                  style: pw.TextStyle(
+                    font: ttfR,
+                    fontSize: 8.5,
+                    color: inv.remainingAmount > 0 ? _kUnpaid : _kSub,
+                  ),
+                  textAlign: pw.TextAlign.right,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (hasReceipts)
+          _buildReceiptDetail(receipts, alt: alt, ttfR: ttfR),
+      ],
+    );
+  }
+
+  static pw.Widget _buildReceiptDetail(
+    List<ArInvoiceReceiptModel> receipts, {
+    required bool alt,
+    required pw.Font ttfR,
+  }) {
+    return pw.Container(
+      margin: const pw.EdgeInsets.only(left: 34, right: 0),
+      padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: pw.BoxDecoration(
+        color: alt ? _kAltRow : PdfColors.white,
+        border: const pw.Border(
+          left: pw.BorderSide(color: _kPaid, width: 2),
+          bottom: pw.BorderSide(color: _kBorder, width: 0.3),
+        ),
+      ),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+        children: [
+          pw.Text(
+            'ประวัติการรับเงิน',
+            style: pw.TextStyle(font: ttfR, fontSize: 7.5, color: _kPaid),
+          ),
+          pw.SizedBox(height: 2),
+          ...receipts.map(
+            (r) => pw.Padding(
+              padding: const pw.EdgeInsets.only(top: 1),
+              child: pw.Row(
+                children: [
+                  pw.Expanded(
+                    flex: 3,
+                    child: pw.Text(
+                      '• ${r.receiptNo}',
+                      style: pw.TextStyle(font: ttfR, fontSize: 7.5, color: _kSub),
+                    ),
+                  ),
+                  pw.Text(
+                    _date.format(r.receiptDate),
+                    style: pw.TextStyle(font: ttfR, fontSize: 7.5, color: _kSub),
+                  ),
+                  pw.SizedBox(width: 8),
+                  pw.Text(
+                    '฿${_money.format(r.allocatedAmount)}',
+                    style: pw.TextStyle(font: ttfR, fontSize: 7.5, color: _kPaid),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -392,7 +437,6 @@ class ApInvoicePdfBuilder {
     );
   }
 
-  // ── Totals row ────────────────────────────────────────────────
   static pw.Widget _buildTotalsRow({
     required double totalAmt,
     required double remainingAmt,
