@@ -210,6 +210,46 @@ class ArReceiptRoutes {
               status: Value(newStatus),
               updatedAt: Value(DateTime.now()),
             ));
+
+            // ── สะสมแต้มเมื่อชำระหนี้ครบถ้วน (PAID) ──────────────────────────
+            if (newStatus == 'PAID') {
+              final customer = await (db.select(db.customers)
+                    ..where((c) => c.customerId.equals(invoice.customerId)))
+                  .getSingleOrNull();
+              if (customer != null && customer.memberNo != null) {
+                const double pointsPerBaht = 100.0;
+                final earnedPts = (invoice.totalAmount / pointsPerBaht).floor();
+                if (earnedPts > 0) {
+                  await (db.update(db.customers)
+                        ..where((c) => c.customerId.equals(invoice.customerId)))
+                      .write(CustomersCompanion(
+                    points: Value(customer.points + earnedPts),
+                    updatedAt: Value(DateTime.now()),
+                  ));
+                  final ptxId =
+                      'PTX-ARN-${DateTime.now().millisecondsSinceEpoch}-$i';
+                  try {
+                    await db.into(db.pointsTransactions).insert(
+                          PointsTransactionsCompanion(
+                            transactionId: Value(ptxId),
+                            customerId: Value(invoice.customerId),
+                            type: const Value('EARN'),
+                            points: Value(earnedPts),
+                            referenceNo: Value(invoice.invoiceNo),
+                            remark: Value(
+                              'สะสมแต้มจากการรับชำระหนี้ ${invoice.invoiceNo}',
+                            ),
+                          ),
+                        );
+                  } catch (e) {
+                    print('⚠️ Points transaction log failed (AR EARN): $e');
+                  }
+                  print(
+                    '⭐ Points earned (AR paid): ${invoice.customerId} +$earnedPts',
+                  );
+                }
+              }
+            }
           }
         }
       }

@@ -440,6 +440,7 @@ class _RolePermissionTab extends StatelessWidget {
     AppPermission.arInvoice      => Icons.request_page_rounded,
     AppPermission.arReceipt      => Icons.price_check_rounded,
     AppPermission.reports        => Icons.assessment_rounded,
+    AppPermission.customerDividend => Icons.savings_rounded,
     AppPermission.branch         => Icons.store_rounded,
     AppPermission.sync           => Icons.sync_alt_rounded,
     AppPermission.settings       => Icons.settings_rounded,

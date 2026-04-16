@@ -97,6 +97,14 @@ class ReportsPdfBuilder {
                 'มูลค่าสั่งซื้อรวม',
                 '฿${_money.format((summary['total_po_amount'] ?? 0) as num)}',
               ),
+              (
+                'ชำระแล้ว',
+                '฿${_money.format((summary['total_paid'] ?? 0) as num)}',
+              ),
+              (
+                'คงค้าง',
+                '฿${_money.format((summary['total_outstanding'] ?? 0) as num)}',
+              ),
               ('ใบรับสินค้า', '${summary['total_gr'] ?? 0}'),
             ],
             regular,

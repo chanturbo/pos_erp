@@ -11,10 +11,15 @@ import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/responsive_utils.dart';
 import '../../../../shared/widgets/escape_pop_scope.dart';
 import '../../../../shared/widgets/mobile_home_button.dart';
+import '../../../../shared/permissions/app_permissions.dart';
 import '../../data/models/sales_summary_model.dart';
 import 'reports_pdf_report.dart';
 import 'sales_chart_page.dart';
+import 'customer_purchase_summary_page.dart';
+import 'customer_dividend_summary_page.dart';
+import 'customer_dividend_run_list_page.dart';
 import '../../../../core/utils/csv_export.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 
 // ── Providers ─────────────────────────────────────────────────────────────────
 
@@ -312,6 +317,14 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
         _financialDateTo = picked;
       }
     });
+  }
+
+  bool _canAccessDividend() {
+    final roleId = ref.watch(authProvider).user?.roleId?.toUpperCase();
+    final permData = ref.watch(rolePermissionsProvider).value;
+    return roleId == 'ADMIN' ||
+        ((permData?[roleId] ?? defaultRolePermissions[roleId] ?? [])
+            .contains(AppPermission.customerDividend));
   }
 
   @override
@@ -676,6 +689,7 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
 
   // ── Tab 1: Sales ───────────────────────────────────────────────────────────
   Widget _buildSalesTab() {
+    final canAccessDividend = _canAccessDividend();
     return SingleChildScrollView(
       padding: context.pagePadding,
       child: Column(
@@ -707,6 +721,74 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
                 loading: _loadingWidget,
                 error: (e, _) => _errorWidget('$e'),
               ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                      const CustomerPurchaseSummaryPage(),
+                ),
+              ),
+              icon: const Icon(Icons.bar_chart, size: 18),
+              label: const Text('ดูรายงานสรุปยอดซื้อทุกลูกค้า'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.purple,
+                side: const BorderSide(color: Colors.purple),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ),
+          if (canAccessDividend) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const CustomerDividendSummaryPage(),
+                  ),
+                ),
+                icon: const Icon(Icons.savings_outlined, size: 18),
+                label: const Text('ดูรายงานสรุปยอดปันผลคืนลูกค้า'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF00897B),
+                  side: const BorderSide(color: Color(0xFF00897B)),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const CustomerDividendRunListPage(),
+                  ),
+                ),
+                icon: const Icon(Icons.fact_check_outlined, size: 18),
+                label: const Text('ดูงวดปันผลที่บันทึกแล้ว'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF00695C),
+                  side: const BorderSide(color: Color(0xFF00695C)),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -811,6 +893,8 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
         final cards = [
           _summaryCard('ใบสั่งซื้อทั้งหมด', _fmtInt.format(data['total_po'] ?? 0), Icons.receipt, Colors.red),
           _summaryCard('มูลค่าสั่งซื้อรวม', '฿${_fmt.format((data['total_po_amount'] ?? 0.0) as num)}', Icons.payments, Colors.orange),
+          _summaryCard('ชำระแล้ว', '฿${_fmt.format((data['total_paid'] ?? 0.0) as num)}', Icons.check_circle, Colors.green),
+          _summaryCard('คงค้าง', '฿${_fmt.format((data['total_outstanding'] ?? 0.0) as num)}', Icons.pending_actions, Colors.deepOrange),
           _summaryCard('ใบรับสินค้า', _fmtInt.format(data['total_gr'] ?? 0), Icons.inventory_2, Colors.blue),
         ];
         return Wrap(

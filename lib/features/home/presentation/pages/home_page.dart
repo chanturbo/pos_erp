@@ -25,6 +25,7 @@ import '../../../dashboard/presentation/pages/dashboard_page.dart';
 import '../../../inventory/presentation/pages/stock_balance_page.dart';
 import '../../../inventory/presentation/pages/stock_adjustment_page.dart';
 import '../../../reports/presentation/pages/reports_page.dart';
+import '../../../reports/presentation/pages/customer_dividend_run_list_page.dart';
 import '../../../../core/shortcuts/keyboard_shortcuts.dart';
 import '../../../settings/presentation/pages/settings_page.dart';
 import '../../../settings/presentation/pages/role_permission_page.dart';
@@ -222,6 +223,12 @@ class _HomePageState extends ConsumerState<HomePage> {
         title: 'รายงาน',
         page: const ReportsPage(),
         permissionKey: AppPermission.reports,
+      ),
+      _MenuItem(
+        icon: Icons.savings,
+        title: 'งวดปันผลลูกค้า',
+        page: const CustomerDividendRunListPage(),
+        permissionKey: AppPermission.customerDividend,
       ),
       _MenuItem(
         icon: Icons.store,

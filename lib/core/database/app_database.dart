@@ -106,14 +106,57 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
   AppDatabase.forTesting(super.e);
 
+  static const _createCustomerDividendRunsTable = '''
+    CREATE TABLE IF NOT EXISTS customer_dividend_runs (
+      run_id TEXT PRIMARY KEY NOT NULL,
+      run_no TEXT NOT NULL UNIQUE,
+      period_start TEXT,
+      period_end TEXT,
+      dividend_percent REAL NOT NULL DEFAULT 0,
+      total_customers INTEGER NOT NULL DEFAULT 0,
+      total_dividend_base REAL NOT NULL DEFAULT 0,
+      total_dividend_amount REAL NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'DRAFT',
+      remark TEXT,
+      created_by TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      paid_at TEXT
+    )
+  ''';
+
+  static const _createCustomerDividendRunItemsTable = '''
+    CREATE TABLE IF NOT EXISTS customer_dividend_run_items (
+      item_id TEXT PRIMARY KEY NOT NULL,
+      run_id TEXT NOT NULL,
+      customer_id TEXT NOT NULL,
+      customer_name TEXT NOT NULL,
+      order_count INTEGER NOT NULL DEFAULT 0,
+      paid_amount REAL NOT NULL DEFAULT 0,
+      credit_amount REAL NOT NULL DEFAULT 0,
+      dividend_base REAL NOT NULL DEFAULT 0,
+      dividend_percent REAL NOT NULL DEFAULT 0,
+      dividend_amount REAL NOT NULL DEFAULT 0,
+      payment_status TEXT NOT NULL DEFAULT 'PENDING',
+      paid_amount_actual REAL NOT NULL DEFAULT 0,
+      paid_at TEXT,
+      note TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(run_id) REFERENCES customer_dividend_runs(run_id) ON DELETE CASCADE
+    )
+  ''';
+
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration {
     return MigrationStrategy(
       onCreate: (Migrator m) async {
         await m.createAll();
+        await customStatement(_createCustomerDividendRunsTable);
+        await customStatement(_createCustomerDividendRunItemsTable);
       },
       onUpgrade: (Migrator m, int from, int to) async {
         if (from < 2) {
@@ -147,6 +190,10 @@ class AppDatabase extends _$AppDatabase {
           await customStatement('''
             ALTER TABLE stock_movements ADD COLUMN unit_cost REAL NOT NULL DEFAULT 0
           ''').catchError((_) {});
+        }
+        if (from < 7) {
+          await customStatement(_createCustomerDividendRunsTable);
+          await customStatement(_createCustomerDividendRunItemsTable);
         }
       },
     );

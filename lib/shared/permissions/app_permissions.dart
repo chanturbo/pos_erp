@@ -25,6 +25,7 @@ class AppPermission {
   static const arInvoice      = 'ar_invoice';
   static const arReceipt      = 'ar_receipt';
   static const reports        = 'reports';
+  static const customerDividend = 'customer_dividend';
   static const branch         = 'branch';
   static const sync           = 'sync';
   static const settings       = 'settings';
@@ -37,7 +38,7 @@ class AppPermission {
     customers, suppliers,
     purchaseOrder, goodsReceipt, purchaseReturn,
     apInvoice, apPayment, arInvoice, arReceipt,
-    reports, branch, sync, settings, rolePermissions, userManagement,
+    reports, customerDividend, branch, sync, settings, rolePermissions, userManagement,
   ];
 }
 
@@ -60,6 +61,7 @@ const appPermissionLabels = <String, String>{
   AppPermission.arInvoice:      'ใบแจ้งหนี้ AR (ลูกค้า)',
   AppPermission.arReceipt:      'รับเงิน AR',
   AppPermission.reports:        'รายงาน',
+  AppPermission.customerDividend: 'งวดปันผลลูกค้า',
   AppPermission.branch:         'จัดการสาขา',
   AppPermission.sync:           'การเชื่อมต่อ/ซิงก์',
   AppPermission.settings:       'ตั้งค่าระบบ',
@@ -103,6 +105,7 @@ const appPermissionGroups = [
   ]),
   PermissionGroup('ระบบ', [
     AppPermission.reports,
+    AppPermission.customerDividend,
     AppPermission.branch,
     AppPermission.sync,
     AppPermission.settings,
@@ -152,6 +155,7 @@ const defaultRolePermissions = <String, List<String>>{
     AppPermission.arInvoice,
     AppPermission.arReceipt,
     AppPermission.reports,
+    AppPermission.customerDividend,
     AppPermission.branch,
     AppPermission.sync,
     AppPermission.settings,
@@ -172,6 +176,7 @@ const defaultRolePermissions = <String, List<String>>{
     AppPermission.arInvoice,
     AppPermission.arReceipt,
     AppPermission.reports,
+    AppPermission.customerDividend,
   ],
 };
 

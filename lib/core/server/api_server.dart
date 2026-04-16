@@ -14,6 +14,7 @@ import 'routes/auth_routes.dart';
 import 'routes/goods_receipt_routes.dart';
 import 'routes/product_routes.dart';
 import 'routes/customer_routes.dart';
+import 'routes/customer_dividend_routes.dart';
 import 'routes/promotion_routes.dart';
 import 'routes/purchase_return_routes.dart';
 import 'routes/purchase_routes.dart';
@@ -61,6 +62,10 @@ class ApiServer {
       // Customer routes
       router.mount('/api/customers', CustomerRoutes(db).router.call);
       print('   ✅ /api/customers');
+
+      // Customer dividend routes
+      router.mount('/api/customer-dividend-runs', CustomerDividendRoutes(db).router.call);
+      print('   ✅ /api/customer-dividend-runs');
 
       // Supplier routes
       router.mount('/api/suppliers', SupplierRoutes(db).router.call);

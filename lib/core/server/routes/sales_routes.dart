@@ -503,8 +503,10 @@ class SalesRoutes {
             print('🔻 Points redeemed: $customerId -$pointsUsed');
           }
 
-          // ── บวกแต้มที่ได้รับ (เฉพาะลูกค้าที่มี memberNo) ──────────
-          if (customer.memberNo != null) {
+          // ── บวกแต้มที่ได้รับ (เฉพาะลูกค้าที่มี memberNo และไม่ใช่การขายเชื่อ) ──
+          // การขายเชื่อ (CREDIT): ให้แต้มเมื่อรับชำระหนี้ครบแล้วเท่านั้น (ผ่าน AR Receipt)
+          final paymentType = data['payment_type'] as String? ?? 'CASH';
+          if (customer.memberNo != null && paymentType != 'CREDIT') {
             const double pointsPerBaht = 100.0;
             if (totalAmount > 0) {
               earnedPoints = (totalAmount / pointsPerBaht).floor();

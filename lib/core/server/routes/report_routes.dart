@@ -22,9 +22,11 @@ class ReportRoutes {
     router.get('/sales-daily', _getSalesDailyHandler);
     router.get('/top-products', _getTopProductsHandler);
     router.get('/top-customers', _getTopCustomersHandler);
+    router.get('/sales-by-customer', _getSalesByCustomerHandler);
+    router.get('/customer-dividend-summary', _getCustomerDividendSummaryHandler);
     router.get('/sales-by-payment', _getSalesByPaymentHandler);
-    router.get('/sales-by-category', _getSalesByCategoryHandler); // 🆕
-    router.get('/sales-by-period', _getSalesByPeriodHandler); // 🆕
+    router.get('/sales-by-category', _getSalesByCategoryHandler);
+    router.get('/sales-by-period', _getSalesByPeriodHandler);
 
     // ── Purchase Reports ─────────────────────────────────────────
     router.get('/purchase-summary', _getPurchaseSummaryHandler); // 🆕
@@ -215,6 +217,195 @@ class ReportRoutes {
     }
   }
 
+  Future<Response> _getSalesByCustomerHandler(Request request) async {
+    try {
+      final p = request.url.queryParameters;
+      final startDate = p['start_date'];
+      final endDate = p['end_date'];
+      // ใช้ alias so. เพื่อกันชนกับ subquery ar_invoices
+      final dateFilter = _dateBetweenClause(
+        column: 'so.order_date',
+        startDate: startDate,
+        endDate: endDate,
+      );
+
+      // กรอง COMPLETED เท่านั้น — ตัด CANCELLED และ OPEN ออกจากรายงาน
+      // กรอง COMPLETED เท่านั้น — ตัด CANCELLED และ OPEN ออกจากรายงาน
+      const statusFilter =
+          "so.status = 'COMPLETED' AND so.customer_id IS NOT NULL AND so.customer_id != 'WALK_IN'";
+      final whereBase = dateFilter.clause.isEmpty
+          ? "WHERE $statusFilter"
+          : "${dateFilter.clause} AND $statusFilter";
+
+      // paid_amount  = (1) ยอดขายสด (non-CREDIT, COMPLETED) ในช่วงเวลา
+      //               + (2) ยอดที่รับกลับมาแล้วผ่าน AR Invoice (paid_amount)
+      //   → รวม case ที่ลูกค้าซื้อเชื่อแล้วจ่ายกลับจนหมด — ไม่หายไป
+      // credit_amount = ยอดคงค้างใน AR Invoices ที่ยังไม่ PAID/CANCELLED (ทุก order)
+      // กรอง status = 'COMPLETED' เท่านั้น — ตัด CANCELLED และ OPEN ออก
+      final results = await db.customSelect('''
+        SELECT
+          so.customer_id,
+          MAX(so.customer_name)  AS customer_name,
+          COUNT(*)               AS order_count,
+          COALESCE(SUM(so.total_amount), 0) AS total_amount,
+          COALESCE(SUM(CASE WHEN so.payment_type != 'CREDIT'
+                            THEN so.total_amount ELSE 0 END), 0)
+            + COALESCE(ar.ar_received, 0)  AS paid_amount,
+          COALESCE(ar.outstanding_amount, 0) AS credit_amount,
+          MAX(so.order_date)     AS last_order_date
+        FROM sales_orders so
+        LEFT JOIN (
+          -- ar_received    = ยอดที่ลูกค้าจ่ายกลับมาแล้วทั้งหมด (จาก AR Invoice paid_amount)
+          -- outstanding    = ยอดที่ยังค้างอยู่ (total - paid, เฉพาะ UNPAID/PARTIAL)
+          SELECT customer_id,
+                 SUM(COALESCE(paid_amount, 0))                        AS ar_received,
+                 SUM(CASE WHEN status NOT IN ('PAID','CANCELLED')
+                          THEN total_amount - COALESCE(paid_amount, 0)
+                          ELSE 0 END)                                  AS outstanding_amount
+          FROM   ar_invoices
+          WHERE  status != 'CANCELLED'
+          GROUP  BY customer_id
+        ) ar ON ar.customer_id = so.customer_id
+        $whereBase
+        GROUP BY so.customer_id
+        ORDER BY paid_amount DESC
+      ''', variables: dateFilter.variables).get();
+
+      return _okList(
+        results.map((r) => {
+          'customer_id': r.read<String>('customer_id'),
+          'customer_name': r.read<String>('customer_name'),
+          'order_count': r.read<int>('order_count'),
+          'total_amount': r.read<double>('total_amount'),
+          'paid_amount': r.read<double>('paid_amount'),
+          'credit_amount': r.read<double>('credit_amount'),
+          'last_order_date':
+              r.readNullable<DateTime>('last_order_date')?.toIso8601String(),
+        }),
+      );
+    } catch (e) {
+      return _err(e);
+    }
+  }
+
+  Future<Response> _getCustomerDividendSummaryHandler(Request request) async {
+    try {
+      final p = request.url.queryParameters;
+      final startDate = p['start_date'];
+      final endDate = p['end_date'];
+      final rawPercent = double.tryParse(p['dividend_percent'] ?? '') ?? 0;
+      final dividendPercent = rawPercent < 0 ? 0.0 : rawPercent;
+      final dateFilter = _dateBetweenClause(
+        column: 'so.order_date',
+        startDate: startDate,
+        endDate: endDate,
+      );
+
+      const statusFilter =
+          "so.status = 'COMPLETED' AND so.customer_id IS NOT NULL AND so.customer_id != 'WALK_IN'";
+      final whereBase = dateFilter.clause.isEmpty
+          ? "WHERE $statusFilter"
+          : "${dateFilter.clause} AND $statusFilter";
+
+      final results = await db.customSelect('''
+        SELECT
+          so.customer_id,
+          MAX(so.customer_name)  AS customer_name,
+          COUNT(*)               AS order_count,
+          COALESCE(SUM(so.total_amount), 0) AS total_amount,
+          COALESCE(SUM(CASE WHEN so.payment_type != 'CREDIT'
+                            THEN so.total_amount ELSE 0 END), 0)
+            + COALESCE(ar.ar_received, 0)  AS paid_amount,
+          COALESCE(ar.outstanding_amount, 0) AS credit_amount,
+          MAX(so.order_date)     AS last_order_date
+        FROM sales_orders so
+        LEFT JOIN (
+          SELECT customer_id,
+                 SUM(COALESCE(paid_amount, 0))                        AS ar_received,
+                 SUM(CASE WHEN status NOT IN ('PAID','CANCELLED')
+                          THEN total_amount - COALESCE(paid_amount, 0)
+                          ELSE 0 END)                                  AS outstanding_amount
+          FROM   ar_invoices
+          WHERE  status != 'CANCELLED'
+          GROUP  BY customer_id
+        ) ar ON ar.customer_id = so.customer_id
+        $whereBase
+        GROUP BY so.customer_id
+        ORDER BY paid_amount DESC
+      ''', variables: dateFilter.variables).get();
+
+      String? periodStartIso;
+      String? periodEndIso;
+      if (startDate != null && startDate.isNotEmpty) {
+        periodStartIso = DateTime.parse(startDate).toIso8601String();
+      }
+      if (endDate != null && endDate.isNotEmpty) {
+        final end = DateTime.parse(endDate);
+        periodEndIso = DateTime(end.year, end.month, end.day).toIso8601String();
+      }
+
+      final savedRows = await db.customSelect(
+        '''
+        SELECT
+          i.customer_id,
+          r.run_id,
+          r.run_no
+        FROM customer_dividend_run_items i
+        INNER JOIN customer_dividend_runs r ON r.run_id = i.run_id
+        WHERE r.status != 'CANCELLED'
+          AND COALESCE(r.period_start, '') = COALESCE(?, '')
+          AND COALESCE(r.period_end, '') = COALESCE(?, '')
+          AND ABS(COALESCE(r.dividend_percent, 0) - ?) < 0.0001
+        ORDER BY COALESCE(r.updated_at, r.created_at) DESC
+        ''',
+        variables: [
+          Variable.withString(periodStartIso ?? ''),
+          Variable.withString(periodEndIso ?? ''),
+          Variable.withReal(dividendPercent),
+        ],
+      ).get();
+
+      final savedMap = <String, Map<String, String?>>{};
+      for (final row in savedRows) {
+        final customerId = row.read<String>('customer_id');
+        savedMap.putIfAbsent(customerId, () {
+          return {
+            'run_id': row.read<String>('run_id'),
+            'run_no': row.read<String>('run_no'),
+          };
+        });
+      }
+
+      return _okList(
+        results.map((r) {
+          final paidAmount = r.read<double>('paid_amount');
+          final dividendBase = paidAmount;
+          final dividendAmount = dividendBase * dividendPercent / 100;
+          final customerId = r.read<String>('customer_id');
+          final saved = savedMap[customerId];
+          return {
+            'customer_id': customerId,
+            'customer_name': r.read<String>('customer_name'),
+            'order_count': r.read<int>('order_count'),
+            'total_amount': r.read<double>('total_amount'),
+            'paid_amount': paidAmount,
+            'credit_amount': r.read<double>('credit_amount'),
+            'dividend_percent': dividendPercent,
+            'dividend_base': dividendBase,
+            'dividend_amount': dividendAmount,
+            'last_order_date':
+                r.readNullable<DateTime>('last_order_date')?.toIso8601String(),
+            'saved_run_id': saved?['run_id'],
+            'saved_run_no': saved?['run_no'],
+          };
+        }),
+      );
+    } catch (e) {
+      return _err(e);
+    }
+  }
+
+
   Future<Response> _getSalesByPaymentHandler(Request request) async {
     try {
       final results = await db.customSelect('''
@@ -347,9 +538,11 @@ class ReportRoutes {
       final endDate = p['end_date'];
 
       String where = '';
+      String invoiceWhere = '';
       List<Variable> vars = [];
       if (startDate != null && endDate != null) {
         where = "WHERE DATE(order_date) BETWEEN ? AND ?";
+        invoiceWhere = "WHERE DATE(invoice_date) BETWEEN ? AND ?";
         vars = [Variable.withString(startDate), Variable.withString(endDate)];
       }
 
@@ -366,10 +559,37 @@ class ReportRoutes {
         ${where.isNotEmpty ? where.replaceAll('order_date', 'receipt_date') : ''}
       ''', variables: vars).getSingle();
 
+      final apResult = await db.customSelect('''
+        SELECT
+          COALESCE(
+            SUM(
+              CASE
+                WHEN status != 'CANCELLED' THEN COALESCE(paid_amount, 0)
+                ELSE 0
+              END
+            ),
+            0
+          ) as total_paid,
+          COALESCE(
+            SUM(
+              CASE
+                WHEN status != 'CANCELLED'
+                THEN COALESCE(total_amount, 0) - COALESCE(paid_amount, 0)
+                ELSE 0
+              END
+            ),
+            0
+          ) as total_outstanding
+        FROM ap_invoices
+        $invoiceWhere
+      ''', variables: vars).getSingle();
+
       return _ok({
         'total_po': poResult.read<int>('total_po'),
         'total_po_amount': poResult.read<double>('total_amount'),
         'total_gr': grResult.read<int>('total_gr'),
+        'total_paid': apResult.read<double>('total_paid'),
+        'total_outstanding': apResult.read<double>('total_outstanding'),
       });
     } catch (e) {
       return _err(e);
