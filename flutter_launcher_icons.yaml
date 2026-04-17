@@ -1,0 +1,32 @@
+flutter_launcher_icons:
+  # ── Shared ──────────────────────────────────────────────────────────
+  image_path: "assets/images/logo-deepos.png"
+
+  # ── Android ─────────────────────────────────────────────────────────
+  android: true
+  # Adaptive icon (Android 8.0+): foreground layer (inner icon, should have padding)
+  adaptive_icon_foreground: "assets/images/logo-deepos.png"
+  adaptive_icon_background: "#FFFFFF"
+  # min_sdk_android: 21
+
+  # ── iOS ─────────────────────────────────────────────────────────────
+  ios: true
+  remove_alpha_ios: true   # App Store requires no alpha channel
+
+  # ── macOS ────────────────────────────────────────────────────────────
+  macos:
+    generate: true
+    image_path: "assets/images/logo-deepos.png"
+
+  # ── Windows ──────────────────────────────────────────────────────────
+  windows:
+    generate: true
+    image_path: "assets/images/logo-deepos.png"
+    icon_size: 48   # generates 16, 24, 32, 48, 64, 128, 256 px .ico
+
+  # ── Web (bonus) ──────────────────────────────────────────────────────
+  web:
+    generate: true
+    image_path: "assets/images/logo-deepos.png"
+    background_color: "#FFFFFF"
+    theme_color: "#1565C0"
