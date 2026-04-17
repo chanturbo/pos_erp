@@ -509,6 +509,17 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   const SizedBox(height: 16),
 
                   // ══════════════════════════════════════════
+                  // 🔤 ฟอนต์และขนาดตัวอักษร
+                  // ══════════════════════════════════════════
+                  _SectionCard(
+                    title: 'ฟอนต์และขนาดตัวอักษร',
+                    icon: Icons.text_fields_outlined,
+                    isDark: isDark,
+                    child: _buildFontSection(isDark),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // ══════════════════════════════════════════
                   // 📋 การแสดงรายการข้อมูล
                   // ══════════════════════════════════════════
                   _SectionCard(
@@ -670,6 +681,107 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             ref.read(themeModeProvider.notifier).setThemeMode(modes.first);
           },
           style: const ButtonStyle(visualDensity: VisualDensity.compact),
+        ),
+      ],
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Font Section
+  // ─────────────────────────────────────────────────────────────
+  Widget _buildFontSection(bool isDark) {
+    final fontSettings = ref.watch(fontSettingsProvider);
+
+    const fonts = [
+      ('ibmPlexSansThai', 'IBM Plex Sans Thai'),
+      ('sarabun', 'Sarabun'),
+      ('kanit', 'Kanit'),
+      ('prompt', 'Prompt'),
+      ('notoSansThai', 'Noto Sans Thai'),
+    ];
+
+    const scales = [
+      (0.85, 'เล็ก'),
+      (1.0, 'ปกติ'),
+      (1.15, 'ใหญ่'),
+      (1.3, 'ใหญ่มาก'),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'ฟอนต์',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: isDark ? Colors.white : Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'เลือกแบบอักษรที่ต้องการใช้งานทั่วทั้งแอป',
+          style: TextStyle(
+            fontSize: 12,
+            color: isDark ? Colors.white54 : AppTheme.textSub,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: fonts
+              .map(
+                (f) => _paginationChip(
+                  label: f.$2,
+                  selected: fontSettings.fontFamily == f.$1,
+                  isDark: isDark,
+                  onTap: () {
+                    ref
+                        .read(fontSettingsProvider.notifier)
+                        .setFontFamily(f.$1);
+                    _showSuccess('บันทึกการตั้งค่าแล้ว');
+                  },
+                ),
+              )
+              .toList(),
+        ),
+        const SizedBox(height: 20),
+        Text(
+          'ขนาดตัวอักษร',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: isDark ? Colors.white : Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'ปรับขนาดตัวอักษรทั่วทั้งแอป (ปกติ = 100%)',
+          style: TextStyle(
+            fontSize: 12,
+            color: isDark ? Colors.white54 : AppTheme.textSub,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: scales
+              .map(
+                (s) => _paginationChip(
+                  label: s.$2,
+                  selected: fontSettings.fontScale == s.$1,
+                  isDark: isDark,
+                  onTap: () {
+                    ref
+                        .read(fontSettingsProvider.notifier)
+                        .setFontScale(s.$1);
+                    _showSuccess('บันทึกการตั้งค่าแล้ว');
+                  },
+                ),
+              )
+              .toList(),
         ),
       ],
     );

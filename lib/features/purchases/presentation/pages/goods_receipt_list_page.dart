@@ -11,6 +11,7 @@ import 'package:pos_erp/shared/pdf/pdf_report_button.dart';
 import 'package:pos_erp/shared/widgets/mobile_home_button.dart';
 import '../../../settings/presentation/pages/settings_page.dart';
 import '../providers/goods_receipt_provider.dart';
+import '../../../inventory/presentation/providers/stock_provider.dart';
 import '../../data/models/goods_receipt_model.dart';
 import 'goods_receipt_form_page.dart';
 import 'goods_receipt_pdf_report.dart';
@@ -29,6 +30,8 @@ class _GoodsReceiptListPageState extends ConsumerState<GoodsReceiptListPage> {
   String _statusFilter = 'ALL';
   bool _isCardView = false;
   int _currentPage = 1;
+  String _sortField = 'date';
+  bool _sortAsc = false;
 
   @override
   void dispose() {
@@ -36,8 +39,20 @@ class _GoodsReceiptListPageState extends ConsumerState<GoodsReceiptListPage> {
     super.dispose();
   }
 
+  void _onSort(String field) {
+    setState(() {
+      if (_sortField == field) {
+        _sortAsc = !_sortAsc;
+      } else {
+        _sortField = field;
+        _sortAsc = field != 'date';
+      }
+      _currentPage = 1;
+    });
+  }
+
   List<GoodsReceiptModel> _filter(List<GoodsReceiptModel> src) {
-    return src.where((r) {
+    final list = src.where((r) {
       final matchesSearch =
           r.grNo.toLowerCase().contains(_searchQuery) ||
           (r.poNo?.toLowerCase().contains(_searchQuery) ?? false) ||
@@ -45,6 +60,17 @@ class _GoodsReceiptListPageState extends ConsumerState<GoodsReceiptListPage> {
       final matchesStatus = _statusFilter == 'ALL' || r.status == _statusFilter;
       return matchesSearch && matchesStatus;
     }).toList();
+
+    list.sort((a, b) {
+      final cmp = switch (_sortField) {
+        'no'     => a.grNo.compareTo(b.grNo),
+        'status' => a.status.compareTo(b.status),
+        'items'  => a.itemCount.compareTo(b.itemCount),
+        _        => a.grDate.compareTo(b.grDate),
+      };
+      return _sortAsc ? cmp : -cmp;
+    });
+    return list;
   }
 
   @override
@@ -254,49 +280,49 @@ class _GoodsReceiptListPageState extends ConsumerState<GoodsReceiptListPage> {
               const SizedBox(width: 14),
               Expanded(
                 flex: 3,
-                child: Text(
-                  'เลขที่ GR / PO',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: isDark ? const Color(0xFFAAAAAA) : AppTheme.textSub,
-                  ),
+                child: _SortColHeader(
+                  label: 'เลขที่ GR / PO',
+                  field: 'no',
+                  currentField: _sortField,
+                  isAsc: _sortAsc,
+                  isDark: isDark,
+                  onTap: () => _onSort('no'),
                 ),
               ),
               SizedBox(
                 width: 72,
-                child: Text(
-                  'วันที่',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: isDark ? const Color(0xFFAAAAAA) : AppTheme.textSub,
-                  ),
-                  textAlign: TextAlign.center,
+                child: _SortColHeader(
+                  label: 'วันที่',
+                  field: 'date',
+                  currentField: _sortField,
+                  isAsc: _sortAsc,
+                  isDark: isDark,
+                  onTap: () => _onSort('date'),
+                  align: Alignment.center,
                 ),
               ),
               SizedBox(
                 width: 80,
-                child: Text(
-                  'สถานะ',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: isDark ? const Color(0xFFAAAAAA) : AppTheme.textSub,
-                  ),
-                  textAlign: TextAlign.center,
+                child: _SortColHeader(
+                  label: 'สถานะ',
+                  field: 'status',
+                  currentField: _sortField,
+                  isAsc: _sortAsc,
+                  isDark: isDark,
+                  onTap: () => _onSort('status'),
+                  align: Alignment.center,
                 ),
               ),
               SizedBox(
                 width: 50,
-                child: Text(
-                  'รายการ',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: isDark ? const Color(0xFFAAAAAA) : AppTheme.textSub,
-                  ),
-                  textAlign: TextAlign.right,
+                child: _SortColHeader(
+                  label: 'รายการ',
+                  field: 'items',
+                  currentField: _sortField,
+                  isAsc: _sortAsc,
+                  isDark: isDark,
+                  onTap: () => _onSort('items'),
+                  align: Alignment.centerRight,
                 ),
               ),
             ],
@@ -667,6 +693,12 @@ class _GoodsReceiptListPageState extends ConsumerState<GoodsReceiptListPage> {
         .confirmGoodsReceipt(receipt.grId);
 
     if (!mounted) return;
+
+    if (success) {
+      // รีเฟรช stockBalanceProvider เพื่อให้หน้าสต๊อกแสดงข้อมูลล่าสุดทันที
+      ref.invalidate(stockBalanceProvider);
+    }
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
@@ -1595,6 +1627,67 @@ class _GRValueStat extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Sortable column header ─────────────────────────────────────────
+class _SortColHeader extends StatelessWidget {
+  final String label;
+  final String field;
+  final String currentField;
+  final bool isAsc;
+  final VoidCallback onTap;
+  final bool isDark;
+  final Alignment align;
+
+  const _SortColHeader({
+    required this.label,
+    required this.field,
+    required this.currentField,
+    required this.isAsc,
+    required this.onTap,
+    required this.isDark,
+    this.align = Alignment.centerLeft,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final active = field == currentField;
+    final textColor = active
+        ? AppTheme.primary
+        : (isDark ? const Color(0xFFAAAAAA) : AppTheme.textSub);
+    final iconColor = active
+        ? AppTheme.primary
+        : (isDark ? const Color(0xFF555555) : const Color(0xFFCCCCCC));
+
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Align(
+        alignment: align,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: textColor,
+              ),
+            ),
+            const SizedBox(width: 2),
+            Icon(
+              active
+                  ? (isAsc ? Icons.arrow_upward : Icons.arrow_downward)
+                  : Icons.unfold_more,
+              size: 11,
+              color: iconColor,
+            ),
+          ],
+        ),
       ),
     );
   }

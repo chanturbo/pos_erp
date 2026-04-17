@@ -134,8 +134,25 @@ class AppTheme {
   // 06 · Typography helper — IBM Plex Sans Thai → Sarabun fallback
   // ─────────────────────────────────────────────────────────────────
 
-  static TextTheme _buildTextTheme(TextTheme base) =>
-      GoogleFonts.ibmPlexSansThaiTextTheme(base);
+  static TextTheme _buildTextTheme(TextTheme base, [String fontFamily = 'ibmPlexSansThai']) =>
+      switch (fontFamily) {
+        'sarabun'      => GoogleFonts.sarabunTextTheme(base),
+        'kanit'        => GoogleFonts.kanitTextTheme(base),
+        'prompt'       => GoogleFonts.promptTextTheme(base),
+        'notoSansThai' => GoogleFonts.notoSansThaiTextTheme(base),
+        _              => GoogleFonts.ibmPlexSansThaiTextTheme(base),
+      };
+
+  static ThemeData buildLightTheme([String fontFamily = 'ibmPlexSansThai']) =>
+      lightTheme.copyWith(
+        textTheme: _buildTextTheme(ThemeData.light().textTheme, fontFamily),
+      );
+
+  static ThemeData buildDarkTheme([String fontFamily = 'ibmPlexSansThai']) =>
+      darkTheme.copyWith(
+        textTheme: _buildTextTheme(ThemeData.dark().textTheme, fontFamily)
+            .apply(bodyColor: _darkText, displayColor: _darkText),
+      );
 
   // ─────────────────────────────────────────────────────────────────
   // 07 · Light Theme

@@ -28,6 +28,8 @@ class _PurchaseReturnListPageState
   String _statusFilter = 'ALL';
   bool _isCardView = false;
   int _currentPage = 1;
+  String _sortField = 'date';
+  bool _sortAsc = false;
 
   @override
   void dispose() {
@@ -35,14 +37,37 @@ class _PurchaseReturnListPageState
     super.dispose();
   }
 
+  void _onSort(String field) {
+    setState(() {
+      if (_sortField == field) {
+        _sortAsc = !_sortAsc;
+      } else {
+        _sortField = field;
+        _sortAsc = field != 'date';
+      }
+      _currentPage = 1;
+    });
+  }
+
   List<PurchaseReturnModel> _filter(List<PurchaseReturnModel> src) {
-    return src.where((r) {
+    final list = src.where((r) {
       final matchesSearch =
           r.returnNo.toLowerCase().contains(_searchQuery) ||
           r.supplierName.toLowerCase().contains(_searchQuery);
       final matchesStatus = _statusFilter == 'ALL' || r.status == _statusFilter;
       return matchesSearch && matchesStatus;
-    }).toList()..sort((a, b) => b.returnDate.compareTo(a.returnDate));
+    }).toList();
+
+    list.sort((a, b) {
+      final cmp = switch (_sortField) {
+        'no'     => a.returnNo.compareTo(b.returnNo),
+        'status' => a.status.compareTo(b.status),
+        'amount' => a.totalAmount.compareTo(b.totalAmount),
+        _        => a.returnDate.compareTo(b.returnDate),
+      };
+      return _sortAsc ? cmp : -cmp;
+    });
+    return list;
   }
 
   @override
@@ -262,49 +287,49 @@ class _PurchaseReturnListPageState
               const SizedBox(width: 14),
               Expanded(
                 flex: 3,
-                child: Text(
-                  'เลขที่ / ซัพพลายเออร์',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: isDark ? const Color(0xFFAAAAAA) : AppTheme.textSub,
-                  ),
+                child: _SortColHeader(
+                  label: 'เลขที่ / ซัพพลายเออร์',
+                  field: 'no',
+                  currentField: _sortField,
+                  isAsc: _sortAsc,
+                  isDark: isDark,
+                  onTap: () => _onSort('no'),
                 ),
               ),
               SizedBox(
                 width: 72,
-                child: Text(
-                  'วันที่',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: isDark ? const Color(0xFFAAAAAA) : AppTheme.textSub,
-                  ),
-                  textAlign: TextAlign.center,
+                child: _SortColHeader(
+                  label: 'วันที่',
+                  field: 'date',
+                  currentField: _sortField,
+                  isAsc: _sortAsc,
+                  isDark: isDark,
+                  onTap: () => _onSort('date'),
+                  align: Alignment.center,
                 ),
               ),
               SizedBox(
                 width: 80,
-                child: Text(
-                  'สถานะ',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: isDark ? const Color(0xFFAAAAAA) : AppTheme.textSub,
-                  ),
-                  textAlign: TextAlign.center,
+                child: _SortColHeader(
+                  label: 'สถานะ',
+                  field: 'status',
+                  currentField: _sortField,
+                  isAsc: _sortAsc,
+                  isDark: isDark,
+                  onTap: () => _onSort('status'),
+                  align: Alignment.center,
                 ),
               ),
               SizedBox(
                 width: 86,
-                child: Text(
-                  'ยอดรวม',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: isDark ? const Color(0xFFAAAAAA) : AppTheme.textSub,
-                  ),
-                  textAlign: TextAlign.right,
+                child: _SortColHeader(
+                  label: 'ยอดรวม',
+                  field: 'amount',
+                  currentField: _sortField,
+                  isAsc: _sortAsc,
+                  isDark: isDark,
+                  onTap: () => _onSort('amount'),
+                  align: Alignment.centerRight,
                 ),
               ),
             ],
@@ -1531,6 +1556,67 @@ class _PRAddBtn extends StatelessWidget {
                 fontWeight: FontWeight.w600,
                 color: Colors.white,
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Sortable column header ─────────────────────────────────────────
+class _SortColHeader extends StatelessWidget {
+  final String label;
+  final String field;
+  final String currentField;
+  final bool isAsc;
+  final VoidCallback onTap;
+  final bool isDark;
+  final Alignment align;
+
+  const _SortColHeader({
+    required this.label,
+    required this.field,
+    required this.currentField,
+    required this.isAsc,
+    required this.onTap,
+    required this.isDark,
+    this.align = Alignment.centerLeft,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final active = field == currentField;
+    final textColor = active
+        ? AppTheme.primary
+        : (isDark ? const Color(0xFFAAAAAA) : AppTheme.textSub);
+    final iconColor = active
+        ? AppTheme.primary
+        : (isDark ? const Color(0xFF555555) : const Color(0xFFCCCCCC));
+
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Align(
+        alignment: align,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: textColor,
+              ),
+            ),
+            const SizedBox(width: 2),
+            Icon(
+              active
+                  ? (isAsc ? Icons.arrow_upward : Icons.arrow_downward)
+                  : Icons.unfold_more,
+              size: 11,
+              color: iconColor,
             ),
           ],
         ),

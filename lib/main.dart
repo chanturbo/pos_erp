@@ -9,7 +9,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'core/config/app_mode.dart';
 import 'core/navigation/navigator_key.dart';
 import 'shared/theme/app_theme.dart';
-import 'shared/theme/theme_provider.dart'; // 🌙
+import 'shared/theme/theme_provider.dart';
 import 'routes/app_router.dart';
 import 'core/database/app_database.dart';
 import 'core/server/api_server.dart';
@@ -128,7 +128,8 @@ class MyApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final themeMode = ref.watch(themeModeProvider); // 🌙
+    final themeMode = ref.watch(themeModeProvider);
+    final fontSettings = ref.watch(fontSettingsProvider);
     final navigatorKey = ref.watch(navigatorKeyProvider);
 
     return ScreenUtilInit(
@@ -139,12 +140,11 @@ class MyApp extends ConsumerWidget {
         return MaterialApp(
           navigatorKey: navigatorKey,
           title: 'POS + ERP System',
-          theme: AppTheme.lightTheme,
-          darkTheme: AppTheme.darkTheme, // 🌙
-          themeMode: themeMode, // 🌙
+          theme: AppTheme.buildLightTheme(fontSettings.fontFamily),
+          darkTheme: AppTheme.buildDarkTheme(fontSettings.fontFamily),
+          themeMode: themeMode,
           debugShowCheckedModeBanner: false,
 
-          // ✅ Localization — จำเป็นสำหรับ showDatePicker / DatePickerDialog
           localizationsDelegates: const [
             GlobalMaterialLocalizations.delegate,
             GlobalWidgetsLocalizations.delegate,
@@ -152,6 +152,13 @@ class MyApp extends ConsumerWidget {
           ],
           supportedLocales: const [Locale('th', 'TH'), Locale('en', 'US')],
           locale: const Locale('th', 'TH'),
+
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              textScaler: TextScaler.linear(fontSettings.fontScale),
+            ),
+            child: child!,
+          ),
 
           initialRoute: AppRouter.root,
           onGenerateRoute: AppRouter.generateRoute,
