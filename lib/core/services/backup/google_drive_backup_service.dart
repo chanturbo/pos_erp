@@ -9,27 +9,15 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../config/google_oauth_config.dart';
 import 'backup_storage_provider.dart';
 import 'models/backup_manifest.dart';
 
-// ═══════════════════════════════════════════════════════════════════
-// 🔑 Google OAuth Client IDs — ตั้งค่าโดย Developer ครั้งเดียว
-//    สร้างที่ https://console.cloud.google.com/
-//    APIs & Services → Credentials → Create Credentials → OAuth Client ID
-//
-//    macOS  : Application type = "macOS"
-//    iOS    : Application type = "iOS"
-//    Android: Application type = "Android" (ต้องใส่ SHA-1 fingerprint)
-//    Windows: Application type = "Desktop app" (ได้ client_secret มาด้วย)
-//
-//    หลังสร้างแล้ว แทนที่ค่า YOUR_XXX ด้านล่างด้วยค่าจริง
-//    macOS/iOS: อัปเดต REVERSED_CLIENT_ID ใน Info.plist ด้วย
-// ═══════════════════════════════════════════════════════════════════
-const _kClientIdMacOS = 'YOUR_MACOS_CLIENT_ID.apps.googleusercontent.com';
-const _kClientIdIOS = 'YOUR_IOS_CLIENT_ID.apps.googleusercontent.com';
-const _kClientIdAndroid = 'YOUR_ANDROID_CLIENT_ID.apps.googleusercontent.com';
-const _kClientIdWindows = 'YOUR_WINDOWS_CLIENT_ID.apps.googleusercontent.com';
-const _kClientSecretWindows = 'YOUR_WINDOWS_CLIENT_SECRET';
+const _kClientIdMacOS = googleClientIdMacOS;
+const _kClientIdIOS = googleClientIdIOS;
+const _kClientIdAndroid = googleClientIdAndroid;
+const _kClientIdWindows = googleClientIdWindows;
+const _kClientSecretWindows = googleClientSecretWindows;
 
 // SharedPreferences keys
 const _kGoogleDriveLastEmail = 'google_drive_last_email';

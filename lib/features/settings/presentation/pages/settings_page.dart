@@ -1595,11 +1595,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
-              Text(
-                'รอบนี้เป็น local encrypted backup ก่อน เพื่อให้ต่อ Google Drive หรือ OneDrive ได้ภายหลังโดยไม่ต้องเปลี่ยนรูปแบบไฟล์',
-                style: TextStyle(fontSize: 12, color: captionColor),
-              ),
             ],
           ),
         ),
@@ -1800,46 +1795,40 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 ),
               ),
             ),
-            SizedBox(
-              width: 180,
-              child: OutlinedButton.icon(
-                onPressed: canUseGoogleDrive && _googleDriveEmail != null
-                    ? _disconnectGoogleDrive
-                    : null,
-                icon: const Icon(Icons.logout_outlined, size: 18),
-                label: const Text('ยกเลิกการเชื่อมต่อ'),
-              ),
+            OutlinedButton.icon(
+              onPressed: canUseGoogleDrive && _googleDriveEmail != null
+                  ? _disconnectGoogleDrive
+                  : null,
+              icon: const Icon(Icons.logout_outlined, size: 18),
+              label: const Text('ยกเลิกการเชื่อมต่อ'),
             ),
-            SizedBox(
-              width: 220,
-              child: ElevatedButton.icon(
-                onPressed:
-                    canUseGoogleDrive &&
-                        !_isUploadingGoogleDrive &&
-                        _googleDriveEmail != null
-                    ? () => _backupAndUploadToGoogleDrive(
-                        settings: ref.read(settingsProvider),
-                      )
-                    : null,
-                icon: _isUploadingGoogleDrive
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Icon(Icons.cloud_upload_outlined, size: 18),
-                label: Text(
-                  _isUploadingGoogleDrive
-                      ? 'กำลังอัปโหลด...'
-                      : 'สำรองและอัปโหลดขึ้น Drive',
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF1A73E8),
-                  foregroundColor: Colors.white,
-                ),
+            ElevatedButton.icon(
+              onPressed:
+                  canUseGoogleDrive &&
+                      !_isUploadingGoogleDrive &&
+                      _googleDriveEmail != null
+                  ? () => _backupAndUploadToGoogleDrive(
+                      settings: ref.read(settingsProvider),
+                    )
+                  : null,
+              icon: _isUploadingGoogleDrive
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.cloud_upload_outlined, size: 18),
+              label: Text(
+                _isUploadingGoogleDrive
+                    ? 'กำลังอัปโหลด...'
+                    : 'สำรองและอัปโหลดขึ้น Drive',
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1A73E8),
+                foregroundColor: Colors.white,
               ),
             ),
             SizedBox(

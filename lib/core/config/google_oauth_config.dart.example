@@ -1,0 +1,9 @@
+// Copy this file to google_oauth_config.dart and fill in your credentials
+// from https://console.cloud.google.com/ → APIs & Services → Credentials
+const googleClientIdMacOS = 'YOUR_MACOS_CLIENT_ID.apps.googleusercontent.com';
+const googleClientIdIOS = 'YOUR_IOS_CLIENT_ID.apps.googleusercontent.com';
+const googleClientIdAndroid =
+    'YOUR_ANDROID_CLIENT_ID.apps.googleusercontent.com';
+const googleClientIdWindows =
+    'YOUR_WINDOWS_CLIENT_ID.apps.googleusercontent.com';
+const googleClientSecretWindows = 'YOUR_WINDOWS_CLIENT_SECRET';

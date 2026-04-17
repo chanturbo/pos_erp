@@ -1,3 +1,6 @@
+# Secrets
+lib/core/config/google_oauth_config.dart
+
 # Miscellaneous
 *.class
 *.log
