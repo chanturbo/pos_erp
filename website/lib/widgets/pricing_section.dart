@@ -4,41 +4,42 @@ import 'package:google_fonts/google_fonts.dart';
 class PricingSection extends StatelessWidget {
   const PricingSection({super.key});
 
+  static const _navy = Color(0xFF16213E);
+  static const _border = Color(0xFFE0E0E0);
+  static const _subtext = Color(0xFF757575);
+  static const _success = Color(0xFF2E7D32);
+
   static const _plans = [
     (
       label: 'Founder Price',
       badge: 'เดือนที่ 1',
       price: '990',
-      original: '4,990',
       discount: 'ประหยัด 80%',
-      color: Color(0xFF7C3AED),
+      color: Color(0xFF6A1B9A),
       highlight: false,
     ),
     (
       label: 'Early Bird',
       badge: 'เดือนที่ 2',
       price: '1,490',
-      original: '4,990',
       discount: 'ประหยัด 70%',
-      color: Color(0xFF1E88E5),
+      color: Color(0xFFE57200),
       highlight: true,
     ),
     (
       label: 'Beta Price',
       badge: 'เดือนที่ 3',
       price: '1,990',
-      original: '4,990',
       discount: 'ประหยัด 60%',
-      color: Color(0xFF059669),
+      color: Color(0xFF2E7D32),
       highlight: false,
     ),
     (
       label: 'ราคาปกติ',
       badge: 'หลังจากนั้น',
       price: '4,990',
-      original: '',
       discount: '',
-      color: Color(0xFF374151),
+      color: Color(0xFF16213E),
       highlight: false,
     ),
   ];
@@ -68,8 +69,9 @@ class PricingSection extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             decoration: BoxDecoration(
-              color: const Color(0xFFFEF3C7),
+              color: const Color(0xFFFFF8E1),
               borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFFF9A825)),
             ),
             child: Text(
               '⏰ ราคา Early Adopter — จำกัดเวลา',
@@ -87,7 +89,7 @@ class PricingSection extends StatelessWidget {
             style: GoogleFonts.ibmPlexSansThai(
               fontSize: isMobile ? 28 : 40,
               fontWeight: FontWeight.w700,
-              color: const Color(0xFF111827),
+              color: _navy,
               height: 1.3,
             ),
           ),
@@ -97,7 +99,7 @@ class PricingSection extends StatelessWidget {
             textAlign: TextAlign.center,
             style: GoogleFonts.ibmPlexSansThai(
               fontSize: 15,
-              color: const Color(0xFF6B7280),
+              color: _subtext,
             ),
           ),
           const SizedBox(height: 48),
@@ -111,9 +113,9 @@ class PricingSection extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
+              color: const Color(0xFFF4F4F0),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE5E7EB)),
+              border: Border.all(color: _border),
             ),
             child: Column(
               children: [
@@ -122,7 +124,7 @@ class PricingSection extends StatelessWidget {
                   style: GoogleFonts.ibmPlexSansThai(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: const Color(0xFF111827),
+                    color: _navy,
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -130,29 +132,20 @@ class PricingSection extends StatelessWidget {
                   spacing: 24,
                   runSpacing: 12,
                   alignment: WrapAlignment.center,
-                  children:
-                      _features
-                          .map(
-                            (f) => Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.check_circle,
-                                  color: Color(0xFF059669),
-                                  size: 18,
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  f,
-                                  style: GoogleFonts.ibmPlexSansThai(
-                                    fontSize: 14,
-                                    color: const Color(0xFF374151),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          )
-                          .toList(),
+                  children: _features.map((f) => Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.check_circle, color: _success, size: 18),
+                      const SizedBox(width: 6),
+                      Text(
+                        f,
+                        style: GoogleFonts.ibmPlexSansThai(
+                          fontSize: 14,
+                          color: const Color(0xFF374151),
+                        ),
+                      ),
+                    ],
+                  )).toList(),
                 ),
               ],
             ),
@@ -168,12 +161,10 @@ class _PriceCard extends StatelessWidget {
     String label,
     String badge,
     String price,
-    String original,
     String discount,
     Color color,
     bool highlight,
-  })
-  plan;
+  }) plan;
 
   const _PriceCard({required this.plan});
 
@@ -186,19 +177,18 @@ class _PriceCard extends StatelessWidget {
         color: plan.highlight ? plan.color : Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: plan.highlight ? plan.color : const Color(0xFFE5E7EB),
+          color: plan.highlight ? plan.color : const Color(0xFFE0E0E0),
           width: plan.highlight ? 2 : 1,
         ),
-        boxShadow:
-            plan.highlight
-                ? [
-                  BoxShadow(
-                    color: plan.color.withValues(alpha: 0.3),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
-                  ),
-                ]
-                : null,
+        boxShadow: plan.highlight
+            ? [
+                BoxShadow(
+                  color: plan.color.withValues(alpha: 0.3),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ]
+            : null,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -206,10 +196,9 @@ class _PriceCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color:
-                  plan.highlight
-                      ? Colors.white.withValues(alpha: 0.2)
-                      : plan.color.withValues(alpha: 0.1),
+              color: plan.highlight
+                  ? Colors.white.withValues(alpha: 0.25)
+                  : plan.color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
@@ -249,10 +238,9 @@ class _PriceCard extends StatelessWidget {
                   '/ปี',
                   style: GoogleFonts.ibmPlexSansThai(
                     fontSize: 14,
-                    color:
-                        plan.highlight
-                            ? Colors.white.withValues(alpha: 0.8)
-                            : const Color(0xFF6B7280),
+                    color: plan.highlight
+                        ? Colors.white.withValues(alpha: 0.8)
+                        : const Color(0xFF757575),
                   ),
                 ),
               ),
@@ -264,10 +252,9 @@ class _PriceCard extends StatelessWidget {
               plan.discount,
               style: GoogleFonts.ibmPlexSansThai(
                 fontSize: 12,
-                color:
-                    plan.highlight
-                        ? Colors.white.withValues(alpha: 0.9)
-                        : const Color(0xFF059669),
+                color: plan.highlight
+                    ? Colors.white.withValues(alpha: 0.9)
+                    : const Color(0xFF2E7D32),
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -278,10 +265,8 @@ class _PriceCard extends StatelessWidget {
             child: ElevatedButton(
               onPressed: () {},
               style: ElevatedButton.styleFrom(
-                backgroundColor:
-                    plan.highlight ? Colors.white : plan.color,
-                foregroundColor:
-                    plan.highlight ? plan.color : Colors.white,
+                backgroundColor: plan.highlight ? Colors.white : plan.color,
+                foregroundColor: plan.highlight ? plan.color : Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),

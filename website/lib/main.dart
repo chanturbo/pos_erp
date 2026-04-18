@@ -16,10 +16,14 @@ class DeePosApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF1E88E5),
+          seedColor: const Color(0xFFE57200),
           brightness: Brightness.light,
+        ).copyWith(
+          primary: const Color(0xFFE57200),
+          secondary: const Color(0xFF16213E),
         ),
         textTheme: GoogleFonts.ibmPlexSansThaiTextTheme(),
+        scaffoldBackgroundColor: const Color(0xFFF4F4F0),
         useMaterial3: true,
       ),
       home: const HomePage(),

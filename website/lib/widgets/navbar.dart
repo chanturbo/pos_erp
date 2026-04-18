@@ -4,12 +4,15 @@ import 'package:google_fonts/google_fonts.dart';
 class Navbar extends StatelessWidget {
   const Navbar({super.key});
 
+  static const _primary = Color(0xFFE57200);
+  static const _navy = Color(0xFF16213E);
+
   @override
   Widget build(BuildContext context) {
     final isMobile = MediaQuery.of(context).size.width < 768;
 
     return Container(
-      color: Colors.white,
+      color: _navy,
       padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -19,22 +22,22 @@ class Navbar extends StatelessWidget {
             style: GoogleFonts.ibmPlexSansThai(
               fontSize: 24,
               fontWeight: FontWeight.w700,
-              color: const Color(0xFF1E88E5),
+              color: _primary,
             ),
           ),
           if (!isMobile)
             Row(
               children: [
-                _NavLink(label: 'ฟีเจอร์', anchor: '#features'),
+                _NavLink(label: 'ฟีเจอร์'),
                 const SizedBox(width: 32),
-                _NavLink(label: 'ราคา', anchor: '#pricing'),
+                _NavLink(label: 'ราคา'),
                 const SizedBox(width: 32),
-                _NavLink(label: 'คู่มือ', anchor: '#docs'),
+                _NavLink(label: 'คู่มือ'),
                 const SizedBox(width: 32),
                 ElevatedButton(
                   onPressed: () {},
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1E88E5),
+                    backgroundColor: _primary,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 24,
@@ -43,6 +46,7 @@ class Navbar extends StatelessWidget {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
+                    elevation: 0,
                   ),
                   child: Text(
                     'ทดลองฟรี 3 เดือน',
@@ -55,7 +59,7 @@ class Navbar extends StatelessWidget {
             ),
           if (isMobile)
             IconButton(
-              icon: const Icon(Icons.menu),
+              icon: const Icon(Icons.menu, color: Colors.white),
               onPressed: () {},
             ),
         ],
@@ -66,9 +70,7 @@ class Navbar extends StatelessWidget {
 
 class _NavLink extends StatelessWidget {
   final String label;
-  final String anchor;
-
-  const _NavLink({required this.label, required this.anchor});
+  const _NavLink({required this.label});
 
   @override
   Widget build(BuildContext context) {
@@ -77,7 +79,7 @@ class _NavLink extends StatelessWidget {
       child: Text(
         label,
         style: GoogleFonts.ibmPlexSansThai(
-          color: const Color(0xFF374151),
+          color: Colors.white.withValues(alpha: 0.85),
           fontWeight: FontWeight.w500,
           fontSize: 15,
         ),
