@@ -74,6 +74,7 @@ class ThermalReceiptWidget extends StatelessWidget {
   final int            pointsUsed;
   final int?           pointsBalance;
   final NumberFormat   numFmt;
+  final int            paperWidthMm;
 
   const ThermalReceiptWidget({
     super.key,
@@ -98,6 +99,7 @@ class ThermalReceiptWidget extends StatelessWidget {
     this.earnedPoints  = 0,
     this.pointsUsed    = 0,
     this.pointsBalance,
+    this.paperWidthMm  = 80,
   });
 
   // ── text styles ──────────────────────────────────────────────────
@@ -108,10 +110,16 @@ class ThermalReceiptWidget extends StatelessWidget {
   static const _monoLg = TextStyle(fontFamily: 'monospace', fontSize: 18,
       fontWeight: FontWeight.bold, color: Colors.black);
 
+  bool get _isNarrowPaper => paperWidthMm <= 58;
+  double get _receiptWidth => _isNarrowPaper ? 280 : 340;
+  double get _horizontalPadding => _isNarrowPaper ? 14 : 20;
+  int get _dashSegments => _isNarrowPaper ? 30 : 38;
+  int get _perforatedSegments => _isNarrowPaper ? 22 : 28;
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 340,
+      width: _receiptWidth,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(4),
@@ -126,10 +134,13 @@ class ThermalReceiptWidget extends StatelessWidget {
       child: Column(
         children: [
           // รอยปรุ ด้านบน
-          const PerforatedEdge(top: true),
+          PerforatedEdge(top: true, segments: _perforatedSegments),
 
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            padding: EdgeInsets.symmetric(
+              horizontal: _horizontalPadding,
+              vertical: 16,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
@@ -362,7 +373,7 @@ class ThermalReceiptWidget extends StatelessWidget {
           ),
 
           // รอยปรุ ด้านล่าง
-          const PerforatedEdge(top: false),
+          PerforatedEdge(top: false, segments: _perforatedSegments),
         ],
       ),
     );
@@ -399,7 +410,7 @@ class ThermalReceiptWidget extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Row(
           children: List.generate(
-            38,
+            _dashSegments,
             (i) => Expanded(
               child: Container(
                 height: 1,
@@ -419,7 +430,13 @@ class ThermalReceiptWidget extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────
 class PerforatedEdge extends StatelessWidget {
   final bool top;
-  const PerforatedEdge({super.key, required this.top});
+  final int segments;
+
+  const PerforatedEdge({
+    super.key,
+    required this.top,
+    this.segments = 28,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -427,7 +444,7 @@ class PerforatedEdge extends StatelessWidget {
       child: SizedBox(
         height: 12,
         child: Row(
-          children: List.generate(28, (i) {
+          children: List.generate(segments, (i) {
             return Expanded(
               child: Container(
                 height: 12,

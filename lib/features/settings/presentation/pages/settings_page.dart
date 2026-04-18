@@ -5,13 +5,18 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:pos_erp/main.dart'
-    show applyRestoreInPlace, factoryResetInPlace, factoryResetSkipSeedKey;
+    show
+        applyRestoreInPlace,
+        factoryResetInPlace,
+        factoryResetSkipSeedKey,
+        getMasterBackgroundHostRunning;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
 import '../../../../shared/theme/theme_provider.dart';
+import '../../../../core/config/app_mode.dart';
 import '../../../../core/services/backup/backup_service.dart';
 import '../../../../core/services/backup/google_drive_backup_service.dart';
 import '../../../../core/services/backup/models/backup_result.dart';
@@ -48,6 +53,13 @@ class SettingsState {
   final int reportRowsPerPageMobile;
   final int reportRowsPerPageTablet;
   final int reportRowsPerPageDesktop;
+  final bool enableDirectThermalPrint;
+  final bool autoPrintReceipt;
+  final bool desktopUseTcpPrint;
+  final bool mobileUseNativePrint;
+  final String thermalPrinterHost;
+  final int thermalPrinterPort;
+  final int thermalPaperWidthMm;
 
   SettingsState({
     this.companyName = 'บริษัท ทดสอบ POS จำกัด',
@@ -73,6 +85,13 @@ class SettingsState {
     this.reportRowsPerPageMobile = SettingsDefaults.reportRowsPerPageMobile,
     this.reportRowsPerPageTablet = SettingsDefaults.reportRowsPerPageTablet,
     this.reportRowsPerPageDesktop = SettingsDefaults.reportRowsPerPageDesktop,
+    this.enableDirectThermalPrint = false,
+    this.autoPrintReceipt = false,
+    this.desktopUseTcpPrint = false,
+    this.mobileUseNativePrint = false,
+    this.thermalPrinterHost = '',
+    this.thermalPrinterPort = 9100,
+    this.thermalPaperWidthMm = 80,
   });
 
   int get listPageSize => ResponsiveSettings.pick(
@@ -117,6 +136,13 @@ class SettingsState {
     int? reportRowsPerPageMobile,
     int? reportRowsPerPageTablet,
     int? reportRowsPerPageDesktop,
+    bool? enableDirectThermalPrint,
+    bool? autoPrintReceipt,
+    bool? desktopUseTcpPrint,
+    bool? mobileUseNativePrint,
+    String? thermalPrinterHost,
+    int? thermalPrinterPort,
+    int? thermalPaperWidthMm,
   }) {
     return SettingsState(
       companyName: companyName ?? this.companyName,
@@ -147,6 +173,14 @@ class SettingsState {
           reportRowsPerPageTablet ?? this.reportRowsPerPageTablet,
       reportRowsPerPageDesktop:
           reportRowsPerPageDesktop ?? this.reportRowsPerPageDesktop,
+      enableDirectThermalPrint:
+          enableDirectThermalPrint ?? this.enableDirectThermalPrint,
+      autoPrintReceipt: autoPrintReceipt ?? this.autoPrintReceipt,
+      desktopUseTcpPrint: desktopUseTcpPrint ?? this.desktopUseTcpPrint,
+      mobileUseNativePrint: mobileUseNativePrint ?? this.mobileUseNativePrint,
+      thermalPrinterHost: thermalPrinterHost ?? this.thermalPrinterHost,
+      thermalPrinterPort: thermalPrinterPort ?? this.thermalPrinterPort,
+      thermalPaperWidthMm: thermalPaperWidthMm ?? this.thermalPaperWidthMm,
     );
   }
 }
@@ -224,6 +258,21 @@ class SettingsNotifier extends Notifier<SettingsState> {
           prefs.getInt('report_rows_per_page_desktop') ??
           legacyReport ??
           state.reportRowsPerPageDesktop,
+      enableDirectThermalPrint:
+          prefs.getBool('enable_direct_thermal_print') ??
+          state.enableDirectThermalPrint,
+      autoPrintReceipt:
+          prefs.getBool('auto_print_receipt') ?? state.autoPrintReceipt,
+      desktopUseTcpPrint:
+          prefs.getBool('desktop_use_tcp_print') ?? state.desktopUseTcpPrint,
+      mobileUseNativePrint:
+          prefs.getBool('mobile_use_native_print') ?? state.mobileUseNativePrint,
+      thermalPrinterHost:
+          prefs.getString('thermal_printer_host') ?? state.thermalPrinterHost,
+      thermalPrinterPort:
+          prefs.getInt('thermal_printer_port') ?? state.thermalPrinterPort,
+      thermalPaperWidthMm:
+          prefs.getInt('thermal_paper_width_mm') ?? state.thermalPaperWidthMm,
     );
   }
 
@@ -367,6 +416,51 @@ class SettingsNotifier extends Notifier<SettingsState> {
       pointValue: pointValue,
     );
   }
+
+  Future<void> updateReceiptPrintSettings({
+    bool? enableDirectThermalPrint,
+    bool? autoPrintReceipt,
+    bool? desktopUseTcpPrint,
+    bool? mobileUseNativePrint,
+    String? thermalPrinterHost,
+    int? thermalPrinterPort,
+    int? thermalPaperWidthMm,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (enableDirectThermalPrint != null) {
+      await prefs.setBool(
+        'enable_direct_thermal_print',
+        enableDirectThermalPrint,
+      );
+    }
+    if (autoPrintReceipt != null) {
+      await prefs.setBool('auto_print_receipt', autoPrintReceipt);
+    }
+    if (desktopUseTcpPrint != null) {
+      await prefs.setBool('desktop_use_tcp_print', desktopUseTcpPrint);
+    }
+    if (mobileUseNativePrint != null) {
+      await prefs.setBool('mobile_use_native_print', mobileUseNativePrint);
+    }
+    if (thermalPrinterHost != null) {
+      await prefs.setString('thermal_printer_host', thermalPrinterHost.trim());
+    }
+    if (thermalPrinterPort != null) {
+      await prefs.setInt('thermal_printer_port', thermalPrinterPort);
+    }
+    if (thermalPaperWidthMm != null) {
+      await prefs.setInt('thermal_paper_width_mm', thermalPaperWidthMm);
+    }
+    state = state.copyWith(
+      enableDirectThermalPrint: enableDirectThermalPrint,
+      autoPrintReceipt: autoPrintReceipt,
+      desktopUseTcpPrint: desktopUseTcpPrint,
+      mobileUseNativePrint: mobileUseNativePrint,
+      thermalPrinterHost: thermalPrinterHost,
+      thermalPrinterPort: thermalPrinterPort,
+      thermalPaperWidthMm: thermalPaperWidthMm,
+    );
+  }
 }
 
 final settingsProvider = NotifierProvider<SettingsNotifier, SettingsState>(() {
@@ -401,6 +495,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   late TextEditingController _pointsPerBahtController;
   late TextEditingController _pointValueController;
   late TextEditingController _promptPayController; // ✅
+  late TextEditingController _thermalPrinterHostController;
+  late TextEditingController _thermalPrinterPortController;
   bool _isCreatingBackup = false;
   bool _isPreparingRestore = false;
   bool _isConnectingGoogleDrive = false;
@@ -413,6 +509,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   DateTime? _lastBackupAt;
   int? _lastBackupSize;
   String? _googleDriveEmail;
+  bool? _masterBackgroundHostRunning;
 
   @override
   void initState() {
@@ -427,6 +524,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     _pointsPerBahtController = TextEditingController();
     _pointValueController = TextEditingController();
     _promptPayController = TextEditingController();
+    _thermalPrinterHostController = TextEditingController();
+    _thermalPrinterPortController = TextEditingController();
     // ✅ รอ state โหลดเสร็จแล้วค่อย sync ค่าเข้า controllers
     Future.microtask(() {
       if (!mounted) return;
@@ -434,7 +533,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       _loadBackupMetadata();
       _loadGoogleDriveConfig();
       _loadFactoryResetPreference();
+      _refreshMasterBackgroundHostStatus();
     });
+  }
+
+  Future<void> _refreshMasterBackgroundHostStatus() async {
+    final running = await getMasterBackgroundHostRunning();
+    if (!mounted) return;
+    setState(() => _masterBackgroundHostRunning = running);
   }
 
   /// ✅ Sync ค่าจาก SettingsState เข้า controllers ทั้งหมด
@@ -448,6 +554,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     _pointsPerBahtController.text = s.pointsPerBaht.toStringAsFixed(0);
     _pointValueController.text = s.pointValue.toStringAsFixed(2);
     _promptPayController.text = s.promptPayId;
+    _thermalPrinterHostController.text = s.thermalPrinterHost;
+    _thermalPrinterPortController.text = s.thermalPrinterPort.toString();
   }
 
   @override
@@ -461,6 +569,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     _pointsPerBahtController.dispose();
     _pointValueController.dispose();
     _promptPayController.dispose(); // ✅
+    _thermalPrinterHostController.dispose();
+    _thermalPrinterPortController.dispose();
     super.dispose();
   }
 
@@ -555,6 +665,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     icon: Icons.business_outlined,
                     isDark: isDark,
                     child: _buildCompanySection(isDark),
+                  ),
+                  const SizedBox(height: 16),
+
+                  _SectionCard(
+                    title: 'ใบเสร็จ / เครื่องพิมพ์',
+                    icon: Icons.print_outlined,
+                    isDark: isDark,
+                    child: _buildReceiptPrintSection(settings, isDark),
                   ),
                   const SizedBox(height: 16),
 
@@ -1231,6 +1349,265 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
   }
 
+  Widget _buildReceiptPrintSection(SettingsState settings, bool isDark) {
+    final style = _inputStyle(isDark);
+    final captionColor = isDark ? Colors.white54 : AppTheme.textSub;
+    final boxColor = isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF8FAFC);
+    final borderColor = isDark ? Colors.white12 : AppTheme.border;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppTheme.primary.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppTheme.primary.withValues(alpha: 0.20)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(
+                    Icons.info_outline,
+                    color: AppTheme.primary,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'โหมดนี้รองรับการพิมพ์ตรงผ่านเครื่องพิมพ์ LAN/TCP แบบ ESC/POS บน Android, Windows และ macOS',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? Colors.white : Colors.black87,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'ถ้าปิดไว้ ระบบจะแสดงใบเสร็จแบบ preview อย่างเดียว และยังไม่ส่งงานพิมพ์ตรงไปที่เครื่องสลิป',
+                style: TextStyle(fontSize: 12, color: captionColor),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text(
+            'เปิดใช้งาน Direct Thermal Print',
+            style: TextStyle(
+              color: isDark ? Colors.white : Colors.black87,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          subtitle: Text(
+            settings.enableDirectThermalPrint
+                ? 'เปิดอยู่: ระบบจะใช้ค่าเครื่องพิมพ์ที่ตั้งไว้'
+                : 'ปิดอยู่: แสดง preview ใบเสร็จอย่างเดียว',
+            style: TextStyle(color: isDark ? Colors.white70 : AppTheme.textSub),
+          ),
+          secondary: const Icon(Icons.print_outlined, color: AppTheme.primary),
+          value: settings.enableDirectThermalPrint,
+          activeThumbColor: AppTheme.primary,
+          onChanged: (value) {
+            ref
+                .read(settingsProvider.notifier)
+                .updateReceiptPrintSettings(enableDirectThermalPrint: value);
+          },
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text(
+            'พิมพ์อัตโนมัติหลังชำระเงิน',
+            style: TextStyle(
+              color: isDark ? Colors.white : Colors.black87,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          subtitle: Text(
+            'ใช้กับ flow ขายหน้าร้าน หลังบันทึกบิลสำเร็จแล้วระบบจะพยายามส่งไปยังเครื่องพิมพ์ทันที',
+            style: TextStyle(color: isDark ? Colors.white70 : AppTheme.textSub),
+          ),
+          secondary: const Icon(
+            Icons.local_printshop_outlined,
+            color: AppTheme.primary,
+          ),
+          value: settings.autoPrintReceipt,
+          activeThumbColor: AppTheme.primary,
+          onChanged: settings.enableDirectThermalPrint
+              ? (value) {
+                  ref
+                      .read(settingsProvider.notifier)
+                      .updateReceiptPrintSettings(autoPrintReceipt: value);
+                }
+              : null,
+        ),
+        if (Platform.isMacOS || Platform.isWindows)
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(
+              'ใช้ Direct TCP แทน Native Print Dialog (Desktop)',
+              style: TextStyle(
+                color: isDark ? Colors.white : Colors.black87,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            subtitle: Text(
+              settings.desktopUseTcpPrint
+                  ? 'เปิดอยู่: กดพิมพ์จะแสดง dialog กรอก IP:Port เหมือน Android'
+                  : 'ปิดอยู่: กดพิมพ์จะเปิด native print dialog ของ OS',
+              style: TextStyle(color: isDark ? Colors.white70 : AppTheme.textSub),
+            ),
+            secondary: const Icon(Icons.swap_horiz_outlined,
+                color: AppTheme.primary),
+            value: settings.desktopUseTcpPrint,
+            activeThumbColor: AppTheme.primary,
+            onChanged: (value) {
+              ref
+                  .read(settingsProvider.notifier)
+                  .updateReceiptPrintSettings(desktopUseTcpPrint: value);
+            },
+          ),
+        if (Platform.isAndroid || Platform.isIOS)
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(
+              'ใช้ Native Print Dialog (Android / iOS)',
+              style: TextStyle(
+                color: isDark ? Colors.white : Colors.black87,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            subtitle: Text(
+              settings.mobileUseNativePrint
+                  ? 'เปิดอยู่: ใช้ Android Print / AirPrint เลือก printer จาก OS'
+                  : 'ปิดอยู่: กดพิมพ์จะแสดง dialog กรอก IP:Port (ESC/POS TCP)',
+              style: TextStyle(color: isDark ? Colors.white70 : AppTheme.textSub),
+            ),
+            secondary: const Icon(Icons.print_outlined, color: AppTheme.primary),
+            value: settings.mobileUseNativePrint,
+            activeThumbColor: AppTheme.primary,
+            onChanged: (value) {
+              ref
+                  .read(settingsProvider.notifier)
+                  .updateReceiptPrintSettings(mobileUseNativePrint: value);
+            },
+          ),
+        const SizedBox(height: 12),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: boxColor,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: borderColor),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'รูปแบบกระดาษใบเสร็จ',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'ใช้ค่าเดียวกันทั้ง preview และ direct print เพื่อให้ layout ใกล้กับกระดาษจริงมากขึ้น',
+                style: TextStyle(fontSize: 12, color: captionColor),
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _paginationChip(
+                    label: '58 mm',
+                    selected: settings.thermalPaperWidthMm == 58,
+                    isDark: isDark,
+                    onTap: () {
+                      ref
+                          .read(settingsProvider.notifier)
+                          .updateReceiptPrintSettings(thermalPaperWidthMm: 58);
+                    },
+                  ),
+                  _paginationChip(
+                    label: '80 mm',
+                    selected: settings.thermalPaperWidthMm == 80,
+                    isDark: isDark,
+                    onTap: () {
+                      ref
+                          .read(settingsProvider.notifier)
+                          .updateReceiptPrintSettings(thermalPaperWidthMm: 80);
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: _thermalPrinterHostController,
+                decoration: style.copyWith(
+                  labelText: 'Printer IP / Host',
+                  hintText: 'เช่น 192.168.1.120',
+                  helperText: 'รองรับเครื่องพิมพ์เครือข่ายที่เปิดพอร์ต TCP',
+                  prefixIcon: const Icon(Icons.router_outlined),
+                ),
+                keyboardType: TextInputType.url,
+                style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _thermalPrinterPortController,
+                decoration: style.copyWith(
+                  labelText: 'Port',
+                  hintText: '9100',
+                  helperText: 'ค่ามาตรฐานของเครื่องพิมพ์สลิปส่วนใหญ่คือ 9100',
+                  prefixIcon: const Icon(Icons.settings_ethernet_outlined),
+                ),
+                keyboardType: TextInputType.number,
+                style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        _saveButton(
+          label: 'บันทึกการตั้งค่าเครื่องพิมพ์',
+          icon: Icons.save_outlined,
+          onPressed: () async {
+            final port = int.tryParse(_thermalPrinterPortController.text.trim());
+            if (port == null || port <= 0) {
+              _showError('กรุณาระบุพอร์ตเครื่องพิมพ์ให้ถูกต้อง');
+              return;
+            }
+
+            await ref
+                .read(settingsProvider.notifier)
+                .updateReceiptPrintSettings(
+                  thermalPrinterHost: _thermalPrinterHostController.text.trim(),
+                  thermalPrinterPort: port,
+                );
+            if (mounted) _showSuccess('บันทึกการตั้งค่าเครื่องพิมพ์สำเร็จ');
+          },
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'หมายเหตุ: เวอร์ชันนี้เน้น direct print ผ่าน LAN/TCP (ESC/POS) ก่อน ถ้าเป็น USB/Bluetooth thermal printer จะต้องเพิ่ม integration แยกในเฟสถัดไป',
+          style: TextStyle(fontSize: 12, color: captionColor),
+        ),
+      ],
+    );
+  }
+
   // ─────────────────────────────────────────────────────────────
   // VAT Section
   // ─────────────────────────────────────────────────────────────
@@ -1601,6 +1978,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ),
         ),
         const SizedBox(height: 14),
+        _buildMasterBackgroundHostCard(isDark),
+        const SizedBox(height: 14),
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(14),
@@ -1790,6 +2169,83 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildMasterBackgroundHostCard(bool isDark) {
+    final boxColor = isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF8FAFC);
+    final borderColor = isDark ? Colors.white12 : AppTheme.border;
+
+    final (icon, color, title, subtitle) = switch (_masterBackgroundHostRunning) {
+      true => (
+        Icons.verified_rounded,
+        AppTheme.successColor,
+        'Master background host: ทำงานอยู่',
+        'Android foreground service กำลังช่วยคงการทำงานของโหมด Master',
+      ),
+      false => (
+        AppModeConfig.isMaster
+            ? Icons.warning_amber_rounded
+            : Icons.pause_circle_outline_rounded,
+        AppModeConfig.isMaster ? Colors.orange : AppTheme.infoColor,
+        AppModeConfig.isMaster
+            ? 'Master background host: ยังไม่ทำงาน'
+            : 'Master background host: ปิดอยู่',
+        AppModeConfig.isMaster
+            ? 'หากเพิ่งสลับเป็น Master ลองกลับเข้าหน้านี้อีกครั้ง'
+            : 'เป็นปกติเมื่อเครื่องนี้ไม่ได้อยู่ในโหมด Master',
+      ),
+      null => (
+        Icons.info_outline_rounded,
+        AppTheme.infoColor,
+        'Master background host: ไม่รองรับ/ยังไม่ทราบสถานะ',
+        'บน Android จะแสดงสถานะจริงจาก native service ส่วนแพลตฟอร์มอื่นอาจไม่รองรับ',
+      ),
+    };
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: boxColor,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: borderColor),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? Colors.white54 : AppTheme.textSub,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            tooltip: 'รีเฟรชสถานะ',
+            onPressed: _refreshMasterBackgroundHostStatus,
+            icon: const Icon(Icons.refresh, size: 18),
+          ),
+        ],
+      ),
     );
   }
 

@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:dio/dio.dart';
+import 'package:pos_erp/main.dart'
+    show getMasterBackgroundHostRunning, refreshRuntimeForAppModeChange;
 import '../../../../core/client/api_client.dart';
 import '../../../../core/config/app_mode.dart';
 import '../../../../core/services/master_discovery_service.dart';
@@ -15,6 +17,10 @@ import '../../../../shared/widgets/app_dialogs.dart';
 import '../../../../shared/widgets/mobile_home_button.dart';
 import '../../data/models/branch_model.dart';
 import '../providers/branch_provider.dart';
+
+final masterBackgroundHostStatusProvider = FutureProvider<bool?>((ref) async {
+  return getMasterBackgroundHostRunning();
+});
 
 class SyncStatusPage extends ConsumerWidget {
   const SyncStatusPage({super.key});
@@ -355,6 +361,7 @@ class SyncStatusPage extends ConsumerWidget {
     SyncStatusModel sync,
   ) {
     final discovery = MasterDiscoveryService.instance;
+    final hostStatusAsync = ref.watch(masterBackgroundHostStatusProvider);
 
     return _panelCard(
       context,
@@ -453,6 +460,8 @@ class SyncStatusPage extends ConsumerWidget {
                   ? () {}
                   : () => _disconnectMaster(context, ref),
             ),
+            const SizedBox(height: 10),
+            _buildMasterHostIndicator(context, hostStatusAsync),
             if (AppModeConfig.isStandalone) ...[
               const SizedBox(height: 12),
               Container(
@@ -537,6 +546,87 @@ class SyncStatusPage extends ConsumerWidget {
             ],
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildMasterHostIndicator(
+    BuildContext context,
+    AsyncValue<bool?> hostStatusAsync,
+  ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final borderColor = AppTheme.borderColorOf(context);
+    final bgColor = isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF8FAFC);
+
+    final (icon, color, title, subtitle) = hostStatusAsync.when(
+      loading: () => (
+        Icons.hourglass_top_rounded,
+        AppTheme.infoColor,
+        'กำลังตรวจสอบ Master background host',
+        'รอสถานะจากระบบปฏิบัติการ',
+      ),
+      error: (_, _) => (
+        Icons.error_outline_rounded,
+        AppTheme.errorColor,
+        'ตรวจสอบสถานะ background host ไม่สำเร็จ',
+        'ระบบยังทำงานต่อได้ แต่ไม่สามารถอ่านสถานะจาก native ได้ตอนนี้',
+      ),
+      data: (running) {
+        if (running == null) {
+          return (
+            Icons.info_outline_rounded,
+            AppTheme.infoColor,
+            'Background host ไม่รองรับบนแพลตฟอร์มนี้',
+            'บน iOS ระบบอาจพักแอปเมื่อออกจาก foreground แม้อยู่ในโหมด Master',
+          );
+        }
+        if (running) {
+          return (
+            Icons.verified_rounded,
+            AppTheme.successColor,
+            'Master background host กำลังทำงาน',
+            'Android foreground service ถูกเปิดไว้เพื่อช่วยคงการทำงานของโหมด Master',
+          );
+        }
+        return (
+          AppModeConfig.isMaster
+              ? Icons.warning_amber_rounded
+              : Icons.pause_circle_outline_rounded,
+          AppModeConfig.isMaster ? Colors.orange : AppTheme.infoColor,
+          AppModeConfig.isMaster
+              ? 'Master background host ยังไม่ทำงาน'
+              : 'Master background host ปิดอยู่',
+          AppModeConfig.isMaster
+              ? 'หากเพิ่งสลับโหมด ลองรอสักครู่หรือเปิดหน้านี้ใหม่'
+              : 'สถานะนี้เป็นปกติเมื่อไม่ได้ใช้โหมด Master',
+        );
+      },
+    );
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: borderColor),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: _cardTitleStyle(context, fontSize: 13)),
+                const SizedBox(height: 2),
+                Text(subtitle, style: _cardSubtitleStyle(context)),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1430,6 +1520,8 @@ class SyncStatusPage extends ConsumerWidget {
     }
 
     await MasterDiscoveryService.instance.refresh();
+    await refreshRuntimeForAppModeChange();
+    ref.invalidate(masterBackgroundHostStatusProvider);
     ref.invalidate(syncStatusProvider);
 
     if (context.mounted) {

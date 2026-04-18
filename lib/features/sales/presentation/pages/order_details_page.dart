@@ -1,9 +1,14 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:printing/printing.dart';
 import '../providers/sales_provider.dart';
 import '../../data/models/sales_order_model.dart';
 import '../../../settings/presentation/pages/settings_page.dart';
+import '../../../../shared/pdf/receipt_pdf_builder.dart';
+import '../../../../shared/services/thermal_print_service.dart';
 import '../../../../shared/widgets/mobile_home_button.dart';
 import '../../../../shared/widgets/thermal_receipt.dart';
 
@@ -19,6 +24,7 @@ class OrderDetailsPage extends ConsumerStatefulWidget {
 class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
   SalesOrderModel? _order;
   bool _isLoading = true;
+  bool _isPrintingReceipt = false;
 
   @override
   void initState() {
@@ -39,6 +45,7 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final settings = ref.watch(settingsProvider);
     return Scaffold(
       appBar: AppBar(
         leading: buildMobileHomeLeading(context),
@@ -47,8 +54,12 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
           if (_order != null)
             IconButton(
               icon: const Icon(Icons.print),
-              tooltip: 'พิมพ์ใบเสร็จ',
-              onPressed: _showReceiptPreview,
+              tooltip: settings.enableDirectThermalPrint
+                  ? 'พิมพ์ตรงไปยังเครื่องสลิป'
+                  : 'ดูใบเสร็จ',
+              onPressed: _isPrintingReceipt
+                  ? null
+                  : () => _handleReceiptAction(settings),
             ),
         ],
       ),
@@ -697,12 +708,115 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
       ),
     );
   }
+
+  ThermalPrintSettings _buildPrintSettings(SettingsState settings) {
+    return ThermalPrintSettings(
+      enabled: settings.enableDirectThermalPrint,
+      autoPrintOnSale: settings.autoPrintReceipt,
+      host: settings.thermalPrinterHost,
+      port: settings.thermalPrinterPort,
+      paperWidthMm: settings.thermalPaperWidthMm,
+    );
+  }
+
+  ThermalReceiptDocument _buildReceiptDocument(SettingsState settings) {
+    final order = _order!;
+    final isWalkIn = order.customerId == null ||
+        order.customerId == 'WALK_IN' ||
+        order.customerId!.isEmpty;
+    final allItems = order.items ?? [];
+    final regularItems = allItems.where((i) => !i.isFreeItem).toList();
+    final freeItems = allItems.where((i) => i.isFreeItem).toList();
+
+    return ThermalReceiptDocument(
+      companyName: settings.companyName,
+      address: settings.address,
+      phone: settings.phone,
+      taxId: settings.taxId,
+      orderNo: order.orderNo,
+      orderDate: DateFormat('dd/MM/yyyy HH:mm').format(order.orderDate),
+      customerName: order.customerName,
+      items: regularItems
+          .map(
+            (i) => ReceiptItem(
+              name: i.productName,
+              quantity: i.quantity,
+              unitPrice: i.unitPrice,
+              amount: i.amount,
+            ),
+          )
+          .toList(),
+      freeItems: freeItems
+          .map(
+            (i) => ReceiptFreeItem(
+              name: i.productName,
+              quantity: i.quantity,
+              promotionName: i.promotionName,
+            ),
+          )
+          .toList(),
+      subtotal: order.subtotal,
+      discount: order.discountAmount - order.couponDiscount,
+      coupons: _OrderReceiptPage._buildCoupons(
+        order.couponCodes ?? [],
+        order.couponDiscount,
+        order.couponPromotionNames,
+      ),
+      total: order.totalAmount,
+      paymentLabel: _OrderReceiptPage._paymentLabel(order.paymentType),
+      paymentType: order.paymentType,
+      paidAmount: order.paidAmount,
+      changeAmount: order.changeAmount,
+      earnedPoints: isWalkIn ? 0 : calculateEarnedPoints(order.totalAmount),
+      pointsUsed: order.pointsUsed,
+    );
+  }
+
+  Future<void> _handleReceiptAction(SettingsState settings) async {
+    if (!settings.enableDirectThermalPrint) {
+      _showReceiptPreview();
+      return;
+    }
+
+    await _printReceiptDirect(settings);
+  }
+
+  Future<void> _printReceiptDirect(SettingsState settings) async {
+    if (_order == null || _isPrintingReceipt) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _isPrintingReceipt = true);
+    try {
+      await ThermalPrintService.instance.printReceipt(
+        settings: _buildPrintSettings(settings),
+        document: _buildReceiptDocument(settings),
+      );
+      if (!mounted) return;
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('ส่งใบเสร็จไปยังเครื่องพิมพ์แล้ว'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('พิมพ์ใบเสร็จไม่สำเร็จ: $error'),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Colors.red[700],
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isPrintingReceipt = false);
+    }
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────
 // _OrderReceiptPage — หน้าแสดงใบเสร็จ thermal style (จากประวัติ)
 // ─────────────────────────────────────────────────────────────────
-class _OrderReceiptPage extends ConsumerWidget {
+class _OrderReceiptPage extends ConsumerStatefulWidget {
   final SalesOrderModel order;
   const _OrderReceiptPage({required this.order});
 
@@ -729,17 +843,214 @@ class _OrderReceiptPage extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_OrderReceiptPage> createState() => _OrderReceiptPageState();
+}
+
+class _OrderReceiptPageState extends ConsumerState<_OrderReceiptPage> {
+  bool _isPrinting = false;
+
+  ThermalReceiptDocument _buildDocument(SettingsState settings) {
+    final order = widget.order;
+    final dateFmt = DateFormat('dd/MM/yyyy HH:mm');
+    final isWalkIn = order.customerId == null ||
+        order.customerId == 'WALK_IN' ||
+        order.customerId!.isEmpty;
+    final allItems = order.items ?? [];
+    final regularItems = allItems.where((i) => !i.isFreeItem).toList();
+    final freeItems = allItems.where((i) => i.isFreeItem).toList();
+    return ThermalReceiptDocument(
+      companyName:  settings.companyName,
+      address:      settings.address,
+      phone:        settings.phone,
+      taxId:        settings.taxId,
+      orderNo:      order.orderNo,
+      orderDate:    dateFmt.format(order.orderDate),
+      customerName: order.customerName,
+      items: regularItems
+          .map((i) => ReceiptItem(
+                name:      i.productName,
+                quantity:  i.quantity,
+                unitPrice: i.unitPrice,
+                amount:    i.amount,
+              ))
+          .toList(),
+      freeItems: freeItems
+          .map((i) => ReceiptFreeItem(
+                name:          i.productName,
+                quantity:      i.quantity,
+                promotionName: i.promotionName,
+              ))
+          .toList(),
+      subtotal:     order.subtotal,
+      discount:     order.discountAmount - order.couponDiscount,
+      coupons: _OrderReceiptPage._buildCoupons(
+          order.couponCodes ?? [], order.couponDiscount, order.couponPromotionNames),
+      total:        order.totalAmount,
+      paymentLabel: _OrderReceiptPage._paymentLabel(order.paymentType),
+      paymentType:  order.paymentType,
+      paidAmount:   order.paidAmount,
+      changeAmount: order.changeAmount,
+      earnedPoints: isWalkIn ? 0 : calculateEarnedPoints(order.totalAmount),
+      pointsUsed:   order.pointsUsed,
+    );
+  }
+
+  Future<void> _printNative() async {
+    if (_isPrinting) return;
+    setState(() => _isPrinting = true);
+    try {
+      final settings = ref.read(settingsProvider);
+      final doc = _buildDocument(settings);
+      await Printing.layoutPdf(
+        onLayout: (_) async {
+          final pdf = await ReceiptPdfBuilder.build(
+            doc,
+            paperWidthMm: settings.thermalPaperWidthMm,
+          );
+          return pdf.save();
+        },
+        name: 'ใบเสร็จ-${widget.order.orderNo}',
+      );
+    } finally {
+      if (mounted) setState(() => _isPrinting = false);
+    }
+  }
+
+  Future<void> _showPrinterDialog() async {
+    final settings = ref.read(settingsProvider);
+    final useNative = (Platform.isMacOS || Platform.isWindows)
+        ? !settings.desktopUseTcpPrint
+        : settings.mobileUseNativePrint;
+    if (useNative) {
+      await _printNative();
+      return;
+    }
+
+    final hostCtrl = TextEditingController(text: settings.thermalPrinterHost);
+    final portCtrl = TextEditingController(
+        text: settings.thermalPrinterPort.toString());
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.print_outlined),
+            SizedBox(width: 8),
+            Text('เลือกเครื่องพิมพ์'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: hostCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Printer IP / Host',
+                hintText: 'เช่น 192.168.1.120',
+                prefixIcon: Icon(Icons.router_outlined),
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: TextInputType.url,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: portCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Port',
+                hintText: '9100',
+                prefixIcon: Icon(Icons.settings_ethernet_outlined),
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: TextInputType.number,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('ยกเลิก'),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(ctx, true),
+            icon: const Icon(Icons.print_outlined, size: 18),
+            label: const Text('พิมพ์'),
+          ),
+        ],
+      ),
+    );
+
+    final host = hostCtrl.text.trim();
+    final portStr = portCtrl.text.trim();
+    hostCtrl.dispose();
+    portCtrl.dispose();
+
+    if (confirmed != true || !mounted) return;
+
+    if (host.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('กรุณาระบุ IP เครื่องพิมพ์'),
+        behavior: SnackBarBehavior.floating,
+      ));
+      return;
+    }
+    final port = int.tryParse(portStr);
+    if (port == null || port <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('พอร์ตไม่ถูกต้อง'),
+        behavior: SnackBarBehavior.floating,
+      ));
+      return;
+    }
+
+    await _doPrint(host: host, port: port);
+  }
+
+  Future<void> _doPrint({required String host, required int port}) async {
+    if (_isPrinting) return;
+    final settings = ref.read(settingsProvider);
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _isPrinting = true);
+    try {
+      await ThermalPrintService.instance.printReceipt(
+        settings: ThermalPrintSettings(
+          enabled: true,
+          autoPrintOnSale: false,
+          host: host,
+          port: port,
+          paperWidthMm: settings.thermalPaperWidthMm,
+        ),
+        document: _buildDocument(settings),
+      );
+      if (!mounted) return;
+      messenger.showSnackBar(const SnackBar(
+        content: Text('ส่งใบเสร็จไปยังเครื่องพิมพ์แล้ว'),
+        behavior: SnackBarBehavior.floating,
+      ));
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(
+        content: Text('พิมพ์ใบเสร็จไม่สำเร็จ: $e'),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: Colors.red[700],
+      ));
+    } finally {
+      if (mounted) setState(() => _isPrinting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
-    final dateFmt  = DateFormat('dd/MM/yyyy HH:mm');
-    final numFmt   = NumberFormat('#,##0.00');
+    final numFmt = NumberFormat('#,##0.00');
+    final order = widget.order;
 
     final isWalkIn = order.customerId == null ||
         order.customerId == 'WALK_IN' ||
         order.customerId!.isEmpty;
     final earnedPoints = isWalkIn ? 0 : calculateEarnedPoints(order.totalAmount);
 
-    final allItems    = order.items ?? [];
+    final allItems     = order.items ?? [];
     final regularItems = allItems.where((i) => !i.isFreeItem).toList();
     final freeItems    = allItems.where((i) => i.isFreeItem).toList();
 
@@ -748,6 +1059,19 @@ class _OrderReceiptPage extends ConsumerWidget {
       appBar: AppBar(
         leading: buildMobileHomeLeading(context),
         title: const Text('ใบเสร็จรับเงิน'),
+        actions: [
+          IconButton(
+            onPressed: _isPrinting ? null : _showPrinterDialog,
+            tooltip: 'เลือกเครื่องพิมพ์',
+            icon: _isPrinting
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.print_outlined),
+          ),
+        ],
       ),
       body: Center(
         child: SingleChildScrollView(
@@ -758,7 +1082,7 @@ class _OrderReceiptPage extends ConsumerWidget {
             phone:        settings.phone,
             taxId:        settings.taxId,
             orderNo:      order.orderNo,
-            orderDate:    dateFmt.format(order.orderDate),
+            orderDate:    DateFormat('dd/MM/yyyy HH:mm').format(order.orderDate),
             customerName: order.customerName,
             items: regularItems.map((i) => ReceiptItem(
                   name:      i.productName,
@@ -773,18 +1097,19 @@ class _OrderReceiptPage extends ConsumerWidget {
                 )).toList(),
             subtotal:     order.subtotal,
             discount:     order.discountAmount - order.couponDiscount,
-            coupons: _buildCoupons(
+            coupons: _OrderReceiptPage._buildCoupons(
                 order.couponCodes ?? [],
                 order.couponDiscount,
                 order.couponPromotionNames),
             total:        order.totalAmount,
-            paymentLabel: _paymentLabel(order.paymentType),
+            paymentLabel: _OrderReceiptPage._paymentLabel(order.paymentType),
             paymentType:  order.paymentType,
             paidAmount:   order.paidAmount,
             changeAmount: order.changeAmount,
             numFmt:       numFmt,
             earnedPoints: earnedPoints,
             pointsUsed:   order.pointsUsed,
+            paperWidthMm: settings.thermalPaperWidthMm,
           ),
         ),
       ),

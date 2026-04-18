@@ -6,6 +6,7 @@ import 'package:pos_erp/shared/widgets/app_dialogs.dart';
 import 'package:pos_erp/shared/widgets/pagination_bar.dart';
 import '../providers/product_provider.dart';
 import '../../data/models/product_model.dart';
+import 'barcode_generator_page.dart';
 import 'product_form_page.dart';
 import 'product_group_management_page.dart';
 import 'product_pdf_report.dart'; // ✅ PDF report
@@ -297,6 +298,12 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
                 ),
               );
             },
+            onBarcodeGenerator: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const BarcodeGeneratorPage(),
+              ),
+            ),
             onAdd: () async {
               await Navigator.push(
                 context,
@@ -1081,6 +1088,7 @@ class _ProductListTopBar extends StatelessWidget {
   final VoidCallback onToggleView;
   final VoidCallback onRefresh;
   final VoidCallback onManageGroups;
+  final VoidCallback onBarcodeGenerator;
   final VoidCallback onAdd;
 
   const _ProductListTopBar({
@@ -1096,6 +1104,7 @@ class _ProductListTopBar extends StatelessWidget {
     required this.onToggleView,
     required this.onRefresh,
     required this.onManageGroups,
+    required this.onBarcodeGenerator,
     required this.onAdd,
   });
 
@@ -1174,6 +1183,8 @@ class _ProductListTopBar extends StatelessWidget {
         const SizedBox(width: 6),
         _PManageGroupsBtn(onTap: onManageGroups),
         const SizedBox(width: 6),
+        _PBarcodeBtn(onTap: onBarcodeGenerator),
+        const SizedBox(width: 6),
         _PAddBtn(onTap: onAdd),
         const SizedBox(width: 8),
         Container(
@@ -1240,6 +1251,8 @@ class _ProductListTopBar extends StatelessWidget {
             _PRefreshBtn(onTap: onRefresh),
             const SizedBox(width: 4),
             _PManageGroupsBtn(onTap: onManageGroups, compact: true),
+            const SizedBox(width: 4),
+            _PBarcodeBtn(onTap: onBarcodeGenerator, compact: true),
             const SizedBox(width: 4),
             _PAddBtn(onTap: onAdd, compact: true),
           ],
@@ -1523,6 +1536,43 @@ class _PManageGroupsBtn extends StatelessWidget {
         ? const SizedBox.shrink()
         : const Text(
             'หมวดสินค้า',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          ),
+    style: OutlinedButton.styleFrom(
+      foregroundColor: compact ? Colors.white70 : AppTheme.primaryColor,
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 12 : 16,
+        vertical: 13,
+      ),
+      minimumSize: Size.zero,
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      backgroundColor: compact
+          ? _ProductListColors.of(context).navButtonBg
+          : null,
+      side: BorderSide(
+        color: compact
+            ? _ProductListColors.of(context).navButtonBorder
+            : AppTheme.primaryColor.withValues(alpha: 0.28),
+      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+    ),
+  );
+}
+
+class _PBarcodeBtn extends StatelessWidget {
+  final VoidCallback onTap;
+  final bool compact;
+
+  const _PBarcodeBtn({required this.onTap, this.compact = false});
+
+  @override
+  Widget build(BuildContext context) => OutlinedButton.icon(
+    onPressed: onTap,
+    icon: const Icon(Icons.qr_code_2_outlined, size: 18),
+    label: compact
+        ? const SizedBox.shrink()
+        : const Text(
+            'สร้างบาร์โค้ด',
             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
           ),
     style: OutlinedButton.styleFrom(

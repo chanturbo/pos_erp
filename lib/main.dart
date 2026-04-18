@@ -1,9 +1,13 @@
 // ignore_for_file: avoid_print
 
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter/services.dart';
 import 'package:drift/drift.dart' hide Column;
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -12,7 +16,6 @@ import 'core/navigation/navigator_key.dart';
 import 'shared/theme/app_theme.dart';
 import 'shared/theme/theme_provider.dart';
 import 'routes/app_router.dart';
-import 'dart:io';
 import 'core/database/app_database.dart';
 import 'core/server/api_server.dart';
 import 'core/services/master_discovery_service.dart';
@@ -25,6 +28,24 @@ ApiServer? _serverInstance;
 AppDatabase? _dbInstance;
 _AppHostState? _appHostState; // set when AppHost mounts
 const factoryResetSkipSeedKey = 'factory_reset_skip_seed';
+const MethodChannel _masterRuntimeChannel = MethodChannel(
+  'pos_erp/master_runtime',
+);
+bool _isEnsuringRuntime = false;
+
+Future<bool?> getMasterBackgroundHostRunning() async {
+  if (!Platform.isAndroid) return null;
+
+  try {
+    final result = await _masterRuntimeChannel.invokeMethod<bool>(
+      'isMasterHostRunning',
+    );
+    return result ?? false;
+  } catch (e) {
+    print('⚠️ [Runtime] Unable to query Android background host status: $e');
+    return false;
+  }
+}
 
 /// Called from settings page after prepareRestore() succeeds.
 /// Closes the current DB/server, applies pending restore, reopens everything,
@@ -47,6 +68,7 @@ Future<void> applyRestoreInPlace() async {
     _dbInstance = AppDatabase();
     _serverInstance = ApiServer(_dbInstance!);
     await _serverInstance!.start(port: 8080);
+    await _syncPlatformMasterRuntime();
     print('✅ [RestoreInPlace] server restarted');
 
     _appHostState?.rebuild();
@@ -76,6 +98,7 @@ Future<void> factoryResetInPlace({required bool skipSeedAfterReset}) async {
 
     await AppModeConfig.initialize();
     await _startServerInBackground(skipSeed: skipSeedAfterReset);
+    await _syncPlatformMasterRuntime();
     _appHostState?.rebuild();
     print(
       skipSeedAfterReset
@@ -129,6 +152,7 @@ void main() async {
   final skipSeedPref = prefs.getBool(factoryResetSkipSeedKey) ?? false;
   await _startServerInBackground(skipSeed: didRestore || skipSeedPref);
   await MasterDiscoveryService.instance.start();
+  await _syncPlatformMasterRuntime();
 
   runApp(const _AppHost());
 }
@@ -143,17 +167,43 @@ class _AppHost extends StatefulWidget {
 
 class _AppHostState extends State<_AppHost> {
   Key _scopeKey = UniqueKey();
+  late final AppLifecycleListener _lifecycleListener;
 
   @override
   void initState() {
     super.initState();
     _appHostState = this;
+    _lifecycleListener = AppLifecycleListener(
+      onResume: () => unawaited(_handleLifecycleChange(AppLifecycleState.resumed)),
+      onInactive: () =>
+          unawaited(_handleLifecycleChange(AppLifecycleState.inactive)),
+      onHide: () => unawaited(_handleLifecycleChange(AppLifecycleState.hidden)),
+      onPause: () => unawaited(_handleLifecycleChange(AppLifecycleState.paused)),
+      onDetach: () =>
+          unawaited(_handleLifecycleChange(AppLifecycleState.detached)),
+    );
+    unawaited(_ensureRuntimeForCurrentMode(reason: 'app-host-init'));
   }
 
   @override
   void dispose() {
+    _lifecycleListener.dispose();
     if (_appHostState == this) _appHostState = null;
     super.dispose();
+  }
+
+  Future<void> _handleLifecycleChange(AppLifecycleState state) async {
+    print('🔄 [Lifecycle] $state (mode=${AppModeConfig.mode})');
+
+    if (AppModeConfig.isMaster) {
+      await _ensureRuntimeForCurrentMode(reason: 'lifecycle:$state');
+      return;
+    }
+
+    if (state == AppLifecycleState.resumed) {
+      await MasterDiscoveryService.instance.refresh();
+    }
+    await _syncPlatformMasterRuntime();
   }
 
   /// Flip the key → Flutter tears down and rebuilds the entire ProviderScope,
@@ -200,6 +250,58 @@ Future<void> _startServerInBackground({bool skipSeed = false}) async {
     print('✅ API Server started at http://127.0.0.1:8080');
   } catch (e) {
     print('❌ Failed to start server: $e');
+  }
+}
+
+Future<void> refreshRuntimeForAppModeChange() async {
+  await _ensureRuntimeForCurrentMode(reason: 'mode-change');
+}
+
+Future<void> _ensureRuntimeForCurrentMode({required String reason}) async {
+  if (_isEnsuringRuntime) {
+    print('ℹ️ [Runtime] ensure skipped ($reason) because another run is active');
+    return;
+  }
+
+  _isEnsuringRuntime = true;
+  try {
+    print('🔧 [Runtime] ensure start ($reason)');
+
+    if (_dbInstance == null) {
+      _dbInstance = AppDatabase();
+      print('✅ [Runtime] recreated AppDatabase');
+    }
+
+    _serverInstance ??= ApiServer(_dbInstance!);
+
+    if (!_serverInstance!.isRunning) {
+      await _serverInstance!.start(port: 8080);
+      print('✅ [Runtime] API server ensured');
+    }
+
+    await MasterDiscoveryService.instance.refresh();
+    await _syncPlatformMasterRuntime();
+    print('✅ [Runtime] ensure complete ($reason)');
+  } catch (e) {
+    print('❌ [Runtime] ensure failed ($reason): $e');
+  } finally {
+    _isEnsuringRuntime = false;
+  }
+}
+
+Future<void> _syncPlatformMasterRuntime() async {
+  if (!Platform.isAndroid) return;
+
+  try {
+    if (AppModeConfig.isMaster) {
+      await _masterRuntimeChannel.invokeMethod('startMasterHost', {
+        'deviceName': AppModeConfig.deviceName,
+      });
+    } else {
+      await _masterRuntimeChannel.invokeMethod('stopMasterHost');
+    }
+  } catch (e) {
+    print('⚠️ [Runtime] Android background host sync failed: $e');
   }
 }
 
