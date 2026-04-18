@@ -1,4 +1,4 @@
-package com.example.pos_erp
+package com.dee-pos.poserp
 
 import io.flutter.embedding.android.FlutterActivity
 

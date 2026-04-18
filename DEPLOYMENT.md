@@ -353,7 +353,7 @@ Database is created automatically on first run with seed data.
 ### Manual Database Reset
 ```bash
 # macOS:
-rm ~/Library/Application\ Support/com.example.posErpSystem/app_database.db
+rm ~/Library/Application\ Support/com.dee-pos.poserp/app_database.db
 
 # Windows:
 del %APPDATA%\pos_erp_system\app_database.db
@@ -368,7 +368,7 @@ adb shell rm /data/data/com.yourcompany.pos_erp/databases/app_database.db
 ### Backup Database
 ```bash
 # macOS:
-cp ~/Library/Application\ Support/com.example.posErpSystem/app_database.db \
+cp ~/Library/Application\ Support/com.dee-pos.poserp/app_database.db \
    ~/Desktop/backup_$(date +%Y%m%d).db
 
 # Windows:

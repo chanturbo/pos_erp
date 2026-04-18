@@ -155,8 +155,7 @@ class SeedData {
 
     for (final user in users) {
       try {
-        // insertOrReplace เพื่อให้ roleId/branchId อัปเดตได้ถ้า user มีอยู่แล้วแต่ role เป็น null
-        await db.into(db.users).insertOnConflictUpdate(user);
+        await db.into(db.users).insert(user, mode: InsertMode.insertOrIgnore);
       } catch (e) {
         print('⚠️ seedUsers error: $e');
       }
@@ -482,12 +481,10 @@ class SeedData {
   static Future<void> seedSuppliers(AppDatabase db) async {
     print('🌱 Seeding suppliers...');
 
-    // ✅ ลบข้อมูลเดิมทิ้งก่อน
-    try {
-      await db.delete(db.suppliers).go();
-      print('   🗑️ Cleared existing suppliers');
-    } catch (e) {
-      print('   ⚠️ Could not clear suppliers: $e');
+    final existing = await db.select(db.suppliers).get();
+    if (existing.isNotEmpty) {
+      print('   ⏭️ Suppliers already exist, skipping');
+      return;
     }
 
     final suppliers = [

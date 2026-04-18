@@ -8,7 +8,7 @@
 PRODUCT_NAME = pos_erp
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = com.example.posErp
+PRODUCT_BUNDLE_IDENTIFIER = com.dee-pos.poserp
 
 // The copyright displayed in application information
-PRODUCT_COPYRIGHT = Copyright © 2026 com.example. All rights reserved.
+PRODUCT_COPYRIGHT = Copyright © 2026 com.dee-pos. All rights reserved.

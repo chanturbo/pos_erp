@@ -1,3 +1,4 @@
+// ignore_for_file: avoid_print
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -5,6 +6,7 @@ import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:cryptography/cryptography.dart';
+import 'package:drift/native.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
@@ -33,6 +35,15 @@ class BackupService {
   static const _magic = 'POSBK1';
   static const _appName = 'POS ERP';
   static const _appVersion = '1.0.0';
+  static const trackedInspectionTables = <String>[
+    'companies',
+    'branches',
+    'warehouses',
+    'products',
+    'customers',
+    'sales_orders',
+    'users',
+  ];
 
   final AppDatabase db;
   final Random _random = Random.secure();
@@ -233,6 +244,7 @@ class BackupService {
     }
 
     await _validateExtractedPayload(payloadDir, manifest);
+    final inspection = await _inspectExtractedPayload(payloadDir, manifest);
 
     final requestFile = File(p.join(pendingRoot.path, restoreRequestFileName));
     final requestJson = {
@@ -247,6 +259,7 @@ class BackupService {
 
     return RestorePreparationResult(
       manifest: manifest,
+      inspection: inspection,
       pendingDirectoryPath: pendingRoot.path,
       preparedAt: DateTime.now(),
     );
@@ -254,16 +267,24 @@ class BackupService {
 
   static Future<bool> applyPendingRestoreIfAny() async {
     final backupDir = await AppDatabase.resolveBackupDirectory();
+    print('🔍 [Restore] backupDir: ${backupDir.path}');
+
     final pendingRoot = Directory(
       p.join(backupDir.path, restorePendingFolderName),
     );
+    print('🔍 [Restore] pendingRoot: ${pendingRoot.path}');
+    print('🔍 [Restore] pendingRoot exists: ${pendingRoot.existsSync()}');
     if (!pendingRoot.existsSync()) return false;
 
     final requestFile = File(p.join(pendingRoot.path, restoreRequestFileName));
     final payloadDir = Directory(
       p.join(pendingRoot.path, restorePayloadFolderName),
     );
+    print('🔍 [Restore] requestFile exists: ${requestFile.existsSync()}');
+    print('🔍 [Restore] payloadDir exists: ${payloadDir.existsSync()}');
+
     if (!requestFile.existsSync() || !payloadDir.existsSync()) {
+      await pendingRoot.delete(recursive: true);
       return false;
     }
 
@@ -272,8 +293,15 @@ class BackupService {
     final manifest = BackupManifest.fromJson(
       requestJson['manifest'] as Map<String, dynamic>,
     );
+    print('🔍 [Restore] manifest backupId: ${manifest.backupId}');
+    print('🔍 [Restore] payload files:');
+    await for (final f in payloadDir.list(recursive: true)) {
+      if (f is File) print('   📄 ${f.path} (${await f.length()} bytes)');
+    }
 
     await _validateExtractedPayload(payloadDir, manifest);
+    print('✅ [Restore] payload validated');
+
     final rollbackRoot = Directory(
       p.join(
         backupDir.path,
@@ -284,10 +312,13 @@ class BackupService {
     await rollbackRoot.create(recursive: true);
 
     final currentDb = await AppDatabase.resolveDatabaseFile();
+    print('🔍 [Restore] currentDb path: ${currentDb.path}');
+    print('🔍 [Restore] currentDb exists: ${currentDb.existsSync()}');
     if (currentDb.existsSync()) {
       await currentDb.copy(
         p.join(rollbackRoot.path, AppDatabase.databaseFileName),
       );
+      print('✅ [Restore] current db backed up to rollback');
     }
 
     final currentImages = await AppDatabase.resolveProductImagesDirectory();
@@ -301,23 +332,36 @@ class BackupService {
     final restoredDb = File(
       p.join(payloadDir.path, AppDatabase.databaseFileName),
     );
+    print('🔍 [Restore] restoredDb path: ${restoredDb.path}');
+    print('🔍 [Restore] restoredDb exists: ${restoredDb.existsSync()}');
     if (!restoredDb.existsSync()) {
       throw const BackupException('ไม่พบฐานข้อมูลในชุด restore');
     }
+
     await currentDb.parent.create(recursive: true);
     await restoredDb.copy(currentDb.path);
+    print('✅ [Restore] db file copied to ${currentDb.path}');
+
+    // Delete stale WAL files — if left behind SQLite replays old transactions
+    // on top of the restored data, making the restore appear to have no effect.
+    for (final suffix in ['-wal', '-shm']) {
+      final stale = File('${currentDb.path}$suffix');
+      if (stale.existsSync()) {
+        await stale.delete();
+        print('🗑️ [Restore] deleted stale WAL file: ${stale.path}');
+      }
+    }
 
     final restoredImages = Directory(
       p.join(payloadDir.path, AppDatabase.productImagesFolderName),
     );
-    if (currentImages.existsSync()) {
-      await currentImages.delete(recursive: true);
-    }
+    if (currentImages.existsSync()) await currentImages.delete(recursive: true);
     if (restoredImages.existsSync()) {
       await _copyDirectory(restoredImages, currentImages);
     }
 
     await pendingRoot.delete(recursive: true);
+    print('✅ [Restore] pendingRoot deleted — restore complete');
     return true;
   }
 
@@ -410,6 +454,65 @@ class BackupService {
       final hash = await _sha256OfFile(diskFile);
       if (hash != file.sha256) {
         throw BackupException('checksum หลังแตกไฟล์ไม่ถูกต้อง: ${file.path}');
+      }
+    }
+  }
+
+  Future<BackupInspectionSummary> _inspectExtractedPayload(
+    Directory payloadDir,
+    BackupManifest manifest,
+  ) async {
+    final sourceDb = File(p.join(payloadDir.path, manifest.dbFileName));
+    if (!sourceDb.existsSync()) {
+      throw const BackupException('ไม่พบฐานข้อมูลใน payload สำหรับตรวจสอบ');
+    }
+
+    final tempDir = await getTemporaryDirectory();
+    final workingDir = await Directory(
+      p.join(tempDir.path, 'pos_erp_restore_inspect_${manifest.backupId}'),
+    ).create(recursive: true);
+    final tempDbFile = File(p.join(workingDir.path, manifest.dbFileName));
+
+    try {
+      await sourceDb.copy(tempDbFile.path);
+      final inspectDb = AppDatabase.forTesting(
+        NativeDatabase(
+          tempDbFile,
+          enableMigrations: false,
+          setup: (rawDb) {
+            rawDb.execute('PRAGMA query_only = ON;');
+          },
+        ),
+      );
+      try {
+        final tableCounts = <String, int>{};
+        for (final table in trackedInspectionTables) {
+          final row = await inspectDb
+              .customSelect('SELECT COUNT(*) AS total FROM $table')
+              .getSingle();
+          tableCounts[table] = row.data['total'] as int? ?? 0;
+        }
+
+        final productImageCount = manifest.files
+            .where(
+              (file) => file.path.startsWith(
+                '${AppDatabase.productImagesFolderName}/',
+              ),
+            )
+            .length;
+
+        return BackupInspectionSummary(
+          tableCounts: tableCounts,
+          productImageCount: productImageCount,
+        );
+      } finally {
+        await inspectDb.close();
+      }
+    } catch (e) {
+      throw BackupException('ตรวจสอบข้อมูลใน backup ไม่สำเร็จ: $e');
+    } finally {
+      if (workingDir.existsSync()) {
+        await workingDir.delete(recursive: true);
       }
     }
   }

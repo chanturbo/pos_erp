@@ -186,6 +186,19 @@ class GoogleDriveBackupService implements BackupStorageProvider {
     );
   }
 
+  // Converts a 401/403 DioException into a clear re-auth error and clears
+  // the cached user so the next sign-in triggers a fresh consent screen.
+  Never _handleDioError(DioException e) {
+    final status = e.response?.statusCode;
+    if (status == 401 || status == 403) {
+      _gsiUser = null;
+      throw const GoogleDriveBackupException(
+        'ไม่มีสิทธิ์เข้าถึง Google Drive กรุณากดปุ่ม "ยกเลิกเชื่อมต่อ" แล้วเชื่อมต่อใหม่อีกครั้ง',
+      );
+    }
+    throw GoogleDriveBackupException('Google Drive error $status: ${e.message}');
+  }
+
   Future<GoogleDriveUploadResult> uploadBackupFile({
     required File encryptedBackupFile,
     required BackupManifest manifest,
@@ -205,22 +218,27 @@ class GoogleDriveBackupService implements BackupStorageProvider {
       },
     };
 
-    final startResponse = await _dio.post<dynamic>(
-      'https://www.googleapis.com/upload/drive/v3/files',
-      queryParameters: const {'uploadType': 'resumable'},
-      data: jsonEncode(metadata),
-      options: Options(
-        headers: {
-          HttpHeaders.authorizationHeader: 'Bearer $accessToken',
-          'X-Upload-Content-Type': 'application/octet-stream',
-          'X-Upload-Content-Length': '$fileSize',
-          HttpHeaders.contentTypeHeader: 'application/json; charset=UTF-8',
-        },
-        responseType: ResponseType.plain,
-        validateStatus: (status) =>
-            status != null && status >= 200 && status < 400,
-      ),
-    );
+    final Response<dynamic> startResponse;
+    try {
+      startResponse = await _dio.post<dynamic>(
+        'https://www.googleapis.com/upload/drive/v3/files',
+        queryParameters: const {'uploadType': 'resumable'},
+        data: jsonEncode(metadata),
+        options: Options(
+          headers: {
+            HttpHeaders.authorizationHeader: 'Bearer $accessToken',
+            'X-Upload-Content-Type': 'application/octet-stream',
+            'X-Upload-Content-Length': '$fileSize',
+            HttpHeaders.contentTypeHeader: 'application/json; charset=UTF-8',
+          },
+          responseType: ResponseType.plain,
+          validateStatus: (status) =>
+              status != null && status >= 200 && status < 400,
+        ),
+      );
+    } on DioException catch (e) {
+      _handleDioError(e);
+    }
 
     final locationHeader = startResponse.headers.value(
       HttpHeaders.locationHeader,
@@ -232,20 +250,25 @@ class GoogleDriveBackupService implements BackupStorageProvider {
     }
 
     final bytes = await encryptedBackupFile.readAsBytes();
-    final uploadResponse = await _dio.put<dynamic>(
-      locationHeader,
-      data: Stream.fromIterable(<List<int>>[bytes]),
-      options: Options(
-        headers: {
-          HttpHeaders.authorizationHeader: 'Bearer $accessToken',
-          HttpHeaders.contentLengthHeader: '$fileSize',
-          HttpHeaders.contentTypeHeader: 'application/octet-stream',
-        },
-        responseType: ResponseType.json,
-        validateStatus: (status) =>
-            status != null && status >= 200 && status < 400,
-      ),
-    );
+    final Response<dynamic> uploadResponse;
+    try {
+      uploadResponse = await _dio.put<dynamic>(
+        locationHeader,
+        data: Stream.fromIterable(<List<int>>[bytes]),
+        options: Options(
+          headers: {
+            HttpHeaders.authorizationHeader: 'Bearer $accessToken',
+            HttpHeaders.contentLengthHeader: '$fileSize',
+            HttpHeaders.contentTypeHeader: 'application/octet-stream',
+          },
+          responseType: ResponseType.json,
+          validateStatus: (status) =>
+              status != null && status >= 200 && status < 400,
+        ),
+      );
+    } on DioException catch (e) {
+      _handleDioError(e);
+    }
 
     final data = uploadResponse.data as Map<String, dynamic>? ?? const {};
     final fileId = data['id'] as String?;
@@ -255,28 +278,73 @@ class GoogleDriveBackupService implements BackupStorageProvider {
       );
     }
 
+    // ลบไฟล์เก่าที่เกินกว่า keepCount ไว้ (ล้มเหลวก็ไม่ throw)
+    try {
+      await pruneOldBackups(keepCount: 5, accessToken: accessToken);
+    } catch (_) {}
+
     return GoogleDriveUploadResult(fileId: fileId, fileName: fileName);
+  }
+
+  /// ลบไฟล์ backup เก่า เหลือไว้แค่ [keepCount] ไฟล์ล่าสุด
+  Future<int> pruneOldBackups({
+    required int keepCount,
+    String? accessToken,
+  }) async {
+    final token = accessToken ?? await _getAccessToken();
+    final all = await listBackups(pageSize: 100);
+    if (all.length <= keepCount) return 0;
+
+    // listBackups คืนผลเรียง createdTime desc แล้ว — ลบตัวท้าย
+    final toDelete = all.sublist(keepCount);
+    var deleted = 0;
+    for (final item in toDelete) {
+      try {
+        await _deleteFile(item.fileId, token);
+        deleted++;
+      } catch (_) {}
+    }
+    return deleted;
+  }
+
+  Future<void> _deleteFile(String fileId, String accessToken) async {
+    try {
+      await _dio.delete<void>(
+        'https://www.googleapis.com/drive/v3/files/$fileId',
+        options: Options(
+          headers: {HttpHeaders.authorizationHeader: 'Bearer $accessToken'},
+          validateStatus: (s) => s != null && s >= 200 && s < 400,
+        ),
+      );
+    } on DioException catch (e) {
+      _handleDioError(e);
+    }
   }
 
   Future<List<DriveBackupItem>> listBackups({int pageSize = 20}) async {
     final accessToken = await _getAccessToken();
-    final response = await _dio.get<dynamic>(
-      'https://www.googleapis.com/drive/v3/files',
-      queryParameters: {
-        'spaces': 'appDataFolder',
-        'fields': 'files(id,name,size,createdTime,appProperties)',
-        'pageSize': pageSize,
-        'orderBy': 'createdTime desc',
-      },
-      options: Options(
-        headers: {
-          HttpHeaders.authorizationHeader: 'Bearer $accessToken',
+    final Response<dynamic> response;
+    try {
+      response = await _dio.get<dynamic>(
+        'https://www.googleapis.com/drive/v3/files',
+        queryParameters: {
+          'spaces': 'appDataFolder',
+          'fields': 'files(id,name,size,createdTime,appProperties)',
+          'pageSize': pageSize,
+          'orderBy': 'createdTime desc',
         },
-        responseType: ResponseType.json,
-        validateStatus: (status) =>
-            status != null && status >= 200 && status < 400,
-      ),
-    );
+        options: Options(
+          headers: {
+            HttpHeaders.authorizationHeader: 'Bearer $accessToken',
+          },
+          responseType: ResponseType.json,
+          validateStatus: (status) =>
+              status != null && status >= 200 && status < 400,
+        ),
+      );
+    } on DioException catch (e) {
+      _handleDioError(e);
+    }
     final data = response.data as Map<String, dynamic>? ?? {};
     final files = data['files'] as List? ?? [];
     return files
@@ -299,18 +367,22 @@ class GoogleDriveBackupService implements BackupStorageProvider {
     );
     if (destFile.existsSync()) await destFile.delete();
 
-    await _dio.download(
-      'https://www.googleapis.com/drive/v3/files/$fileId',
-      destFile.path,
-      queryParameters: {'alt': 'media'},
-      options: Options(
-        headers: {
-          HttpHeaders.authorizationHeader: 'Bearer $accessToken',
-        },
-        validateStatus: (status) =>
-            status != null && status >= 200 && status < 400,
-      ),
-    );
+    try {
+      await _dio.download(
+        'https://www.googleapis.com/drive/v3/files/$fileId',
+        destFile.path,
+        queryParameters: {'alt': 'media'},
+        options: Options(
+          headers: {
+            HttpHeaders.authorizationHeader: 'Bearer $accessToken',
+          },
+          validateStatus: (status) =>
+              status != null && status >= 200 && status < 400,
+        ),
+      );
+    } on DioException catch (e) {
+      _handleDioError(e);
+    }
     return destFile;
   }
 
@@ -551,10 +623,10 @@ class GoogleDriveBackupService implements BackupStorageProvider {
     GoogleSignInAccount user,
   ) async {
     const scopes = <String>[_scopeAppData, _scopeProfile];
-    var authorization =
-        await user.authorizationClient.authorizationForScopes(scopes);
-    authorization ??= await user.authorizationClient.authorizeScopes(scopes);
-    return authorization;
+    // Always call authorizeScopes to ensure drive.appdata scope is included.
+    // authorizationForScopes may return a cached token from a previous
+    // sign-in that only has email/profile scopes (no drive access).
+    return user.authorizationClient.authorizeScopes(scopes);
   }
 }
 

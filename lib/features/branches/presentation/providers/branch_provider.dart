@@ -266,8 +266,11 @@ final syncStatusProvider = StreamProvider<SyncStatusModel>((ref) async* {
   }
 
   while (true) {
-    yield await _loadSyncStatus(ref);
+    final status = await _loadSyncStatus(ref);
+    if (!ref.mounted) return;
+    yield status;
     await Future.delayed(const Duration(seconds: 3));
+    if (!ref.mounted) return;
   }
 });
 
@@ -280,8 +283,11 @@ final syncBatchHistoryProvider =
   }
 
   while (true) {
-    yield await _loadSyncBatchHistory(ref);
+    final history = await _loadSyncBatchHistory(ref);
+    if (!ref.mounted) return;
+    yield history;
     await Future.delayed(const Duration(seconds: 3));
+    if (!ref.mounted) return;
   }
 });
 
@@ -295,6 +301,7 @@ final syncBatchIssuesOnlyProvider = StateProvider<bool>((ref) => false);
 Future<SyncStatusModel> _loadSyncStatus(Ref ref) async {
   final localQueued =
       await ref.read(pendingSalesQueueServiceProvider).pendingCount();
+  if (!ref.mounted) throw StateError('provider disposed');
   final batchMetrics = ref.read(offlineSyncServiceProvider).lastBatchMetrics;
 
   if (AppModeConfig.isStandalone) {

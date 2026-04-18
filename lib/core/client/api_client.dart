@@ -10,16 +10,16 @@ class ApiClient {
 
   /// ✅ Callback เมื่อ server ตอบ 401 — ใช้ redirect ไป login page
   void Function()? onUnauthorized;
-  
-  ApiClient({String? baseUrl}) 
-      : _dio = Dio(BaseOptions(
-    baseUrl: baseUrl ?? AppConfig.resolveApiBaseUrl(),
-    connectTimeout: AppConfig.connectTimeout,
-    receiveTimeout: AppConfig.receiveTimeout,
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  )) {
+
+  ApiClient({String? baseUrl})
+    : _dio = Dio(
+        BaseOptions(
+          baseUrl: baseUrl ?? AppConfig.resolveApiBaseUrl(),
+          connectTimeout: AppConfig.connectTimeout,
+          receiveTimeout: AppConfig.receiveTimeout,
+          headers: {'Content-Type': 'application/json'},
+        ),
+      ) {
     // Add interceptor for logging
     _dio.interceptors.add(
       InterceptorsWrapper(
@@ -28,16 +28,19 @@ class ApiClient {
           return handler.next(options);
         },
         onResponse: (response, handler) {
-          print('✅ Response [${response.statusCode}]: ${response.requestOptions.uri.path}');
+          print(
+            '✅ Response [${response.statusCode}]: ${response.requestOptions.uri.path}',
+          );
           return handler.next(response);
         },
         onError: (error, handler) {
           final statusCode = error.response?.statusCode;
           print('❌ Error [$statusCode]: ${error.message}');
+          final path = error.requestOptions.path;
 
           // ✅ 401 — token หมดอายุ / ไม่มี token
           // resolve แทน throw ไม่ให้ app crash
-          if (statusCode == 401) {
+          if (statusCode == 401 && path != '/api/auth/login') {
             print('🔒 401 Unauthorized — token may be expired or missing');
             onUnauthorized?.call();
             return handler.resolve(
@@ -64,7 +67,7 @@ class ApiClient {
       print('🌐 API Base URL switched to $resolved');
     }
   }
-  
+
   /// Set authentication token
   void setToken(String? token) {
     _token = token;
@@ -76,24 +79,25 @@ class ApiClient {
       print('🔓 Token removed');
     }
   }
-  
+
   /// Get current token
   String? getToken() => _token;
-  
+
   /// Get with auth
-  Future<Response> get(String path,
-      {Map<String, dynamic>? queryParameters}) async {
+  Future<Response> get(
+    String path, {
+    Map<String, dynamic>? queryParameters,
+  }) async {
     try {
       refreshBaseUrl();
-      final response =
-          await _dio.get(path, queryParameters: queryParameters);
+      final response = await _dio.get(path, queryParameters: queryParameters);
       return response;
     } on DioException catch (e) {
       print('❌ GET Error: ${e.message}');
       rethrow;
     }
   }
-  
+
   /// Post with auth
   Future<Response> post(String path, {dynamic data}) async {
     try {
@@ -105,7 +109,7 @@ class ApiClient {
       rethrow;
     }
   }
-  
+
   /// Put with auth
   Future<Response> put(String path, {dynamic data}) async {
     try {
@@ -117,14 +121,18 @@ class ApiClient {
       rethrow;
     }
   }
-  
+
   /// Delete with auth
-  Future<Response> delete(String path,
-      {Map<String, dynamic>? queryParameters}) async {
+  Future<Response> delete(
+    String path, {
+    Map<String, dynamic>? queryParameters,
+  }) async {
     try {
       refreshBaseUrl();
-      final response =
-          await _dio.delete(path, queryParameters: queryParameters);
+      final response = await _dio.delete(
+        path,
+        queryParameters: queryParameters,
+      );
       return response;
     } on DioException catch (e) {
       print('❌ DELETE Error: ${e.message}');

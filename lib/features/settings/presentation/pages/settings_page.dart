@@ -4,6 +4,8 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:pos_erp/main.dart'
+    show applyRestoreInPlace, factoryResetInPlace, factoryResetSkipSeedKey;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:path/path.dart' as p;
@@ -13,6 +15,7 @@ import '../../../../shared/theme/theme_provider.dart';
 import '../../../../core/services/backup/backup_service.dart';
 import '../../../../core/services/backup/google_drive_backup_service.dart';
 import '../../../../core/services/backup/models/backup_result.dart';
+import '../../../../routes/app_router.dart';
 import '../../shared/settings_defaults.dart';
 
 // ─────────────────────────────────────────────────────────────────
@@ -404,6 +407,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   bool _isUploadingGoogleDrive = false;
   bool _isDriveListLoading = false;
   bool _isRestoringFromDrive = false;
+  bool _isFactoryResetting = false;
+  bool _skipSeedAfterFactoryReset = false;
   String? _lastBackupPath;
   DateTime? _lastBackupAt;
   int? _lastBackupSize;
@@ -428,6 +433,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       _syncControllers(ref.read(settingsProvider));
       _loadBackupMetadata();
       _loadGoogleDriveConfig();
+      _loadFactoryResetPreference();
     });
   }
 
@@ -737,9 +743,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   selected: fontSettings.fontFamily == f.$1,
                   isDark: isDark,
                   onTap: () {
-                    ref
-                        .read(fontSettingsProvider.notifier)
-                        .setFontFamily(f.$1);
+                    ref.read(fontSettingsProvider.notifier).setFontFamily(f.$1);
                     _showSuccess('บันทึกการตั้งค่าแล้ว');
                   },
                 ),
@@ -774,9 +778,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   selected: fontSettings.fontScale == s.$1,
                   isDark: isDark,
                   onTap: () {
-                    ref
-                        .read(fontSettingsProvider.notifier)
-                        .setFontScale(s.$1);
+                    ref.read(fontSettingsProvider.notifier).setFontScale(s.$1);
                     _showSuccess('บันทึกการตั้งค่าแล้ว');
                   },
                 ),
@@ -1702,6 +1704,91 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         const Divider(height: 1),
         const SizedBox(height: 18),
         _buildGoogleDriveSection(isDark),
+        const SizedBox(height: 18),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF2A1F1F) : const Color(0xFFFFF4F4),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isDark
+                  ? Colors.redAccent.withValues(alpha: 0.35)
+                  : const Color(0xFFFFD0D0),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(
+                    Icons.warning_amber_rounded,
+                    color: AppTheme.error,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Factory Reset',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'ล้างฐานข้อมูลในเครื่องและ session ปัจจุบันทั้งหมด เหมาะสำหรับทดสอบการเริ่มระบบใหม่หรือเคลียร์เครื่องก่อน restore',
+                style: TextStyle(fontSize: 12, color: captionColor),
+              ),
+              const SizedBox(height: 12),
+              SwitchListTile.adaptive(
+                value: _skipSeedAfterFactoryReset,
+                contentPadding: EdgeInsets.zero,
+                activeThumbColor: AppTheme.error,
+                onChanged: _isFactoryResetting
+                    ? null
+                    : _setSkipSeedAfterFactoryReset,
+                title: const Text('Skip seed หลังล้างข้อมูล'),
+                subtitle: Text(
+                  _skipSeedAfterFactoryReset
+                      ? 'หลังรีเซ็ตจะไม่สร้างข้อมูลตั้งต้นและจะไม่มีผู้ใช้เริ่มต้น'
+                      : 'หลังรีเซ็ตจะสร้างข้อมูลตั้งต้นและผู้ใช้เริ่มต้นกลับมาใหม่',
+                  style: TextStyle(fontSize: 12, color: captionColor),
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: 260,
+                child: ElevatedButton.icon(
+                  onPressed: _isFactoryResetting ? null : _confirmFactoryReset,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.error,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  icon: _isFactoryResetting
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.delete_forever_outlined, size: 18),
+                  label: Text(
+                    _isFactoryResetting
+                        ? 'กำลังล้างข้อมูล...'
+                        : 'Factory Reset ตอนนี้',
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -1859,15 +1946,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             ),
           ],
         ),
-        const SizedBox(height: 10),
-        Text(
-          'ถ้าใช้ macOS/iOS ต้องแทนที่ REVERSED_CLIENT_ID ใน Info.plist ด้วยค่า Reversed Client ID '
-          'จาก Google Cloud Console เช่น com.googleusercontent.apps.XXXXX-YYYY',
-          style: TextStyle(
-            fontSize: 12,
-            color: isDark ? Colors.white54 : AppTheme.textSub,
-          ),
-        ),
       ],
     );
   }
@@ -2008,6 +2086,120 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
   }
 
+  Future<void> _applyRestore(BuildContext dialogContext) async {
+    Navigator.of(dialogContext).pop(); // ปิด dialog ก่อน
+    try {
+      await applyRestoreInPlace(); // swap DB + rebuild ProviderScope
+    } catch (e) {
+      if (mounted) _showError('กู้คืนข้อมูลไม่สำเร็จ: $e');
+    }
+  }
+
+  String _restoreTableLabel(String table) {
+    switch (table) {
+      case 'companies':
+        return 'บริษัท';
+      case 'branches':
+        return 'สาขา';
+      case 'warehouses':
+        return 'คลัง';
+      case 'products':
+        return 'สินค้า';
+      case 'customers':
+        return 'ลูกค้า';
+      case 'sales_orders':
+        return 'ออเดอร์ขาย';
+      case 'users':
+        return 'ผู้ใช้';
+      default:
+        return table;
+    }
+  }
+
+  Future<void> _showRestoreInspectionDialog(
+    RestorePreparationResult result,
+  ) async {
+    final createdAt = DateTime.tryParse(result.manifest.createdAt)?.toLocal();
+    final imageCount = result.inspection.productImageCount;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('ตรวจสอบ Backup ก่อนกู้คืน'),
+        content: SizedBox(
+          width: 520,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'ระบบตรวจสอบไฟล์สำรองข้อมูลเรียบร้อยแล้ว กรุณาตรวจสอบจำนวนข้อมูลก่อนโหลดชุดข้อมูลนี้',
+                ),
+                const SizedBox(height: 16),
+                _backupInfoRow(
+                  label: 'ชุดข้อมูล',
+                  value: result.manifest.companyName.isNotEmpty
+                      ? result.manifest.companyName
+                      : '-',
+                  isDark: isDark,
+                ),
+                _backupInfoRow(
+                  label: 'สร้างเมื่อ',
+                  value: createdAt != null
+                      ? _dateTimeFmt.format(createdAt)
+                      : result.manifest.createdAt,
+                  isDark: isDark,
+                ),
+                _backupInfoRow(
+                  label: 'ไฟล์ในชุดสำรอง',
+                  value:
+                      '${result.manifest.fileCount} ไฟล์ • ${_formatBytes(result.manifest.totalBytes)}',
+                  isDark: isDark,
+                ),
+                _backupInfoRow(
+                  label: 'รูปสินค้า',
+                  value: '$imageCount ไฟล์',
+                  isDark: isDark,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'จำนวนข้อมูลในฐานข้อมูลสำรอง',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                ...BackupService.trackedInspectionTables.map((table) {
+                  final count = result.inspection.tableCounts[table] ?? 0;
+                  return _backupInfoRow(
+                    label: _restoreTableLabel(table),
+                    value: NumberFormat.decimalPattern().format(count),
+                    isDark: isDark,
+                  );
+                }),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('ยกเลิก'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () => _applyRestore(context),
+            icon: const Icon(Icons.refresh),
+            label: const Text('โหลดข้อมูลที่กู้คืน'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showSuccess(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -2015,7 +2207,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           children: [
             const Icon(Icons.check_circle, color: Colors.white, size: 18),
             const SizedBox(width: 8),
-            Text(msg),
+            Expanded(child: Text(msg)),
           ],
         ),
         backgroundColor: AppTheme.success,
@@ -2061,6 +2253,22 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     setState(() {
       _googleDriveEmail = session?.email ?? lastEmail;
     });
+  }
+
+  Future<void> _loadFactoryResetPreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _skipSeedAfterFactoryReset =
+          prefs.getBool(factoryResetSkipSeedKey) ?? false;
+    });
+  }
+
+  Future<void> _setSkipSeedAfterFactoryReset(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(factoryResetSkipSeedKey, value);
+    if (!mounted) return;
+    setState(() => _skipSeedAfterFactoryReset = value);
   }
 
   Future<void> _persistBackupMetadata({
@@ -2278,8 +2486,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       },
     );
 
-    passphraseCtrl.dispose();
-    confirmCtrl.dispose();
     return result;
   }
 
@@ -2334,28 +2540,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       }
 
       if (!mounted) return;
-      await showDialog<void>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('เตรียมกู้คืนข้อมูลสำเร็จ'),
-          content: Text(
-            'ระบบตรวจสอบไฟล์สำรองข้อมูลเรียบร้อยแล้ว\n\n'
-            'ชุดข้อมูล: ${result.manifest.companyName}\n'
-            'สร้างเมื่อ: ${result.manifest.createdAt}\n'
-            'จำนวนไฟล์: ${result.manifest.fileCount}\n\n'
-            'ข้อมูลจะถูกสลับใช้งานเมื่อเปิดแอปรอบถัดไป',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('ปิด'),
-            ),
-          ],
-        ),
-      );
-      if (mounted) {
-        _showSuccess('เตรียมกู้คืนข้อมูลแล้ว กรุณาปิดและเปิดแอปใหม่');
-      }
+      await _showRestoreInspectionDialog(result);
     } on BackupException catch (e) {
       if (mounted) _showError(e.message);
     } on GoogleDriveBackupException catch (e) {
@@ -2425,7 +2610,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         ),
       ),
     );
-    ctrl.dispose();
     return result;
   }
 
@@ -2434,7 +2618,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final restorePath = await backupService.pickBackupRestorePath();
     if (restorePath == null || restorePath.isEmpty || !mounted) return;
 
-    final passphrase = await _promptBackupPassphrase();
+    final passphrase = await _promptRestorePassphrase();
     if (passphrase == null || !mounted) return;
 
     setState(() => _isPreparingRestore = true);
@@ -2444,26 +2628,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         passphrase: passphrase,
       );
       if (!mounted) return;
-      await showDialog<void>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('เตรียมกู้คืนข้อมูลสำเร็จ'),
-          content: Text(
-            'ระบบตรวจสอบไฟล์สำรองข้อมูลเรียบร้อยแล้ว\n\n'
-            'ชุดข้อมูล: ${result.manifest.companyName}\n'
-            'สร้างเมื่อ: ${result.manifest.createdAt}\n'
-            'จำนวนไฟล์: ${result.manifest.fileCount}\n\n'
-            'ข้อมูลจะถูกสลับใช้งานเมื่อเปิดแอปรอบถัดไป',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('ปิด'),
-            ),
-          ],
-        ),
-      );
-      _showSuccess('เตรียมกู้คืนข้อมูลแล้ว กรุณาปิดและเปิดแอปใหม่');
+      await _showRestoreInspectionDialog(result);
     } on BackupException catch (e) {
       if (mounted) _showError(e.message);
     } catch (e) {
@@ -2472,6 +2637,63 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       if (mounted) {
         setState(() => _isPreparingRestore = false);
       }
+    }
+  }
+
+  Future<void> _confirmFactoryReset() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Factory Reset'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'การดำเนินการนี้จะล้างฐานข้อมูล, รูปสินค้า, backup ในเครื่อง และ session ปัจจุบันทั้งหมด',
+            ),
+            const SizedBox(height: 12),
+            Text(
+              _skipSeedAfterFactoryReset
+                  ? 'เปิดโหมด Skip seed อยู่: หลังรีเซ็ต แอปจะไม่สร้างข้อมูลตั้งต้นและจะไม่มีผู้ใช้เริ่มต้นจนกว่าจะ restore backup'
+                  : 'ปิดโหมด Skip seed อยู่: หลังรีเซ็ต แอปจะสร้างข้อมูลตั้งต้นและผู้ใช้เริ่มต้นกลับมาใหม่',
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white70
+                    : Colors.black87,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('ยกเลิก'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('ล้างข้อมูลทั้งหมด'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isFactoryResetting = true);
+    try {
+      await factoryResetInPlace(skipSeedAfterReset: _skipSeedAfterFactoryReset);
+      if (!mounted) return;
+      Navigator.of(
+        context,
+      ).pushNamedAndRemoveUntil(AppRouter.login, (_) => false);
+    } catch (e) {
+      if (mounted) _showError('Factory reset ไม่สำเร็จ: $e');
+    } finally {
+      if (mounted) setState(() => _isFactoryResetting = false);
     }
   }
 

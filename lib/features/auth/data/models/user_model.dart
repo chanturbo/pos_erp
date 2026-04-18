@@ -1,3 +1,5 @@
+import '../../../../shared/permissions/app_permissions.dart';
+
 class UserModel {
   final String userId;
   final String username;
@@ -5,7 +7,7 @@ class UserModel {
   final String? email;
   final String? roleId;
   final String? branchId;
-  
+
   UserModel({
     required this.userId,
     required this.username,
@@ -14,18 +16,18 @@ class UserModel {
     this.roleId,
     this.branchId,
   });
-  
+
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
       userId: json['user_id'] as String,
       username: json['username'] as String,
       fullName: json['full_name'] as String,
       email: json['email'] as String?,
-      roleId: json['role_id'] as String?,
+      roleId: normalizeAppRoleId(json['role_id'] as String?),
       branchId: json['branch_id'] as String?,
     );
   }
-  
+
   Map<String, dynamic> toJson() {
     return {
       'user_id': userId,
