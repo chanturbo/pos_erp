@@ -663,10 +663,6 @@ class _StockBalancePageState extends ConsumerState<StockBalancePage> {
               value: 'WH001',
               child: Text('คลังหลัก', style: TextStyle(color: colors.text)),
             ),
-            DropdownMenuItem(
-              value: 'WH002',
-              child: Text('คลังสยาม', style: TextStyle(color: colors.text)),
-            ),
           ],
           onChanged: (v) => setState(() {
             _selectedWarehouse = v!;

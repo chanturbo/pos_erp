@@ -2133,13 +2133,6 @@ class _StockTakeSubPageState extends ConsumerState<StockTakeSubPage> {
                           style: TextStyle(color: txtColor),
                         ),
                       ),
-                      DropdownMenuItem(
-                        value: 'WH002',
-                        child: Text(
-                          'คลังสยาม',
-                          style: TextStyle(color: txtColor),
-                        ),
-                      ),
                     ],
                     onChanged: (v) {
                       if (v != null) _changeWarehouse(v, stocks);
@@ -2769,11 +2762,10 @@ class _StockTransferSubPageState extends ConsumerState<StockTransferSubPage> {
   // คลังที่มีในระบบ
   static const List<Map<String, String>> _warehouses = [
     {'id': 'WH001', 'name': 'คลังหลัก'},
-    {'id': 'WH002', 'name': 'คลังสยาม'},
   ];
 
   String _fromWarehouseId = 'WH001';
-  String _toWarehouseId = 'WH002';
+  String _toWarehouseId = 'WH001';
   String _searchQuery = '';
   StockBalanceModel? _selectedStock;
   bool _isLoading = false;
@@ -3436,7 +3428,7 @@ class _StockTransferSubPageState extends ConsumerState<StockTransferSubPage> {
               decoration: const InputDecoration(
                 labelText: 'หมายเหตุ',
                 border: OutlineInputBorder(),
-                hintText: 'เช่น โอนสต๊อกไปสาขาสยาม',
+                hintText: 'เช่น โอนสต๊อกไปคลังหลัก',
                 prefixIcon: Icon(Icons.note_alt_outlined),
               ),
               maxLines: 2,
@@ -3910,7 +3902,6 @@ class _VarianceReportPageState extends ConsumerState<VarianceReportPage> {
   static const List<Map<String, String>> _warehouses = [
     {'id': 'ALL', 'name': 'ทุกคลัง'},
     {'id': 'WH001', 'name': 'คลังหลัก'},
-    {'id': 'WH002', 'name': 'คลังสยาม'},
   ];
 
   String _warehouseName(String id) => _warehouses.firstWhere(

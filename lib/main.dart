@@ -12,6 +12,7 @@ import 'package:drift/drift.dart' hide Column;
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'core/config/app_mode.dart';
+import 'core/config/app_config.dart';
 import 'core/navigation/navigator_key.dart';
 import 'shared/theme/app_theme.dart';
 import 'shared/theme/theme_provider.dart';
@@ -391,7 +392,7 @@ class MyApp extends ConsumerWidget {
       builder: (context, child) {
         return MaterialApp(
           navigatorKey: navigatorKey,
-          title: 'POS + ERP System',
+          title: AppConfig.appName,
           theme: AppTheme.buildLightTheme(fontSettings.fontFamily),
           darkTheme: AppTheme.buildDarkTheme(fontSettings.fontFamily),
           themeMode: themeMode,

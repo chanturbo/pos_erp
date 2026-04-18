@@ -400,7 +400,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
                       // Title
                       Text(
-                        'POS + ERP System',
+                        'DEE POS [POINT OF SALE SYSTEM]',
                         style: Theme.of(context).textTheme.headlineSmall
                             ?.copyWith(fontWeight: FontWeight.bold),
                       ),

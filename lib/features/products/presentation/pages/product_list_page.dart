@@ -167,7 +167,6 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
 
   String get _selectedWarehouseLabel => switch (_selectedWarehouse) {
     'WH001' => 'คลังหลัก',
-    'WH002' => 'คลังสยาม',
     _ => 'ทุกคลัง',
   };
 
@@ -1461,7 +1460,6 @@ class _PWarehouseDropdown extends StatelessWidget {
           items: const [
             DropdownMenuItem(value: 'ALL', child: Text('ทุกคลัง')),
             DropdownMenuItem(value: 'WH001', child: Text('คลังหลัก')),
-            DropdownMenuItem(value: 'WH002', child: Text('คลังสยาม')),
           ],
           onChanged: (v) {
             if (v != null) onChanged(v);

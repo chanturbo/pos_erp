@@ -31,14 +31,6 @@ class SeedData {
         address: const Value('123 ถนนทดสอบ กรุงเทพฯ 10100'),
         phone: const Value('02-123-4567'),
       ),
-      BranchesCompanion.insert(
-        branchId: 'BR002',
-        companyId: 'COMP001', // ✅ เพิ่ม required field
-        branchCode: 'SIAM',
-        branchName: 'สาขาสยาม',
-        address: const Value('456 ถนนพระราม 1 กรุงเทพฯ 10330'),
-        phone: const Value('02-234-5678'),
-      ),
     ];
 
     for (var branch in branches) {
@@ -71,12 +63,6 @@ class SeedData {
         warehouseName: 'คลังสาขาหลัก',
         branchId: 'BR001',
         // ❌ ลบ isActive ออก
-      ),
-      WarehousesCompanion.insert(
-        warehouseId: 'WH002',
-        warehouseCode: 'WH-SIAM',
-        warehouseName: 'คลังสาขาสยาม',
-        branchId: 'BR002',
       ),
     ];
 

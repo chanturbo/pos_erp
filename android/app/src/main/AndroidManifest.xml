@@ -2,7 +2,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <application
-        android:label="pos_erp"
+        android:label="DEE POS [POINT OF SALE SYSTEM]"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <service

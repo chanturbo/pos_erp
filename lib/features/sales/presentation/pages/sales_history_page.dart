@@ -45,9 +45,9 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
   int _currentPage = 1;
 
   // ── Column widths [วันที่, เลขที่, ลูกค้า, ชำระ, ยอด, สถานะ, จัดการ]
-  final List<double> _colWidths = [140, 130, 180, 100, 110, 100, 70];
-  static const List<double> _colMinW = [110, 100, 120, 80, 90, 80, 70];
-  static const List<double> _colMaxW = [200, 200, 320, 140, 160, 130, 70];
+  final List<double> _colWidths = [140, 130, 180, 100, 118, 96, 70];
+  static const List<double> _colMinW = [110, 100, 120, 80, 100, 88, 70];
+  static const List<double> _colMaxW = [200, 200, 320, 140, 170, 120, 70];
   final _hScroll = ScrollController();
   final _fmt = NumberFormat('#,##0.00');
   final _dateFmt = DateFormat('dd/MM/yyyy HH:mm');
@@ -190,9 +190,9 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                 onTap: () => _pickDate(true),
                 onClear: _dateFrom != null
                     ? () => setState(() {
-                          _dateFrom = null;
-                          _currentPage = 1;
-                        })
+                        _dateFrom = null;
+                        _currentPage = 1;
+                      })
                     : null,
               ),
               const SizedBox(width: 8),
@@ -205,9 +205,9 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                 onTap: () => _pickDate(false),
                 onClear: _dateTo != null
                     ? () => setState(() {
-                          _dateTo = null;
-                          _currentPage = 1;
-                        })
+                        _dateTo = null;
+                        _currentPage = 1;
+                      })
                     : null,
               ),
               const SizedBox(width: 8),
@@ -821,9 +821,7 @@ class _SummaryBar extends StatelessWidget {
               builder: (context, constraints) => SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    minWidth: constraints.maxWidth,
-                  ),
+                  constraints: BoxConstraints(minWidth: constraints.maxWidth),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -1243,22 +1241,25 @@ class _SalesOrderRowState extends State<_SalesOrderRow> {
               // ── ยอดรวม ─────────────────────────────────────────
               SizedBox(
                 width: w[4],
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: Text(
-                    '฿${widget.fmt.format(o.totalAmount)}',
-                    textAlign: TextAlign.right,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: isCancelled
-                          ? colors.amountCancelledText
-                          : colors.amountText,
-                      decoration: isCancelled
-                          ? TextDecoration.lineThrough
-                          : null,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Text(
+                      '฿${widget.fmt.format(o.totalAmount)}',
+                      textAlign: TextAlign.right,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: isCancelled
+                            ? colors.amountCancelledText
+                            : colors.amountText,
+                        decoration: isCancelled
+                            ? TextDecoration.lineThrough
+                            : null,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ),
@@ -1266,7 +1267,7 @@ class _SalesOrderRowState extends State<_SalesOrderRow> {
               // ── สถานะ ──────────────────────────────────────────
               SizedBox(
                 width: w[5],
-                child: _StatusBadge(status: o.status),
+                child: Center(child: _StatusBadge(status: o.status)),
               ),
 
               // ── ดูรายละเอียด ───────────────────────────────────
@@ -1356,25 +1357,25 @@ class _StatusBadge extends StatelessWidget {
       _ => (status, AppTheme.textSub, colors.neutralChipBg),
     };
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: color.withValues(alpha: 0.16)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 6,
-            height: 6,
+            width: 5,
+            height: 5,
             decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           ),
-          const SizedBox(width: 5),
+          const SizedBox(width: 4),
           Text(
             label,
             style: TextStyle(
-              fontSize: 11,
+              fontSize: 10,
               fontWeight: FontWeight.w600,
               color: color,
             ),

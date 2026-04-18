@@ -16,7 +16,7 @@ class AppConfig {
   // APP INFORMATION
   // ========================================
 
-  static const String appName = 'POS + ERP System';
+  static const String appName = 'DEE POS [POINT OF SALE SYSTEM]';
   static const String appVersion = '1.0.0';
   static const int buildNumber = 1;
   static const String companyName = 'Your Company';
