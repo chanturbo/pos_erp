@@ -27,7 +27,9 @@
 - Multiple Payment Methods (Cash/Card/Transfer)
 - Change Calculation
 - Receipt Generation
+- Receipt Preview + System Print Dialog
 - Promotion & Coupon System
+- Barcode Support (USB keyboard-style scanner + Camera scanner)
 
 ### 📦 Product Management
 - CRUD Operations พร้อม Responsive Form (3 คอลัมน์ / 1 คอลัมน์ ≥880px)
@@ -104,7 +106,7 @@
 - Branch Management
 - Stock Transfer Between Branches
 - Master-Client Architecture
-- Offline Sync
+- Offline Sync (ใช้ในโหมด Master / Client)
 
 ### 🍽️ Restaurant Features
 - Table Management
@@ -119,6 +121,13 @@
 - Keyboard Shortcuts
 - Company & VAT Configuration
 - **Loyalty Points Config** — กำหนดได้ว่าทุกกี่บาทได้ 1 แต้ม และ 1 แต้ม = กี่บาท
+
+## 📌 Current Status Notes
+
+- Receipt printing ใช้งานผ่าน PDF preview และ system print dialog ของ OS ยังไม่มี direct thermal printer integration แบบเลือกเครื่องพิมพ์เฉพาะทาง
+- Barcode รองรับทั้ง USB scanner แบบ keyboard input และ camera scanner ผ่าน `mobile_scanner`
+- Offline sync ใช้งานเมื่อแอปอยู่ในโหมด `master`, `clientPOS`, หรือ `clientMobile` ส่วนโหมด standalone จะปิด sync อัตโนมัติ
+- UI รองรับ responsive layout และมีหน้า mobile เฉพาะบาง flow เช่น POS/mobile order
 
 ---
 

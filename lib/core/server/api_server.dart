@@ -34,8 +34,14 @@ class ApiServer {
 
   ApiServer(this.db);
 
+  bool get isRunning => _server != null;
+
   /// เริ่ม Server
   Future<void> start({int port = 8080}) async {
+    if (_server != null) {
+      print('ℹ️ API Server already running');
+      return;
+    }
     try {
       final router = Router();
 
@@ -151,6 +157,7 @@ class ApiServer {
   /// หยุด Server
   Future<void> stop() async {
     await _server?.close();
+    _server = null;
     print('⏹️  API Server stopped');
   }
 

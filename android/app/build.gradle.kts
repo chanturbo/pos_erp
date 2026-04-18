@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.dee-pos.poserp"
+    namespace = "com.dee_pos.poserp"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -21,7 +21,8 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.dee-pos.poserp"
+        applicationId = "com.dee_pos.poserp"
+        manifestPlaceholders["appAuthRedirectScheme"] = "com.dee_pos.poserp"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

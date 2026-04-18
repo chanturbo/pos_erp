@@ -1,4 +1,4 @@
-# 🐛 Known Issues & Fixes
+# 🐛 Known Issues & Current Limitations
 
 ## Fixed Issues ✅
 
@@ -22,27 +22,25 @@
 - **Fix**: Added network entitlements, changed to 127.0.0.1
 - **Status**: ✅ Fixed
 
-## Known Limitations ⚠️
+## Current Limitations ⚠️
 
-### 1. Print Functionality
-- **Status**: Not implemented
-- **Workaround**: Export receipt as PDF or use screenshot
-- **Planned**: Day 21+ (Future Enhancement)
+### 1. Receipt Printing
+- **Status**: Implemented via PDF preview + system print dialog
+- **Current Limitation**: ยังไม่มี direct thermal printer integration หรือ preset เครื่องพิมพ์เฉพาะทางในแอป
+- **Workaround**: ใช้ปุ่มพิมพ์จาก PDF preview แล้วเลือก printer ผ่านระบบปฏิบัติการ
 
-### 2. Barcode Scanner
-- **Status**: Not implemented
-- **Workaround**: Manual entry or search
-- **Planned**: Day 21+ (Future Enhancement)
+### 2. Barcode Input
+- **Status**: Implemented
+- **Supported**: USB keyboard-style scanner และ camera scanner ในหน้าที่รองรับ
+- **Current Limitation**: ถ้าอุปกรณ์สแกนไม่ได้ส่งข้อมูลเป็น keyboard input มาตรฐาน อาจต้องกรอกเองหรือใช้ camera scanner แทน
 
 ### 3. Multi-branch Sync
-- **Status**: Master mode only, no sync
-- **Workaround**: Use single instance or manual data transfer
-- **Planned**: Phase 2
+- **Status**: Implemented for Master / Client modes
+- **Current Limitation**: โหมด standalone จะไม่ sync อัตโนมัติ และการใช้งานหลายสาขาต้องตั้งค่า app mode / branch ให้ถูกต้องก่อน
 
-### 4. Mobile Responsive
-- **Status**: Desktop only
-- **Note**: Optimized for macOS/Windows
-- **Planned**: Phase 2 (Mobile App)
+### 4. Mobile / Responsive UI
+- **Status**: Implemented
+- **Current Limitation**: ระบบรองรับ responsive layout และมี mobile flow สำหรับบางหน้าหลัก แต่ประสบการณ์ใช้งานยังดีที่สุดบนหน้าจอ tablet/desktop สำหรับงาน back-office ที่ข้อมูลหนาแน่น
 
 ## Performance Notes 📊
 
@@ -66,4 +64,4 @@
 
 ---
 
-**Last Updated**: Day 20
+**Last Updated**: 2026-04-18

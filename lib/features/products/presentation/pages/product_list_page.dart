@@ -300,9 +300,7 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
             },
             onBarcodeGenerator: () => Navigator.push(
               context,
-              MaterialPageRoute(
-                builder: (_) => const BarcodeGeneratorPage(),
-              ),
+              MaterialPageRoute(builder: (_) => const BarcodeGeneratorPage()),
             ),
             onAdd: () async {
               await Navigator.push(
@@ -697,7 +695,17 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
                   _userResized = true; // ✅ user resize แล้ว หยุด auto-adjust
                 }),
                 onReset: () => setState(() {
-                  _colWidths.setAll(0, [120, 200, 100, 60, 110, 96, 110, 76, 88]);
+                  _colWidths.setAll(0, [
+                    120,
+                    200,
+                    100,
+                    60,
+                    110,
+                    96,
+                    110,
+                    76,
+                    88,
+                  ]);
                   _userResized = false; // ✅ reset → auto-fit ทำงานอีกครั้ง
                 }),
               ),
@@ -1108,7 +1116,7 @@ class _ProductListTopBar extends StatelessWidget {
     required this.onAdd,
   });
 
-  static const _kBreak = 720.0;
+  static const _kBreak = 960.0;
 
   @override
   Widget build(BuildContext context) {
@@ -1145,7 +1153,7 @@ class _ProductListTopBar extends StatelessWidget {
         ),
         const Spacer(),
         ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 280),
+          constraints: const BoxConstraints(maxWidth: 200),
           child: _PSearchField(
             controller: searchController,
             query: searchQuery,
@@ -1158,7 +1166,7 @@ class _ProductListTopBar extends StatelessWidget {
           value: selectedWarehouse,
           onChanged: onWarehouseChanged,
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 6),
         // Toggle active-only
         _PToggleBtn(
           icon: Icons.check_circle_outline,
@@ -1181,9 +1189,9 @@ class _ProductListTopBar extends StatelessWidget {
         const SizedBox(width: 6),
         _PRefreshBtn(onTap: onRefresh),
         const SizedBox(width: 6),
-        _PManageGroupsBtn(onTap: onManageGroups),
+        _PManageGroupsBtn(onTap: onManageGroups, compact: true),
         const SizedBox(width: 6),
-        _PBarcodeBtn(onTap: onBarcodeGenerator),
+        _PBarcodeBtn(onTap: onBarcodeGenerator, compact: true),
         const SizedBox(width: 6),
         _PAddBtn(onTap: onAdd),
         const SizedBox(width: 8),
