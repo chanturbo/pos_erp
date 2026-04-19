@@ -31,6 +31,9 @@ import '../../../settings/presentation/pages/settings_page.dart';
 import '../../../settings/presentation/pages/role_permission_page.dart';
 import '../../../users/presentation/pages/user_list_page.dart';
 import '../../../../shared/permissions/app_permissions.dart';
+import '../../../../shared/widgets/license_notice_banner.dart';
+import '../../../../core/services/license/license_service.dart';
+import '../../../../core/config/app_config.dart';
 
 // ─────────────────────────────────────────────────────────────────
 // Models
@@ -305,6 +308,81 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
   }
 
+  Future<void> _handleAbout(BuildContext context) async {
+    final licenseStatus = ref.read(licenseServiceProvider).asData?.value;
+    final deviceId = licenseStatus?.deviceId ?? '-';
+
+    String firstLaunch = '-';
+    if (licenseStatus != null) {
+      final days = licenseStatus.daysSinceFirstLaunch;
+      final d = DateTime.now().subtract(Duration(days: days));
+      firstLaunch =
+          '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year + 543}';
+    }
+
+    if (!context.mounted) return;
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+        title: Row(
+          children: [
+            Image.asset(
+              'assets/images/logo-deepos.png',
+              width: 36,
+              height: 36,
+              fit: BoxFit.contain,
+              errorBuilder: (_, _, _) =>
+                  const Icon(Icons.point_of_sale, size: 36),
+            ),
+            const SizedBox(width: 12),
+            const Text('เกี่ยวกับโปรแกรม'),
+          ],
+        ),
+        content: SizedBox(
+          width: 340,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _AboutRow('ชื่อโปรแกรม', AppConfig.appName),
+              _AboutRow('เวอร์ชัน', '${AppConfig.appVersion} (build ${AppConfig.buildNumber})'),
+              const Divider(height: 20),
+              _AboutRow('วันเปิดใช้งานครั้งแรก', firstLaunch),
+              _AboutRow(
+                'สถานะ License',
+                licenseStatus == null
+                    ? 'กำลังโหลด...'
+                    : licenseStatus.isLicensed
+                        ? '✅ ลงทะเบียนแล้ว'
+                        : licenseStatus.isTrialActive
+                            ? '⏳ ทดลองใช้ (${licenseStatus.trialPhaseLabel})'
+                            : '❌ ทดลองใช้หมดอายุ',
+              ),
+              _AboutRow('Device ID', deviceId, mono: true),
+              const Divider(height: 20),
+              _AboutRow('เว็บไซต์', 'https://www.dee-pos.com'),
+              const SizedBox(height: 4),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('ปิด'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(dialogCtx);
+              Navigator.of(context).pushNamed('/license');
+            },
+            child: const Text('ลงทะเบียน'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _handleLogout(BuildContext context) async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -382,6 +460,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       onItemSelected: _selectItem,
       onSyncTap: () => _push(context, const SyncStatusPage()),
       onTestTap: () => _push(context, const TestPage()),
+      onAboutTap: () => _handleAbout(context),
       onLogout: () => _handleLogout(context),
       onToggleCollapse: () => setState(() {
         if (context.isLarge) {
@@ -455,7 +534,9 @@ class _HomePageState extends ConsumerState<HomePage> {
                     child: sidebarWidget,
                   ),
                   const VerticalDivider(width: 1, thickness: 1),
-                  Expanded(child: _currentPage),
+                  Expanded(
+                    child: LicenseNoticeBanner(child: _currentPage),
+                  ),
                 ],
               ),
             )
@@ -472,7 +553,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                 backgroundColor: AppTheme.navyColor,
                 child: sidebarWidget,
               ),
-              body: _currentPage,
+              body: LicenseNoticeBanner(child: _currentPage),
             ),
     );
   }
@@ -587,6 +668,7 @@ class _SidebarContent extends StatelessWidget {
   final void Function(int) onItemSelected;
   final VoidCallback onSyncTap;
   final VoidCallback onTestTap;
+  final VoidCallback onAboutTap;
   final VoidCallback onLogout;
   final VoidCallback? onToggleCollapse;
 
@@ -601,6 +683,7 @@ class _SidebarContent extends StatelessWidget {
     required this.onItemSelected,
     required this.onSyncTap,
     required this.onTestTap,
+    required this.onAboutTap,
     required this.onLogout,
     this.isCollapsed = false,
     this.onToggleCollapse,
@@ -638,6 +721,7 @@ class _SidebarContent extends StatelessWidget {
             isCollapsed: isCollapsed,
             onSyncTap: onSyncTap,
             onTestTap: onTestTap,
+            onAboutTap: onAboutTap,
             onLogout: onLogout,
           ),
         ],
@@ -1147,6 +1231,7 @@ class _SidebarBottom extends StatelessWidget {
   final bool isCollapsed;
   final VoidCallback onSyncTap;
   final VoidCallback onTestTap;
+  final VoidCallback onAboutTap;
   final VoidCallback onLogout;
 
   const _SidebarBottom({
@@ -1154,6 +1239,7 @@ class _SidebarBottom extends StatelessWidget {
     required this.connectionAsync,
     required this.onSyncTap,
     required this.onTestTap,
+    required this.onAboutTap,
     required this.onLogout,
     this.isCollapsed = false,
   });
@@ -1231,6 +1317,19 @@ class _SidebarBottom extends StatelessWidget {
               ),
             ),
             _CollapsedSidebarHint(
+              label: 'เกี่ยวกับโปรแกรม',
+              child: IconButton(
+                icon: const Icon(
+                  Icons.info_outline,
+                  size: 18,
+                  color: Color(0xFF8A9BC0),
+                ),
+                onPressed: onAboutTap,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+              ),
+            ),
+            _CollapsedSidebarHint(
               label: 'ออกจากระบบ',
               child: IconButton(
                 icon: const Icon(
@@ -1284,6 +1383,12 @@ class _SidebarBottom extends StatelessWidget {
             onTap: onTestTap,
           ),
           _BottomAction(
+            icon: Icons.info_outline,
+            label: 'เกี่ยวกับโปรแกรม',
+            iconColor: const Color(0xFF8A9BC0),
+            onTap: onAboutTap,
+          ),
+          _BottomAction(
             icon: Icons.logout,
             label: 'ออกจากระบบ',
             iconColor: AppTheme.errorLight,
@@ -1295,6 +1400,46 @@ class _SidebarBottom extends StatelessWidget {
             style: TextStyle(fontSize: 9, color: Color(0xFF4A5A7A)),
           ),
           const SizedBox(height: 2),
+        ],
+      ),
+    );
+  }
+}
+
+class _AboutRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool mono;
+
+  const _AboutRow(this.label, this.value, {this.mono = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 140,
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12,
+                color: Colors.grey,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                fontFamily: mono ? 'monospace' : null,
+              ),
+            ),
+          ),
         ],
       ),
     );

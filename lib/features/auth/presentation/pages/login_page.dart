@@ -391,18 +391,29 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       // Logo
-                      const Icon(
-                        Icons.point_of_sale,
-                        size: 80,
-                        color: Colors.blue,
+                      Image.asset(
+                        'assets/images/logo-deepos.png',
+                        width: 100,
+                        height: 100,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, _, _) => const Icon(
+                          Icons.point_of_sale,
+                          size: 80,
+                          color: Colors.blue,
+                        ),
                       ),
                       const SizedBox(height: 16),
 
                       // Title
                       Text(
-                        'DEE POS [POINT OF SALE SYSTEM]',
+                        'DEE POS',
                         style: Theme.of(context).textTheme.headlineSmall
                             ?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        '[POINT OF SALE SYSTEM]',
+                        style: Theme.of(context).textTheme.bodyMedium
+                            ?.copyWith(letterSpacing: 1.2),
                       ),
                       const SizedBox(height: 8),
                       Text(
