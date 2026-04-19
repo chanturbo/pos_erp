@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class Navbar extends StatelessWidget {
@@ -34,7 +35,7 @@ class Navbar extends StatelessWidget {
                 _NavLink(label: 'คู่มือ'),
                 const SizedBox(width: 32),
                 ElevatedButton(
-                  onPressed: () {},
+                  onPressed: () => context.go('/login'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _primary,
                     foregroundColor: Colors.white,

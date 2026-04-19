@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'pages/home_page.dart';
+import 'router.dart';
 
 void main() {
   runApp(const DeePosApp());
@@ -11,7 +11,7 @@ class DeePosApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return MaterialApp.router(
       title: 'DEE POS — ระบบ POS สำหรับร้านค้าไทย',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
@@ -22,7 +22,7 @@ class DeePosApp extends StatelessWidget {
         textTheme: GoogleFonts.ibmPlexSansThaiTextTheme(),
         useMaterial3: true,
       ),
-      home: const HomePage(),
+      routerConfig: appRouter,
     );
   }
 }
