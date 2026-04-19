@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class PricingSection extends StatelessWidget {
@@ -197,7 +198,7 @@ class _PriceCard extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: () {},
+              onPressed: () => context.go('/login'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: plan.highlight ? Colors.white : plan.color,
                 foregroundColor: plan.highlight ? plan.color : Colors.white,

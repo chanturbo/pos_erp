@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class HeroSection extends StatelessWidget {
@@ -67,7 +68,7 @@ class HeroSection extends StatelessWidget {
             alignment: WrapAlignment.center,
             children: [
               ElevatedButton(
-                onPressed: () {},
+                onPressed: () => context.go('/login'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.white,
                   foregroundColor: const Color(0xFF1E88E5),

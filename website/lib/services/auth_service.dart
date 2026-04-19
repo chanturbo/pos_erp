@@ -4,13 +4,19 @@ class AuthService {
   AuthService._();
   static final instance = AuthService._();
 
-  final _googleSignIn = GoogleSignIn(
-    scopes: ['email', 'profile'],
-  );
+  // สร้าง instance เดียวตลอด lifecycle ของ app ป้องกัน GSI initialize ซ้ำ
+  static final _googleSignIn = GoogleSignIn(scopes: ['email', 'profile']);
 
   GoogleSignInAccount? _user;
   GoogleSignInAccount? get user => _user;
   bool get isLoggedIn => _user != null;
+
+  Future<void> tryRestoreSession() async {
+    try {
+      final account = await _googleSignIn.signInSilently();
+      _user = account;
+    } catch (_) {}
+  }
 
   Future<bool> signInWithGoogle() async {
     try {
