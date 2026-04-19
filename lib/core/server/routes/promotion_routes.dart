@@ -560,10 +560,10 @@ class PromotionRoutes {
         FROM coupons
       ''').getSingle();
       final summary = {
-        'total':   sumRow.read<int>('total'),
-        'valid':   sumRow.read<int>('valid'),
-        'used':    sumRow.read<int>('used'),
-        'expired': sumRow.read<int>('expired'),
+        'total':   sumRow.read<int?>('total') ?? 0,
+        'valid':   sumRow.read<int?>('valid') ?? 0,
+        'used':    sumRow.read<int?>('used') ?? 0,
+        'expired': sumRow.read<int?>('expired') ?? 0,
       };
 
       // Paginated data
