@@ -4,6 +4,7 @@ import '../core/config/app_mode.dart';
 import '../features/auth/presentation/pages/login_page.dart';
 import '../features/auth/presentation/providers/auth_provider.dart'; // ✅ เพิ่ม สำหรับ _RootRedirect
 import '../features/home/presentation/pages/home_page.dart';
+import '../features/license/presentation/pages/license_page.dart';
 import '../features/sales/presentation/pages/mobile_order_page.dart';
 import '../features/sales/presentation/pages/pos_page.dart';
 import '../shared/utils/app_transitions.dart'; // ✅ Phase 4
@@ -23,6 +24,7 @@ class AppRouter {
   static const String home = '/home';
   static const String pos = '/pos';
   static const String mobileOrder = '/mobile-order';
+  static const String license = '/license';
 
   /// Cashier role IDs — ตรงกับ roleId ใน database
   static const _cashierRoles = {'CASHIER', 'SALE', 'POS'};
@@ -76,6 +78,13 @@ class AppRouter {
         return SlideRightRoute(
           settings: settings,
           page: const MobileOrderPage(),
+        );
+
+      // ── License ───────────────────────────────────────────
+      case license:
+        return FadeSlideRoute(
+          settings: settings,
+          page: const LicenseRegistrationPage(),
         );
 
       // ── Default ───────────────────────────────────────────

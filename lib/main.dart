@@ -23,6 +23,7 @@ import 'core/services/master_discovery_service.dart';
 import 'core/services/backup/backup_service.dart';
 import 'core/utils/crypto_utils.dart';
 import 'core/database/seed_data.dart';
+import 'core/services/license/time_guard_service.dart';
 
 // ─── Global handles ────────────────────────────────────────────────────────
 ApiServer? _serverInstance;
@@ -154,6 +155,8 @@ void main() async {
   await _startServerInBackground(skipSeed: didRestore || skipSeedPref);
   await MasterDiscoveryService.instance.start();
   await _syncPlatformMasterRuntime();
+  // Sync NTP time in background (ป้องกันย้อนนาฬิกา)
+  unawaited(TimeGuardService.syncNtpTime());
 
   runApp(const _AppHost());
 }
