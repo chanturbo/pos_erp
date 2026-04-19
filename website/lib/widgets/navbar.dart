@@ -4,15 +4,14 @@ import 'package:google_fonts/google_fonts.dart';
 class Navbar extends StatelessWidget {
   const Navbar({super.key});
 
-  static const _primary = Color(0xFFE57200);
-  static const _navy = Color(0xFF16213E);
+  static const _primary = Color(0xFF1E88E5);
 
   @override
   Widget build(BuildContext context) {
     final isMobile = MediaQuery.of(context).size.width < 768;
 
     return Container(
-      color: _navy,
+      color: Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -59,7 +58,7 @@ class Navbar extends StatelessWidget {
             ),
           if (isMobile)
             IconButton(
-              icon: const Icon(Icons.menu, color: Colors.white),
+              icon: const Icon(Icons.menu),
               onPressed: () {},
             ),
         ],
@@ -79,7 +78,7 @@ class _NavLink extends StatelessWidget {
       child: Text(
         label,
         style: GoogleFonts.ibmPlexSansThai(
-          color: Colors.white.withValues(alpha: 0.85),
+          color: const Color(0xFF374151),
           fontWeight: FontWeight.w500,
           fontSize: 15,
         ),
