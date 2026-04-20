@@ -20,6 +20,14 @@ import 'customer_dividend_summary_page.dart';
 import 'customer_dividend_run_list_page.dart';
 import '../../../../core/utils/csv_export.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../../core/services/license/license_models.dart';
+import '../../../../core/services/license/license_service.dart';
+import '../../../branches/presentation/providers/branch_provider.dart';
+import '../../../purchases/presentation/pages/purchase_order_list_page.dart';
+import '../../../purchases/presentation/pages/goods_receipt_list_page.dart';
+import '../../../inventory/presentation/pages/stock_balance_page.dart';
+import '../../../inventory/presentation/pages/stock_movement_history_page.dart';
+import '../../../products/presentation/pages/product_list_page.dart';
 
 // ── Providers ─────────────────────────────────────────────────────────────────
 
@@ -78,11 +86,33 @@ final topSuppliersProvider = FutureProvider<List<Map<String, dynamic>>>((
   return [];
 });
 
+final purchaseCategoryProvider = FutureProvider<List<Map<String, dynamic>>>((
+  ref,
+) async {
+  final api = ref.read(apiClientProvider);
+  final res = await api.get('/api/reports/purchase-by-category');
+  if (res.statusCode == 200) {
+    return (res.data['data'] as List).cast<Map<String, dynamic>>();
+  }
+  return [];
+});
+
 final lowStockProvider = FutureProvider<List<Map<String, dynamic>>>((
   ref,
 ) async {
   final api = ref.read(apiClientProvider);
   final res = await api.get('/api/reports/low-stock?threshold=10');
+  if (res.statusCode == 200) {
+    return (res.data['data'] as List).cast<Map<String, dynamic>>();
+  }
+  return [];
+});
+
+final stockMovementProvider = FutureProvider<List<Map<String, dynamic>>>((
+  ref,
+) async {
+  final api = ref.read(apiClientProvider);
+  final res = await api.get('/api/reports/stock-movement?days=30');
   if (res.statusCode == 200) {
     return (res.data['data'] as List).cast<Map<String, dynamic>>();
   }
@@ -98,6 +128,18 @@ final stockAgingProvider = FutureProvider<List<Map<String, dynamic>>>((
     return (res.data['data'] as List).cast<Map<String, dynamic>>();
   }
   return [];
+});
+
+final restaurantReportProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+  final api = ref.read(apiClientProvider);
+  final branchId = ref.watch(selectedBranchProvider)?.branchId;
+  final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+  final query = branchId != null && branchId.isNotEmpty
+      ? '/api/kitchen/analytics?date=$today&branch_id=$branchId'
+      : '/api/kitchen/analytics?date=$today';
+  final res = await api.get(query);
+  if (res.statusCode == 200) return res.data['data'] as Map<String, dynamic>;
+  return {};
 });
 
 class FinancialDateFilter {
@@ -215,7 +257,7 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging &&
           _currentTab != _tabController.index) {
@@ -236,7 +278,9 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
     ref.invalidate(topCustomersProvider);
     ref.invalidate(purchaseSummaryProvider);
     ref.invalidate(topSuppliersProvider);
+    ref.invalidate(purchaseCategoryProvider);
     ref.invalidate(lowStockProvider);
+    ref.invalidate(stockMovementProvider);
     ref.invalidate(stockAgingProvider);
     ref.invalidate(profitLossProvider(_financialFilter));
     ref.invalidate(arAgingProvider(_financialFilter));
@@ -508,6 +552,7 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
                   Tab(icon: Icon(Icons.shopping_bag), text: 'การซื้อ'),
                   Tab(icon: Icon(Icons.warehouse), text: 'สต๊อก'),
                   Tab(icon: Icon(Icons.account_balance), text: 'การเงิน'),
+                  Tab(icon: Icon(Icons.restaurant), text: 'ร้านอาหาร'),
                 ],
               ),
             ),
@@ -520,6 +565,7 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
                   _tabShell(context, _buildPurchaseTab()),
                   _tabShell(context, _buildInventoryTab()),
                   _tabShell(context, _buildFinancialTab()),
+                  _tabShell(context, _buildRestaurantTab()),
                 ],
               ),
             ),
@@ -650,15 +696,21 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
       case 1:
         final summary = await ref.read(purchaseSummaryProvider.future);
         final topSuppliers = await ref.read(topSuppliersProvider.future);
+        final purchaseCategories = await ref.read(
+          purchaseCategoryProvider.future,
+        );
         return ReportsPdfBuilder.buildPurchase(
           summary: summary,
           topSuppliers: topSuppliers,
+          purchaseCategories: purchaseCategories,
         );
       case 2:
         final lowStock = await ref.read(lowStockProvider.future);
+        final stockMovement = await ref.read(stockMovementProvider.future);
         final stockAging = await ref.read(stockAgingProvider.future);
         return ReportsPdfBuilder.buildInventory(
           lowStock: lowStock,
+          stockMovement: stockMovement,
           stockAging: stockAging,
         );
       case 3:
@@ -684,6 +736,179 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
           topProducts: topProducts,
           topCustomers: topCustomers,
         );
+    }
+  }
+
+  // ── Tab 5: Restaurant ─────────────────────────────────────────────────────
+  Widget _buildRestaurantTab() {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _sectionTitle('สรุปห้องครัววันนี้', Icons.restaurant, Colors.orange),
+          ref.watch(restaurantReportProvider).when(
+                data: _buildRestaurantSummaryCards,
+                loading: _loadingWidget,
+                error: (e, _) => _errorWidget('$e'),
+              ),
+          const SizedBox(height: 24),
+          _sectionTitle('เวลาเตรียมอาหารต่อ Station', Icons.timer, Colors.teal),
+          ref.watch(restaurantReportProvider).when(
+                data: _buildStationPrepTime,
+                loading: _loadingWidget,
+                error: (e, _) => _errorWidget('$e'),
+              ),
+          const SizedBox(height: 24),
+          _sectionTitle('เมนูยอดนิยมวันนี้ Top 10', Icons.star, Colors.amber),
+          ref.watch(restaurantReportProvider).when(
+                data: _buildTopMenuItems,
+                loading: _loadingWidget,
+                error: (e, _) => _errorWidget('$e'),
+              ),
+          const SizedBox(height: 12),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRestaurantSummaryCards(Map<String, dynamic> data) {
+    if (data.isEmpty) return _emptyWidget('ยังไม่มีข้อมูลวันนี้');
+    final totalOrders = data['total_orders'] as int? ?? 0;
+    final totalItems = data['total_items'] as int? ?? 0;
+    final avgPrepMins = (data['avg_prep_time_minutes'] as num?)?.toDouble() ?? 0;
+    final avgOrderMins = (data['avg_order_time_minutes'] as num?)?.toDouble() ?? 0;
+
+    return GridView.count(
+      crossAxisCount: context.isMobile ? 2 : 4,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisSpacing: 8,
+      mainAxisSpacing: 8,
+      childAspectRatio: context.isMobile ? 1.8 : 2.2,
+      children: [
+        _summaryCard('ออเดอร์วันนี้', '$totalOrders', Icons.receipt_long, Colors.blue),
+        _summaryCard('รายการอาหาร', '$totalItems', Icons.fastfood, Colors.orange),
+        _summaryCard(
+          'เตรียมเฉลี่ย',
+          avgPrepMins > 0 ? '${avgPrepMins.toStringAsFixed(1)} นาที' : '-',
+          Icons.timer,
+          Colors.teal,
+        ),
+        _summaryCard(
+          'เสร็จเฉลี่ย/ออเดอร์',
+          avgOrderMins > 0 ? '${avgOrderMins.toStringAsFixed(1)} นาที' : '-',
+          Icons.hourglass_bottom,
+          Colors.purple,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStationPrepTime(Map<String, dynamic> data) {
+    if (data.isEmpty) return _emptyWidget('ยังไม่มีข้อมูล');
+    final byStation = (data['avg_prep_by_station'] as Map<String, dynamic>?) ?? {};
+    final itemsByStation = (data['items_by_station'] as Map<String, dynamic>?) ?? {};
+    if (byStation.isEmpty) return _emptyWidget('ยังไม่มีข้อมูลเวลาต่อ station');
+
+    final maxMins = byStation.values
+        .map((v) => (v as num).toDouble())
+        .fold(0.0, (a, b) => a > b ? a : b);
+
+    return _panelCard(
+      child: Padding(
+        padding: context.cardPadding,
+        child: Column(
+          children: byStation.entries.map((e) {
+            final station = e.key;
+            final mins = (e.value as num).toDouble();
+            final count = (itemsByStation[station] as int?) ?? 0;
+            final fraction = maxMins > 0 ? mins / maxMins : 0.0;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _stationLabel(station),
+                          style: _cardTitleStyle(fontSize: 12),
+                        ),
+                      ),
+                      Text(
+                        '${mins.toStringAsFixed(1)} นาที  ($count รายการ)',
+                        style: _cardSubtitleStyle(),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 5),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: fraction,
+                      minHeight: 8,
+                      backgroundColor: Colors.grey.shade200,
+                      color: _stationColor(station),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTopMenuItems(Map<String, dynamic> data) {
+    if (data.isEmpty) return _emptyWidget('ยังไม่มีข้อมูล');
+    final topItems = (data['top_items'] as List<dynamic>?) ?? [];
+    if (topItems.isEmpty) return _emptyWidget('ยังไม่มีข้อมูลเมนู');
+
+    return Column(
+      children: topItems.asMap().entries.map((entry) {
+        final rank = entry.key + 1;
+        final item = entry.value as Map<String, dynamic>;
+        return _rankCard(
+          rank: rank,
+          title: item['product_name'] as String? ?? '',
+          subtitle: 'อันดับ $rank',
+          trailing: '${item['count']} รายการ',
+          trailingColor: rank <= 3 ? Colors.orange : AppTheme.primaryColor,
+        );
+      }).toList(),
+    );
+  }
+
+  String _stationLabel(String station) {
+    switch (station.toLowerCase()) {
+      case 'kitchen':
+        return 'ครัวหลัก';
+      case 'bar':
+        return 'บาร์/เครื่องดื่ม';
+      case 'dessert':
+        return 'ของหวาน';
+      case 'cashier':
+        return 'แคชเชียร์';
+      default:
+        return station;
+    }
+  }
+
+  Color _stationColor(String station) {
+    switch (station.toLowerCase()) {
+      case 'kitchen':
+        return Colors.orange;
+      case 'bar':
+        return Colors.blue;
+      case 'dessert':
+        return Colors.pink;
+      case 'cashier':
+        return Colors.green;
+      default:
+        return Colors.grey;
     }
   }
 
@@ -877,6 +1102,46 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
                 loading: _loadingWidget,
                 error: (e, _) => _errorWidget('$e'),
               ),
+          const SizedBox(height: 24),
+          _sectionTitle(
+            'หมวดหมู่สินค้าที่จัดซื้อมากสุด',
+            Icons.category_outlined,
+            Colors.deepPurple,
+          ),
+          ref
+              .watch(purchaseCategoryProvider)
+              .when(
+                data: _buildPurchaseCategories,
+                loading: _loadingWidget,
+                error: (e, _) => _errorWidget('$e'),
+              ),
+          const SizedBox(height: 12),
+          _buildActionGrid(
+            actions: [
+              _ReportAction(
+                label: 'เปิดใบสั่งซื้อ',
+                icon: Icons.receipt_long_outlined,
+                color: Colors.red,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const PurchaseOrderListPage(),
+                  ),
+                ),
+              ),
+              _ReportAction(
+                label: 'เปิดรับสินค้า',
+                icon: Icons.inventory_2_outlined,
+                color: Colors.blue,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const GoodsReceiptListPage(),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -922,6 +1187,40 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
     );
   }
 
+  Widget _buildPurchaseCategories(List<Map<String, dynamic>> list) {
+    if (list.isEmpty) return _emptyWidget('ยังไม่มีข้อมูลหมวดหมู่สินค้า');
+    return Column(
+      children: list.take(5).map((item) {
+        final amount = (item['total_amount'] as num?) ?? 0;
+        final qty = (item['total_qty'] as num?) ?? 0;
+        return _dataCard(
+          child: ListTile(
+            dense: context.isMobile,
+            leading: _metricBadge(
+              label: _formatQty(qty),
+              color: Colors.deepPurple,
+            ),
+            title: Text(
+              item['category'] as String? ?? 'ไม่มีหมวดหมู่',
+              style: _cardTitleStyle(),
+            ),
+            subtitle: Text(
+              'ปริมาณรวม ${_formatQty(qty)} หน่วย',
+              style: _cardSubtitleStyle(),
+            ),
+            trailing: Text(
+              '฿${_fmt.format(amount)}',
+              style: const TextStyle(
+                color: Colors.deepPurple,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
   // ── Tab 3: Inventory ───────────────────────────────────────────────────────
   Widget _buildInventoryTab() {
     return SingleChildScrollView(
@@ -943,6 +1242,19 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
               ),
           const SizedBox(height: 24),
           _sectionTitle(
+            'ความเคลื่อนไหวสต๊อกล่าสุด',
+            Icons.swap_vert_circle_outlined,
+            Colors.indigo,
+          ),
+          ref
+              .watch(stockMovementProvider)
+              .when(
+                data: _buildStockMovements,
+                loading: _loadingWidget,
+                error: (e, _) => _errorWidget('$e'),
+              ),
+          const SizedBox(height: 24),
+          _sectionTitle(
             'สินค้าค้างสต๊อก (≥90 วัน)',
             Icons.hourglass_empty,
             Colors.brown,
@@ -954,6 +1266,40 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
                 loading: _loadingWidget,
                 error: (e, _) => _errorWidget('$e'),
               ),
+          const SizedBox(height: 12),
+          _buildActionGrid(
+            actions: [
+              _ReportAction(
+                label: 'เปิดหน้าสต๊อก',
+                icon: Icons.warehouse_outlined,
+                color: Colors.orange,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const StockBalancePage()),
+                ),
+              ),
+              _ReportAction(
+                label: 'ดู movement',
+                icon: Icons.timeline_outlined,
+                color: Colors.indigo,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const StockMovementHistoryPage(),
+                  ),
+                ),
+              ),
+              _ReportAction(
+                label: 'จัดการสินค้า',
+                icon: Icons.inventory_2_outlined,
+                color: Colors.green,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ProductListPage()),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -1027,6 +1373,41 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
                     style: _metaTextStyle(),
                   )
                 : Text('ไม่มีข้อมูล', style: _metaTextStyle()),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildStockMovements(List<Map<String, dynamic>> list) {
+    if (list.isEmpty) return _emptyWidget('ยังไม่มีความเคลื่อนไหวสต๊อกล่าสุด');
+    return Column(
+      children: list.take(6).map((item) {
+        final movementType = item['movement_type'] as String? ?? '-';
+        final quantity = (item['quantity'] as num?) ?? 0;
+        final balanceAfter = (item['balance_after'] as num?) ?? 0;
+        final createdAt = item['created_at'] as String?;
+        return _dataCard(
+          child: ListTile(
+            dense: context.isMobile,
+            leading: _metricBadge(
+              label: movementType,
+              color: _movementTypeColor(movementType),
+            ),
+            title: Text(
+              item['product_name'] as String? ?? '',
+              style: _cardTitleStyle(),
+            ),
+            subtitle: Text(
+              'จำนวน ${_formatQty(quantity)} | คงเหลือ ${_formatQty(balanceAfter)}',
+              style: _cardSubtitleStyle(),
+            ),
+            trailing: createdAt == null
+                ? null
+                : Text(
+                    DateFormat('dd/MM HH:mm').format(DateTime.parse(createdAt)),
+                    style: _metaTextStyle(),
+                  ),
           ),
         );
       }).toList(),
@@ -2029,6 +2410,84 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
     );
   }
 
+  Widget _buildActionGrid({required List<_ReportAction> actions}) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final columns = width >= 900
+            ? 3
+            : width >= 560
+            ? 2
+            : 1;
+        const spacing = 8.0;
+        final itemWidth = (width - spacing * (columns - 1)) / columns;
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: actions
+              .map((action) => SizedBox(
+                    width: itemWidth,
+                    child: _reportActionCard(action),
+                  ))
+              .toList(),
+        );
+      },
+    );
+  }
+
+  Widget _reportActionCard(_ReportAction action) {
+    return InkWell(
+      onTap: action.onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: _panelCard(
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: action.color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(action.icon, color: action.color, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  action.label,
+                  style: _cardTitleStyle(fontSize: 12.5),
+                ),
+              ),
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 14,
+                color: AppTheme.subtextColorOf(context),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Color _movementTypeColor(String type) {
+    switch (type) {
+      case 'IN':
+      case 'TRANSFER_IN':
+        return Colors.green;
+      case 'OUT':
+      case 'TRANSFER_OUT':
+      case 'SALE':
+        return Colors.red;
+      case 'ADJUST':
+        return Colors.blue;
+      default:
+        return Colors.indigo;
+    }
+  }
+
   Widget _metricBadge({required String label, required Color color}) {
     return Container(
       constraints: const BoxConstraints(minWidth: 38),
@@ -2147,45 +2606,219 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
 
   // ── Export ─────────────────────────────────────────────────────────────────
   Future<void> _exportReport(BuildContext context) async {
-    final summaryAsync = ref.read(salesSummaryProvider);
-    final topAsync = ref.read(topProductsProvider);
-
-    summaryAsync.whenData((s) async {
-      topAsync.whenData((products) async {
-        final headers = ['รายการ', 'ค่า'];
-        final rows = [
-          ['ยอดขายรวม', '฿${_fmt.format(s.totalSales)}'],
-          ['จำนวนออเดอร์', '${s.totalOrders}'],
-          ['ยอดเฉลี่ย/ออเดอร์', '฿${_fmt.format(s.avgOrderValue)}'],
-          ['ส่วนลดรวม', '฿${_fmt.format(s.totalDiscount)}'],
-          [''],
-          ['สินค้าขายดี Top 5', ''],
-          ...products.map(
-            (p) => [
-              p.productName,
-              '฿${_fmt.format(p.totalSales)} (${_fmtInt.format(p.totalQuantity)} ชิ้น)',
-            ],
+    final licenseStatus = ref.read(licenseServiceProvider).asData?.value;
+    if (licenseStatus != null &&
+        !licenseStatus.canUseFeature(LicenseFeature.exportReport)) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('หมดช่วงทดลองแล้ว ต้องมี License ก่อนส่งออกรายงาน'),
+            backgroundColor: Colors.red,
           ),
-        ];
-
-        final path = await CsvExport.exportToCsv(
-          filename: 'sales_report',
-          headers: headers,
-          rows: rows,
-          chooseLocation: true,
         );
+        Navigator.of(context).pushNamed('/license');
+      }
+      return;
+    }
 
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                path != null ? 'Export สำเร็จ: $path' : 'Export ไม่สำเร็จ',
-              ),
-              backgroundColor: path != null ? null : Colors.red,
-            ),
-          );
-        }
-      });
-    });
+    final export = await _buildCurrentTabCsv();
+    final path = await CsvExport.exportToCsv(
+      filename: export.$1,
+      headers: export.$2,
+      rows: export.$3,
+      chooseLocation: true,
+    );
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(path != null ? 'Export สำเร็จ: $path' : 'Export ไม่สำเร็จ'),
+          backgroundColor: path != null ? null : Colors.red,
+        ),
+      );
+    }
   }
+
+  Future<(String, List<String>, List<List<String>>)> _buildCurrentTabCsv() async {
+    switch (_currentTab) {
+      case 1:
+        final summary = await ref.read(purchaseSummaryProvider.future);
+        final topSuppliers = await ref.read(topSuppliersProvider.future);
+        final purchaseCategories = await ref.read(
+          purchaseCategoryProvider.future,
+        );
+        return (
+          'purchase_report',
+          ['หมวด', 'รายการ', 'ค่า1', 'ค่า2'],
+          [
+            ['สรุปการจัดซื้อ', 'ใบสั่งซื้อทั้งหมด', '${summary['total_po'] ?? 0}', ''],
+            [
+              'สรุปการจัดซื้อ',
+              'มูลค่าสั่งซื้อรวม',
+              '฿${_fmt.format((summary['total_po_amount'] ?? 0) as num)}',
+              '',
+            ],
+            [
+              'สรุปการจัดซื้อ',
+              'ชำระแล้ว',
+              '฿${_fmt.format((summary['total_paid'] ?? 0) as num)}',
+              '',
+            ],
+            [
+              'สรุปการจัดซื้อ',
+              'คงค้าง',
+              '฿${_fmt.format((summary['total_outstanding'] ?? 0) as num)}',
+              '',
+            ],
+            ['สรุปการจัดซื้อ', 'ใบรับสินค้า', '${summary['total_gr'] ?? 0}', ''],
+            ...topSuppliers.asMap().entries.map(
+              (entry) => [
+                'ซัพพลายเออร์สูงสุด',
+                '${entry.key + 1}. ${entry.value['supplier_name'] ?? '-'}',
+                '${entry.value['po_count'] ?? 0} PO',
+                '฿${_fmt.format((entry.value['total_amount'] ?? 0) as num)}',
+              ],
+            ),
+            ...purchaseCategories.asMap().entries.map(
+              (entry) => [
+                'หมวดหมู่จัดซื้อ',
+                '${entry.key + 1}. ${entry.value['category'] ?? '-'}',
+                _formatQty((entry.value['total_qty'] ?? 0) as num),
+                '฿${_fmt.format((entry.value['total_amount'] ?? 0) as num)}',
+              ],
+            ),
+          ],
+        );
+      case 2:
+        final lowStock = await ref.read(lowStockProvider.future);
+        final stockMovement = await ref.read(stockMovementProvider.future);
+        final stockAging = await ref.read(stockAgingProvider.future);
+        return (
+          'inventory_report',
+          ['หมวด', 'รายการ', 'ค่า1', 'ค่า2'],
+          [
+            ...lowStock.map(
+              (item) => [
+                'สินค้าใกล้หมด',
+                '${item['product_name'] ?? '-'}',
+                _formatQty((item['current_stock'] ?? 0) as num),
+                '${item['base_unit'] ?? '-'}',
+              ],
+            ),
+            ...stockMovement.map(
+              (item) => [
+                'ความเคลื่อนไหวสต๊อก',
+                '${item['product_name'] ?? '-'}',
+                '${item['movement_type'] ?? '-'} ${_formatQty((item['quantity'] ?? 0) as num)}',
+                'คงเหลือ ${_formatQty((item['balance_after'] ?? 0) as num)}',
+              ],
+            ),
+            ...stockAging.map(
+              (item) => [
+                'สินค้าค้างสต๊อก',
+                '${item['product_name'] ?? '-'}',
+                '${item['days_no_movement'] ?? 0} วัน',
+                'คงเหลือ ${_formatQty((item['quantity'] ?? 0) as num)} ${item['base_unit'] ?? ''}',
+              ],
+            ),
+          ],
+        );
+      case 3:
+        final filter = _financialFilter;
+        final profitLoss = await ref.read(profitLossProvider(filter).future);
+        final cashFlow = await ref.read(cashFlowProvider(filter).future);
+        final arAging = await ref.read(arAgingProvider(filter).future);
+        final apAging = await ref.read(apAgingProvider(filter).future);
+        return (
+          'financial_report',
+          ['หมวด', 'รายการ', 'ค่า1', 'ค่า2'],
+          [
+            [
+              'กำไรขาดทุน',
+              'รายได้สุทธิ',
+              '฿${_fmt.format((profitLoss['net_revenue'] ?? 0) as num)}',
+              '',
+            ],
+            [
+              'กำไรขาดทุน',
+              'กำไรสุทธิ',
+              '฿${_fmt.format((profitLoss['net_profit'] ?? 0) as num)}',
+              '',
+            ],
+            [
+              'กระแสเงินสด',
+              'กระแสเงินสดสุทธิ',
+              '฿${_fmt.format((cashFlow['net_cash_flow'] ?? 0) as num)}',
+              '',
+            ],
+            ...arAging.take(30).map(
+              (item) => [
+                'ลูกหนี้คงค้าง',
+                '${item['invoice_no'] ?? '-'} / ${item['customer_name'] ?? '-'}',
+                '฿${_fmt.format((item['outstanding'] ?? 0) as num)}',
+                '${item['aging_bucket'] ?? '-'}',
+              ],
+            ),
+            ...apAging.take(30).map(
+              (item) => [
+                'เจ้าหนี้คงค้าง',
+                '${item['invoice_no'] ?? '-'} / ${item['supplier_name'] ?? '-'}',
+                '฿${_fmt.format((item['outstanding'] ?? 0) as num)}',
+                '${item['aging_bucket'] ?? '-'}',
+              ],
+            ),
+          ],
+        );
+      case 0:
+      default:
+        final summary = await ref.read(salesSummaryProvider.future);
+        final topProducts = await ref.read(topProductsProvider.future);
+        final topCustomers = await ref.read(topCustomersProvider.future);
+        return (
+          'sales_report',
+          ['หมวด', 'รายการ', 'ค่า1', 'ค่า2'],
+          [
+            ['สรุปยอดขาย', 'ยอดขายรวม', '฿${_fmt.format(summary.totalSales)}', ''],
+            ['สรุปยอดขาย', 'จำนวนออเดอร์', '${summary.totalOrders}', ''],
+            [
+              'สรุปยอดขาย',
+              'ยอดเฉลี่ย/ออเดอร์',
+              '฿${_fmt.format(summary.avgOrderValue)}',
+              '',
+            ],
+            ['สรุปยอดขาย', 'ส่วนลดรวม', '฿${_fmt.format(summary.totalDiscount)}', ''],
+            ...topProducts.map(
+              (p) => [
+                'สินค้าขายดี',
+                p.productName,
+                _formatQty(p.totalQuantity),
+                '฿${_fmt.format(p.totalSales)}',
+              ],
+            ),
+            ...topCustomers.map(
+              (c) => [
+                'ลูกค้าซื้อบ่อย',
+                c.customerName,
+                '${c.orderCount} ออเดอร์',
+                '฿${_fmt.format(c.totalSales)}',
+              ],
+            ),
+          ],
+        );
+    }
+  }
+}
+
+class _ReportAction {
+  final String label;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _ReportAction({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
 }

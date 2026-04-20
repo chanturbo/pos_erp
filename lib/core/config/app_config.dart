@@ -19,7 +19,7 @@ class AppConfig {
   static const String appName = 'DEE POS';
   static const String appVersion = '1.0.0';
   static const int buildNumber = 1;
-  static const String companyName = 'Your Company';
+  static const String companyName = '';
 
   // ========================================
   // ENVIRONMENT
@@ -150,7 +150,8 @@ class AppConfig {
   static bool get enableBarcodeScanner => true;
   static bool get enableOfflineSync => true;
   static bool get enableMultiBranch => true;
-  static bool get enableRestaurantMode => true;
+  static bool get enableRestaurantMode => false;
+  static bool get showTestingTools => isDevelopment;
   static bool get enableDarkMode => true;
 
   // ========================================

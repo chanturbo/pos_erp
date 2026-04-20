@@ -13,6 +13,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import '../../database/app_database.dart';
+import '../license/license_local_service.dart';
 import 'models/backup_manifest.dart';
 import 'models/backup_result.dart';
 
@@ -133,6 +134,9 @@ class BackupService {
         fileCount: fileEntries.length + 1,
         totalBytes: totalBytes,
         files: fileEntries,
+        appMeta: BackupAppMeta.fromJson(
+          (await LicenseLocalService.buildBackupMetadata()).toJson(),
+        ),
       );
 
       final manifestFile = File(p.join(stagingDir.path, manifestFileName));
@@ -358,6 +362,18 @@ class BackupService {
     if (currentImages.existsSync()) await currentImages.delete(recursive: true);
     if (restoredImages.existsSync()) {
       await _copyDirectory(restoredImages, currentImages);
+    }
+
+    if (manifest.appMeta?.hasLicenseMetadata == true) {
+      await LicenseLocalService.restoreBackupMetadata(
+        LicenseBackupMetadata(
+          firstLaunchDate: manifest.appMeta!.firstLaunchDate!,
+          deviceId: manifest.appMeta!.deviceId!,
+          checksum: manifest.appMeta!.checksum!,
+          licensedEmail: manifest.appMeta!.licensedEmail,
+        ),
+      );
+      print('✅ [Restore] restored license metadata from backup manifest');
     }
 
     await pendingRoot.delete(recursive: true);

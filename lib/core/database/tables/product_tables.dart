@@ -68,9 +68,19 @@ class Products extends Table {
   TextColumn get imagePath => text().nullable()(); // ✅ path รูปหลักในเครื่อง
   
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+
+  // Restaurant context
+  // retail | restaurant | both
+  TextColumn get serviceMode => text().withDefault(const Constant('RETAIL'))();
+  // kitchen | bar | dessert | cashier (nullable = ไม่ระบุ station)
+  TextColumn get prepStation => text().nullable()();
+  BoolColumn get requiresPreparation => boolean().withDefault(const Constant(false))();
+  BoolColumn get dineInAvailable => boolean().withDefault(const Constant(false))();
+  BoolColumn get takeawayAvailable => boolean().withDefault(const Constant(false))();
+
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
-  
+
   @override
   Set<Column> get primaryKey => {productId};
   

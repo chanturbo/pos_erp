@@ -1,11 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+import 'package:dio/dio.dart';
 import '../providers/cart_provider.dart';
 import '../pages/payment_page.dart';
 import '../widgets/discount_dialog.dart';
 import '../../../products/presentation/providers/product_provider.dart'; // ✅ scan เพิ่มสินค้า
+import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../branches/presentation/providers/branch_provider.dart';
+import '../../../restaurant/presentation/providers/table_provider.dart';
+import '../../../../core/client/api_client.dart';
 import '../../../../shared/services/mobile_scanner_service.dart'; // ✅ MobileScannerService
+import '../../../../shared/services/thermal_print_service.dart';
+import '../../../settings/presentation/pages/settings_page.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/responsive_utils.dart';
 import '../../../../shared/widgets/cart_toast.dart';
@@ -46,6 +54,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
   final _scrollController = ScrollController();
   int _prevItemCount = 0;
   int _scanRowSession = 0;
+  bool _isSendingRestaurantOrder = false;
 
   @override
   void dispose() {
@@ -65,6 +74,189 @@ class _CartPanelState extends ConsumerState<CartPanel> {
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeOut,
     );
+  }
+
+  Future<void> _sendRestaurantOrder() async {
+    if (_isSendingRestaurantOrder) return;
+
+    final restaurantContext = ref.read(restaurantOrderContextProvider);
+    final cartState = ref.read(cartProvider);
+    final authState = ref.read(authProvider);
+    final selectedBranch = ref.read(selectedBranchProvider);
+    final selectedWarehouse = ref.read(selectedWarehouseProvider);
+    final apiClient = ref.read(apiClientProvider);
+
+    if (restaurantContext == null) return;
+    if (restaurantContext.currentOrderId != null &&
+        restaurantContext.currentOrderId!.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('โต๊ะนี้ส่งออเดอร์เข้าครัวแล้ว'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+    if (cartState.items.isEmpty) return;
+    if (selectedBranch == null || selectedWarehouse == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('กรุณาเลือกสาขาและคลังของเครื่องนี้ก่อนส่งออเดอร์'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isSendingRestaurantOrder = true);
+
+    final orderData = {
+      'status': 'OPEN',
+      'customer_id': cartState.customerId,
+      'customer_name': cartState.customerName,
+      'user_id': authState.user?.userId ?? 'USR001',
+      'branch_id': selectedBranch.branchId,
+      'warehouse_id': selectedWarehouse.warehouseId,
+      'table_id': restaurantContext.tableId,
+      'session_id': restaurantContext.sessionId,
+      'service_type': restaurantContext.serviceType,
+      'party_size': restaurantContext.guestCount,
+      'subtotal': cartState.subtotal,
+      'discount_amount':
+          cartState.totalDiscount + cartState.totalCouponDiscount,
+      'coupon_discount': cartState.totalCouponDiscount,
+      'points_used': 0,
+      'amount_before_vat': cartState.total,
+      'vat_amount': 0.0,
+      'total_amount': cartState.total,
+      'payment_type': 'PENDING',
+      'paid_amount': 0.0,
+      'change_amount': 0.0,
+      if (cartState.appliedCoupons.isNotEmpty)
+        'coupon_codes': cartState.appliedCoupons.map((c) => c.code).toList(),
+      'items': cartState.items
+          .map(
+            (item) => {
+              'product_id': item.productId,
+              'product_code': item.productCode,
+              'product_name': item.productName,
+              'unit': item.unit,
+              'quantity': item.quantity,
+              'unit_price': item.unitPrice,
+              'discount_percent': 0.0,
+              'discount_amount': 0.0,
+              'amount': item.amount,
+            },
+          )
+          .toList(),
+      if (cartState.freeItems.isNotEmpty) ...{
+        'free_items': cartState.freeItems
+            .map(
+              (item) => {
+                'product_id': item.productId,
+                'product_code': item.productCode,
+                'product_name': item.productName,
+                'unit': item.unit,
+                'quantity': item.quantity,
+                'promotion_id': item.promotionId,
+              },
+            )
+            .toList(),
+        'promotion_ids': cartState.freeItems
+            .map((i) => i.promotionId)
+            .whereType<String>()
+            .toSet()
+            .toList(),
+      },
+    };
+
+    try {
+      final response = await apiClient.post('/api/sales', data: orderData);
+      if (response.statusCode != 200) {
+        throw Exception('ไม่สามารถส่งออเดอร์เข้าครัวได้');
+      }
+
+      final responseData = response.data is Map ? response.data as Map : {};
+      final dataMap =
+          responseData['data'] is Map ? responseData['data'] as Map : {};
+      final orderId = dataMap['order_id'] as String? ?? '';
+      final orderNo = dataMap['order_no'] as String?;
+
+      if (orderId.isEmpty) {
+        throw Exception('สร้างออเดอร์ไม่สำเร็จ');
+      }
+
+      ref.read(restaurantOrderContextProvider.notifier).state =
+          restaurantContext.copyWith(
+        currentOrderId: orderId,
+        currentOrderNo: orderNo,
+      );
+      ref.invalidate(tableListProvider);
+
+      // Auto-print kitchen ticket if enabled
+      final settings = ref.read(settingsProvider);
+      if (settings.autoPrintKitchenTicket && settings.enableDirectThermalPrint) {
+        final printSettings = ThermalPrintSettings(
+          enabled: settings.enableDirectThermalPrint,
+          autoPrintOnSale: settings.autoPrintReceipt,
+          host: settings.thermalPrinterHost,
+          port: settings.thermalPrinterPort,
+          paperWidthMm: settings.thermalPaperWidthMm,
+        );
+        final ticket = KitchenTicketDocument(
+          tableName: restaurantContext.tableName,
+          orderNo: orderNo ?? orderId,
+          orderTime: DateFormat('HH:mm').format(DateTime.now()),
+          items: cartState.items.map((item) => KitchenTicketItem(
+            courseNo: 1,
+            quantity: item.quantity.toDouble(),
+            unit: item.unit,
+            name: item.productName,
+            specialInstructions: null,
+            station: 'kitchen',
+          )).toList(),
+        );
+        ThermalPrintService.instance.printKitchenTicket(
+          settings: printSettings,
+          document: ticket,
+        );
+      }
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            orderNo == null || orderNo.isEmpty
+                ? 'ส่งออเดอร์เข้าครัวแล้ว'
+                : 'ส่งออเดอร์ $orderNo เข้าครัวแล้ว',
+          ),
+          backgroundColor: _success,
+        ),
+      );
+    } on DioException catch (e) {
+      if (!mounted) return;
+      final serverMsg = e.response?.data is Map
+          ? (e.response!.data['message'] as String?)
+          : null;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(serverMsg ?? 'ไม่สามารถส่งออเดอร์เข้าครัวได้'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSendingRestaurantOrder = false);
+      }
+    }
   }
 
   @override
@@ -156,6 +348,14 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                 showCheckoutButton: widget.showCheckoutButton,
                 showHoldButton: widget.showHoldButton,
                 onHold: widget.onHold,
+                isRestaurantFlow:
+                    ref.watch(restaurantOrderContextProvider) != null,
+                isKitchenSent:
+                    (ref.watch(restaurantOrderContextProvider)?.currentOrderId
+                            ?.isNotEmpty ??
+                        false),
+                isSendingRestaurantOrder: _isSendingRestaurantOrder,
+                onSendToKitchen: _sendRestaurantOrder,
                 onOpenNewBill: () => setState(() => _scanRowSession++),
               ),
             ],
@@ -726,10 +926,42 @@ class _CartRowState extends ConsumerState<_CartRow> {
     setState(() => _editingQty = false);
   }
 
+  Future<void> _showCourseDialog(CartItem item) async {
+    final selected = await showDialog<int>(
+      context: context,
+      builder: (_) => SimpleDialog(
+        title: Text(
+          'กำหนดคอร์สสำหรับ\n${item.productName}',
+          style: const TextStyle(fontSize: 15),
+        ),
+        children: List.generate(4, (i) {
+          final n = i + 1;
+          final label = n == 1 ? 'คอร์ส 1 (เสิร์ฟทันที)' : 'คอร์ส $n';
+          return SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, n),
+            child: Row(children: [
+              Icon(
+                n == item.courseNo ? Icons.radio_button_checked : Icons.radio_button_off,
+                size: 18,
+                color: n == item.courseNo ? _orange : Colors.grey,
+              ),
+              const SizedBox(width: 10),
+              Text(label),
+            ]),
+          );
+        }),
+      ),
+    );
+    if (selected != null) {
+      ref.read(cartProvider.notifier).setCourseNo(item.productId, selected);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final item = widget.item;
     final density = widget.density;
+    final isRestaurant = ref.watch(restaurantOrderContextProvider) != null;
     final productInfo = Expanded(
       flex: 5,
       child: Padding(
@@ -748,12 +980,46 @@ class _CartRowState extends ConsumerState<_CartRow> {
               overflow: TextOverflow.ellipsis,
               maxLines: density.compact ? 2 : 1,
             ),
-            Text(
-              '฿${item.unitPrice.toStringAsFixed(2)} / ${item.unit}',
-              style: TextStyle(
-                fontSize: density.metaFontSize,
-                color: AppTheme.subtextColor,
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '฿${item.unitPrice.toStringAsFixed(2)} / ${item.unit}',
+                    style: TextStyle(
+                      fontSize: density.metaFontSize,
+                      color: AppTheme.subtextColor,
+                    ),
+                  ),
+                ),
+                if (isRestaurant)
+                  GestureDetector(
+                    onTap: () => _showCourseDialog(item),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: item.courseNo > 1
+                            ? Colors.blue.shade50
+                            : Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                          color: item.courseNo > 1
+                              ? Colors.blue.shade300
+                              : Colors.grey.shade300,
+                        ),
+                      ),
+                      child: Text(
+                        'C${item.courseNo}',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: item.courseNo > 1
+                              ? Colors.blue.shade700
+                              : Colors.grey.shade600,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ],
         ),
@@ -1180,7 +1446,11 @@ class _CartSummary extends StatelessWidget {
   final _CartPanelDensity density;
   final bool showCheckoutButton;
   final bool showHoldButton;
+  final bool isRestaurantFlow;
+  final bool isKitchenSent;
+  final bool isSendingRestaurantOrder;
   final VoidCallback? onHold;
+  final Future<void> Function()? onSendToKitchen;
   final VoidCallback? onOpenNewBill;
 
   const _CartSummary({
@@ -1188,7 +1458,11 @@ class _CartSummary extends StatelessWidget {
     required this.density,
     required this.showCheckoutButton,
     required this.showHoldButton,
+    required this.isRestaurantFlow,
+    required this.isKitchenSent,
+    required this.isSendingRestaurantOrder,
     required this.onHold,
+    this.onSendToKitchen,
     this.onOpenNewBill,
   });
 
@@ -1205,6 +1479,8 @@ class _CartSummary extends StatelessWidget {
         : Colors.grey;
     final dividerColor = isDark ? const Color(0xFF333333) : _border;
     final disabledColor = isDark ? const Color(0xFF2A2A2A) : Colors.grey[300];
+    final canCheckout = cartState.items.isNotEmpty &&
+        (!isRestaurantFlow || isKitchenSent);
 
     return Container(
       decoration: BoxDecoration(
@@ -1344,11 +1620,65 @@ class _CartSummary extends StatelessWidget {
               ),
             ),
 
-          if (showCheckoutButton || showHoldButton)
+          if (showCheckoutButton || showHoldButton || isRestaurantFlow)
             Padding(
               padding: EdgeInsets.all(density.compactHeight ? 6 : 10),
               child: Row(
                 children: [
+                  if (isRestaurantFlow && !isKitchenSent) ...[
+                    Expanded(
+                      flex: showCheckoutButton || showHoldButton ? 6 : 1,
+                      child: SizedBox(
+                        height: density.compactHeight
+                            ? 38
+                            : (context.isMobile ? 44 : 48),
+                        child: ElevatedButton(
+                          onPressed: cartState.items.isEmpty || isSendingRestaurantOrder
+                              ? null
+                              : onSendToKitchen,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _info,
+                            foregroundColor: Colors.white,
+                            disabledBackgroundColor: disabledColor,
+                            disabledForegroundColor: isDark
+                                ? Colors.white30
+                                : Colors.grey[500],
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              if (isSendingRestaurantOrder)
+                                const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              else
+                                const Icon(Icons.kitchen_outlined, size: 18),
+                              const SizedBox(width: 8),
+                              Text(
+                                isSendingRestaurantOrder
+                                    ? 'กำลังส่ง...'
+                                    : 'ส่งเข้าครัว',
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
                   if (showHoldButton) ...[
                     Expanded(
                       flex: 5,
@@ -1401,9 +1731,7 @@ class _CartSummary extends StatelessWidget {
                             : (context.isMobile ? 44 : 48),
                         child: ElevatedButton(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: cartState.items.isEmpty
-                                ? disabledColor
-                                : _success,
+                            backgroundColor: canCheckout ? _success : disabledColor,
                             foregroundColor: Colors.white,
                             disabledForegroundColor: isDark
                                 ? Colors.white30
@@ -1413,7 +1741,7 @@ class _CartSummary extends StatelessWidget {
                               borderRadius: BorderRadius.circular(10),
                             ),
                           ),
-                          onPressed: cartState.items.isEmpty
+                          onPressed: !canCheckout
                               ? null
                               : () async {
                                   final result =
@@ -1433,9 +1761,13 @@ class _CartSummary extends StatelessWidget {
                               const Icon(Icons.payment, size: 18),
                               const SizedBox(width: 8),
                               Text(
-                                cartState.items.isEmpty
-                                    ? 'ชำระเงิน'
-                                    : 'ชำระเงิน  ฿${cartState.total.toStringAsFixed(2)}',
+                                !canCheckout
+                                    ? (isRestaurantFlow && !isKitchenSent
+                                        ? 'ส่งเข้าครัวก่อน'
+                                        : 'ชำระเงิน')
+                                    : (isRestaurantFlow
+                                        ? 'ปิดบิล  ฿${cartState.total.toStringAsFixed(2)}'
+                                        : 'ชำระเงิน  ฿${cartState.total.toStringAsFixed(2)}'),
                                 style: const TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w600,

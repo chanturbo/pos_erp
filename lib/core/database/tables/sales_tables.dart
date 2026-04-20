@@ -27,9 +27,12 @@ class SalesOrders extends Table {
   TextColumn get warehouseId => text().references(Warehouses, #warehouseId)();
   TextColumn get userId => text().references(Users, #userId)();
   
-  // Table (สำหรับร้านอาหาร)
+  // Table & Session (สำหรับร้านอาหาร)
   TextColumn get tableId => text().nullable()();
+  TextColumn get sessionId => text().nullable()();
   IntColumn get partySize => integer().nullable()();
+  // DINE_IN | TAKEAWAY | DELIVERY
+  TextColumn get serviceType => text().nullable()();
   
   // Amounts
   RealColumn get subtotal => real().withDefault(const Constant(0))();
@@ -38,6 +41,10 @@ class SalesOrders extends Table {
   RealColumn get vatAmount => real().withDefault(const Constant(0))();
   RealColumn get totalAmount => real().withDefault(const Constant(0))();
   
+  // Service Charge (ร้านอาหาร)
+  RealColumn get serviceChargeRate => real().withDefault(const Constant(0))();
+  RealColumn get serviceChargeAmount => real().withDefault(const Constant(0))();
+
   // Coupon & Promotion
   RealColumn get couponDiscount => real().withDefault(const Constant(0))();
   TextColumn get couponCodes => text().nullable()(); // JSON array e.g. '["CODE1","CODE2"]'
@@ -97,7 +104,10 @@ class SalesOrderItems extends Table {
   // Kitchen Status (สำหรับร้านอาหาร)
   TextColumn get kitchenStatus => text().withDefault(const Constant('PENDING'))();
   DateTimeColumn get preparedAt => dateTime().nullable()();
-  
+
+  // Course / Fire Order (R4) — 1 = first course, 2 = second, etc.
+  IntColumn get courseNo => integer().withDefault(const Constant(1))();
+
   // Special Instructions
   TextColumn get specialInstructions => text().nullable()();
 

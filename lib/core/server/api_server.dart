@@ -26,7 +26,10 @@ import 'routes/ap_invoice_routes.dart';
 import 'routes/ap_payment_routes.dart';
 import 'routes/branch_routes.dart'; // 🆕 Week 7
 import 'routes/user_routes.dart';
+import 'routes/table_routes.dart'; // Restaurant Phase R1
+import 'routes/kitchen_routes.dart'; // Restaurant Phase R2
 import 'middleware/auth_middleware.dart';
+import 'middleware/license_middleware.dart';
 
 class ApiServer {
   final AppDatabase db;
@@ -129,6 +132,14 @@ class ApiServer {
       router.mount('/api/branches', BranchRoutes(db).router.call);
       print('   ✅ /api/branches');
 
+      // Restaurant Table routes ✅ Phase R1
+      router.mount('/api/tables', TableRoutes(db).router.call);
+      print('   ✅ /api/tables');
+
+      // Kitchen Display routes ✅ Phase R2
+      router.mount('/api/kitchen', KitchenRoutes(db).router.call);
+      print('   ✅ /api/kitchen');
+
       // 🆕 Sync helper endpoints (เรียกจาก OfflineSyncService)
       router.post('/api/sync/push-pending', _pushPendingHandler);
       router.post('/api/sync/enqueue', _enqueueHandler);
@@ -142,6 +153,7 @@ class ApiServer {
           .addMiddleware(logRequests())
           .addMiddleware(_corsHeaders())
           .addMiddleware(authMiddleware(db))
+          .addMiddleware(licenseMiddleware())
           .addHandler(router.call);
 
       // ==================== START SERVER ====================

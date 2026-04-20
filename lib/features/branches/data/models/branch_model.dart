@@ -9,6 +9,8 @@ class BranchModel {
   final String? address;
   final String? phone;
   final bool isActive;
+  // RETAIL | RESTAURANT | HYBRID
+  final String businessMode;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -24,11 +26,17 @@ class BranchModel {
     this.address,
     this.phone,
     this.isActive = true,
+    this.businessMode = 'RETAIL',
     required this.createdAt,
     required this.updatedAt,
     this.warehouseCount,
     this.userCount,
   });
+
+  bool get isRestaurantMode =>
+      businessMode == 'RESTAURANT' || businessMode == 'HYBRID';
+  bool get isRetailMode =>
+      businessMode == 'RETAIL' || businessMode == 'HYBRID';
 
   factory BranchModel.fromJson(Map<String, dynamic> json) {
     return BranchModel(
@@ -39,6 +47,7 @@ class BranchModel {
       address: json['address'] as String?,
       phone: json['phone'] as String?,
       isActive: json['is_active'] as bool? ?? true,
+      businessMode: json['business_mode'] as String? ?? 'RETAIL',
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
       warehouseCount: json['warehouse_count'] as int?,
@@ -54,6 +63,7 @@ class BranchModel {
         'address': address,
         'phone': phone,
         'is_active': isActive,
+        'business_mode': businessMode,
         'created_at': createdAt.toIso8601String(),
         'updated_at': updatedAt.toIso8601String(),
       };
@@ -66,6 +76,7 @@ class BranchModel {
     String? address,
     String? phone,
     bool? isActive,
+    String? businessMode,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -77,6 +88,7 @@ class BranchModel {
       address: address ?? this.address,
       phone: phone ?? this.phone,
       isActive: isActive ?? this.isActive,
+      businessMode: businessMode ?? this.businessMode,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

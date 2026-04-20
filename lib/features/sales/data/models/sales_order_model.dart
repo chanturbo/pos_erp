@@ -17,6 +17,10 @@ class SalesOrderModel {
   final double couponDiscount;               // ส่วนลดรวมจากคูปอง
   final int pointsUsed;                      // แต้มที่แลกในใบขายนี้
   final DateTime? dueDate;                   // วันครบกำหนดชำระ (สำหรับการขายเครดิต)
+  final String? tableId;
+  final String? sessionId;
+  final String? serviceType;
+  final int? partySize;
 
   SalesOrderModel({
     required this.orderId,
@@ -37,6 +41,10 @@ class SalesOrderModel {
     this.couponDiscount = 0.0,
     this.pointsUsed = 0,
     this.dueDate,
+    this.tableId,
+    this.sessionId,
+    this.serviceType,
+    this.partySize,
   });
 
   factory SalesOrderModel.fromJson(Map<String, dynamic> json) {
@@ -65,6 +73,10 @@ class SalesOrderModel {
       couponDiscount: (json['coupon_discount'] as num?)?.toDouble() ?? 0.0,
       pointsUsed: (json['points_used'] as int?) ?? 0,
       dueDate: json['due_date'] != null ? DateTime.parse(json['due_date'] as String) : null,
+      tableId: json['table_id'] as String?,
+      sessionId: json['session_id'] as String?,
+      serviceType: json['service_type'] as String?,
+      partySize: (json['party_size'] as num?)?.toInt(),
     );
   }
   
@@ -87,6 +99,10 @@ class SalesOrderModel {
       'coupon_discount': couponDiscount,
       'points_used': pointsUsed,
       'due_date': dueDate?.toIso8601String(),
+      'table_id': tableId,
+      'session_id': sessionId,
+      'service_type': serviceType,
+      'party_size': partySize,
     };
   }
 }
@@ -97,9 +113,12 @@ class SalesOrderItemModel {
   final String productId;
   final String productCode;
   final String productName;
+  final String unit;
   final double quantity;
   final double unitPrice;
   final double amount;
+  final String? specialInstructions;
+  final List<SalesOrderItemModifierModel> modifiers;
   final bool isFreeItem;
   final String? promotionName;
   final double unitCost;    // ต้นทุนเฉลี่ย (WAC) ณ เวลาขาย
@@ -114,9 +133,12 @@ class SalesOrderItemModel {
     required this.productId,
     required this.productCode,
     required this.productName,
+    required this.unit,
     required this.quantity,
     required this.unitPrice,
     required this.amount,
+    this.specialInstructions,
+    this.modifiers = const [],
     this.isFreeItem = false,
     this.promotionName,
     this.unitCost = 0,
@@ -130,9 +152,16 @@ class SalesOrderItemModel {
       productId: json['product_id'] as String,
       productCode: json['product_code'] as String,
       productName: json['product_name'] as String,
+      unit: json['unit'] as String? ?? '',
       quantity: (json['quantity'] as num).toDouble(),
       unitPrice: (json['unit_price'] as num).toDouble(),
       amount: (json['amount'] as num).toDouble(),
+      specialInstructions: json['special_instructions'] as String?,
+      modifiers: (json['modifiers'] as List?)
+              ?.map((item) => SalesOrderItemModifierModel.fromJson(
+                  item as Map<String, dynamic>))
+              .toList() ??
+          const [],
       isFreeItem: (json['is_free_item'] as bool?) ?? false,
       promotionName: json['promotion_name'] as String?,
       unitCost: (json['unit_cost'] as num?)?.toDouble() ?? 0,
@@ -147,13 +176,44 @@ class SalesOrderItemModel {
       'product_id': productId,
       'product_code': productCode,
       'product_name': productName,
+      'unit': unit,
       'quantity': quantity,
       'unit_price': unitPrice,
       'amount': amount,
+      'special_instructions': specialInstructions,
+      'modifiers': modifiers.map((item) => item.toJson()).toList(),
       'is_free_item': isFreeItem,
       'promotion_name': promotionName,
       'unit_cost': unitCost,
       'cogs_amount': cogsAmount,
+    };
+  }
+}
+
+class SalesOrderItemModifierModel {
+  final String modifierId;
+  final String modifierName;
+  final double priceAdjustment;
+
+  SalesOrderItemModifierModel({
+    required this.modifierId,
+    required this.modifierName,
+    this.priceAdjustment = 0,
+  });
+
+  factory SalesOrderItemModifierModel.fromJson(Map<String, dynamic> json) {
+    return SalesOrderItemModifierModel(
+      modifierId: json['modifier_id'] as String? ?? '',
+      modifierName: json['modifier_name'] as String? ?? '',
+      priceAdjustment: (json['price_adjustment'] as num?)?.toDouble() ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'modifier_id': modifierId,
+      'modifier_name': modifierName,
+      'price_adjustment': priceAdjustment,
     };
   }
 }

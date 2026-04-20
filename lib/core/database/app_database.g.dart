@@ -615,6 +615,18 @@ class $BranchesTable extends Branches with TableInfo<$BranchesTable, Branch> {
     ),
     defaultValue: const Constant(true),
   );
+  static const VerificationMeta _businessModeMeta = const VerificationMeta(
+    'businessMode',
+  );
+  @override
+  late final GeneratedColumn<String> businessMode = GeneratedColumn<String>(
+    'business_mode',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('RETAIL'),
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -648,6 +660,7 @@ class $BranchesTable extends Branches with TableInfo<$BranchesTable, Branch> {
     address,
     phone,
     isActive,
+    businessMode,
     createdAt,
     updatedAt,
   ];
@@ -713,6 +726,15 @@ class $BranchesTable extends Branches with TableInfo<$BranchesTable, Branch> {
         isActive.isAcceptableOrUnknown(data['is_active']!, _isActiveMeta),
       );
     }
+    if (data.containsKey('business_mode')) {
+      context.handle(
+        _businessModeMeta,
+        businessMode.isAcceptableOrUnknown(
+          data['business_mode']!,
+          _businessModeMeta,
+        ),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -762,6 +784,10 @@ class $BranchesTable extends Branches with TableInfo<$BranchesTable, Branch> {
         DriftSqlType.bool,
         data['${effectivePrefix}is_active'],
       )!,
+      businessMode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}business_mode'],
+      )!,
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -787,6 +813,7 @@ class Branch extends DataClass implements Insertable<Branch> {
   final String? address;
   final String? phone;
   final bool isActive;
+  final String businessMode;
   final DateTime createdAt;
   final DateTime updatedAt;
   const Branch({
@@ -797,6 +824,7 @@ class Branch extends DataClass implements Insertable<Branch> {
     this.address,
     this.phone,
     required this.isActive,
+    required this.businessMode,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -814,6 +842,7 @@ class Branch extends DataClass implements Insertable<Branch> {
       map['phone'] = Variable<String>(phone);
     }
     map['is_active'] = Variable<bool>(isActive);
+    map['business_mode'] = Variable<String>(businessMode);
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
@@ -832,6 +861,7 @@ class Branch extends DataClass implements Insertable<Branch> {
           ? const Value.absent()
           : Value(phone),
       isActive: Value(isActive),
+      businessMode: Value(businessMode),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -850,6 +880,7 @@ class Branch extends DataClass implements Insertable<Branch> {
       address: serializer.fromJson<String?>(json['address']),
       phone: serializer.fromJson<String?>(json['phone']),
       isActive: serializer.fromJson<bool>(json['isActive']),
+      businessMode: serializer.fromJson<String>(json['businessMode']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -865,6 +896,7 @@ class Branch extends DataClass implements Insertable<Branch> {
       'address': serializer.toJson<String?>(address),
       'phone': serializer.toJson<String?>(phone),
       'isActive': serializer.toJson<bool>(isActive),
+      'businessMode': serializer.toJson<String>(businessMode),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -878,6 +910,7 @@ class Branch extends DataClass implements Insertable<Branch> {
     Value<String?> address = const Value.absent(),
     Value<String?> phone = const Value.absent(),
     bool? isActive,
+    String? businessMode,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) => Branch(
@@ -888,6 +921,7 @@ class Branch extends DataClass implements Insertable<Branch> {
     address: address.present ? address.value : this.address,
     phone: phone.present ? phone.value : this.phone,
     isActive: isActive ?? this.isActive,
+    businessMode: businessMode ?? this.businessMode,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -904,6 +938,9 @@ class Branch extends DataClass implements Insertable<Branch> {
       address: data.address.present ? data.address.value : this.address,
       phone: data.phone.present ? data.phone.value : this.phone,
       isActive: data.isActive.present ? data.isActive.value : this.isActive,
+      businessMode: data.businessMode.present
+          ? data.businessMode.value
+          : this.businessMode,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -919,6 +956,7 @@ class Branch extends DataClass implements Insertable<Branch> {
           ..write('address: $address, ')
           ..write('phone: $phone, ')
           ..write('isActive: $isActive, ')
+          ..write('businessMode: $businessMode, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -934,6 +972,7 @@ class Branch extends DataClass implements Insertable<Branch> {
     address,
     phone,
     isActive,
+    businessMode,
     createdAt,
     updatedAt,
   );
@@ -948,6 +987,7 @@ class Branch extends DataClass implements Insertable<Branch> {
           other.address == this.address &&
           other.phone == this.phone &&
           other.isActive == this.isActive &&
+          other.businessMode == this.businessMode &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -960,6 +1000,7 @@ class BranchesCompanion extends UpdateCompanion<Branch> {
   final Value<String?> address;
   final Value<String?> phone;
   final Value<bool> isActive;
+  final Value<String> businessMode;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
@@ -971,6 +1012,7 @@ class BranchesCompanion extends UpdateCompanion<Branch> {
     this.address = const Value.absent(),
     this.phone = const Value.absent(),
     this.isActive = const Value.absent(),
+    this.businessMode = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -983,6 +1025,7 @@ class BranchesCompanion extends UpdateCompanion<Branch> {
     this.address = const Value.absent(),
     this.phone = const Value.absent(),
     this.isActive = const Value.absent(),
+    this.businessMode = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -998,6 +1041,7 @@ class BranchesCompanion extends UpdateCompanion<Branch> {
     Expression<String>? address,
     Expression<String>? phone,
     Expression<bool>? isActive,
+    Expression<String>? businessMode,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
@@ -1010,6 +1054,7 @@ class BranchesCompanion extends UpdateCompanion<Branch> {
       if (address != null) 'address': address,
       if (phone != null) 'phone': phone,
       if (isActive != null) 'is_active': isActive,
+      if (businessMode != null) 'business_mode': businessMode,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
@@ -1024,6 +1069,7 @@ class BranchesCompanion extends UpdateCompanion<Branch> {
     Value<String?>? address,
     Value<String?>? phone,
     Value<bool>? isActive,
+    Value<String>? businessMode,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
@@ -1036,6 +1082,7 @@ class BranchesCompanion extends UpdateCompanion<Branch> {
       address: address ?? this.address,
       phone: phone ?? this.phone,
       isActive: isActive ?? this.isActive,
+      businessMode: businessMode ?? this.businessMode,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
@@ -1066,6 +1113,9 @@ class BranchesCompanion extends UpdateCompanion<Branch> {
     if (isActive.present) {
       map['is_active'] = Variable<bool>(isActive.value);
     }
+    if (businessMode.present) {
+      map['business_mode'] = Variable<String>(businessMode.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -1088,6 +1138,7 @@ class BranchesCompanion extends UpdateCompanion<Branch> {
           ..write('address: $address, ')
           ..write('phone: $phone, ')
           ..write('isActive: $isActive, ')
+          ..write('businessMode: $businessMode, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
@@ -3001,6 +3052,73 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
     ),
     defaultValue: const Constant(true),
   );
+  static const VerificationMeta _serviceModeMeta = const VerificationMeta(
+    'serviceMode',
+  );
+  @override
+  late final GeneratedColumn<String> serviceMode = GeneratedColumn<String>(
+    'service_mode',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('RETAIL'),
+  );
+  static const VerificationMeta _prepStationMeta = const VerificationMeta(
+    'prepStation',
+  );
+  @override
+  late final GeneratedColumn<String> prepStation = GeneratedColumn<String>(
+    'prep_station',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _requiresPreparationMeta =
+      const VerificationMeta('requiresPreparation');
+  @override
+  late final GeneratedColumn<bool> requiresPreparation = GeneratedColumn<bool>(
+    'requires_preparation',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("requires_preparation" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _dineInAvailableMeta = const VerificationMeta(
+    'dineInAvailable',
+  );
+  @override
+  late final GeneratedColumn<bool> dineInAvailable = GeneratedColumn<bool>(
+    'dine_in_available',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("dine_in_available" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _takeawayAvailableMeta = const VerificationMeta(
+    'takeawayAvailable',
+  );
+  @override
+  late final GeneratedColumn<bool> takeawayAvailable = GeneratedColumn<bool>(
+    'takeaway_available',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("takeaway_available" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -3054,6 +3172,11 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
     imageUrls,
     imagePath,
     isActive,
+    serviceMode,
+    prepStation,
+    requiresPreparation,
+    dineInAvailable,
+    takeawayAvailable,
     createdAt,
     updatedAt,
   ];
@@ -3266,6 +3389,51 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
         isActive.isAcceptableOrUnknown(data['is_active']!, _isActiveMeta),
       );
     }
+    if (data.containsKey('service_mode')) {
+      context.handle(
+        _serviceModeMeta,
+        serviceMode.isAcceptableOrUnknown(
+          data['service_mode']!,
+          _serviceModeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('prep_station')) {
+      context.handle(
+        _prepStationMeta,
+        prepStation.isAcceptableOrUnknown(
+          data['prep_station']!,
+          _prepStationMeta,
+        ),
+      );
+    }
+    if (data.containsKey('requires_preparation')) {
+      context.handle(
+        _requiresPreparationMeta,
+        requiresPreparation.isAcceptableOrUnknown(
+          data['requires_preparation']!,
+          _requiresPreparationMeta,
+        ),
+      );
+    }
+    if (data.containsKey('dine_in_available')) {
+      context.handle(
+        _dineInAvailableMeta,
+        dineInAvailable.isAcceptableOrUnknown(
+          data['dine_in_available']!,
+          _dineInAvailableMeta,
+        ),
+      );
+    }
+    if (data.containsKey('takeaway_available')) {
+      context.handle(
+        _takeawayAvailableMeta,
+        takeawayAvailable.isAcceptableOrUnknown(
+          data['takeaway_available']!,
+          _takeawayAvailableMeta,
+        ),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -3403,6 +3571,26 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
         DriftSqlType.bool,
         data['${effectivePrefix}is_active'],
       )!,
+      serviceMode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}service_mode'],
+      )!,
+      prepStation: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}prep_station'],
+      ),
+      requiresPreparation: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}requires_preparation'],
+      )!,
+      dineInAvailable: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}dine_in_available'],
+      )!,
+      takeawayAvailable: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}takeaway_available'],
+      )!,
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -3459,6 +3647,11 @@ class Product extends DataClass implements Insertable<Product> {
   final Map<String, dynamic>? imageUrls;
   final String? imagePath;
   final bool isActive;
+  final String serviceMode;
+  final String? prepStation;
+  final bool requiresPreparation;
+  final bool dineInAvailable;
+  final bool takeawayAvailable;
   final DateTime createdAt;
   final DateTime updatedAt;
   const Product({
@@ -3489,6 +3682,11 @@ class Product extends DataClass implements Insertable<Product> {
     this.imageUrls,
     this.imagePath,
     required this.isActive,
+    required this.serviceMode,
+    this.prepStation,
+    required this.requiresPreparation,
+    required this.dineInAvailable,
+    required this.takeawayAvailable,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -3544,6 +3742,13 @@ class Product extends DataClass implements Insertable<Product> {
       map['image_path'] = Variable<String>(imagePath);
     }
     map['is_active'] = Variable<bool>(isActive);
+    map['service_mode'] = Variable<String>(serviceMode);
+    if (!nullToAbsent || prepStation != null) {
+      map['prep_station'] = Variable<String>(prepStation);
+    }
+    map['requires_preparation'] = Variable<bool>(requiresPreparation);
+    map['dine_in_available'] = Variable<bool>(dineInAvailable);
+    map['takeaway_available'] = Variable<bool>(takeawayAvailable);
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
@@ -3596,6 +3801,13 @@ class Product extends DataClass implements Insertable<Product> {
           ? const Value.absent()
           : Value(imagePath),
       isActive: Value(isActive),
+      serviceMode: Value(serviceMode),
+      prepStation: prepStation == null && nullToAbsent
+          ? const Value.absent()
+          : Value(prepStation),
+      requiresPreparation: Value(requiresPreparation),
+      dineInAvailable: Value(dineInAvailable),
+      takeawayAvailable: Value(takeawayAvailable),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -3636,6 +3848,13 @@ class Product extends DataClass implements Insertable<Product> {
       imageUrls: serializer.fromJson<Map<String, dynamic>?>(json['imageUrls']),
       imagePath: serializer.fromJson<String?>(json['imagePath']),
       isActive: serializer.fromJson<bool>(json['isActive']),
+      serviceMode: serializer.fromJson<String>(json['serviceMode']),
+      prepStation: serializer.fromJson<String?>(json['prepStation']),
+      requiresPreparation: serializer.fromJson<bool>(
+        json['requiresPreparation'],
+      ),
+      dineInAvailable: serializer.fromJson<bool>(json['dineInAvailable']),
+      takeawayAvailable: serializer.fromJson<bool>(json['takeawayAvailable']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -3673,6 +3892,11 @@ class Product extends DataClass implements Insertable<Product> {
       'imageUrls': serializer.toJson<Map<String, dynamic>?>(imageUrls),
       'imagePath': serializer.toJson<String?>(imagePath),
       'isActive': serializer.toJson<bool>(isActive),
+      'serviceMode': serializer.toJson<String>(serviceMode),
+      'prepStation': serializer.toJson<String?>(prepStation),
+      'requiresPreparation': serializer.toJson<bool>(requiresPreparation),
+      'dineInAvailable': serializer.toJson<bool>(dineInAvailable),
+      'takeawayAvailable': serializer.toJson<bool>(takeawayAvailable),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -3706,6 +3930,11 @@ class Product extends DataClass implements Insertable<Product> {
     Value<Map<String, dynamic>?> imageUrls = const Value.absent(),
     Value<String?> imagePath = const Value.absent(),
     bool? isActive,
+    String? serviceMode,
+    Value<String?> prepStation = const Value.absent(),
+    bool? requiresPreparation,
+    bool? dineInAvailable,
+    bool? takeawayAvailable,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) => Product(
@@ -3740,6 +3969,11 @@ class Product extends DataClass implements Insertable<Product> {
     imageUrls: imageUrls.present ? imageUrls.value : this.imageUrls,
     imagePath: imagePath.present ? imagePath.value : this.imagePath,
     isActive: isActive ?? this.isActive,
+    serviceMode: serviceMode ?? this.serviceMode,
+    prepStation: prepStation.present ? prepStation.value : this.prepStation,
+    requiresPreparation: requiresPreparation ?? this.requiresPreparation,
+    dineInAvailable: dineInAvailable ?? this.dineInAvailable,
+    takeawayAvailable: takeawayAvailable ?? this.takeawayAvailable,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -3802,6 +4036,21 @@ class Product extends DataClass implements Insertable<Product> {
       imageUrls: data.imageUrls.present ? data.imageUrls.value : this.imageUrls,
       imagePath: data.imagePath.present ? data.imagePath.value : this.imagePath,
       isActive: data.isActive.present ? data.isActive.value : this.isActive,
+      serviceMode: data.serviceMode.present
+          ? data.serviceMode.value
+          : this.serviceMode,
+      prepStation: data.prepStation.present
+          ? data.prepStation.value
+          : this.prepStation,
+      requiresPreparation: data.requiresPreparation.present
+          ? data.requiresPreparation.value
+          : this.requiresPreparation,
+      dineInAvailable: data.dineInAvailable.present
+          ? data.dineInAvailable.value
+          : this.dineInAvailable,
+      takeawayAvailable: data.takeawayAvailable.present
+          ? data.takeawayAvailable.value
+          : this.takeawayAvailable,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -3837,6 +4086,11 @@ class Product extends DataClass implements Insertable<Product> {
           ..write('imageUrls: $imageUrls, ')
           ..write('imagePath: $imagePath, ')
           ..write('isActive: $isActive, ')
+          ..write('serviceMode: $serviceMode, ')
+          ..write('prepStation: $prepStation, ')
+          ..write('requiresPreparation: $requiresPreparation, ')
+          ..write('dineInAvailable: $dineInAvailable, ')
+          ..write('takeawayAvailable: $takeawayAvailable, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -3872,6 +4126,11 @@ class Product extends DataClass implements Insertable<Product> {
     imageUrls,
     imagePath,
     isActive,
+    serviceMode,
+    prepStation,
+    requiresPreparation,
+    dineInAvailable,
+    takeawayAvailable,
     createdAt,
     updatedAt,
   ]);
@@ -3906,6 +4165,11 @@ class Product extends DataClass implements Insertable<Product> {
           other.imageUrls == this.imageUrls &&
           other.imagePath == this.imagePath &&
           other.isActive == this.isActive &&
+          other.serviceMode == this.serviceMode &&
+          other.prepStation == this.prepStation &&
+          other.requiresPreparation == this.requiresPreparation &&
+          other.dineInAvailable == this.dineInAvailable &&
+          other.takeawayAvailable == this.takeawayAvailable &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -3938,6 +4202,11 @@ class ProductsCompanion extends UpdateCompanion<Product> {
   final Value<Map<String, dynamic>?> imageUrls;
   final Value<String?> imagePath;
   final Value<bool> isActive;
+  final Value<String> serviceMode;
+  final Value<String?> prepStation;
+  final Value<bool> requiresPreparation;
+  final Value<bool> dineInAvailable;
+  final Value<bool> takeawayAvailable;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
@@ -3969,6 +4238,11 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     this.imageUrls = const Value.absent(),
     this.imagePath = const Value.absent(),
     this.isActive = const Value.absent(),
+    this.serviceMode = const Value.absent(),
+    this.prepStation = const Value.absent(),
+    this.requiresPreparation = const Value.absent(),
+    this.dineInAvailable = const Value.absent(),
+    this.takeawayAvailable = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -4001,6 +4275,11 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     this.imageUrls = const Value.absent(),
     this.imagePath = const Value.absent(),
     this.isActive = const Value.absent(),
+    this.serviceMode = const Value.absent(),
+    this.prepStation = const Value.absent(),
+    this.requiresPreparation = const Value.absent(),
+    this.dineInAvailable = const Value.absent(),
+    this.takeawayAvailable = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -4036,6 +4315,11 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     Expression<String>? imageUrls,
     Expression<String>? imagePath,
     Expression<bool>? isActive,
+    Expression<String>? serviceMode,
+    Expression<String>? prepStation,
+    Expression<bool>? requiresPreparation,
+    Expression<bool>? dineInAvailable,
+    Expression<bool>? takeawayAvailable,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
@@ -4069,6 +4353,12 @@ class ProductsCompanion extends UpdateCompanion<Product> {
       if (imageUrls != null) 'image_urls': imageUrls,
       if (imagePath != null) 'image_path': imagePath,
       if (isActive != null) 'is_active': isActive,
+      if (serviceMode != null) 'service_mode': serviceMode,
+      if (prepStation != null) 'prep_station': prepStation,
+      if (requiresPreparation != null)
+        'requires_preparation': requiresPreparation,
+      if (dineInAvailable != null) 'dine_in_available': dineInAvailable,
+      if (takeawayAvailable != null) 'takeaway_available': takeawayAvailable,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
@@ -4103,6 +4393,11 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     Value<Map<String, dynamic>?>? imageUrls,
     Value<String?>? imagePath,
     Value<bool>? isActive,
+    Value<String>? serviceMode,
+    Value<String?>? prepStation,
+    Value<bool>? requiresPreparation,
+    Value<bool>? dineInAvailable,
+    Value<bool>? takeawayAvailable,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
@@ -4135,6 +4430,11 @@ class ProductsCompanion extends UpdateCompanion<Product> {
       imageUrls: imageUrls ?? this.imageUrls,
       imagePath: imagePath ?? this.imagePath,
       isActive: isActive ?? this.isActive,
+      serviceMode: serviceMode ?? this.serviceMode,
+      prepStation: prepStation ?? this.prepStation,
+      requiresPreparation: requiresPreparation ?? this.requiresPreparation,
+      dineInAvailable: dineInAvailable ?? this.dineInAvailable,
+      takeawayAvailable: takeawayAvailable ?? this.takeawayAvailable,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
@@ -4229,6 +4529,21 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     if (isActive.present) {
       map['is_active'] = Variable<bool>(isActive.value);
     }
+    if (serviceMode.present) {
+      map['service_mode'] = Variable<String>(serviceMode.value);
+    }
+    if (prepStation.present) {
+      map['prep_station'] = Variable<String>(prepStation.value);
+    }
+    if (requiresPreparation.present) {
+      map['requires_preparation'] = Variable<bool>(requiresPreparation.value);
+    }
+    if (dineInAvailable.present) {
+      map['dine_in_available'] = Variable<bool>(dineInAvailable.value);
+    }
+    if (takeawayAvailable.present) {
+      map['takeaway_available'] = Variable<bool>(takeawayAvailable.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -4271,6 +4586,11 @@ class ProductsCompanion extends UpdateCompanion<Product> {
           ..write('imageUrls: $imageUrls, ')
           ..write('imagePath: $imagePath, ')
           ..write('isActive: $isActive, ')
+          ..write('serviceMode: $serviceMode, ')
+          ..write('prepStation: $prepStation, ')
+          ..write('requiresPreparation: $requiresPreparation, ')
+          ..write('dineInAvailable: $dineInAvailable, ')
+          ..write('takeawayAvailable: $takeawayAvailable, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
@@ -7952,6 +8272,1403 @@ class DiningTablesCompanion extends UpdateCompanion<DiningTable> {
   }
 }
 
+class $TableSessionsTable extends TableSessions
+    with TableInfo<$TableSessionsTable, TableSession> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $TableSessionsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _sessionIdMeta = const VerificationMeta(
+    'sessionId',
+  );
+  @override
+  late final GeneratedColumn<String> sessionId = GeneratedColumn<String>(
+    'session_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _tableIdMeta = const VerificationMeta(
+    'tableId',
+  );
+  @override
+  late final GeneratedColumn<String> tableId = GeneratedColumn<String>(
+    'table_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES dining_tables (table_id)',
+    ),
+  );
+  static const VerificationMeta _branchIdMeta = const VerificationMeta(
+    'branchId',
+  );
+  @override
+  late final GeneratedColumn<String> branchId = GeneratedColumn<String>(
+    'branch_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES branches (branch_id)',
+    ),
+  );
+  static const VerificationMeta _openedAtMeta = const VerificationMeta(
+    'openedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> openedAt = GeneratedColumn<DateTime>(
+    'opened_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  static const VerificationMeta _closedAtMeta = const VerificationMeta(
+    'closedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> closedAt = GeneratedColumn<DateTime>(
+    'closed_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _guestCountMeta = const VerificationMeta(
+    'guestCount',
+  );
+  @override
+  late final GeneratedColumn<int> guestCount = GeneratedColumn<int>(
+    'guest_count',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('OPEN'),
+  );
+  static const VerificationMeta _openedByMeta = const VerificationMeta(
+    'openedBy',
+  );
+  @override
+  late final GeneratedColumn<String> openedBy = GeneratedColumn<String>(
+    'opened_by',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _noteMeta = const VerificationMeta('note');
+  @override
+  late final GeneratedColumn<String> note = GeneratedColumn<String>(
+    'note',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _waiterIdMeta = const VerificationMeta(
+    'waiterId',
+  );
+  @override
+  late final GeneratedColumn<String> waiterId = GeneratedColumn<String>(
+    'waiter_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _waiterNameMeta = const VerificationMeta(
+    'waiterName',
+  );
+  @override
+  late final GeneratedColumn<String> waiterName = GeneratedColumn<String>(
+    'waiter_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    sessionId,
+    tableId,
+    branchId,
+    openedAt,
+    closedAt,
+    guestCount,
+    status,
+    openedBy,
+    note,
+    waiterId,
+    waiterName,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'table_sessions';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<TableSession> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('session_id')) {
+      context.handle(
+        _sessionIdMeta,
+        sessionId.isAcceptableOrUnknown(data['session_id']!, _sessionIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sessionIdMeta);
+    }
+    if (data.containsKey('table_id')) {
+      context.handle(
+        _tableIdMeta,
+        tableId.isAcceptableOrUnknown(data['table_id']!, _tableIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_tableIdMeta);
+    }
+    if (data.containsKey('branch_id')) {
+      context.handle(
+        _branchIdMeta,
+        branchId.isAcceptableOrUnknown(data['branch_id']!, _branchIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_branchIdMeta);
+    }
+    if (data.containsKey('opened_at')) {
+      context.handle(
+        _openedAtMeta,
+        openedAt.isAcceptableOrUnknown(data['opened_at']!, _openedAtMeta),
+      );
+    }
+    if (data.containsKey('closed_at')) {
+      context.handle(
+        _closedAtMeta,
+        closedAt.isAcceptableOrUnknown(data['closed_at']!, _closedAtMeta),
+      );
+    }
+    if (data.containsKey('guest_count')) {
+      context.handle(
+        _guestCountMeta,
+        guestCount.isAcceptableOrUnknown(data['guest_count']!, _guestCountMeta),
+      );
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    }
+    if (data.containsKey('opened_by')) {
+      context.handle(
+        _openedByMeta,
+        openedBy.isAcceptableOrUnknown(data['opened_by']!, _openedByMeta),
+      );
+    }
+    if (data.containsKey('note')) {
+      context.handle(
+        _noteMeta,
+        note.isAcceptableOrUnknown(data['note']!, _noteMeta),
+      );
+    }
+    if (data.containsKey('waiter_id')) {
+      context.handle(
+        _waiterIdMeta,
+        waiterId.isAcceptableOrUnknown(data['waiter_id']!, _waiterIdMeta),
+      );
+    }
+    if (data.containsKey('waiter_name')) {
+      context.handle(
+        _waiterNameMeta,
+        waiterName.isAcceptableOrUnknown(data['waiter_name']!, _waiterNameMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {sessionId};
+  @override
+  TableSession map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return TableSession(
+      sessionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}session_id'],
+      )!,
+      tableId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}table_id'],
+      )!,
+      branchId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}branch_id'],
+      )!,
+      openedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}opened_at'],
+      )!,
+      closedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}closed_at'],
+      ),
+      guestCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}guest_count'],
+      )!,
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      openedBy: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}opened_by'],
+      ),
+      note: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}note'],
+      ),
+      waiterId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}waiter_id'],
+      ),
+      waiterName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}waiter_name'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $TableSessionsTable createAlias(String alias) {
+    return $TableSessionsTable(attachedDatabase, alias);
+  }
+}
+
+class TableSession extends DataClass implements Insertable<TableSession> {
+  final String sessionId;
+  final String tableId;
+  final String branchId;
+  final DateTime openedAt;
+  final DateTime? closedAt;
+  final int guestCount;
+  final String status;
+  final String? openedBy;
+  final String? note;
+  final String? waiterId;
+  final String? waiterName;
+  final DateTime createdAt;
+  const TableSession({
+    required this.sessionId,
+    required this.tableId,
+    required this.branchId,
+    required this.openedAt,
+    this.closedAt,
+    required this.guestCount,
+    required this.status,
+    this.openedBy,
+    this.note,
+    this.waiterId,
+    this.waiterName,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['session_id'] = Variable<String>(sessionId);
+    map['table_id'] = Variable<String>(tableId);
+    map['branch_id'] = Variable<String>(branchId);
+    map['opened_at'] = Variable<DateTime>(openedAt);
+    if (!nullToAbsent || closedAt != null) {
+      map['closed_at'] = Variable<DateTime>(closedAt);
+    }
+    map['guest_count'] = Variable<int>(guestCount);
+    map['status'] = Variable<String>(status);
+    if (!nullToAbsent || openedBy != null) {
+      map['opened_by'] = Variable<String>(openedBy);
+    }
+    if (!nullToAbsent || note != null) {
+      map['note'] = Variable<String>(note);
+    }
+    if (!nullToAbsent || waiterId != null) {
+      map['waiter_id'] = Variable<String>(waiterId);
+    }
+    if (!nullToAbsent || waiterName != null) {
+      map['waiter_name'] = Variable<String>(waiterName);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  TableSessionsCompanion toCompanion(bool nullToAbsent) {
+    return TableSessionsCompanion(
+      sessionId: Value(sessionId),
+      tableId: Value(tableId),
+      branchId: Value(branchId),
+      openedAt: Value(openedAt),
+      closedAt: closedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(closedAt),
+      guestCount: Value(guestCount),
+      status: Value(status),
+      openedBy: openedBy == null && nullToAbsent
+          ? const Value.absent()
+          : Value(openedBy),
+      note: note == null && nullToAbsent ? const Value.absent() : Value(note),
+      waiterId: waiterId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(waiterId),
+      waiterName: waiterName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(waiterName),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory TableSession.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return TableSession(
+      sessionId: serializer.fromJson<String>(json['sessionId']),
+      tableId: serializer.fromJson<String>(json['tableId']),
+      branchId: serializer.fromJson<String>(json['branchId']),
+      openedAt: serializer.fromJson<DateTime>(json['openedAt']),
+      closedAt: serializer.fromJson<DateTime?>(json['closedAt']),
+      guestCount: serializer.fromJson<int>(json['guestCount']),
+      status: serializer.fromJson<String>(json['status']),
+      openedBy: serializer.fromJson<String?>(json['openedBy']),
+      note: serializer.fromJson<String?>(json['note']),
+      waiterId: serializer.fromJson<String?>(json['waiterId']),
+      waiterName: serializer.fromJson<String?>(json['waiterName']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'sessionId': serializer.toJson<String>(sessionId),
+      'tableId': serializer.toJson<String>(tableId),
+      'branchId': serializer.toJson<String>(branchId),
+      'openedAt': serializer.toJson<DateTime>(openedAt),
+      'closedAt': serializer.toJson<DateTime?>(closedAt),
+      'guestCount': serializer.toJson<int>(guestCount),
+      'status': serializer.toJson<String>(status),
+      'openedBy': serializer.toJson<String?>(openedBy),
+      'note': serializer.toJson<String?>(note),
+      'waiterId': serializer.toJson<String?>(waiterId),
+      'waiterName': serializer.toJson<String?>(waiterName),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  TableSession copyWith({
+    String? sessionId,
+    String? tableId,
+    String? branchId,
+    DateTime? openedAt,
+    Value<DateTime?> closedAt = const Value.absent(),
+    int? guestCount,
+    String? status,
+    Value<String?> openedBy = const Value.absent(),
+    Value<String?> note = const Value.absent(),
+    Value<String?> waiterId = const Value.absent(),
+    Value<String?> waiterName = const Value.absent(),
+    DateTime? createdAt,
+  }) => TableSession(
+    sessionId: sessionId ?? this.sessionId,
+    tableId: tableId ?? this.tableId,
+    branchId: branchId ?? this.branchId,
+    openedAt: openedAt ?? this.openedAt,
+    closedAt: closedAt.present ? closedAt.value : this.closedAt,
+    guestCount: guestCount ?? this.guestCount,
+    status: status ?? this.status,
+    openedBy: openedBy.present ? openedBy.value : this.openedBy,
+    note: note.present ? note.value : this.note,
+    waiterId: waiterId.present ? waiterId.value : this.waiterId,
+    waiterName: waiterName.present ? waiterName.value : this.waiterName,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  TableSession copyWithCompanion(TableSessionsCompanion data) {
+    return TableSession(
+      sessionId: data.sessionId.present ? data.sessionId.value : this.sessionId,
+      tableId: data.tableId.present ? data.tableId.value : this.tableId,
+      branchId: data.branchId.present ? data.branchId.value : this.branchId,
+      openedAt: data.openedAt.present ? data.openedAt.value : this.openedAt,
+      closedAt: data.closedAt.present ? data.closedAt.value : this.closedAt,
+      guestCount: data.guestCount.present
+          ? data.guestCount.value
+          : this.guestCount,
+      status: data.status.present ? data.status.value : this.status,
+      openedBy: data.openedBy.present ? data.openedBy.value : this.openedBy,
+      note: data.note.present ? data.note.value : this.note,
+      waiterId: data.waiterId.present ? data.waiterId.value : this.waiterId,
+      waiterName: data.waiterName.present
+          ? data.waiterName.value
+          : this.waiterName,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TableSession(')
+          ..write('sessionId: $sessionId, ')
+          ..write('tableId: $tableId, ')
+          ..write('branchId: $branchId, ')
+          ..write('openedAt: $openedAt, ')
+          ..write('closedAt: $closedAt, ')
+          ..write('guestCount: $guestCount, ')
+          ..write('status: $status, ')
+          ..write('openedBy: $openedBy, ')
+          ..write('note: $note, ')
+          ..write('waiterId: $waiterId, ')
+          ..write('waiterName: $waiterName, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    sessionId,
+    tableId,
+    branchId,
+    openedAt,
+    closedAt,
+    guestCount,
+    status,
+    openedBy,
+    note,
+    waiterId,
+    waiterName,
+    createdAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is TableSession &&
+          other.sessionId == this.sessionId &&
+          other.tableId == this.tableId &&
+          other.branchId == this.branchId &&
+          other.openedAt == this.openedAt &&
+          other.closedAt == this.closedAt &&
+          other.guestCount == this.guestCount &&
+          other.status == this.status &&
+          other.openedBy == this.openedBy &&
+          other.note == this.note &&
+          other.waiterId == this.waiterId &&
+          other.waiterName == this.waiterName &&
+          other.createdAt == this.createdAt);
+}
+
+class TableSessionsCompanion extends UpdateCompanion<TableSession> {
+  final Value<String> sessionId;
+  final Value<String> tableId;
+  final Value<String> branchId;
+  final Value<DateTime> openedAt;
+  final Value<DateTime?> closedAt;
+  final Value<int> guestCount;
+  final Value<String> status;
+  final Value<String?> openedBy;
+  final Value<String?> note;
+  final Value<String?> waiterId;
+  final Value<String?> waiterName;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const TableSessionsCompanion({
+    this.sessionId = const Value.absent(),
+    this.tableId = const Value.absent(),
+    this.branchId = const Value.absent(),
+    this.openedAt = const Value.absent(),
+    this.closedAt = const Value.absent(),
+    this.guestCount = const Value.absent(),
+    this.status = const Value.absent(),
+    this.openedBy = const Value.absent(),
+    this.note = const Value.absent(),
+    this.waiterId = const Value.absent(),
+    this.waiterName = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  TableSessionsCompanion.insert({
+    required String sessionId,
+    required String tableId,
+    required String branchId,
+    this.openedAt = const Value.absent(),
+    this.closedAt = const Value.absent(),
+    this.guestCount = const Value.absent(),
+    this.status = const Value.absent(),
+    this.openedBy = const Value.absent(),
+    this.note = const Value.absent(),
+    this.waiterId = const Value.absent(),
+    this.waiterName = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : sessionId = Value(sessionId),
+       tableId = Value(tableId),
+       branchId = Value(branchId);
+  static Insertable<TableSession> custom({
+    Expression<String>? sessionId,
+    Expression<String>? tableId,
+    Expression<String>? branchId,
+    Expression<DateTime>? openedAt,
+    Expression<DateTime>? closedAt,
+    Expression<int>? guestCount,
+    Expression<String>? status,
+    Expression<String>? openedBy,
+    Expression<String>? note,
+    Expression<String>? waiterId,
+    Expression<String>? waiterName,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (sessionId != null) 'session_id': sessionId,
+      if (tableId != null) 'table_id': tableId,
+      if (branchId != null) 'branch_id': branchId,
+      if (openedAt != null) 'opened_at': openedAt,
+      if (closedAt != null) 'closed_at': closedAt,
+      if (guestCount != null) 'guest_count': guestCount,
+      if (status != null) 'status': status,
+      if (openedBy != null) 'opened_by': openedBy,
+      if (note != null) 'note': note,
+      if (waiterId != null) 'waiter_id': waiterId,
+      if (waiterName != null) 'waiter_name': waiterName,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  TableSessionsCompanion copyWith({
+    Value<String>? sessionId,
+    Value<String>? tableId,
+    Value<String>? branchId,
+    Value<DateTime>? openedAt,
+    Value<DateTime?>? closedAt,
+    Value<int>? guestCount,
+    Value<String>? status,
+    Value<String?>? openedBy,
+    Value<String?>? note,
+    Value<String?>? waiterId,
+    Value<String?>? waiterName,
+    Value<DateTime>? createdAt,
+    Value<int>? rowid,
+  }) {
+    return TableSessionsCompanion(
+      sessionId: sessionId ?? this.sessionId,
+      tableId: tableId ?? this.tableId,
+      branchId: branchId ?? this.branchId,
+      openedAt: openedAt ?? this.openedAt,
+      closedAt: closedAt ?? this.closedAt,
+      guestCount: guestCount ?? this.guestCount,
+      status: status ?? this.status,
+      openedBy: openedBy ?? this.openedBy,
+      note: note ?? this.note,
+      waiterId: waiterId ?? this.waiterId,
+      waiterName: waiterName ?? this.waiterName,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (sessionId.present) {
+      map['session_id'] = Variable<String>(sessionId.value);
+    }
+    if (tableId.present) {
+      map['table_id'] = Variable<String>(tableId.value);
+    }
+    if (branchId.present) {
+      map['branch_id'] = Variable<String>(branchId.value);
+    }
+    if (openedAt.present) {
+      map['opened_at'] = Variable<DateTime>(openedAt.value);
+    }
+    if (closedAt.present) {
+      map['closed_at'] = Variable<DateTime>(closedAt.value);
+    }
+    if (guestCount.present) {
+      map['guest_count'] = Variable<int>(guestCount.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (openedBy.present) {
+      map['opened_by'] = Variable<String>(openedBy.value);
+    }
+    if (note.present) {
+      map['note'] = Variable<String>(note.value);
+    }
+    if (waiterId.present) {
+      map['waiter_id'] = Variable<String>(waiterId.value);
+    }
+    if (waiterName.present) {
+      map['waiter_name'] = Variable<String>(waiterName.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TableSessionsCompanion(')
+          ..write('sessionId: $sessionId, ')
+          ..write('tableId: $tableId, ')
+          ..write('branchId: $branchId, ')
+          ..write('openedAt: $openedAt, ')
+          ..write('closedAt: $closedAt, ')
+          ..write('guestCount: $guestCount, ')
+          ..write('status: $status, ')
+          ..write('openedBy: $openedBy, ')
+          ..write('note: $note, ')
+          ..write('waiterId: $waiterId, ')
+          ..write('waiterName: $waiterName, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $TableReservationsTable extends TableReservations
+    with TableInfo<$TableReservationsTable, TableReservation> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $TableReservationsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _reservationIdMeta = const VerificationMeta(
+    'reservationId',
+  );
+  @override
+  late final GeneratedColumn<String> reservationId = GeneratedColumn<String>(
+    'reservation_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _tableIdMeta = const VerificationMeta(
+    'tableId',
+  );
+  @override
+  late final GeneratedColumn<String> tableId = GeneratedColumn<String>(
+    'table_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES dining_tables (table_id)',
+    ),
+  );
+  static const VerificationMeta _branchIdMeta = const VerificationMeta(
+    'branchId',
+  );
+  @override
+  late final GeneratedColumn<String> branchId = GeneratedColumn<String>(
+    'branch_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES branches (branch_id)',
+    ),
+  );
+  static const VerificationMeta _customerNameMeta = const VerificationMeta(
+    'customerName',
+  );
+  @override
+  late final GeneratedColumn<String> customerName = GeneratedColumn<String>(
+    'customer_name',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(maxTextLength: 300),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _customerPhoneMeta = const VerificationMeta(
+    'customerPhone',
+  );
+  @override
+  late final GeneratedColumn<String> customerPhone = GeneratedColumn<String>(
+    'customer_phone',
+    aliasedName,
+    true,
+    additionalChecks: GeneratedColumn.checkTextLength(maxTextLength: 50),
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _reservationTimeMeta = const VerificationMeta(
+    'reservationTime',
+  );
+  @override
+  late final GeneratedColumn<DateTime> reservationTime =
+      GeneratedColumn<DateTime>(
+        'reservation_time',
+        aliasedName,
+        false,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: true,
+      );
+  static const VerificationMeta _partySizeMeta = const VerificationMeta(
+    'partySize',
+  );
+  @override
+  late final GeneratedColumn<int> partySize = GeneratedColumn<int>(
+    'party_size',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(2),
+  );
+  static const VerificationMeta _notesMeta = const VerificationMeta('notes');
+  @override
+  late final GeneratedColumn<String> notes = GeneratedColumn<String>(
+    'notes',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('PENDING'),
+  );
+  static const VerificationMeta _sessionIdMeta = const VerificationMeta(
+    'sessionId',
+  );
+  @override
+  late final GeneratedColumn<String> sessionId = GeneratedColumn<String>(
+    'session_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    reservationId,
+    tableId,
+    branchId,
+    customerName,
+    customerPhone,
+    reservationTime,
+    partySize,
+    notes,
+    status,
+    sessionId,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'table_reservations';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<TableReservation> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('reservation_id')) {
+      context.handle(
+        _reservationIdMeta,
+        reservationId.isAcceptableOrUnknown(
+          data['reservation_id']!,
+          _reservationIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_reservationIdMeta);
+    }
+    if (data.containsKey('table_id')) {
+      context.handle(
+        _tableIdMeta,
+        tableId.isAcceptableOrUnknown(data['table_id']!, _tableIdMeta),
+      );
+    }
+    if (data.containsKey('branch_id')) {
+      context.handle(
+        _branchIdMeta,
+        branchId.isAcceptableOrUnknown(data['branch_id']!, _branchIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_branchIdMeta);
+    }
+    if (data.containsKey('customer_name')) {
+      context.handle(
+        _customerNameMeta,
+        customerName.isAcceptableOrUnknown(
+          data['customer_name']!,
+          _customerNameMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_customerNameMeta);
+    }
+    if (data.containsKey('customer_phone')) {
+      context.handle(
+        _customerPhoneMeta,
+        customerPhone.isAcceptableOrUnknown(
+          data['customer_phone']!,
+          _customerPhoneMeta,
+        ),
+      );
+    }
+    if (data.containsKey('reservation_time')) {
+      context.handle(
+        _reservationTimeMeta,
+        reservationTime.isAcceptableOrUnknown(
+          data['reservation_time']!,
+          _reservationTimeMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_reservationTimeMeta);
+    }
+    if (data.containsKey('party_size')) {
+      context.handle(
+        _partySizeMeta,
+        partySize.isAcceptableOrUnknown(data['party_size']!, _partySizeMeta),
+      );
+    }
+    if (data.containsKey('notes')) {
+      context.handle(
+        _notesMeta,
+        notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
+      );
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    }
+    if (data.containsKey('session_id')) {
+      context.handle(
+        _sessionIdMeta,
+        sessionId.isAcceptableOrUnknown(data['session_id']!, _sessionIdMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {reservationId};
+  @override
+  TableReservation map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return TableReservation(
+      reservationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}reservation_id'],
+      )!,
+      tableId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}table_id'],
+      ),
+      branchId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}branch_id'],
+      )!,
+      customerName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}customer_name'],
+      )!,
+      customerPhone: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}customer_phone'],
+      ),
+      reservationTime: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}reservation_time'],
+      )!,
+      partySize: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}party_size'],
+      )!,
+      notes: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}notes'],
+      ),
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      sessionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}session_id'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $TableReservationsTable createAlias(String alias) {
+    return $TableReservationsTable(attachedDatabase, alias);
+  }
+}
+
+class TableReservation extends DataClass
+    implements Insertable<TableReservation> {
+  final String reservationId;
+  final String? tableId;
+  final String branchId;
+  final String customerName;
+  final String? customerPhone;
+  final DateTime reservationTime;
+  final int partySize;
+  final String? notes;
+  final String status;
+  final String? sessionId;
+  final DateTime createdAt;
+  const TableReservation({
+    required this.reservationId,
+    this.tableId,
+    required this.branchId,
+    required this.customerName,
+    this.customerPhone,
+    required this.reservationTime,
+    required this.partySize,
+    this.notes,
+    required this.status,
+    this.sessionId,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['reservation_id'] = Variable<String>(reservationId);
+    if (!nullToAbsent || tableId != null) {
+      map['table_id'] = Variable<String>(tableId);
+    }
+    map['branch_id'] = Variable<String>(branchId);
+    map['customer_name'] = Variable<String>(customerName);
+    if (!nullToAbsent || customerPhone != null) {
+      map['customer_phone'] = Variable<String>(customerPhone);
+    }
+    map['reservation_time'] = Variable<DateTime>(reservationTime);
+    map['party_size'] = Variable<int>(partySize);
+    if (!nullToAbsent || notes != null) {
+      map['notes'] = Variable<String>(notes);
+    }
+    map['status'] = Variable<String>(status);
+    if (!nullToAbsent || sessionId != null) {
+      map['session_id'] = Variable<String>(sessionId);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  TableReservationsCompanion toCompanion(bool nullToAbsent) {
+    return TableReservationsCompanion(
+      reservationId: Value(reservationId),
+      tableId: tableId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(tableId),
+      branchId: Value(branchId),
+      customerName: Value(customerName),
+      customerPhone: customerPhone == null && nullToAbsent
+          ? const Value.absent()
+          : Value(customerPhone),
+      reservationTime: Value(reservationTime),
+      partySize: Value(partySize),
+      notes: notes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(notes),
+      status: Value(status),
+      sessionId: sessionId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sessionId),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory TableReservation.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return TableReservation(
+      reservationId: serializer.fromJson<String>(json['reservationId']),
+      tableId: serializer.fromJson<String?>(json['tableId']),
+      branchId: serializer.fromJson<String>(json['branchId']),
+      customerName: serializer.fromJson<String>(json['customerName']),
+      customerPhone: serializer.fromJson<String?>(json['customerPhone']),
+      reservationTime: serializer.fromJson<DateTime>(json['reservationTime']),
+      partySize: serializer.fromJson<int>(json['partySize']),
+      notes: serializer.fromJson<String?>(json['notes']),
+      status: serializer.fromJson<String>(json['status']),
+      sessionId: serializer.fromJson<String?>(json['sessionId']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'reservationId': serializer.toJson<String>(reservationId),
+      'tableId': serializer.toJson<String?>(tableId),
+      'branchId': serializer.toJson<String>(branchId),
+      'customerName': serializer.toJson<String>(customerName),
+      'customerPhone': serializer.toJson<String?>(customerPhone),
+      'reservationTime': serializer.toJson<DateTime>(reservationTime),
+      'partySize': serializer.toJson<int>(partySize),
+      'notes': serializer.toJson<String?>(notes),
+      'status': serializer.toJson<String>(status),
+      'sessionId': serializer.toJson<String?>(sessionId),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  TableReservation copyWith({
+    String? reservationId,
+    Value<String?> tableId = const Value.absent(),
+    String? branchId,
+    String? customerName,
+    Value<String?> customerPhone = const Value.absent(),
+    DateTime? reservationTime,
+    int? partySize,
+    Value<String?> notes = const Value.absent(),
+    String? status,
+    Value<String?> sessionId = const Value.absent(),
+    DateTime? createdAt,
+  }) => TableReservation(
+    reservationId: reservationId ?? this.reservationId,
+    tableId: tableId.present ? tableId.value : this.tableId,
+    branchId: branchId ?? this.branchId,
+    customerName: customerName ?? this.customerName,
+    customerPhone: customerPhone.present
+        ? customerPhone.value
+        : this.customerPhone,
+    reservationTime: reservationTime ?? this.reservationTime,
+    partySize: partySize ?? this.partySize,
+    notes: notes.present ? notes.value : this.notes,
+    status: status ?? this.status,
+    sessionId: sessionId.present ? sessionId.value : this.sessionId,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  TableReservation copyWithCompanion(TableReservationsCompanion data) {
+    return TableReservation(
+      reservationId: data.reservationId.present
+          ? data.reservationId.value
+          : this.reservationId,
+      tableId: data.tableId.present ? data.tableId.value : this.tableId,
+      branchId: data.branchId.present ? data.branchId.value : this.branchId,
+      customerName: data.customerName.present
+          ? data.customerName.value
+          : this.customerName,
+      customerPhone: data.customerPhone.present
+          ? data.customerPhone.value
+          : this.customerPhone,
+      reservationTime: data.reservationTime.present
+          ? data.reservationTime.value
+          : this.reservationTime,
+      partySize: data.partySize.present ? data.partySize.value : this.partySize,
+      notes: data.notes.present ? data.notes.value : this.notes,
+      status: data.status.present ? data.status.value : this.status,
+      sessionId: data.sessionId.present ? data.sessionId.value : this.sessionId,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TableReservation(')
+          ..write('reservationId: $reservationId, ')
+          ..write('tableId: $tableId, ')
+          ..write('branchId: $branchId, ')
+          ..write('customerName: $customerName, ')
+          ..write('customerPhone: $customerPhone, ')
+          ..write('reservationTime: $reservationTime, ')
+          ..write('partySize: $partySize, ')
+          ..write('notes: $notes, ')
+          ..write('status: $status, ')
+          ..write('sessionId: $sessionId, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    reservationId,
+    tableId,
+    branchId,
+    customerName,
+    customerPhone,
+    reservationTime,
+    partySize,
+    notes,
+    status,
+    sessionId,
+    createdAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is TableReservation &&
+          other.reservationId == this.reservationId &&
+          other.tableId == this.tableId &&
+          other.branchId == this.branchId &&
+          other.customerName == this.customerName &&
+          other.customerPhone == this.customerPhone &&
+          other.reservationTime == this.reservationTime &&
+          other.partySize == this.partySize &&
+          other.notes == this.notes &&
+          other.status == this.status &&
+          other.sessionId == this.sessionId &&
+          other.createdAt == this.createdAt);
+}
+
+class TableReservationsCompanion extends UpdateCompanion<TableReservation> {
+  final Value<String> reservationId;
+  final Value<String?> tableId;
+  final Value<String> branchId;
+  final Value<String> customerName;
+  final Value<String?> customerPhone;
+  final Value<DateTime> reservationTime;
+  final Value<int> partySize;
+  final Value<String?> notes;
+  final Value<String> status;
+  final Value<String?> sessionId;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const TableReservationsCompanion({
+    this.reservationId = const Value.absent(),
+    this.tableId = const Value.absent(),
+    this.branchId = const Value.absent(),
+    this.customerName = const Value.absent(),
+    this.customerPhone = const Value.absent(),
+    this.reservationTime = const Value.absent(),
+    this.partySize = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.status = const Value.absent(),
+    this.sessionId = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  TableReservationsCompanion.insert({
+    required String reservationId,
+    this.tableId = const Value.absent(),
+    required String branchId,
+    required String customerName,
+    this.customerPhone = const Value.absent(),
+    required DateTime reservationTime,
+    this.partySize = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.status = const Value.absent(),
+    this.sessionId = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : reservationId = Value(reservationId),
+       branchId = Value(branchId),
+       customerName = Value(customerName),
+       reservationTime = Value(reservationTime);
+  static Insertable<TableReservation> custom({
+    Expression<String>? reservationId,
+    Expression<String>? tableId,
+    Expression<String>? branchId,
+    Expression<String>? customerName,
+    Expression<String>? customerPhone,
+    Expression<DateTime>? reservationTime,
+    Expression<int>? partySize,
+    Expression<String>? notes,
+    Expression<String>? status,
+    Expression<String>? sessionId,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (reservationId != null) 'reservation_id': reservationId,
+      if (tableId != null) 'table_id': tableId,
+      if (branchId != null) 'branch_id': branchId,
+      if (customerName != null) 'customer_name': customerName,
+      if (customerPhone != null) 'customer_phone': customerPhone,
+      if (reservationTime != null) 'reservation_time': reservationTime,
+      if (partySize != null) 'party_size': partySize,
+      if (notes != null) 'notes': notes,
+      if (status != null) 'status': status,
+      if (sessionId != null) 'session_id': sessionId,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  TableReservationsCompanion copyWith({
+    Value<String>? reservationId,
+    Value<String?>? tableId,
+    Value<String>? branchId,
+    Value<String>? customerName,
+    Value<String?>? customerPhone,
+    Value<DateTime>? reservationTime,
+    Value<int>? partySize,
+    Value<String?>? notes,
+    Value<String>? status,
+    Value<String?>? sessionId,
+    Value<DateTime>? createdAt,
+    Value<int>? rowid,
+  }) {
+    return TableReservationsCompanion(
+      reservationId: reservationId ?? this.reservationId,
+      tableId: tableId ?? this.tableId,
+      branchId: branchId ?? this.branchId,
+      customerName: customerName ?? this.customerName,
+      customerPhone: customerPhone ?? this.customerPhone,
+      reservationTime: reservationTime ?? this.reservationTime,
+      partySize: partySize ?? this.partySize,
+      notes: notes ?? this.notes,
+      status: status ?? this.status,
+      sessionId: sessionId ?? this.sessionId,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (reservationId.present) {
+      map['reservation_id'] = Variable<String>(reservationId.value);
+    }
+    if (tableId.present) {
+      map['table_id'] = Variable<String>(tableId.value);
+    }
+    if (branchId.present) {
+      map['branch_id'] = Variable<String>(branchId.value);
+    }
+    if (customerName.present) {
+      map['customer_name'] = Variable<String>(customerName.value);
+    }
+    if (customerPhone.present) {
+      map['customer_phone'] = Variable<String>(customerPhone.value);
+    }
+    if (reservationTime.present) {
+      map['reservation_time'] = Variable<DateTime>(reservationTime.value);
+    }
+    if (partySize.present) {
+      map['party_size'] = Variable<int>(partySize.value);
+    }
+    if (notes.present) {
+      map['notes'] = Variable<String>(notes.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (sessionId.present) {
+      map['session_id'] = Variable<String>(sessionId.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TableReservationsCompanion(')
+          ..write('reservationId: $reservationId, ')
+          ..write('tableId: $tableId, ')
+          ..write('branchId: $branchId, ')
+          ..write('customerName: $customerName, ')
+          ..write('customerPhone: $customerPhone, ')
+          ..write('reservationTime: $reservationTime, ')
+          ..write('partySize: $partySize, ')
+          ..write('notes: $notes, ')
+          ..write('status: $status, ')
+          ..write('sessionId: $sessionId, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $CustomerGroupsTable extends CustomerGroups
     with TableInfo<$CustomerGroupsTable, CustomerGroup> {
   @override
@@ -10772,6 +12489,17 @@ class $SalesOrdersTable extends SalesOrders
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _sessionIdMeta = const VerificationMeta(
+    'sessionId',
+  );
+  @override
+  late final GeneratedColumn<String> sessionId = GeneratedColumn<String>(
+    'session_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _partySizeMeta = const VerificationMeta(
     'partySize',
   );
@@ -10781,6 +12509,17 @@ class $SalesOrdersTable extends SalesOrders
     aliasedName,
     true,
     type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _serviceTypeMeta = const VerificationMeta(
+    'serviceType',
+  );
+  @override
+  late final GeneratedColumn<String> serviceType = GeneratedColumn<String>(
+    'service_type',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
   static const VerificationMeta _subtotalMeta = const VerificationMeta(
@@ -10843,6 +12582,31 @@ class $SalesOrdersTable extends SalesOrders
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _serviceChargeRateMeta = const VerificationMeta(
+    'serviceChargeRate',
+  );
+  @override
+  late final GeneratedColumn<double> serviceChargeRate =
+      GeneratedColumn<double>(
+        'service_charge_rate',
+        aliasedName,
+        false,
+        type: DriftSqlType.double,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(0),
+      );
+  static const VerificationMeta _serviceChargeAmountMeta =
+      const VerificationMeta('serviceChargeAmount');
+  @override
+  late final GeneratedColumn<double> serviceChargeAmount =
+      GeneratedColumn<double>(
+        'service_charge_amount',
+        aliasedName,
+        false,
+        type: DriftSqlType.double,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(0),
+      );
   static const VerificationMeta _couponDiscountMeta = const VerificationMeta(
     'couponDiscount',
   );
@@ -10997,12 +12761,16 @@ class $SalesOrdersTable extends SalesOrders
     warehouseId,
     userId,
     tableId,
+    sessionId,
     partySize,
+    serviceType,
     subtotal,
     discountAmount,
     amountBeforeVat,
     vatAmount,
     totalAmount,
+    serviceChargeRate,
+    serviceChargeAmount,
     couponDiscount,
     couponCodes,
     pointsUsed,
@@ -11124,10 +12892,25 @@ class $SalesOrdersTable extends SalesOrders
         tableId.isAcceptableOrUnknown(data['table_id']!, _tableIdMeta),
       );
     }
+    if (data.containsKey('session_id')) {
+      context.handle(
+        _sessionIdMeta,
+        sessionId.isAcceptableOrUnknown(data['session_id']!, _sessionIdMeta),
+      );
+    }
     if (data.containsKey('party_size')) {
       context.handle(
         _partySizeMeta,
         partySize.isAcceptableOrUnknown(data['party_size']!, _partySizeMeta),
+      );
+    }
+    if (data.containsKey('service_type')) {
+      context.handle(
+        _serviceTypeMeta,
+        serviceType.isAcceptableOrUnknown(
+          data['service_type']!,
+          _serviceTypeMeta,
+        ),
       );
     }
     if (data.containsKey('subtotal')) {
@@ -11166,6 +12949,24 @@ class $SalesOrdersTable extends SalesOrders
         totalAmount.isAcceptableOrUnknown(
           data['total_amount']!,
           _totalAmountMeta,
+        ),
+      );
+    }
+    if (data.containsKey('service_charge_rate')) {
+      context.handle(
+        _serviceChargeRateMeta,
+        serviceChargeRate.isAcceptableOrUnknown(
+          data['service_charge_rate']!,
+          _serviceChargeRateMeta,
+        ),
+      );
+    }
+    if (data.containsKey('service_charge_amount')) {
+      context.handle(
+        _serviceChargeAmountMeta,
+        serviceChargeAmount.isAcceptableOrUnknown(
+          data['service_charge_amount']!,
+          _serviceChargeAmountMeta,
         ),
       );
     }
@@ -11320,9 +13121,17 @@ class $SalesOrdersTable extends SalesOrders
         DriftSqlType.string,
         data['${effectivePrefix}table_id'],
       ),
+      sessionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}session_id'],
+      ),
       partySize: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}party_size'],
+      ),
+      serviceType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}service_type'],
       ),
       subtotal: attachedDatabase.typeMapping.read(
         DriftSqlType.double,
@@ -11343,6 +13152,14 @@ class $SalesOrdersTable extends SalesOrders
       totalAmount: attachedDatabase.typeMapping.read(
         DriftSqlType.double,
         data['${effectivePrefix}total_amount'],
+      )!,
+      serviceChargeRate: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}service_charge_rate'],
+      )!,
+      serviceChargeAmount: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}service_charge_amount'],
       )!,
       couponDiscount: attachedDatabase.typeMapping.read(
         DriftSqlType.double,
@@ -11414,12 +13231,16 @@ class SalesOrder extends DataClass implements Insertable<SalesOrder> {
   final String warehouseId;
   final String userId;
   final String? tableId;
+  final String? sessionId;
   final int? partySize;
+  final String? serviceType;
   final double subtotal;
   final double discountAmount;
   final double amountBeforeVat;
   final double vatAmount;
   final double totalAmount;
+  final double serviceChargeRate;
+  final double serviceChargeAmount;
   final double couponDiscount;
   final String? couponCodes;
   final int pointsUsed;
@@ -11445,12 +13266,16 @@ class SalesOrder extends DataClass implements Insertable<SalesOrder> {
     required this.warehouseId,
     required this.userId,
     this.tableId,
+    this.sessionId,
     this.partySize,
+    this.serviceType,
     required this.subtotal,
     required this.discountAmount,
     required this.amountBeforeVat,
     required this.vatAmount,
     required this.totalAmount,
+    required this.serviceChargeRate,
+    required this.serviceChargeAmount,
     required this.couponDiscount,
     this.couponCodes,
     required this.pointsUsed,
@@ -11489,14 +13314,22 @@ class SalesOrder extends DataClass implements Insertable<SalesOrder> {
     if (!nullToAbsent || tableId != null) {
       map['table_id'] = Variable<String>(tableId);
     }
+    if (!nullToAbsent || sessionId != null) {
+      map['session_id'] = Variable<String>(sessionId);
+    }
     if (!nullToAbsent || partySize != null) {
       map['party_size'] = Variable<int>(partySize);
+    }
+    if (!nullToAbsent || serviceType != null) {
+      map['service_type'] = Variable<String>(serviceType);
     }
     map['subtotal'] = Variable<double>(subtotal);
     map['discount_amount'] = Variable<double>(discountAmount);
     map['amount_before_vat'] = Variable<double>(amountBeforeVat);
     map['vat_amount'] = Variable<double>(vatAmount);
     map['total_amount'] = Variable<double>(totalAmount);
+    map['service_charge_rate'] = Variable<double>(serviceChargeRate);
+    map['service_charge_amount'] = Variable<double>(serviceChargeAmount);
     map['coupon_discount'] = Variable<double>(couponDiscount);
     if (!nullToAbsent || couponCodes != null) {
       map['coupon_codes'] = Variable<String>(couponCodes);
@@ -11542,14 +13375,22 @@ class SalesOrder extends DataClass implements Insertable<SalesOrder> {
       tableId: tableId == null && nullToAbsent
           ? const Value.absent()
           : Value(tableId),
+      sessionId: sessionId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sessionId),
       partySize: partySize == null && nullToAbsent
           ? const Value.absent()
           : Value(partySize),
+      serviceType: serviceType == null && nullToAbsent
+          ? const Value.absent()
+          : Value(serviceType),
       subtotal: Value(subtotal),
       discountAmount: Value(discountAmount),
       amountBeforeVat: Value(amountBeforeVat),
       vatAmount: Value(vatAmount),
       totalAmount: Value(totalAmount),
+      serviceChargeRate: Value(serviceChargeRate),
+      serviceChargeAmount: Value(serviceChargeAmount),
       couponDiscount: Value(couponDiscount),
       couponCodes: couponCodes == null && nullToAbsent
           ? const Value.absent()
@@ -11589,12 +13430,18 @@ class SalesOrder extends DataClass implements Insertable<SalesOrder> {
       warehouseId: serializer.fromJson<String>(json['warehouseId']),
       userId: serializer.fromJson<String>(json['userId']),
       tableId: serializer.fromJson<String?>(json['tableId']),
+      sessionId: serializer.fromJson<String?>(json['sessionId']),
       partySize: serializer.fromJson<int?>(json['partySize']),
+      serviceType: serializer.fromJson<String?>(json['serviceType']),
       subtotal: serializer.fromJson<double>(json['subtotal']),
       discountAmount: serializer.fromJson<double>(json['discountAmount']),
       amountBeforeVat: serializer.fromJson<double>(json['amountBeforeVat']),
       vatAmount: serializer.fromJson<double>(json['vatAmount']),
       totalAmount: serializer.fromJson<double>(json['totalAmount']),
+      serviceChargeRate: serializer.fromJson<double>(json['serviceChargeRate']),
+      serviceChargeAmount: serializer.fromJson<double>(
+        json['serviceChargeAmount'],
+      ),
       couponDiscount: serializer.fromJson<double>(json['couponDiscount']),
       couponCodes: serializer.fromJson<String?>(json['couponCodes']),
       pointsUsed: serializer.fromJson<int>(json['pointsUsed']),
@@ -11625,12 +13472,16 @@ class SalesOrder extends DataClass implements Insertable<SalesOrder> {
       'warehouseId': serializer.toJson<String>(warehouseId),
       'userId': serializer.toJson<String>(userId),
       'tableId': serializer.toJson<String?>(tableId),
+      'sessionId': serializer.toJson<String?>(sessionId),
       'partySize': serializer.toJson<int?>(partySize),
+      'serviceType': serializer.toJson<String?>(serviceType),
       'subtotal': serializer.toJson<double>(subtotal),
       'discountAmount': serializer.toJson<double>(discountAmount),
       'amountBeforeVat': serializer.toJson<double>(amountBeforeVat),
       'vatAmount': serializer.toJson<double>(vatAmount),
       'totalAmount': serializer.toJson<double>(totalAmount),
+      'serviceChargeRate': serializer.toJson<double>(serviceChargeRate),
+      'serviceChargeAmount': serializer.toJson<double>(serviceChargeAmount),
       'couponDiscount': serializer.toJson<double>(couponDiscount),
       'couponCodes': serializer.toJson<String?>(couponCodes),
       'pointsUsed': serializer.toJson<int>(pointsUsed),
@@ -11659,12 +13510,16 @@ class SalesOrder extends DataClass implements Insertable<SalesOrder> {
     String? warehouseId,
     String? userId,
     Value<String?> tableId = const Value.absent(),
+    Value<String?> sessionId = const Value.absent(),
     Value<int?> partySize = const Value.absent(),
+    Value<String?> serviceType = const Value.absent(),
     double? subtotal,
     double? discountAmount,
     double? amountBeforeVat,
     double? vatAmount,
     double? totalAmount,
+    double? serviceChargeRate,
+    double? serviceChargeAmount,
     double? couponDiscount,
     Value<String?> couponCodes = const Value.absent(),
     int? pointsUsed,
@@ -11694,12 +13549,16 @@ class SalesOrder extends DataClass implements Insertable<SalesOrder> {
     warehouseId: warehouseId ?? this.warehouseId,
     userId: userId ?? this.userId,
     tableId: tableId.present ? tableId.value : this.tableId,
+    sessionId: sessionId.present ? sessionId.value : this.sessionId,
     partySize: partySize.present ? partySize.value : this.partySize,
+    serviceType: serviceType.present ? serviceType.value : this.serviceType,
     subtotal: subtotal ?? this.subtotal,
     discountAmount: discountAmount ?? this.discountAmount,
     amountBeforeVat: amountBeforeVat ?? this.amountBeforeVat,
     vatAmount: vatAmount ?? this.vatAmount,
     totalAmount: totalAmount ?? this.totalAmount,
+    serviceChargeRate: serviceChargeRate ?? this.serviceChargeRate,
+    serviceChargeAmount: serviceChargeAmount ?? this.serviceChargeAmount,
     couponDiscount: couponDiscount ?? this.couponDiscount,
     couponCodes: couponCodes.present ? couponCodes.value : this.couponCodes,
     pointsUsed: pointsUsed ?? this.pointsUsed,
@@ -11737,7 +13596,11 @@ class SalesOrder extends DataClass implements Insertable<SalesOrder> {
           : this.warehouseId,
       userId: data.userId.present ? data.userId.value : this.userId,
       tableId: data.tableId.present ? data.tableId.value : this.tableId,
+      sessionId: data.sessionId.present ? data.sessionId.value : this.sessionId,
       partySize: data.partySize.present ? data.partySize.value : this.partySize,
+      serviceType: data.serviceType.present
+          ? data.serviceType.value
+          : this.serviceType,
       subtotal: data.subtotal.present ? data.subtotal.value : this.subtotal,
       discountAmount: data.discountAmount.present
           ? data.discountAmount.value
@@ -11749,6 +13612,12 @@ class SalesOrder extends DataClass implements Insertable<SalesOrder> {
       totalAmount: data.totalAmount.present
           ? data.totalAmount.value
           : this.totalAmount,
+      serviceChargeRate: data.serviceChargeRate.present
+          ? data.serviceChargeRate.value
+          : this.serviceChargeRate,
+      serviceChargeAmount: data.serviceChargeAmount.present
+          ? data.serviceChargeAmount.value
+          : this.serviceChargeAmount,
       couponDiscount: data.couponDiscount.present
           ? data.couponDiscount.value
           : this.couponDiscount,
@@ -11795,12 +13664,16 @@ class SalesOrder extends DataClass implements Insertable<SalesOrder> {
           ..write('warehouseId: $warehouseId, ')
           ..write('userId: $userId, ')
           ..write('tableId: $tableId, ')
+          ..write('sessionId: $sessionId, ')
           ..write('partySize: $partySize, ')
+          ..write('serviceType: $serviceType, ')
           ..write('subtotal: $subtotal, ')
           ..write('discountAmount: $discountAmount, ')
           ..write('amountBeforeVat: $amountBeforeVat, ')
           ..write('vatAmount: $vatAmount, ')
           ..write('totalAmount: $totalAmount, ')
+          ..write('serviceChargeRate: $serviceChargeRate, ')
+          ..write('serviceChargeAmount: $serviceChargeAmount, ')
           ..write('couponDiscount: $couponDiscount, ')
           ..write('couponCodes: $couponCodes, ')
           ..write('pointsUsed: $pointsUsed, ')
@@ -11831,12 +13704,16 @@ class SalesOrder extends DataClass implements Insertable<SalesOrder> {
     warehouseId,
     userId,
     tableId,
+    sessionId,
     partySize,
+    serviceType,
     subtotal,
     discountAmount,
     amountBeforeVat,
     vatAmount,
     totalAmount,
+    serviceChargeRate,
+    serviceChargeAmount,
     couponDiscount,
     couponCodes,
     pointsUsed,
@@ -11866,12 +13743,16 @@ class SalesOrder extends DataClass implements Insertable<SalesOrder> {
           other.warehouseId == this.warehouseId &&
           other.userId == this.userId &&
           other.tableId == this.tableId &&
+          other.sessionId == this.sessionId &&
           other.partySize == this.partySize &&
+          other.serviceType == this.serviceType &&
           other.subtotal == this.subtotal &&
           other.discountAmount == this.discountAmount &&
           other.amountBeforeVat == this.amountBeforeVat &&
           other.vatAmount == this.vatAmount &&
           other.totalAmount == this.totalAmount &&
+          other.serviceChargeRate == this.serviceChargeRate &&
+          other.serviceChargeAmount == this.serviceChargeAmount &&
           other.couponDiscount == this.couponDiscount &&
           other.couponCodes == this.couponCodes &&
           other.pointsUsed == this.pointsUsed &&
@@ -11899,12 +13780,16 @@ class SalesOrdersCompanion extends UpdateCompanion<SalesOrder> {
   final Value<String> warehouseId;
   final Value<String> userId;
   final Value<String?> tableId;
+  final Value<String?> sessionId;
   final Value<int?> partySize;
+  final Value<String?> serviceType;
   final Value<double> subtotal;
   final Value<double> discountAmount;
   final Value<double> amountBeforeVat;
   final Value<double> vatAmount;
   final Value<double> totalAmount;
+  final Value<double> serviceChargeRate;
+  final Value<double> serviceChargeAmount;
   final Value<double> couponDiscount;
   final Value<String?> couponCodes;
   final Value<int> pointsUsed;
@@ -11931,12 +13816,16 @@ class SalesOrdersCompanion extends UpdateCompanion<SalesOrder> {
     this.warehouseId = const Value.absent(),
     this.userId = const Value.absent(),
     this.tableId = const Value.absent(),
+    this.sessionId = const Value.absent(),
     this.partySize = const Value.absent(),
+    this.serviceType = const Value.absent(),
     this.subtotal = const Value.absent(),
     this.discountAmount = const Value.absent(),
     this.amountBeforeVat = const Value.absent(),
     this.vatAmount = const Value.absent(),
     this.totalAmount = const Value.absent(),
+    this.serviceChargeRate = const Value.absent(),
+    this.serviceChargeAmount = const Value.absent(),
     this.couponDiscount = const Value.absent(),
     this.couponCodes = const Value.absent(),
     this.pointsUsed = const Value.absent(),
@@ -11964,12 +13853,16 @@ class SalesOrdersCompanion extends UpdateCompanion<SalesOrder> {
     required String warehouseId,
     required String userId,
     this.tableId = const Value.absent(),
+    this.sessionId = const Value.absent(),
     this.partySize = const Value.absent(),
+    this.serviceType = const Value.absent(),
     this.subtotal = const Value.absent(),
     this.discountAmount = const Value.absent(),
     this.amountBeforeVat = const Value.absent(),
     this.vatAmount = const Value.absent(),
     this.totalAmount = const Value.absent(),
+    this.serviceChargeRate = const Value.absent(),
+    this.serviceChargeAmount = const Value.absent(),
     this.couponDiscount = const Value.absent(),
     this.couponCodes = const Value.absent(),
     this.pointsUsed = const Value.absent(),
@@ -12002,12 +13895,16 @@ class SalesOrdersCompanion extends UpdateCompanion<SalesOrder> {
     Expression<String>? warehouseId,
     Expression<String>? userId,
     Expression<String>? tableId,
+    Expression<String>? sessionId,
     Expression<int>? partySize,
+    Expression<String>? serviceType,
     Expression<double>? subtotal,
     Expression<double>? discountAmount,
     Expression<double>? amountBeforeVat,
     Expression<double>? vatAmount,
     Expression<double>? totalAmount,
+    Expression<double>? serviceChargeRate,
+    Expression<double>? serviceChargeAmount,
     Expression<double>? couponDiscount,
     Expression<String>? couponCodes,
     Expression<int>? pointsUsed,
@@ -12035,12 +13932,17 @@ class SalesOrdersCompanion extends UpdateCompanion<SalesOrder> {
       if (warehouseId != null) 'warehouse_id': warehouseId,
       if (userId != null) 'user_id': userId,
       if (tableId != null) 'table_id': tableId,
+      if (sessionId != null) 'session_id': sessionId,
       if (partySize != null) 'party_size': partySize,
+      if (serviceType != null) 'service_type': serviceType,
       if (subtotal != null) 'subtotal': subtotal,
       if (discountAmount != null) 'discount_amount': discountAmount,
       if (amountBeforeVat != null) 'amount_before_vat': amountBeforeVat,
       if (vatAmount != null) 'vat_amount': vatAmount,
       if (totalAmount != null) 'total_amount': totalAmount,
+      if (serviceChargeRate != null) 'service_charge_rate': serviceChargeRate,
+      if (serviceChargeAmount != null)
+        'service_charge_amount': serviceChargeAmount,
       if (couponDiscount != null) 'coupon_discount': couponDiscount,
       if (couponCodes != null) 'coupon_codes': couponCodes,
       if (pointsUsed != null) 'points_used': pointsUsed,
@@ -12070,12 +13972,16 @@ class SalesOrdersCompanion extends UpdateCompanion<SalesOrder> {
     Value<String>? warehouseId,
     Value<String>? userId,
     Value<String?>? tableId,
+    Value<String?>? sessionId,
     Value<int?>? partySize,
+    Value<String?>? serviceType,
     Value<double>? subtotal,
     Value<double>? discountAmount,
     Value<double>? amountBeforeVat,
     Value<double>? vatAmount,
     Value<double>? totalAmount,
+    Value<double>? serviceChargeRate,
+    Value<double>? serviceChargeAmount,
     Value<double>? couponDiscount,
     Value<String?>? couponCodes,
     Value<int>? pointsUsed,
@@ -12103,12 +14009,16 @@ class SalesOrdersCompanion extends UpdateCompanion<SalesOrder> {
       warehouseId: warehouseId ?? this.warehouseId,
       userId: userId ?? this.userId,
       tableId: tableId ?? this.tableId,
+      sessionId: sessionId ?? this.sessionId,
       partySize: partySize ?? this.partySize,
+      serviceType: serviceType ?? this.serviceType,
       subtotal: subtotal ?? this.subtotal,
       discountAmount: discountAmount ?? this.discountAmount,
       amountBeforeVat: amountBeforeVat ?? this.amountBeforeVat,
       vatAmount: vatAmount ?? this.vatAmount,
       totalAmount: totalAmount ?? this.totalAmount,
+      serviceChargeRate: serviceChargeRate ?? this.serviceChargeRate,
+      serviceChargeAmount: serviceChargeAmount ?? this.serviceChargeAmount,
       couponDiscount: couponDiscount ?? this.couponDiscount,
       couponCodes: couponCodes ?? this.couponCodes,
       pointsUsed: pointsUsed ?? this.pointsUsed,
@@ -12164,8 +14074,14 @@ class SalesOrdersCompanion extends UpdateCompanion<SalesOrder> {
     if (tableId.present) {
       map['table_id'] = Variable<String>(tableId.value);
     }
+    if (sessionId.present) {
+      map['session_id'] = Variable<String>(sessionId.value);
+    }
     if (partySize.present) {
       map['party_size'] = Variable<int>(partySize.value);
+    }
+    if (serviceType.present) {
+      map['service_type'] = Variable<String>(serviceType.value);
     }
     if (subtotal.present) {
       map['subtotal'] = Variable<double>(subtotal.value);
@@ -12181,6 +14097,14 @@ class SalesOrdersCompanion extends UpdateCompanion<SalesOrder> {
     }
     if (totalAmount.present) {
       map['total_amount'] = Variable<double>(totalAmount.value);
+    }
+    if (serviceChargeRate.present) {
+      map['service_charge_rate'] = Variable<double>(serviceChargeRate.value);
+    }
+    if (serviceChargeAmount.present) {
+      map['service_charge_amount'] = Variable<double>(
+        serviceChargeAmount.value,
+      );
     }
     if (couponDiscount.present) {
       map['coupon_discount'] = Variable<double>(couponDiscount.value);
@@ -12239,12 +14163,16 @@ class SalesOrdersCompanion extends UpdateCompanion<SalesOrder> {
           ..write('warehouseId: $warehouseId, ')
           ..write('userId: $userId, ')
           ..write('tableId: $tableId, ')
+          ..write('sessionId: $sessionId, ')
           ..write('partySize: $partySize, ')
+          ..write('serviceType: $serviceType, ')
           ..write('subtotal: $subtotal, ')
           ..write('discountAmount: $discountAmount, ')
           ..write('amountBeforeVat: $amountBeforeVat, ')
           ..write('vatAmount: $vatAmount, ')
           ..write('totalAmount: $totalAmount, ')
+          ..write('serviceChargeRate: $serviceChargeRate, ')
+          ..write('serviceChargeAmount: $serviceChargeAmount, ')
           ..write('couponDiscount: $couponDiscount, ')
           ..write('couponCodes: $couponCodes, ')
           ..write('pointsUsed: $pointsUsed, ')
@@ -12463,6 +14391,18 @@ class $SalesOrderItemsTable extends SalesOrderItems
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _courseNoMeta = const VerificationMeta(
+    'courseNo',
+  );
+  @override
+  late final GeneratedColumn<int> courseNo = GeneratedColumn<int>(
+    'course_no',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
   static const VerificationMeta _specialInstructionsMeta =
       const VerificationMeta('specialInstructions');
   @override
@@ -12531,6 +14471,7 @@ class $SalesOrderItemsTable extends SalesOrderItems
     serialNo,
     kitchenStatus,
     preparedAt,
+    courseNo,
     specialInstructions,
     isFreeItem,
     promotionId,
@@ -12690,6 +14631,12 @@ class $SalesOrderItemsTable extends SalesOrderItems
         preparedAt.isAcceptableOrUnknown(data['prepared_at']!, _preparedAtMeta),
       );
     }
+    if (data.containsKey('course_no')) {
+      context.handle(
+        _courseNoMeta,
+        courseNo.isAcceptableOrUnknown(data['course_no']!, _courseNoMeta),
+      );
+    }
     if (data.containsKey('special_instructions')) {
       context.handle(
         _specialInstructionsMeta,
@@ -12800,6 +14747,10 @@ class $SalesOrderItemsTable extends SalesOrderItems
         DriftSqlType.dateTime,
         data['${effectivePrefix}prepared_at'],
       ),
+      courseNo: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}course_no'],
+      )!,
       specialInstructions: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}special_instructions'],
@@ -12843,6 +14794,7 @@ class SalesOrderItem extends DataClass implements Insertable<SalesOrderItem> {
   final String? serialNo;
   final String kitchenStatus;
   final DateTime? preparedAt;
+  final int courseNo;
   final String? specialInstructions;
   final bool isFreeItem;
   final String? promotionId;
@@ -12865,6 +14817,7 @@ class SalesOrderItem extends DataClass implements Insertable<SalesOrderItem> {
     this.serialNo,
     required this.kitchenStatus,
     this.preparedAt,
+    required this.courseNo,
     this.specialInstructions,
     required this.isFreeItem,
     this.promotionId,
@@ -12894,6 +14847,7 @@ class SalesOrderItem extends DataClass implements Insertable<SalesOrderItem> {
     if (!nullToAbsent || preparedAt != null) {
       map['prepared_at'] = Variable<DateTime>(preparedAt);
     }
+    map['course_no'] = Variable<int>(courseNo);
     if (!nullToAbsent || specialInstructions != null) {
       map['special_instructions'] = Variable<String>(specialInstructions);
     }
@@ -12928,6 +14882,7 @@ class SalesOrderItem extends DataClass implements Insertable<SalesOrderItem> {
       preparedAt: preparedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(preparedAt),
+      courseNo: Value(courseNo),
       specialInstructions: specialInstructions == null && nullToAbsent
           ? const Value.absent()
           : Value(specialInstructions),
@@ -12962,6 +14917,7 @@ class SalesOrderItem extends DataClass implements Insertable<SalesOrderItem> {
       serialNo: serializer.fromJson<String?>(json['serialNo']),
       kitchenStatus: serializer.fromJson<String>(json['kitchenStatus']),
       preparedAt: serializer.fromJson<DateTime?>(json['preparedAt']),
+      courseNo: serializer.fromJson<int>(json['courseNo']),
       specialInstructions: serializer.fromJson<String?>(
         json['specialInstructions'],
       ),
@@ -12991,6 +14947,7 @@ class SalesOrderItem extends DataClass implements Insertable<SalesOrderItem> {
       'serialNo': serializer.toJson<String?>(serialNo),
       'kitchenStatus': serializer.toJson<String>(kitchenStatus),
       'preparedAt': serializer.toJson<DateTime?>(preparedAt),
+      'courseNo': serializer.toJson<int>(courseNo),
       'specialInstructions': serializer.toJson<String?>(specialInstructions),
       'isFreeItem': serializer.toJson<bool>(isFreeItem),
       'promotionId': serializer.toJson<String?>(promotionId),
@@ -13016,6 +14973,7 @@ class SalesOrderItem extends DataClass implements Insertable<SalesOrderItem> {
     Value<String?> serialNo = const Value.absent(),
     String? kitchenStatus,
     Value<DateTime?> preparedAt = const Value.absent(),
+    int? courseNo,
     Value<String?> specialInstructions = const Value.absent(),
     bool? isFreeItem,
     Value<String?> promotionId = const Value.absent(),
@@ -13038,6 +14996,7 @@ class SalesOrderItem extends DataClass implements Insertable<SalesOrderItem> {
     serialNo: serialNo.present ? serialNo.value : this.serialNo,
     kitchenStatus: kitchenStatus ?? this.kitchenStatus,
     preparedAt: preparedAt.present ? preparedAt.value : this.preparedAt,
+    courseNo: courseNo ?? this.courseNo,
     specialInstructions: specialInstructions.present
         ? specialInstructions.value
         : this.specialInstructions,
@@ -13078,6 +15037,7 @@ class SalesOrderItem extends DataClass implements Insertable<SalesOrderItem> {
       preparedAt: data.preparedAt.present
           ? data.preparedAt.value
           : this.preparedAt,
+      courseNo: data.courseNo.present ? data.courseNo.value : this.courseNo,
       specialInstructions: data.specialInstructions.present
           ? data.specialInstructions.value
           : this.specialInstructions,
@@ -13111,6 +15071,7 @@ class SalesOrderItem extends DataClass implements Insertable<SalesOrderItem> {
           ..write('serialNo: $serialNo, ')
           ..write('kitchenStatus: $kitchenStatus, ')
           ..write('preparedAt: $preparedAt, ')
+          ..write('courseNo: $courseNo, ')
           ..write('specialInstructions: $specialInstructions, ')
           ..write('isFreeItem: $isFreeItem, ')
           ..write('promotionId: $promotionId, ')
@@ -13138,6 +15099,7 @@ class SalesOrderItem extends DataClass implements Insertable<SalesOrderItem> {
     serialNo,
     kitchenStatus,
     preparedAt,
+    courseNo,
     specialInstructions,
     isFreeItem,
     promotionId,
@@ -13164,6 +15126,7 @@ class SalesOrderItem extends DataClass implements Insertable<SalesOrderItem> {
           other.serialNo == this.serialNo &&
           other.kitchenStatus == this.kitchenStatus &&
           other.preparedAt == this.preparedAt &&
+          other.courseNo == this.courseNo &&
           other.specialInstructions == this.specialInstructions &&
           other.isFreeItem == this.isFreeItem &&
           other.promotionId == this.promotionId &&
@@ -13188,6 +15151,7 @@ class SalesOrderItemsCompanion extends UpdateCompanion<SalesOrderItem> {
   final Value<String?> serialNo;
   final Value<String> kitchenStatus;
   final Value<DateTime?> preparedAt;
+  final Value<int> courseNo;
   final Value<String?> specialInstructions;
   final Value<bool> isFreeItem;
   final Value<String?> promotionId;
@@ -13211,6 +15175,7 @@ class SalesOrderItemsCompanion extends UpdateCompanion<SalesOrderItem> {
     this.serialNo = const Value.absent(),
     this.kitchenStatus = const Value.absent(),
     this.preparedAt = const Value.absent(),
+    this.courseNo = const Value.absent(),
     this.specialInstructions = const Value.absent(),
     this.isFreeItem = const Value.absent(),
     this.promotionId = const Value.absent(),
@@ -13235,6 +15200,7 @@ class SalesOrderItemsCompanion extends UpdateCompanion<SalesOrderItem> {
     this.serialNo = const Value.absent(),
     this.kitchenStatus = const Value.absent(),
     this.preparedAt = const Value.absent(),
+    this.courseNo = const Value.absent(),
     this.specialInstructions = const Value.absent(),
     this.isFreeItem = const Value.absent(),
     this.promotionId = const Value.absent(),
@@ -13269,6 +15235,7 @@ class SalesOrderItemsCompanion extends UpdateCompanion<SalesOrderItem> {
     Expression<String>? serialNo,
     Expression<String>? kitchenStatus,
     Expression<DateTime>? preparedAt,
+    Expression<int>? courseNo,
     Expression<String>? specialInstructions,
     Expression<bool>? isFreeItem,
     Expression<String>? promotionId,
@@ -13293,6 +15260,7 @@ class SalesOrderItemsCompanion extends UpdateCompanion<SalesOrderItem> {
       if (serialNo != null) 'serial_no': serialNo,
       if (kitchenStatus != null) 'kitchen_status': kitchenStatus,
       if (preparedAt != null) 'prepared_at': preparedAt,
+      if (courseNo != null) 'course_no': courseNo,
       if (specialInstructions != null)
         'special_instructions': specialInstructions,
       if (isFreeItem != null) 'is_free_item': isFreeItem,
@@ -13320,6 +15288,7 @@ class SalesOrderItemsCompanion extends UpdateCompanion<SalesOrderItem> {
     Value<String?>? serialNo,
     Value<String>? kitchenStatus,
     Value<DateTime?>? preparedAt,
+    Value<int>? courseNo,
     Value<String?>? specialInstructions,
     Value<bool>? isFreeItem,
     Value<String?>? promotionId,
@@ -13344,6 +15313,7 @@ class SalesOrderItemsCompanion extends UpdateCompanion<SalesOrderItem> {
       serialNo: serialNo ?? this.serialNo,
       kitchenStatus: kitchenStatus ?? this.kitchenStatus,
       preparedAt: preparedAt ?? this.preparedAt,
+      courseNo: courseNo ?? this.courseNo,
       specialInstructions: specialInstructions ?? this.specialInstructions,
       isFreeItem: isFreeItem ?? this.isFreeItem,
       promotionId: promotionId ?? this.promotionId,
@@ -13406,6 +15376,9 @@ class SalesOrderItemsCompanion extends UpdateCompanion<SalesOrderItem> {
     if (preparedAt.present) {
       map['prepared_at'] = Variable<DateTime>(preparedAt.value);
     }
+    if (courseNo.present) {
+      map['course_no'] = Variable<int>(courseNo.value);
+    }
     if (specialInstructions.present) {
       map['special_instructions'] = Variable<String>(specialInstructions.value);
     }
@@ -13444,6 +15417,7 @@ class SalesOrderItemsCompanion extends UpdateCompanion<SalesOrderItem> {
           ..write('serialNo: $serialNo, ')
           ..write('kitchenStatus: $kitchenStatus, ')
           ..write('preparedAt: $preparedAt, ')
+          ..write('courseNo: $courseNo, ')
           ..write('specialInstructions: $specialInstructions, ')
           ..write('isFreeItem: $isFreeItem, ')
           ..write('promotionId: $promotionId, ')
@@ -30243,6 +32217,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   );
   late final $ZonesTable zones = $ZonesTable(this);
   late final $DiningTablesTable diningTables = $DiningTablesTable(this);
+  late final $TableSessionsTable tableSessions = $TableSessionsTable(this);
+  late final $TableReservationsTable tableReservations =
+      $TableReservationsTable(this);
   late final $CustomerGroupsTable customerGroups = $CustomerGroupsTable(this);
   late final $CustomersTable customers = $CustomersTable(this);
   late final $PointsTransactionsTable pointsTransactions =
@@ -30304,6 +32281,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     productModifiers,
     zones,
     diningTables,
+    tableSessions,
+    tableReservations,
     customerGroups,
     customers,
     pointsTransactions,
@@ -30724,6 +32703,7 @@ typedef $$BranchesTableCreateCompanionBuilder =
       Value<String?> address,
       Value<String?> phone,
       Value<bool> isActive,
+      Value<String> businessMode,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
       Value<int> rowid,
@@ -30737,6 +32717,7 @@ typedef $$BranchesTableUpdateCompanionBuilder =
       Value<String?> address,
       Value<String?> phone,
       Value<bool> isActive,
+      Value<String> businessMode,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
       Value<int> rowid,
@@ -30821,6 +32802,56 @@ final class $$BranchesTableReferences
     );
   }
 
+  static MultiTypedResultKey<$TableSessionsTable, List<TableSession>>
+  _tableSessionsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.tableSessions,
+    aliasName: $_aliasNameGenerator(
+      db.branches.branchId,
+      db.tableSessions.branchId,
+    ),
+  );
+
+  $$TableSessionsTableProcessedTableManager get tableSessionsRefs {
+    final manager = $$TableSessionsTableTableManager($_db, $_db.tableSessions)
+        .filter(
+          (f) =>
+              f.branchId.branchId.sqlEquals($_itemColumn<String>('branch_id')!),
+        );
+
+    final cache = $_typedResult.readTableOrNull(_tableSessionsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$TableReservationsTable, List<TableReservation>>
+  _tableReservationsRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.tableReservations,
+        aliasName: $_aliasNameGenerator(
+          db.branches.branchId,
+          db.tableReservations.branchId,
+        ),
+      );
+
+  $$TableReservationsTableProcessedTableManager get tableReservationsRefs {
+    final manager =
+        $$TableReservationsTableTableManager(
+          $_db,
+          $_db.tableReservations,
+        ).filter(
+          (f) =>
+              f.branchId.branchId.sqlEquals($_itemColumn<String>('branch_id')!),
+        );
+
+    final cache = $_typedResult.readTableOrNull(
+      _tableReservationsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
   static MultiTypedResultKey<$SalesOrdersTable, List<SalesOrder>>
   _salesOrdersRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
     db.salesOrders,
@@ -30880,6 +32911,11 @@ class $$BranchesTableFilterComposer
 
   ColumnFilters<bool> get isActive => $composableBuilder(
     column: $table.isActive,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get businessMode => $composableBuilder(
+    column: $table.businessMode,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -30991,6 +33027,56 @@ class $$BranchesTableFilterComposer
     return f(composer);
   }
 
+  Expression<bool> tableSessionsRefs(
+    Expression<bool> Function($$TableSessionsTableFilterComposer f) f,
+  ) {
+    final $$TableSessionsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.branchId,
+      referencedTable: $db.tableSessions,
+      getReferencedColumn: (t) => t.branchId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TableSessionsTableFilterComposer(
+            $db: $db,
+            $table: $db.tableSessions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> tableReservationsRefs(
+    Expression<bool> Function($$TableReservationsTableFilterComposer f) f,
+  ) {
+    final $$TableReservationsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.branchId,
+      referencedTable: $db.tableReservations,
+      getReferencedColumn: (t) => t.branchId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TableReservationsTableFilterComposer(
+            $db: $db,
+            $table: $db.tableReservations,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
   Expression<bool> salesOrdersRefs(
     Expression<bool> Function($$SalesOrdersTableFilterComposer f) f,
   ) {
@@ -31053,6 +33139,11 @@ class $$BranchesTableOrderingComposer
 
   ColumnOrderings<bool> get isActive => $composableBuilder(
     column: $table.isActive,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get businessMode => $composableBuilder(
+    column: $table.businessMode,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -31120,6 +33211,11 @@ class $$BranchesTableAnnotationComposer
 
   GeneratedColumn<bool> get isActive =>
       $composableBuilder(column: $table.isActive, builder: (column) => column);
+
+  GeneratedColumn<String> get businessMode => $composableBuilder(
+    column: $table.businessMode,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -31225,6 +33321,57 @@ class $$BranchesTableAnnotationComposer
     return f(composer);
   }
 
+  Expression<T> tableSessionsRefs<T extends Object>(
+    Expression<T> Function($$TableSessionsTableAnnotationComposer a) f,
+  ) {
+    final $$TableSessionsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.branchId,
+      referencedTable: $db.tableSessions,
+      getReferencedColumn: (t) => t.branchId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TableSessionsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.tableSessions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<T> tableReservationsRefs<T extends Object>(
+    Expression<T> Function($$TableReservationsTableAnnotationComposer a) f,
+  ) {
+    final $$TableReservationsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.branchId,
+          referencedTable: $db.tableReservations,
+          getReferencedColumn: (t) => t.branchId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$TableReservationsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.tableReservations,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+
   Expression<T> salesOrdersRefs<T extends Object>(
     Expression<T> Function($$SalesOrdersTableAnnotationComposer a) f,
   ) {
@@ -31269,6 +33416,8 @@ class $$BranchesTableTableManager
             bool usersRefs,
             bool warehousesRefs,
             bool zonesRefs,
+            bool tableSessionsRefs,
+            bool tableReservationsRefs,
             bool salesOrdersRefs,
           })
         > {
@@ -31292,6 +33441,7 @@ class $$BranchesTableTableManager
                 Value<String?> address = const Value.absent(),
                 Value<String?> phone = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
+                Value<String> businessMode = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -31303,6 +33453,7 @@ class $$BranchesTableTableManager
                 address: address,
                 phone: phone,
                 isActive: isActive,
+                businessMode: businessMode,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -31316,6 +33467,7 @@ class $$BranchesTableTableManager
                 Value<String?> address = const Value.absent(),
                 Value<String?> phone = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
+                Value<String> businessMode = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -31327,6 +33479,7 @@ class $$BranchesTableTableManager
                 address: address,
                 phone: phone,
                 isActive: isActive,
+                businessMode: businessMode,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -31345,6 +33498,8 @@ class $$BranchesTableTableManager
                 usersRefs = false,
                 warehousesRefs = false,
                 zonesRefs = false,
+                tableSessionsRefs = false,
+                tableReservationsRefs = false,
                 salesOrdersRefs = false,
               }) {
                 return PrefetchHooks(
@@ -31353,6 +33508,8 @@ class $$BranchesTableTableManager
                     if (usersRefs) db.users,
                     if (warehousesRefs) db.warehouses,
                     if (zonesRefs) db.zones,
+                    if (tableSessionsRefs) db.tableSessions,
+                    if (tableReservationsRefs) db.tableReservations,
                     if (salesOrdersRefs) db.salesOrders,
                   ],
                   addJoins:
@@ -31444,6 +33601,48 @@ class $$BranchesTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (tableSessionsRefs)
+                        await $_getPrefetchedData<
+                          Branch,
+                          $BranchesTable,
+                          TableSession
+                        >(
+                          currentTable: table,
+                          referencedTable: $$BranchesTableReferences
+                              ._tableSessionsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$BranchesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).tableSessionsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.branchId == item.branchId,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (tableReservationsRefs)
+                        await $_getPrefetchedData<
+                          Branch,
+                          $BranchesTable,
+                          TableReservation
+                        >(
+                          currentTable: table,
+                          referencedTable: $$BranchesTableReferences
+                              ._tableReservationsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$BranchesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).tableReservationsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.branchId == item.branchId,
+                              ),
+                          typedResults: items,
+                        ),
                       if (salesOrdersRefs)
                         await $_getPrefetchedData<
                           Branch,
@@ -31490,6 +33689,8 @@ typedef $$BranchesTableProcessedTableManager =
         bool usersRefs,
         bool warehousesRefs,
         bool zonesRefs,
+        bool tableSessionsRefs,
+        bool tableReservationsRefs,
         bool salesOrdersRefs,
       })
     >;
@@ -33361,6 +35562,11 @@ typedef $$ProductsTableCreateCompanionBuilder =
       Value<Map<String, dynamic>?> imageUrls,
       Value<String?> imagePath,
       Value<bool> isActive,
+      Value<String> serviceMode,
+      Value<String?> prepStation,
+      Value<bool> requiresPreparation,
+      Value<bool> dineInAvailable,
+      Value<bool> takeawayAvailable,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
       Value<int> rowid,
@@ -33394,6 +35600,11 @@ typedef $$ProductsTableUpdateCompanionBuilder =
       Value<Map<String, dynamic>?> imageUrls,
       Value<String?> imagePath,
       Value<bool> isActive,
+      Value<String> serviceMode,
+      Value<String?> prepStation,
+      Value<bool> requiresPreparation,
+      Value<bool> dineInAvailable,
+      Value<bool> takeawayAvailable,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
       Value<int> rowid,
@@ -33766,6 +35977,31 @@ class $$ProductsTableFilterComposer
 
   ColumnFilters<bool> get isActive => $composableBuilder(
     column: $table.isActive,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get serviceMode => $composableBuilder(
+    column: $table.serviceMode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get prepStation => $composableBuilder(
+    column: $table.prepStation,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get requiresPreparation => $composableBuilder(
+    column: $table.requiresPreparation,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get dineInAvailable => $composableBuilder(
+    column: $table.dineInAvailable,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get takeawayAvailable => $composableBuilder(
+    column: $table.takeawayAvailable,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -34142,6 +36378,31 @@ class $$ProductsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get serviceMode => $composableBuilder(
+    column: $table.serviceMode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get prepStation => $composableBuilder(
+    column: $table.prepStation,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get requiresPreparation => $composableBuilder(
+    column: $table.requiresPreparation,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get dineInAvailable => $composableBuilder(
+    column: $table.dineInAvailable,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get takeawayAvailable => $composableBuilder(
+    column: $table.takeawayAvailable,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -34294,6 +36555,31 @@ class $$ProductsTableAnnotationComposer
 
   GeneratedColumn<bool> get isActive =>
       $composableBuilder(column: $table.isActive, builder: (column) => column);
+
+  GeneratedColumn<String> get serviceMode => $composableBuilder(
+    column: $table.serviceMode,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get prepStation => $composableBuilder(
+    column: $table.prepStation,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get requiresPreparation => $composableBuilder(
+    column: $table.requiresPreparation,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get dineInAvailable => $composableBuilder(
+    column: $table.dineInAvailable,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get takeawayAvailable => $composableBuilder(
+    column: $table.takeawayAvailable,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -34592,6 +36878,11 @@ class $$ProductsTableTableManager
                 Value<Map<String, dynamic>?> imageUrls = const Value.absent(),
                 Value<String?> imagePath = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
+                Value<String> serviceMode = const Value.absent(),
+                Value<String?> prepStation = const Value.absent(),
+                Value<bool> requiresPreparation = const Value.absent(),
+                Value<bool> dineInAvailable = const Value.absent(),
+                Value<bool> takeawayAvailable = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -34623,6 +36914,11 @@ class $$ProductsTableTableManager
                 imageUrls: imageUrls,
                 imagePath: imagePath,
                 isActive: isActive,
+                serviceMode: serviceMode,
+                prepStation: prepStation,
+                requiresPreparation: requiresPreparation,
+                dineInAvailable: dineInAvailable,
+                takeawayAvailable: takeawayAvailable,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -34657,6 +36953,11 @@ class $$ProductsTableTableManager
                 Value<Map<String, dynamic>?> imageUrls = const Value.absent(),
                 Value<String?> imagePath = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
+                Value<String> serviceMode = const Value.absent(),
+                Value<String?> prepStation = const Value.absent(),
+                Value<bool> requiresPreparation = const Value.absent(),
+                Value<bool> dineInAvailable = const Value.absent(),
+                Value<bool> takeawayAvailable = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -34688,6 +36989,11 @@ class $$ProductsTableTableManager
                 imageUrls: imageUrls,
                 imagePath: imagePath,
                 isActive: isActive,
+                serviceMode: serviceMode,
+                prepStation: prepStation,
+                requiresPreparation: requiresPreparation,
+                dineInAvailable: dineInAvailable,
+                takeawayAvailable: takeawayAvailable,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -38522,6 +40828,54 @@ final class $$DiningTablesTableReferences
       manager.$state.copyWith(prefetchedData: [item]),
     );
   }
+
+  static MultiTypedResultKey<$TableSessionsTable, List<TableSession>>
+  _tableSessionsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.tableSessions,
+    aliasName: $_aliasNameGenerator(
+      db.diningTables.tableId,
+      db.tableSessions.tableId,
+    ),
+  );
+
+  $$TableSessionsTableProcessedTableManager get tableSessionsRefs {
+    final manager = $$TableSessionsTableTableManager($_db, $_db.tableSessions)
+        .filter(
+          (f) => f.tableId.tableId.sqlEquals($_itemColumn<String>('table_id')!),
+        );
+
+    final cache = $_typedResult.readTableOrNull(_tableSessionsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$TableReservationsTable, List<TableReservation>>
+  _tableReservationsRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.tableReservations,
+        aliasName: $_aliasNameGenerator(
+          db.diningTables.tableId,
+          db.tableReservations.tableId,
+        ),
+      );
+
+  $$TableReservationsTableProcessedTableManager get tableReservationsRefs {
+    final manager =
+        $$TableReservationsTableTableManager(
+          $_db,
+          $_db.tableReservations,
+        ).filter(
+          (f) => f.tableId.tableId.sqlEquals($_itemColumn<String>('table_id')!),
+        );
+
+    final cache = $_typedResult.readTableOrNull(
+      _tableReservationsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 }
 
 class $$DiningTablesTableFilterComposer
@@ -38594,6 +40948,56 @@ class $$DiningTablesTableFilterComposer
           ),
     );
     return composer;
+  }
+
+  Expression<bool> tableSessionsRefs(
+    Expression<bool> Function($$TableSessionsTableFilterComposer f) f,
+  ) {
+    final $$TableSessionsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.tableId,
+      referencedTable: $db.tableSessions,
+      getReferencedColumn: (t) => t.tableId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TableSessionsTableFilterComposer(
+            $db: $db,
+            $table: $db.tableSessions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> tableReservationsRefs(
+    Expression<bool> Function($$TableReservationsTableFilterComposer f) f,
+  ) {
+    final $$TableReservationsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.tableId,
+      referencedTable: $db.tableReservations,
+      getReferencedColumn: (t) => t.tableId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TableReservationsTableFilterComposer(
+            $db: $db,
+            $table: $db.tableReservations,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
   }
 }
 
@@ -38731,6 +41135,57 @@ class $$DiningTablesTableAnnotationComposer
     );
     return composer;
   }
+
+  Expression<T> tableSessionsRefs<T extends Object>(
+    Expression<T> Function($$TableSessionsTableAnnotationComposer a) f,
+  ) {
+    final $$TableSessionsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.tableId,
+      referencedTable: $db.tableSessions,
+      getReferencedColumn: (t) => t.tableId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TableSessionsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.tableSessions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<T> tableReservationsRefs<T extends Object>(
+    Expression<T> Function($$TableReservationsTableAnnotationComposer a) f,
+  ) {
+    final $$TableReservationsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.tableId,
+          referencedTable: $db.tableReservations,
+          getReferencedColumn: (t) => t.tableId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$TableReservationsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.tableReservations,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
 }
 
 class $$DiningTablesTableTableManager
@@ -38746,7 +41201,11 @@ class $$DiningTablesTableTableManager
           $$DiningTablesTableUpdateCompanionBuilder,
           (DiningTable, $$DiningTablesTableReferences),
           DiningTable,
-          PrefetchHooks Function({bool zoneId})
+          PrefetchHooks Function({
+            bool zoneId,
+            bool tableSessionsRefs,
+            bool tableReservationsRefs,
+          })
         > {
   $$DiningTablesTableTableManager(_$AppDatabase db, $DiningTablesTable table)
     : super(
@@ -38815,7 +41274,599 @@ class $$DiningTablesTableTableManager
                 ),
               )
               .toList(),
-          prefetchHooksCallback: ({zoneId = false}) {
+          prefetchHooksCallback:
+              ({
+                zoneId = false,
+                tableSessionsRefs = false,
+                tableReservationsRefs = false,
+              }) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [
+                    if (tableSessionsRefs) db.tableSessions,
+                    if (tableReservationsRefs) db.tableReservations,
+                  ],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (zoneId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.zoneId,
+                                    referencedTable:
+                                        $$DiningTablesTableReferences
+                                            ._zoneIdTable(db),
+                                    referencedColumn:
+                                        $$DiningTablesTableReferences
+                                            ._zoneIdTable(db)
+                                            .zoneId,
+                                  )
+                                  as T;
+                        }
+
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (tableSessionsRefs)
+                        await $_getPrefetchedData<
+                          DiningTable,
+                          $DiningTablesTable,
+                          TableSession
+                        >(
+                          currentTable: table,
+                          referencedTable: $$DiningTablesTableReferences
+                              ._tableSessionsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$DiningTablesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).tableSessionsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.tableId == item.tableId,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (tableReservationsRefs)
+                        await $_getPrefetchedData<
+                          DiningTable,
+                          $DiningTablesTable,
+                          TableReservation
+                        >(
+                          currentTable: table,
+                          referencedTable: $$DiningTablesTableReferences
+                              ._tableReservationsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$DiningTablesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).tableReservationsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.tableId == item.tableId,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
+                  },
+                );
+              },
+        ),
+      );
+}
+
+typedef $$DiningTablesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $DiningTablesTable,
+      DiningTable,
+      $$DiningTablesTableFilterComposer,
+      $$DiningTablesTableOrderingComposer,
+      $$DiningTablesTableAnnotationComposer,
+      $$DiningTablesTableCreateCompanionBuilder,
+      $$DiningTablesTableUpdateCompanionBuilder,
+      (DiningTable, $$DiningTablesTableReferences),
+      DiningTable,
+      PrefetchHooks Function({
+        bool zoneId,
+        bool tableSessionsRefs,
+        bool tableReservationsRefs,
+      })
+    >;
+typedef $$TableSessionsTableCreateCompanionBuilder =
+    TableSessionsCompanion Function({
+      required String sessionId,
+      required String tableId,
+      required String branchId,
+      Value<DateTime> openedAt,
+      Value<DateTime?> closedAt,
+      Value<int> guestCount,
+      Value<String> status,
+      Value<String?> openedBy,
+      Value<String?> note,
+      Value<String?> waiterId,
+      Value<String?> waiterName,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
+typedef $$TableSessionsTableUpdateCompanionBuilder =
+    TableSessionsCompanion Function({
+      Value<String> sessionId,
+      Value<String> tableId,
+      Value<String> branchId,
+      Value<DateTime> openedAt,
+      Value<DateTime?> closedAt,
+      Value<int> guestCount,
+      Value<String> status,
+      Value<String?> openedBy,
+      Value<String?> note,
+      Value<String?> waiterId,
+      Value<String?> waiterName,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
+
+final class $$TableSessionsTableReferences
+    extends BaseReferences<_$AppDatabase, $TableSessionsTable, TableSession> {
+  $$TableSessionsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $DiningTablesTable _tableIdTable(_$AppDatabase db) =>
+      db.diningTables.createAlias(
+        $_aliasNameGenerator(db.tableSessions.tableId, db.diningTables.tableId),
+      );
+
+  $$DiningTablesTableProcessedTableManager get tableId {
+    final $_column = $_itemColumn<String>('table_id')!;
+
+    final manager = $$DiningTablesTableTableManager(
+      $_db,
+      $_db.diningTables,
+    ).filter((f) => f.tableId.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_tableIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $BranchesTable _branchIdTable(_$AppDatabase db) =>
+      db.branches.createAlias(
+        $_aliasNameGenerator(db.tableSessions.branchId, db.branches.branchId),
+      );
+
+  $$BranchesTableProcessedTableManager get branchId {
+    final $_column = $_itemColumn<String>('branch_id')!;
+
+    final manager = $$BranchesTableTableManager(
+      $_db,
+      $_db.branches,
+    ).filter((f) => f.branchId.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_branchIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$TableSessionsTableFilterComposer
+    extends Composer<_$AppDatabase, $TableSessionsTable> {
+  $$TableSessionsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get sessionId => $composableBuilder(
+    column: $table.sessionId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get openedAt => $composableBuilder(
+    column: $table.openedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get closedAt => $composableBuilder(
+    column: $table.closedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get guestCount => $composableBuilder(
+    column: $table.guestCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get openedBy => $composableBuilder(
+    column: $table.openedBy,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get note => $composableBuilder(
+    column: $table.note,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get waiterId => $composableBuilder(
+    column: $table.waiterId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get waiterName => $composableBuilder(
+    column: $table.waiterName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$DiningTablesTableFilterComposer get tableId {
+    final $$DiningTablesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.tableId,
+      referencedTable: $db.diningTables,
+      getReferencedColumn: (t) => t.tableId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$DiningTablesTableFilterComposer(
+            $db: $db,
+            $table: $db.diningTables,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$BranchesTableFilterComposer get branchId {
+    final $$BranchesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.branchId,
+      referencedTable: $db.branches,
+      getReferencedColumn: (t) => t.branchId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BranchesTableFilterComposer(
+            $db: $db,
+            $table: $db.branches,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$TableSessionsTableOrderingComposer
+    extends Composer<_$AppDatabase, $TableSessionsTable> {
+  $$TableSessionsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get sessionId => $composableBuilder(
+    column: $table.sessionId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get openedAt => $composableBuilder(
+    column: $table.openedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get closedAt => $composableBuilder(
+    column: $table.closedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get guestCount => $composableBuilder(
+    column: $table.guestCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get openedBy => $composableBuilder(
+    column: $table.openedBy,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get note => $composableBuilder(
+    column: $table.note,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get waiterId => $composableBuilder(
+    column: $table.waiterId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get waiterName => $composableBuilder(
+    column: $table.waiterName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$DiningTablesTableOrderingComposer get tableId {
+    final $$DiningTablesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.tableId,
+      referencedTable: $db.diningTables,
+      getReferencedColumn: (t) => t.tableId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$DiningTablesTableOrderingComposer(
+            $db: $db,
+            $table: $db.diningTables,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$BranchesTableOrderingComposer get branchId {
+    final $$BranchesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.branchId,
+      referencedTable: $db.branches,
+      getReferencedColumn: (t) => t.branchId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BranchesTableOrderingComposer(
+            $db: $db,
+            $table: $db.branches,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$TableSessionsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $TableSessionsTable> {
+  $$TableSessionsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get sessionId =>
+      $composableBuilder(column: $table.sessionId, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get openedAt =>
+      $composableBuilder(column: $table.openedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get closedAt =>
+      $composableBuilder(column: $table.closedAt, builder: (column) => column);
+
+  GeneratedColumn<int> get guestCount => $composableBuilder(
+    column: $table.guestCount,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<String> get openedBy =>
+      $composableBuilder(column: $table.openedBy, builder: (column) => column);
+
+  GeneratedColumn<String> get note =>
+      $composableBuilder(column: $table.note, builder: (column) => column);
+
+  GeneratedColumn<String> get waiterId =>
+      $composableBuilder(column: $table.waiterId, builder: (column) => column);
+
+  GeneratedColumn<String> get waiterName => $composableBuilder(
+    column: $table.waiterName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  $$DiningTablesTableAnnotationComposer get tableId {
+    final $$DiningTablesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.tableId,
+      referencedTable: $db.diningTables,
+      getReferencedColumn: (t) => t.tableId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$DiningTablesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.diningTables,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$BranchesTableAnnotationComposer get branchId {
+    final $$BranchesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.branchId,
+      referencedTable: $db.branches,
+      getReferencedColumn: (t) => t.branchId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BranchesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.branches,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$TableSessionsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $TableSessionsTable,
+          TableSession,
+          $$TableSessionsTableFilterComposer,
+          $$TableSessionsTableOrderingComposer,
+          $$TableSessionsTableAnnotationComposer,
+          $$TableSessionsTableCreateCompanionBuilder,
+          $$TableSessionsTableUpdateCompanionBuilder,
+          (TableSession, $$TableSessionsTableReferences),
+          TableSession,
+          PrefetchHooks Function({bool tableId, bool branchId})
+        > {
+  $$TableSessionsTableTableManager(_$AppDatabase db, $TableSessionsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$TableSessionsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$TableSessionsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$TableSessionsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> sessionId = const Value.absent(),
+                Value<String> tableId = const Value.absent(),
+                Value<String> branchId = const Value.absent(),
+                Value<DateTime> openedAt = const Value.absent(),
+                Value<DateTime?> closedAt = const Value.absent(),
+                Value<int> guestCount = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<String?> openedBy = const Value.absent(),
+                Value<String?> note = const Value.absent(),
+                Value<String?> waiterId = const Value.absent(),
+                Value<String?> waiterName = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TableSessionsCompanion(
+                sessionId: sessionId,
+                tableId: tableId,
+                branchId: branchId,
+                openedAt: openedAt,
+                closedAt: closedAt,
+                guestCount: guestCount,
+                status: status,
+                openedBy: openedBy,
+                note: note,
+                waiterId: waiterId,
+                waiterName: waiterName,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String sessionId,
+                required String tableId,
+                required String branchId,
+                Value<DateTime> openedAt = const Value.absent(),
+                Value<DateTime?> closedAt = const Value.absent(),
+                Value<int> guestCount = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<String?> openedBy = const Value.absent(),
+                Value<String?> note = const Value.absent(),
+                Value<String?> waiterId = const Value.absent(),
+                Value<String?> waiterName = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TableSessionsCompanion.insert(
+                sessionId: sessionId,
+                tableId: tableId,
+                branchId: branchId,
+                openedAt: openedAt,
+                closedAt: closedAt,
+                guestCount: guestCount,
+                status: status,
+                openedBy: openedBy,
+                note: note,
+                waiterId: waiterId,
+                waiterName: waiterName,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$TableSessionsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({tableId = false, branchId = false}) {
             return PrefetchHooks(
               db: db,
               explicitlyWatchedTables: [],
@@ -38835,16 +41886,29 @@ class $$DiningTablesTableTableManager
                       dynamic
                     >
                   >(state) {
-                    if (zoneId) {
+                    if (tableId) {
                       state =
                           state.withJoin(
                                 currentTable: table,
-                                currentColumn: table.zoneId,
-                                referencedTable: $$DiningTablesTableReferences
-                                    ._zoneIdTable(db),
-                                referencedColumn: $$DiningTablesTableReferences
-                                    ._zoneIdTable(db)
-                                    .zoneId,
+                                currentColumn: table.tableId,
+                                referencedTable: $$TableSessionsTableReferences
+                                    ._tableIdTable(db),
+                                referencedColumn: $$TableSessionsTableReferences
+                                    ._tableIdTable(db)
+                                    .tableId,
+                              )
+                              as T;
+                    }
+                    if (branchId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.branchId,
+                                referencedTable: $$TableSessionsTableReferences
+                                    ._branchIdTable(db),
+                                referencedColumn: $$TableSessionsTableReferences
+                                    ._branchIdTable(db)
+                                    .branchId,
                               )
                               as T;
                     }
@@ -38860,19 +41924,572 @@ class $$DiningTablesTableTableManager
       );
 }
 
-typedef $$DiningTablesTableProcessedTableManager =
+typedef $$TableSessionsTableProcessedTableManager =
     ProcessedTableManager<
       _$AppDatabase,
-      $DiningTablesTable,
-      DiningTable,
-      $$DiningTablesTableFilterComposer,
-      $$DiningTablesTableOrderingComposer,
-      $$DiningTablesTableAnnotationComposer,
-      $$DiningTablesTableCreateCompanionBuilder,
-      $$DiningTablesTableUpdateCompanionBuilder,
-      (DiningTable, $$DiningTablesTableReferences),
-      DiningTable,
-      PrefetchHooks Function({bool zoneId})
+      $TableSessionsTable,
+      TableSession,
+      $$TableSessionsTableFilterComposer,
+      $$TableSessionsTableOrderingComposer,
+      $$TableSessionsTableAnnotationComposer,
+      $$TableSessionsTableCreateCompanionBuilder,
+      $$TableSessionsTableUpdateCompanionBuilder,
+      (TableSession, $$TableSessionsTableReferences),
+      TableSession,
+      PrefetchHooks Function({bool tableId, bool branchId})
+    >;
+typedef $$TableReservationsTableCreateCompanionBuilder =
+    TableReservationsCompanion Function({
+      required String reservationId,
+      Value<String?> tableId,
+      required String branchId,
+      required String customerName,
+      Value<String?> customerPhone,
+      required DateTime reservationTime,
+      Value<int> partySize,
+      Value<String?> notes,
+      Value<String> status,
+      Value<String?> sessionId,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
+typedef $$TableReservationsTableUpdateCompanionBuilder =
+    TableReservationsCompanion Function({
+      Value<String> reservationId,
+      Value<String?> tableId,
+      Value<String> branchId,
+      Value<String> customerName,
+      Value<String?> customerPhone,
+      Value<DateTime> reservationTime,
+      Value<int> partySize,
+      Value<String?> notes,
+      Value<String> status,
+      Value<String?> sessionId,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
+
+final class $$TableReservationsTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $TableReservationsTable,
+          TableReservation
+        > {
+  $$TableReservationsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $DiningTablesTable _tableIdTable(_$AppDatabase db) =>
+      db.diningTables.createAlias(
+        $_aliasNameGenerator(
+          db.tableReservations.tableId,
+          db.diningTables.tableId,
+        ),
+      );
+
+  $$DiningTablesTableProcessedTableManager? get tableId {
+    final $_column = $_itemColumn<String>('table_id');
+    if ($_column == null) return null;
+    final manager = $$DiningTablesTableTableManager(
+      $_db,
+      $_db.diningTables,
+    ).filter((f) => f.tableId.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_tableIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $BranchesTable _branchIdTable(_$AppDatabase db) =>
+      db.branches.createAlias(
+        $_aliasNameGenerator(
+          db.tableReservations.branchId,
+          db.branches.branchId,
+        ),
+      );
+
+  $$BranchesTableProcessedTableManager get branchId {
+    final $_column = $_itemColumn<String>('branch_id')!;
+
+    final manager = $$BranchesTableTableManager(
+      $_db,
+      $_db.branches,
+    ).filter((f) => f.branchId.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_branchIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$TableReservationsTableFilterComposer
+    extends Composer<_$AppDatabase, $TableReservationsTable> {
+  $$TableReservationsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get reservationId => $composableBuilder(
+    column: $table.reservationId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get customerName => $composableBuilder(
+    column: $table.customerName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get customerPhone => $composableBuilder(
+    column: $table.customerPhone,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get reservationTime => $composableBuilder(
+    column: $table.reservationTime,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get partySize => $composableBuilder(
+    column: $table.partySize,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sessionId => $composableBuilder(
+    column: $table.sessionId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$DiningTablesTableFilterComposer get tableId {
+    final $$DiningTablesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.tableId,
+      referencedTable: $db.diningTables,
+      getReferencedColumn: (t) => t.tableId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$DiningTablesTableFilterComposer(
+            $db: $db,
+            $table: $db.diningTables,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$BranchesTableFilterComposer get branchId {
+    final $$BranchesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.branchId,
+      referencedTable: $db.branches,
+      getReferencedColumn: (t) => t.branchId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BranchesTableFilterComposer(
+            $db: $db,
+            $table: $db.branches,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$TableReservationsTableOrderingComposer
+    extends Composer<_$AppDatabase, $TableReservationsTable> {
+  $$TableReservationsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get reservationId => $composableBuilder(
+    column: $table.reservationId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get customerName => $composableBuilder(
+    column: $table.customerName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get customerPhone => $composableBuilder(
+    column: $table.customerPhone,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get reservationTime => $composableBuilder(
+    column: $table.reservationTime,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get partySize => $composableBuilder(
+    column: $table.partySize,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sessionId => $composableBuilder(
+    column: $table.sessionId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$DiningTablesTableOrderingComposer get tableId {
+    final $$DiningTablesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.tableId,
+      referencedTable: $db.diningTables,
+      getReferencedColumn: (t) => t.tableId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$DiningTablesTableOrderingComposer(
+            $db: $db,
+            $table: $db.diningTables,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$BranchesTableOrderingComposer get branchId {
+    final $$BranchesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.branchId,
+      referencedTable: $db.branches,
+      getReferencedColumn: (t) => t.branchId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BranchesTableOrderingComposer(
+            $db: $db,
+            $table: $db.branches,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$TableReservationsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $TableReservationsTable> {
+  $$TableReservationsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get reservationId => $composableBuilder(
+    column: $table.reservationId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get customerName => $composableBuilder(
+    column: $table.customerName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get customerPhone => $composableBuilder(
+    column: $table.customerPhone,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get reservationTime => $composableBuilder(
+    column: $table.reservationTime,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get partySize =>
+      $composableBuilder(column: $table.partySize, builder: (column) => column);
+
+  GeneratedColumn<String> get notes =>
+      $composableBuilder(column: $table.notes, builder: (column) => column);
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<String> get sessionId =>
+      $composableBuilder(column: $table.sessionId, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  $$DiningTablesTableAnnotationComposer get tableId {
+    final $$DiningTablesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.tableId,
+      referencedTable: $db.diningTables,
+      getReferencedColumn: (t) => t.tableId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$DiningTablesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.diningTables,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$BranchesTableAnnotationComposer get branchId {
+    final $$BranchesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.branchId,
+      referencedTable: $db.branches,
+      getReferencedColumn: (t) => t.branchId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BranchesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.branches,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$TableReservationsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $TableReservationsTable,
+          TableReservation,
+          $$TableReservationsTableFilterComposer,
+          $$TableReservationsTableOrderingComposer,
+          $$TableReservationsTableAnnotationComposer,
+          $$TableReservationsTableCreateCompanionBuilder,
+          $$TableReservationsTableUpdateCompanionBuilder,
+          (TableReservation, $$TableReservationsTableReferences),
+          TableReservation,
+          PrefetchHooks Function({bool tableId, bool branchId})
+        > {
+  $$TableReservationsTableTableManager(
+    _$AppDatabase db,
+    $TableReservationsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$TableReservationsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$TableReservationsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$TableReservationsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> reservationId = const Value.absent(),
+                Value<String?> tableId = const Value.absent(),
+                Value<String> branchId = const Value.absent(),
+                Value<String> customerName = const Value.absent(),
+                Value<String?> customerPhone = const Value.absent(),
+                Value<DateTime> reservationTime = const Value.absent(),
+                Value<int> partySize = const Value.absent(),
+                Value<String?> notes = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<String?> sessionId = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TableReservationsCompanion(
+                reservationId: reservationId,
+                tableId: tableId,
+                branchId: branchId,
+                customerName: customerName,
+                customerPhone: customerPhone,
+                reservationTime: reservationTime,
+                partySize: partySize,
+                notes: notes,
+                status: status,
+                sessionId: sessionId,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String reservationId,
+                Value<String?> tableId = const Value.absent(),
+                required String branchId,
+                required String customerName,
+                Value<String?> customerPhone = const Value.absent(),
+                required DateTime reservationTime,
+                Value<int> partySize = const Value.absent(),
+                Value<String?> notes = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<String?> sessionId = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TableReservationsCompanion.insert(
+                reservationId: reservationId,
+                tableId: tableId,
+                branchId: branchId,
+                customerName: customerName,
+                customerPhone: customerPhone,
+                reservationTime: reservationTime,
+                partySize: partySize,
+                notes: notes,
+                status: status,
+                sessionId: sessionId,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$TableReservationsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({tableId = false, branchId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (tableId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.tableId,
+                                referencedTable:
+                                    $$TableReservationsTableReferences
+                                        ._tableIdTable(db),
+                                referencedColumn:
+                                    $$TableReservationsTableReferences
+                                        ._tableIdTable(db)
+                                        .tableId,
+                              )
+                              as T;
+                    }
+                    if (branchId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.branchId,
+                                referencedTable:
+                                    $$TableReservationsTableReferences
+                                        ._branchIdTable(db),
+                                referencedColumn:
+                                    $$TableReservationsTableReferences
+                                        ._branchIdTable(db)
+                                        .branchId,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$TableReservationsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $TableReservationsTable,
+      TableReservation,
+      $$TableReservationsTableFilterComposer,
+      $$TableReservationsTableOrderingComposer,
+      $$TableReservationsTableAnnotationComposer,
+      $$TableReservationsTableCreateCompanionBuilder,
+      $$TableReservationsTableUpdateCompanionBuilder,
+      (TableReservation, $$TableReservationsTableReferences),
+      TableReservation,
+      PrefetchHooks Function({bool tableId, bool branchId})
     >;
 typedef $$CustomerGroupsTableCreateCompanionBuilder =
     CustomerGroupsCompanion Function({
@@ -41447,12 +45064,16 @@ typedef $$SalesOrdersTableCreateCompanionBuilder =
       required String warehouseId,
       required String userId,
       Value<String?> tableId,
+      Value<String?> sessionId,
       Value<int?> partySize,
+      Value<String?> serviceType,
       Value<double> subtotal,
       Value<double> discountAmount,
       Value<double> amountBeforeVat,
       Value<double> vatAmount,
       Value<double> totalAmount,
+      Value<double> serviceChargeRate,
+      Value<double> serviceChargeAmount,
       Value<double> couponDiscount,
       Value<String?> couponCodes,
       Value<int> pointsUsed,
@@ -41481,12 +45102,16 @@ typedef $$SalesOrdersTableUpdateCompanionBuilder =
       Value<String> warehouseId,
       Value<String> userId,
       Value<String?> tableId,
+      Value<String?> sessionId,
       Value<int?> partySize,
+      Value<String?> serviceType,
       Value<double> subtotal,
       Value<double> discountAmount,
       Value<double> amountBeforeVat,
       Value<double> vatAmount,
       Value<double> totalAmount,
+      Value<double> serviceChargeRate,
+      Value<double> serviceChargeAmount,
       Value<double> couponDiscount,
       Value<String?> couponCodes,
       Value<int> pointsUsed,
@@ -41683,8 +45308,18 @@ class $$SalesOrdersTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get sessionId => $composableBuilder(
+    column: $table.sessionId,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<int> get partySize => $composableBuilder(
     column: $table.partySize,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get serviceType => $composableBuilder(
+    column: $table.serviceType,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -41710,6 +45345,16 @@ class $$SalesOrdersTableFilterComposer
 
   ColumnFilters<double> get totalAmount => $composableBuilder(
     column: $table.totalAmount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get serviceChargeRate => $composableBuilder(
+    column: $table.serviceChargeRate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get serviceChargeAmount => $composableBuilder(
+    column: $table.serviceChargeAmount,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -41965,8 +45610,18 @@ class $$SalesOrdersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get sessionId => $composableBuilder(
+    column: $table.sessionId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get partySize => $composableBuilder(
     column: $table.partySize,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get serviceType => $composableBuilder(
+    column: $table.serviceType,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -41992,6 +45647,16 @@ class $$SalesOrdersTableOrderingComposer
 
   ColumnOrderings<double> get totalAmount => $composableBuilder(
     column: $table.totalAmount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get serviceChargeRate => $composableBuilder(
+    column: $table.serviceChargeRate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get serviceChargeAmount => $composableBuilder(
+    column: $table.serviceChargeAmount,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -42187,8 +45852,16 @@ class $$SalesOrdersTableAnnotationComposer
   GeneratedColumn<String> get tableId =>
       $composableBuilder(column: $table.tableId, builder: (column) => column);
 
+  GeneratedColumn<String> get sessionId =>
+      $composableBuilder(column: $table.sessionId, builder: (column) => column);
+
   GeneratedColumn<int> get partySize =>
       $composableBuilder(column: $table.partySize, builder: (column) => column);
+
+  GeneratedColumn<String> get serviceType => $composableBuilder(
+    column: $table.serviceType,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<double> get subtotal =>
       $composableBuilder(column: $table.subtotal, builder: (column) => column);
@@ -42208,6 +45881,16 @@ class $$SalesOrdersTableAnnotationComposer
 
   GeneratedColumn<double> get totalAmount => $composableBuilder(
     column: $table.totalAmount,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get serviceChargeRate => $composableBuilder(
+    column: $table.serviceChargeRate,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get serviceChargeAmount => $composableBuilder(
+    column: $table.serviceChargeAmount,
     builder: (column) => column,
   );
 
@@ -42453,12 +46136,16 @@ class $$SalesOrdersTableTableManager
                 Value<String> warehouseId = const Value.absent(),
                 Value<String> userId = const Value.absent(),
                 Value<String?> tableId = const Value.absent(),
+                Value<String?> sessionId = const Value.absent(),
                 Value<int?> partySize = const Value.absent(),
+                Value<String?> serviceType = const Value.absent(),
                 Value<double> subtotal = const Value.absent(),
                 Value<double> discountAmount = const Value.absent(),
                 Value<double> amountBeforeVat = const Value.absent(),
                 Value<double> vatAmount = const Value.absent(),
                 Value<double> totalAmount = const Value.absent(),
+                Value<double> serviceChargeRate = const Value.absent(),
+                Value<double> serviceChargeAmount = const Value.absent(),
                 Value<double> couponDiscount = const Value.absent(),
                 Value<String?> couponCodes = const Value.absent(),
                 Value<int> pointsUsed = const Value.absent(),
@@ -42485,12 +46172,16 @@ class $$SalesOrdersTableTableManager
                 warehouseId: warehouseId,
                 userId: userId,
                 tableId: tableId,
+                sessionId: sessionId,
                 partySize: partySize,
+                serviceType: serviceType,
                 subtotal: subtotal,
                 discountAmount: discountAmount,
                 amountBeforeVat: amountBeforeVat,
                 vatAmount: vatAmount,
                 totalAmount: totalAmount,
+                serviceChargeRate: serviceChargeRate,
+                serviceChargeAmount: serviceChargeAmount,
                 couponDiscount: couponDiscount,
                 couponCodes: couponCodes,
                 pointsUsed: pointsUsed,
@@ -42519,12 +46210,16 @@ class $$SalesOrdersTableTableManager
                 required String warehouseId,
                 required String userId,
                 Value<String?> tableId = const Value.absent(),
+                Value<String?> sessionId = const Value.absent(),
                 Value<int?> partySize = const Value.absent(),
+                Value<String?> serviceType = const Value.absent(),
                 Value<double> subtotal = const Value.absent(),
                 Value<double> discountAmount = const Value.absent(),
                 Value<double> amountBeforeVat = const Value.absent(),
                 Value<double> vatAmount = const Value.absent(),
                 Value<double> totalAmount = const Value.absent(),
+                Value<double> serviceChargeRate = const Value.absent(),
+                Value<double> serviceChargeAmount = const Value.absent(),
                 Value<double> couponDiscount = const Value.absent(),
                 Value<String?> couponCodes = const Value.absent(),
                 Value<int> pointsUsed = const Value.absent(),
@@ -42551,12 +46246,16 @@ class $$SalesOrdersTableTableManager
                 warehouseId: warehouseId,
                 userId: userId,
                 tableId: tableId,
+                sessionId: sessionId,
                 partySize: partySize,
+                serviceType: serviceType,
                 subtotal: subtotal,
                 discountAmount: discountAmount,
                 amountBeforeVat: amountBeforeVat,
                 vatAmount: vatAmount,
                 totalAmount: totalAmount,
+                serviceChargeRate: serviceChargeRate,
+                serviceChargeAmount: serviceChargeAmount,
                 couponDiscount: couponDiscount,
                 couponCodes: couponCodes,
                 pointsUsed: pointsUsed,
@@ -42765,6 +46464,7 @@ typedef $$SalesOrderItemsTableCreateCompanionBuilder =
       Value<String?> serialNo,
       Value<String> kitchenStatus,
       Value<DateTime?> preparedAt,
+      Value<int> courseNo,
       Value<String?> specialInstructions,
       Value<bool> isFreeItem,
       Value<String?> promotionId,
@@ -42790,6 +46490,7 @@ typedef $$SalesOrderItemsTableUpdateCompanionBuilder =
       Value<String?> serialNo,
       Value<String> kitchenStatus,
       Value<DateTime?> preparedAt,
+      Value<int> courseNo,
       Value<String?> specialInstructions,
       Value<bool> isFreeItem,
       Value<String?> promotionId,
@@ -42977,6 +46678,11 @@ class $$SalesOrderItemsTableFilterComposer
 
   ColumnFilters<DateTime> get preparedAt => $composableBuilder(
     column: $table.preparedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get courseNo => $composableBuilder(
+    column: $table.courseNo,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -43174,6 +46880,11 @@ class $$SalesOrderItemsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get courseNo => $composableBuilder(
+    column: $table.courseNo,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get specialInstructions => $composableBuilder(
     column: $table.specialInstructions,
     builder: (column) => ColumnOrderings(column),
@@ -43326,6 +47037,9 @@ class $$SalesOrderItemsTableAnnotationComposer
     column: $table.preparedAt,
     builder: (column) => column,
   );
+
+  GeneratedColumn<int> get courseNo =>
+      $composableBuilder(column: $table.courseNo, builder: (column) => column);
 
   GeneratedColumn<String> get specialInstructions => $composableBuilder(
     column: $table.specialInstructions,
@@ -43493,6 +47207,7 @@ class $$SalesOrderItemsTableTableManager
                 Value<String?> serialNo = const Value.absent(),
                 Value<String> kitchenStatus = const Value.absent(),
                 Value<DateTime?> preparedAt = const Value.absent(),
+                Value<int> courseNo = const Value.absent(),
                 Value<String?> specialInstructions = const Value.absent(),
                 Value<bool> isFreeItem = const Value.absent(),
                 Value<String?> promotionId = const Value.absent(),
@@ -43516,6 +47231,7 @@ class $$SalesOrderItemsTableTableManager
                 serialNo: serialNo,
                 kitchenStatus: kitchenStatus,
                 preparedAt: preparedAt,
+                courseNo: courseNo,
                 specialInstructions: specialInstructions,
                 isFreeItem: isFreeItem,
                 promotionId: promotionId,
@@ -43541,6 +47257,7 @@ class $$SalesOrderItemsTableTableManager
                 Value<String?> serialNo = const Value.absent(),
                 Value<String> kitchenStatus = const Value.absent(),
                 Value<DateTime?> preparedAt = const Value.absent(),
+                Value<int> courseNo = const Value.absent(),
                 Value<String?> specialInstructions = const Value.absent(),
                 Value<bool> isFreeItem = const Value.absent(),
                 Value<String?> promotionId = const Value.absent(),
@@ -43564,6 +47281,7 @@ class $$SalesOrderItemsTableTableManager
                 serialNo: serialNo,
                 kitchenStatus: kitchenStatus,
                 preparedAt: preparedAt,
+                courseNo: courseNo,
                 specialInstructions: specialInstructions,
                 isFreeItem: isFreeItem,
                 promotionId: promotionId,
@@ -56152,6 +59870,10 @@ class $AppDatabaseManager {
       $$ZonesTableTableManager(_db, _db.zones);
   $$DiningTablesTableTableManager get diningTables =>
       $$DiningTablesTableTableManager(_db, _db.diningTables);
+  $$TableSessionsTableTableManager get tableSessions =>
+      $$TableSessionsTableTableManager(_db, _db.tableSessions);
+  $$TableReservationsTableTableManager get tableReservations =>
+      $$TableReservationsTableTableManager(_db, _db.tableReservations);
   $$CustomerGroupsTableTableManager get customerGroups =>
       $$CustomerGroupsTableTableManager(_db, _db.customerGroups);
   $$CustomersTableTableManager get customers =>

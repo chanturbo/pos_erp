@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/config/app_config.dart';
 
 enum ResponsivePreset { mobile, tablet, desktop }
 
@@ -107,7 +108,7 @@ class SettingsStorage {
     final prefs = await SharedPreferences.getInstance();
     final companyName = prefs.getString('company_name')?.trim();
     if (companyName == null || companyName.isEmpty) {
-      return 'บริษัท ทดสอบ POS จำกัด';
+      return AppConfig.companyName;
     }
     return companyName;
   }

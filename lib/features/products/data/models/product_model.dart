@@ -50,6 +50,15 @@ class ProductModel {
   final bool isActive;
   final String? imagePath;
 
+  // Restaurant context
+  // RETAIL | RESTAURANT | BOTH
+  final String serviceMode;
+  // kitchen | bar | dessert | cashier (nullable)
+  final String? prepStation;
+  final bool requiresPreparation;
+  final bool dineInAvailable;
+  final bool takeawayAvailable;
+
   ProductModel({
     required this.productId,
     required this.productCode,
@@ -68,6 +77,11 @@ class ProductModel {
     this.allowNegativeStock = false,
     this.isActive = true,
     this.imagePath,
+    this.serviceMode = 'RETAIL',
+    this.prepStation,
+    this.requiresPreparation = false,
+    this.dineInAvailable = false,
+    this.takeawayAvailable = false,
   });
 
   /// ตัวเลือกหน่วยทั้งหมด: base unit (factor=1) + หน่วยแปลง
@@ -105,6 +119,11 @@ class ProductModel {
       allowNegativeStock: json['allow_negative_stock'] as bool? ?? false,
       isActive: json['is_active'] as bool? ?? true,
       imagePath: json['image_path'] as String?,
+      serviceMode: json['service_mode'] as String? ?? 'RETAIL',
+      prepStation: json['prep_station'] as String?,
+      requiresPreparation: json['requires_preparation'] as bool? ?? false,
+      dineInAvailable: json['dine_in_available'] as bool? ?? false,
+      takeawayAvailable: json['takeaway_available'] as bool? ?? false,
     );
   }
 
@@ -127,6 +146,11 @@ class ProductModel {
       'allow_negative_stock': allowNegativeStock,
       'is_active': isActive,
       'image_path': imagePath,
+      'service_mode': serviceMode,
+      'prep_station': prepStation,
+      'requires_preparation': requiresPreparation,
+      'dine_in_available': dineInAvailable,
+      'takeaway_available': takeawayAvailable,
     };
   }
 }

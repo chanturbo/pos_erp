@@ -63,6 +63,11 @@ class ProductRoutes {
     'allow_negative_stock': p.allowNegativeStock,
     'is_active': p.isActive,
     'image_path': p.imagePath,
+    'service_mode': p.serviceMode,
+    'prep_station': p.prepStation,
+    'requires_preparation': p.requiresPreparation,
+    'dine_in_available': p.dineInAvailable,
+    'takeaway_available': p.takeawayAvailable,
   };
 
   // ─────────────────────────────────────────────────────────────
@@ -640,6 +645,21 @@ class ProductRoutes {
                 data['allow_negative_stock'] as bool? ?? false,
               ),
               imagePath: Value(data['image_path'] as String?),
+              serviceMode: Value(
+                (data['service_mode'] as String? ?? 'RETAIL').toUpperCase(),
+              ),
+              prepStation: Value(
+                (data['prep_station'] as String?)?.toUpperCase(),
+              ),
+              requiresPreparation: Value(
+                data['requires_preparation'] as bool? ?? false,
+              ),
+              dineInAvailable: Value(
+                data['dine_in_available'] as bool? ?? false,
+              ),
+              takeawayAvailable: Value(
+                data['takeaway_available'] as bool? ?? false,
+              ),
             ),
           );
 
@@ -716,6 +736,23 @@ class ProductRoutes {
           allowNegativeStock: Value(
             data['allow_negative_stock'] as bool? ?? false,
           ),
+          serviceMode: data.containsKey('service_mode')
+              ? Value(
+                  (data['service_mode'] as String? ?? 'RETAIL').toUpperCase(),
+                )
+              : const Value.absent(),
+          prepStation: data.containsKey('prep_station')
+              ? Value((data['prep_station'] as String?)?.toUpperCase())
+              : const Value.absent(),
+          requiresPreparation: data.containsKey('requires_preparation')
+              ? Value(data['requires_preparation'] as bool? ?? false)
+              : const Value.absent(),
+          dineInAvailable: data.containsKey('dine_in_available')
+              ? Value(data['dine_in_available'] as bool? ?? false)
+              : const Value.absent(),
+          takeawayAvailable: data.containsKey('takeaway_available')
+              ? Value(data['takeaway_available'] as bool? ?? false)
+              : const Value.absent(),
           imagePath: data.containsKey('image_path')
               ? Value(data['image_path'] as String?)
               : const Value.absent(),

@@ -1,11 +1,13 @@
 import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/config/app_mode.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../promotions/data/models/promotion_model.dart';
 import '../../../products/data/models/product_model.dart';
+import '../../../restaurant/data/models/restaurant_order_context.dart';
 
 // ─── Applied Coupon ───────────────────────────────────────────────
 class AppliedCoupon {
@@ -52,6 +54,9 @@ class CartItem {
   final String? groupId; // สำหรับ CATEGORY matching ใน BUY_X_GET_Y
   final String? promotionId; // โปรโมชั่นที่ให้ของแถมนี้ (freeItems เท่านั้น)
   final String? promotionName;
+  final String? note;
+  final List<CartItemModifier> modifiers;
+  final int courseNo; // Course/Fire order — 1 = first course (default)
 
   // ✅ เก็บราคาทุก level ไว้ เพื่อให้ re-price ได้เมื่อเปลี่ยนลูกค้า
   final double priceLevel1;
@@ -71,6 +76,9 @@ class CartItem {
     this.groupId,
     this.promotionId,
     this.promotionName,
+    this.note,
+    this.modifiers = const [],
+    this.courseNo = 1,
     this.priceLevel1 = 0,
     this.priceLevel2 = 0,
     this.priceLevel3 = 0,
@@ -94,7 +102,14 @@ class CartItem {
     }
   }
 
-  CartItem copyWith({double? quantity, double? unitPrice, double? amount}) {
+  CartItem copyWith({
+    double? quantity,
+    double? unitPrice,
+    double? amount,
+    String? note,
+    List<CartItemModifier>? modifiers,
+    int? courseNo,
+  }) {
     return CartItem(
       productId: productId,
       productCode: productCode,
@@ -106,6 +121,9 @@ class CartItem {
       groupId: groupId,
       promotionId: promotionId,
       promotionName: promotionName,
+      note: note ?? this.note,
+      modifiers: modifiers ?? this.modifiers,
+      courseNo: courseNo ?? this.courseNo,
       priceLevel1: priceLevel1,
       priceLevel2: priceLevel2,
       priceLevel3: priceLevel3,
@@ -122,10 +140,13 @@ class CartItem {
     'quantity': quantity,
     'unit_price': unitPrice,
     'amount': amount,
-    'group_id': groupId,
-    'promotion_id': promotionId,
-    'promotion_name': promotionName,
-    'price_level1': priceLevel1,
+      'group_id': groupId,
+      'promotion_id': promotionId,
+      'promotion_name': promotionName,
+      'note': note,
+      'modifiers': modifiers.map((item) => item.toJson()).toList(),
+      'course_no': courseNo,
+      'price_level1': priceLevel1,
     'price_level2': priceLevel2,
     'price_level3': priceLevel3,
     'price_level4': priceLevel4,
@@ -143,12 +164,44 @@ class CartItem {
     groupId: json['group_id'] as String?,
     promotionId: json['promotion_id'] as String?,
     promotionName: json['promotion_name'] as String?,
+    note: json['note'] as String?,
+    modifiers: (json['modifiers'] as List?)
+            ?.map((item) => CartItemModifier.fromJson(
+                Map<String, dynamic>.from(item as Map)))
+            .toList() ??
+        const [],
+    courseNo: json['course_no'] as int? ?? 1,
     priceLevel1: (json['price_level1'] as num?)?.toDouble() ?? 0,
     priceLevel2: (json['price_level2'] as num?)?.toDouble() ?? 0,
     priceLevel3: (json['price_level3'] as num?)?.toDouble() ?? 0,
     priceLevel4: (json['price_level4'] as num?)?.toDouble() ?? 0,
     priceLevel5: (json['price_level5'] as num?)?.toDouble() ?? 0,
   );
+}
+
+class CartItemModifier {
+  final String modifierId;
+  final String modifierName;
+  final double priceAdjustment;
+
+  const CartItemModifier({
+    required this.modifierId,
+    required this.modifierName,
+    this.priceAdjustment = 0,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'modifier_id': modifierId,
+        'modifier_name': modifierName,
+        'price_adjustment': priceAdjustment,
+      };
+
+  factory CartItemModifier.fromJson(Map<String, dynamic> json) =>
+      CartItemModifier(
+        modifierId: json['modifier_id'] as String? ?? '',
+        modifierName: json['modifier_name'] as String? ?? '',
+        priceAdjustment: (json['price_adjustment'] as num?)?.toDouble() ?? 0,
+      );
 }
 
 // Cart State
@@ -254,6 +307,9 @@ class CartState {
 final cartProvider = NotifierProvider<CartNotifier, CartState>(() {
   return CartNotifier();
 });
+
+final restaurantOrderContextProvider =
+    StateProvider<RestaurantOrderContext?>((ref) => null);
 
 class CartNotifier extends Notifier<CartState> {
   @override
@@ -373,6 +429,14 @@ class CartNotifier extends Notifier<CartState> {
     state = state.copyWith(items: items);
   }
 
+  void setCourseNo(String productId, int courseNo) {
+    final items = state.items.map((item) {
+      if (item.productId != productId) return item;
+      return item.copyWith(courseNo: courseNo);
+    }).toList();
+    state = state.copyWith(items: items);
+  }
+
   /// ✅ ตั้งค่าลูกค้า พร้อม priceLevel (ไม่ re-price อัตโนมัติ)
   void setCustomer(
     String? customerId,
@@ -434,6 +498,11 @@ class CartNotifier extends Notifier<CartState> {
   /// เคลียร์ตะกร้า
   void clear() {
     state = CartState(); // Reset เป็น default (freeItems = [] ด้วย)
+  }
+
+  /// ใช้ตอน restore order ที่เปิดค้างจากโต๊ะ
+  void replaceCart(CartState nextState) {
+    state = nextState;
   }
 
   /// คำนวณของแถม BUY_X_GET_Y และอัปเดต freeItems

@@ -19,6 +19,10 @@ import '../../../branches/presentation/pages/branch_list_page.dart';
 import '../../../branches/presentation/pages/sync_status_page.dart';
 import '../../../branches/presentation/providers/branch_provider.dart';
 import '../../../testing/test_page.dart';
+import '../../../restaurant/presentation/pages/table_overview_page.dart';
+import '../../../restaurant/presentation/pages/kitchen_display_page.dart';
+import '../../../restaurant/presentation/pages/kitchen_analytics_page.dart';
+import '../../../restaurant/presentation/pages/reservations_page.dart';
 import '../../../sales/presentation/pages/pos_page.dart';
 import '../../../sales/presentation/pages/sales_history_page.dart';
 import '../../../dashboard/presentation/pages/dashboard_page.dart';
@@ -78,7 +82,11 @@ class _HomePageState extends ConsumerState<HomePage> {
   /// (เช่น SalesHistoryPage กรองวันนี้) โดยยัง highlight เมนูที่ถูกต้อง
   Widget? _overridePage;
 
-  List<_MenuSection> get _sections => [
+  List<_MenuSection> get _sections {
+    final selectedBranch = ref.read(selectedBranchProvider);
+    final showRestaurantSection = selectedBranch?.isRestaurantMode ?? true;
+
+    return [
     _MenuSection('หลัก', [
       _MenuItem(
         icon: Icons.dashboard,
@@ -120,6 +128,33 @@ class _HomePageState extends ConsumerState<HomePage> {
         ),
       ),
     ]),
+    if (showRestaurantSection)
+      _MenuSection('ร้านอาหาร', [
+        _MenuItem(
+          icon: Icons.table_restaurant,
+          title: 'โต๊ะอาหาร',
+          page: const TableOverviewPage(),
+          permissionKey: AppPermission.pos,
+        ),
+        _MenuItem(
+          icon: Icons.kitchen,
+          title: 'หน้าจอครัว (KDS)',
+          page: const KitchenDisplayPage(),
+          permissionKey: AppPermission.pos,
+        ),
+        _MenuItem(
+          icon: Icons.event_note,
+          title: 'การจองโต๊ะ',
+          page: const ReservationsPage(),
+          permissionKey: AppPermission.pos,
+        ),
+        _MenuItem(
+          icon: Icons.analytics,
+          title: 'Kitchen Analytics',
+          page: const KitchenAnalyticsPage(),
+          permissionKey: AppPermission.pos,
+        ),
+      ]),
     _MenuSection('การขาย', [
       _MenuItem(
         icon: Icons.shopping_cart,
@@ -264,7 +299,8 @@ class _HomePageState extends ConsumerState<HomePage> {
         permissionKey: AppPermission.userManagement,
       ),
     ]),
-  ];
+    ];
+  }
 
   List<_MenuItem> get _allItems => _sections.expand((s) => s.items).toList();
 
@@ -719,6 +755,7 @@ class _SidebarContent extends StatelessWidget {
             syncAsync: syncAsync,
             connectionAsync: connectionAsync,
             isCollapsed: isCollapsed,
+            showTestTools: AppConfig.showTestingTools,
             onSyncTap: onSyncTap,
             onTestTap: onTestTap,
             onAboutTap: onAboutTap,
@@ -1229,6 +1266,7 @@ class _SidebarBottom extends StatelessWidget {
   final AsyncValue syncAsync;
   final AsyncValue connectionAsync;
   final bool isCollapsed;
+  final bool showTestTools;
   final VoidCallback onSyncTap;
   final VoidCallback onTestTap;
   final VoidCallback onAboutTap;
@@ -1237,6 +1275,7 @@ class _SidebarBottom extends StatelessWidget {
   const _SidebarBottom({
     required this.syncAsync,
     required this.connectionAsync,
+    required this.showTestTools,
     required this.onSyncTap,
     required this.onTestTap,
     required this.onAboutTap,
@@ -1303,19 +1342,23 @@ class _SidebarBottom extends StatelessWidget {
               loading: () => const SizedBox(height: 36),
               error: (_, _) => const SizedBox(height: 36),
             ),
-            _CollapsedSidebarHint(
-              label: 'ทดสอบระบบ',
-              child: IconButton(
-                icon: const Icon(
-                  Icons.science_outlined,
-                  size: 18,
-                  color: Color(0xFF8A9BC0),
+            if (showTestTools)
+              _CollapsedSidebarHint(
+                label: 'ทดสอบระบบ',
+                child: IconButton(
+                  icon: const Icon(
+                    Icons.science_outlined,
+                    size: 18,
+                    color: Color(0xFF8A9BC0),
+                  ),
+                  onPressed: onTestTap,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 36,
+                    minHeight: 36,
+                  ),
                 ),
-                onPressed: onTestTap,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
               ),
-            ),
             _CollapsedSidebarHint(
               label: 'เกี่ยวกับโปรแกรม',
               child: IconButton(
@@ -1376,12 +1419,13 @@ class _SidebarBottom extends StatelessWidget {
             loading: () => const SizedBox(height: 32),
             error: (_, _) => const SizedBox(height: 32),
           ),
-          _BottomAction(
-            icon: Icons.science_outlined,
-            label: 'ทดสอบระบบ',
-            iconColor: const Color(0xFF8A9BC0),
-            onTap: onTestTap,
-          ),
+          if (showTestTools)
+            _BottomAction(
+              icon: Icons.science_outlined,
+              label: 'ทดสอบระบบ',
+              iconColor: const Color(0xFF8A9BC0),
+              onTap: onTestTap,
+            ),
           _BottomAction(
             icon: Icons.info_outline,
             label: 'เกี่ยวกับโปรแกรม',

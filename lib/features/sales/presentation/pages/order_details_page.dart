@@ -7,6 +7,8 @@ import 'package:printing/printing.dart';
 import '../providers/sales_provider.dart';
 import '../../data/models/sales_order_model.dart';
 import '../../../settings/presentation/pages/settings_page.dart';
+import '../../../../core/services/license/license_models.dart';
+import '../../../../core/services/license/license_service.dart';
 import '../../../../shared/pdf/receipt_pdf_builder.dart';
 import '../../../../shared/services/thermal_print_service.dart';
 import '../../../../shared/widgets/mobile_home_button.dart';
@@ -41,6 +43,20 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
       _order = order;
       _isLoading = false;
     });
+  }
+
+  bool _ensureLicenseFeature(LicenseFeature feature, String message) {
+    final status = ref.read(licenseServiceProvider).asData?.value;
+    if (status != null && !status.canUseFeature(feature)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message), backgroundColor: Colors.red),
+        );
+        Navigator.of(context).pushNamed('/license');
+      }
+      return false;
+    }
+    return true;
   }
 
   @override
@@ -782,6 +798,12 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
   }
 
   Future<void> _printReceiptDirect(SettingsState settings) async {
+    if (!_ensureLicenseFeature(
+      LicenseFeature.printReceipt,
+      'หมดช่วงทดลองแล้ว ต้องมี License ก่อนพิมพ์ใบเสร็จ',
+    )) {
+      return;
+    }
     if (_order == null || _isPrintingReceipt) return;
 
     final messenger = ScaffoldMessenger.of(context);
@@ -849,6 +871,20 @@ class _OrderReceiptPage extends ConsumerStatefulWidget {
 class _OrderReceiptPageState extends ConsumerState<_OrderReceiptPage> {
   bool _isPrinting = false;
 
+  bool _ensureLicenseFeature(LicenseFeature feature, String message) {
+    final status = ref.read(licenseServiceProvider).asData?.value;
+    if (status != null && !status.canUseFeature(feature)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message), backgroundColor: Colors.red),
+        );
+        Navigator.of(context).pushNamed('/license');
+      }
+      return false;
+    }
+    return true;
+  }
+
   ThermalReceiptDocument _buildDocument(SettingsState settings) {
     final order = widget.order;
     final dateFmt = DateFormat('dd/MM/yyyy HH:mm');
@@ -896,6 +932,12 @@ class _OrderReceiptPageState extends ConsumerState<_OrderReceiptPage> {
   }
 
   Future<void> _printNative() async {
+    if (!_ensureLicenseFeature(
+      LicenseFeature.printReceipt,
+      'หมดช่วงทดลองแล้ว ต้องมี License ก่อนพิมพ์ใบเสร็จ',
+    )) {
+      return;
+    }
     if (_isPrinting) return;
     setState(() => _isPrinting = true);
     try {

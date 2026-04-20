@@ -60,9 +60,13 @@ class SettingsState {
   final String thermalPrinterHost;
   final int thermalPrinterPort;
   final int thermalPaperWidthMm;
+  // ✅ Restaurant
+  final double defaultServiceChargeRate;
+  final String managerPin;
+  final bool autoPrintKitchenTicket;
 
   SettingsState({
-    this.companyName = 'บริษัท ทดสอบ POS จำกัด',
+    this.companyName = '',
     this.taxId = '1234567890123',
     this.address = '123 ถนนทดสอบ กรุงเทพฯ 10100',
     this.phone = '02-123-4567',
@@ -92,6 +96,9 @@ class SettingsState {
     this.thermalPrinterHost = '',
     this.thermalPrinterPort = 9100,
     this.thermalPaperWidthMm = 80,
+    this.defaultServiceChargeRate = 0,
+    this.managerPin = '',
+    this.autoPrintKitchenTicket = false,
   });
 
   int get listPageSize => ResponsiveSettings.pick(
@@ -143,6 +150,9 @@ class SettingsState {
     String? thermalPrinterHost,
     int? thermalPrinterPort,
     int? thermalPaperWidthMm,
+    double? defaultServiceChargeRate,
+    String? managerPin,
+    bool? autoPrintKitchenTicket,
   }) {
     return SettingsState(
       companyName: companyName ?? this.companyName,
@@ -181,6 +191,9 @@ class SettingsState {
       thermalPrinterHost: thermalPrinterHost ?? this.thermalPrinterHost,
       thermalPrinterPort: thermalPrinterPort ?? this.thermalPrinterPort,
       thermalPaperWidthMm: thermalPaperWidthMm ?? this.thermalPaperWidthMm,
+      defaultServiceChargeRate: defaultServiceChargeRate ?? this.defaultServiceChargeRate,
+      managerPin: managerPin ?? this.managerPin,
+      autoPrintKitchenTicket: autoPrintKitchenTicket ?? this.autoPrintKitchenTicket,
     );
   }
 }
@@ -273,6 +286,34 @@ class SettingsNotifier extends Notifier<SettingsState> {
           prefs.getInt('thermal_printer_port') ?? state.thermalPrinterPort,
       thermalPaperWidthMm:
           prefs.getInt('thermal_paper_width_mm') ?? state.thermalPaperWidthMm,
+      defaultServiceChargeRate:
+          prefs.getDouble('default_service_charge_rate') ?? state.defaultServiceChargeRate,
+      managerPin:
+          prefs.getString('manager_pin') ?? state.managerPin,
+      autoPrintKitchenTicket:
+          prefs.getBool('auto_print_kitchen_ticket') ?? state.autoPrintKitchenTicket,
+    );
+  }
+
+  Future<void> updateRestaurantSettings({
+    double? defaultServiceChargeRate,
+    String? managerPin,
+    bool? autoPrintKitchenTicket,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (defaultServiceChargeRate != null) {
+      await prefs.setDouble('default_service_charge_rate', defaultServiceChargeRate);
+    }
+    if (managerPin != null) {
+      await prefs.setString('manager_pin', managerPin);
+    }
+    if (autoPrintKitchenTicket != null) {
+      await prefs.setBool('auto_print_kitchen_ticket', autoPrintKitchenTicket);
+    }
+    state = state.copyWith(
+      defaultServiceChargeRate: defaultServiceChargeRate,
+      managerPin: managerPin,
+      autoPrintKitchenTicket: autoPrintKitchenTicket,
     );
   }
 
@@ -588,11 +629,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           _promptPayController.text.isEmpty) {
         _syncControllers(next);
       }
-      // sync ถ้า companyName เปลี่ยนจาก default → ค่าจริง
+      // sync company name รอบแรก ถ้า controller ยังว่างอยู่
       if (previous != null &&
-          previous.companyName == 'บริษัท ทดสอบ POS จำกัด' &&
-          next.companyName != previous.companyName &&
-          _companyNameController.text == 'บริษัท ทดสอบ POS จำกัด') {
+          previous.companyName != next.companyName &&
+          _companyNameController.text.trim().isEmpty) {
         _syncControllers(next);
       }
     });
@@ -717,6 +757,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     icon: Icons.keyboard_outlined,
                     isDark: isDark,
                     child: _buildShortcutsSection(isDark),
+                  ),
+                  const SizedBox(height: 16),
+
+                  _SectionCard(
+                    title: 'ร้านอาหาร',
+                    icon: Icons.restaurant_outlined,
+                    isDark: isDark,
+                    child: _buildRestaurantSection(settings, isDark),
                   ),
                   const SizedBox(height: 16),
 
@@ -1932,6 +1980,105 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     ];
     return Column(
       children: shortcuts.map((s) => _shortcutRow(s.$1, s.$2, isDark)).toList(),
+    );
+  }
+
+  Widget _buildRestaurantSection(SettingsState settings, bool isDark) {
+    final scCtrl = TextEditingController(
+      text: settings.defaultServiceChargeRate > 0
+          ? settings.defaultServiceChargeRate.toStringAsFixed(
+              settings.defaultServiceChargeRate ==
+                      settings.defaultServiceChargeRate.truncateToDouble()
+                  ? 0
+                  : 1)
+          : '0',
+    );
+    final pinCtrl = TextEditingController(text: settings.managerPin);
+
+    return Column(
+      children: [
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.percent, color: Colors.orange),
+          title: Text('Service Charge เริ่มต้น (%)',
+              style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+          subtitle: Text(
+            settings.defaultServiceChargeRate > 0
+                ? 'ใช้ ${settings.defaultServiceChargeRate.toStringAsFixed(1)}% อัตโนมัติเมื่อเปิดบิล'
+                : 'ไม่ตั้งค่า (กรอกเองที่หน้าบิล)',
+            style: TextStyle(color: isDark ? Colors.white54 : AppTheme.textSub),
+          ),
+          trailing: SizedBox(
+            width: 90,
+            child: TextFormField(
+              controller: scCtrl,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              textAlign: TextAlign.center,
+              decoration: InputDecoration(
+                suffixText: '%',
+                isDense: true,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8)),
+              ),
+              onFieldSubmitted: (v) {
+                final rate = double.tryParse(v) ?? 0;
+                ref
+                    .read(settingsProvider.notifier)
+                    .updateRestaurantSettings(defaultServiceChargeRate: rate);
+              },
+            ),
+          ),
+        ),
+        const Divider(height: 1),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.lock_outline, color: Colors.purple),
+          title: Text('Manager PIN (สำหรับยกเลิกรายการ)',
+              style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+          subtitle: Text(
+            settings.managerPin.isEmpty ? 'ไม่ตั้ง PIN (ยกเลิกได้ทันที)' : 'ตั้ง PIN แล้ว',
+            style: TextStyle(color: isDark ? Colors.white54 : AppTheme.textSub),
+          ),
+          trailing: SizedBox(
+            width: 120,
+            child: TextFormField(
+              controller: pinCtrl,
+              obscureText: true,
+              keyboardType: TextInputType.number,
+              textAlign: TextAlign.center,
+              decoration: InputDecoration(
+                hintText: 'ไม่ตั้งค่า',
+                isDense: true,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8)),
+              ),
+              onFieldSubmitted: (v) {
+                ref
+                    .read(settingsProvider.notifier)
+                    .updateRestaurantSettings(managerPin: v.trim());
+              },
+            ),
+          ),
+        ),
+        const Divider(height: 1),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          secondary: const Icon(Icons.print_outlined, color: Colors.teal),
+          title: Text('พิมพ์ใบสั่งครัวอัตโนมัติ',
+              style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+          subtitle: Text(
+            settings.autoPrintKitchenTicket
+                ? 'พิมพ์ Kitchen Ticket ทุกครั้งที่ส่งออเดอร์'
+                : 'ไม่พิมพ์อัตโนมัติ',
+            style: TextStyle(color: isDark ? Colors.white54 : AppTheme.textSub),
+          ),
+          value: settings.autoPrintKitchenTicket,
+          onChanged: (v) => ref
+              .read(settingsProvider.notifier)
+              .updateRestaurantSettings(autoPrintKitchenTicket: v),
+        ),
+      ],
     );
   }
 

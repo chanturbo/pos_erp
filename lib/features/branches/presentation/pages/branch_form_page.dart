@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../shared/widgets/mobile_home_button.dart';
+import '../../../restaurant/data/models/restaurant_enums.dart';
 import '../providers/branch_provider.dart';
 import '../../data/models/branch_model.dart';
 
@@ -26,6 +27,7 @@ class _BranchFormPageState extends ConsumerState<BranchFormPage>
   late TextEditingController _addressCtrl;
   late TextEditingController _phoneCtrl;
   bool _isActive = true;
+  BusinessMode _businessMode = BusinessMode.retail;
 
   // Warehouse form
   final _whCodeCtrl = TextEditingController();
@@ -43,6 +45,7 @@ class _BranchFormPageState extends ConsumerState<BranchFormPage>
     _addressCtrl = TextEditingController(text: b?.address ?? '');
     _phoneCtrl = TextEditingController(text: b?.phone ?? '');
     _isActive = b?.isActive ?? true;
+    _businessMode = BusinessMode.fromString(b?.businessMode);
   }
 
   @override
@@ -178,6 +181,27 @@ class _BranchFormPageState extends ConsumerState<BranchFormPage>
                       prefixIcon: Icon(Icons.location_on),
                       alignLabelWithHint: true,
                     ),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<BusinessMode>(
+                    initialValue: _businessMode,
+                    decoration: const InputDecoration(
+                      labelText: 'โหมดธุรกิจ',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.storefront_outlined),
+                    ),
+                    items: BusinessMode.values
+                        .map(
+                          (mode) => DropdownMenuItem(
+                            value: mode,
+                            child: Text(mode.label),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setState(() => _businessMode = value);
+                    },
                   ),
                   const SizedBox(height: 12),
                   SwitchListTile(
@@ -392,6 +416,7 @@ class _BranchFormPageState extends ConsumerState<BranchFormPage>
           ? _phoneCtrl.text.trim()
           : null,
       isActive: _isActive,
+      businessMode: _businessMode.value,
       createdAt: widget.branch?.createdAt ?? now,
       updatedAt: now,
     );

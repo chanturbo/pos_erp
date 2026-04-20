@@ -81,6 +81,7 @@ class ReportsPdfBuilder {
   static Future<pw.Document> buildPurchase({
     required Map<String, dynamic> summary,
     required List<Map<String, dynamic>> topSuppliers,
+    required List<Map<String, dynamic>> purchaseCategories,
     String? companyName,
   }) async {
     final effectiveCompanyName =
@@ -126,6 +127,22 @@ class ReportsPdfBuilder {
             ttf: ttf,
             regular: regular,
           ),
+          pw.SizedBox(height: 12),
+          _tableSection(
+            title: 'หมวดหมู่สินค้าที่จัดซื้อมากสุด',
+            headers: ['#', 'หมวดหมู่', 'ปริมาณรวม', 'มูลค่า'],
+            rows: purchaseCategories.asMap().entries.map((entry) {
+              final item = entry.value;
+              return [
+                '${entry.key + 1}',
+                '${item['category'] ?? '-'}',
+                _qty.format((item['total_qty'] ?? 0) as num),
+                _money.format((item['total_amount'] ?? 0) as num),
+              ];
+            }).toList(),
+            ttf: ttf,
+            regular: regular,
+          ),
         ],
       ],
     );
@@ -133,6 +150,7 @@ class ReportsPdfBuilder {
 
   static Future<pw.Document> buildInventory({
     required List<Map<String, dynamic>> lowStock,
+    required List<Map<String, dynamic>> stockMovement,
     required List<Map<String, dynamic>> stockAging,
     String? companyName,
   }) async {
@@ -154,6 +172,27 @@ class ReportsPdfBuilder {
                 '${item['product_code'] ?? '-'}',
                 _qty.format((item['current_stock'] ?? 0) as num),
                 '${item['base_unit'] ?? '-'}',
+              ];
+            }).toList(),
+            ttf: ttf,
+            regular: regular,
+          ),
+          pw.SizedBox(height: 12),
+          _tableSection(
+            title: 'ความเคลื่อนไหวสต๊อกล่าสุด',
+            headers: ['#', 'สินค้า', 'ประเภท', 'จำนวน', 'คงเหลือ', 'เวลา'],
+            rows: stockMovement.asMap().entries.map((entry) {
+              final item = entry.value;
+              final createdAt = item['created_at'] as String?;
+              return [
+                '${entry.key + 1}',
+                '${item['product_name'] ?? '-'}',
+                '${item['movement_type'] ?? '-'}',
+                _qty.format((item['quantity'] ?? 0) as num),
+                _qty.format((item['balance_after'] ?? 0) as num),
+                createdAt == null
+                    ? '-'
+                    : _dateTime.format(DateTime.parse(createdAt)),
               ];
             }).toList(),
             ttf: ttf,

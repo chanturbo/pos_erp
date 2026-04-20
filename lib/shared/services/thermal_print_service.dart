@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert' show utf8;
 import 'dart:io';
 
+import '../../core/services/license/license_local_service.dart';
+import '../../core/services/license/license_models.dart';
 import '../widgets/thermal_receipt.dart';
 
 class ThermalPrintSettings {
@@ -30,6 +32,8 @@ class ThermalReceiptDocument {
   final String address;
   final String phone;
   final String taxId;
+  final String title;
+  final String? footerNote;
   final String orderNo;
   final String orderDate;
   final String? customerName;
@@ -37,6 +41,7 @@ class ThermalReceiptDocument {
   final List<ReceiptFreeItem> freeItems;
   final double subtotal;
   final double discount;
+  final double serviceCharge;
   final List<ReceiptCoupon> coupons;
   final double total;
   final String paymentLabel;
@@ -52,11 +57,14 @@ class ThermalReceiptDocument {
     required this.address,
     required this.phone,
     required this.taxId,
+    this.title = 'ใบเสร็จรับเงิน',
+    this.footerNote,
     required this.orderNo,
     required this.orderDate,
     required this.items,
     required this.subtotal,
     required this.discount,
+    this.serviceCharge = 0,
     required this.total,
     required this.paymentLabel,
     required this.paymentType,
@@ -68,6 +76,40 @@ class ThermalReceiptDocument {
     this.earnedPoints = 0,
     this.pointsUsed = 0,
     this.pointsBalance,
+  });
+}
+
+// ── Kitchen Ticket ────────────────────────────────────────────────────────────
+
+class KitchenTicketItem {
+  final int courseNo;
+  final double quantity;
+  final String unit;
+  final String name;
+  final String? specialInstructions;
+  final String? station;
+
+  const KitchenTicketItem({
+    required this.courseNo,
+    required this.quantity,
+    required this.unit,
+    required this.name,
+    this.specialInstructions,
+    this.station,
+  });
+}
+
+class KitchenTicketDocument {
+  final String tableName;
+  final String orderNo;
+  final String orderTime;
+  final List<KitchenTicketItem> items;
+
+  const KitchenTicketDocument({
+    required this.tableName,
+    required this.orderNo,
+    required this.orderTime,
+    required this.items,
   });
 }
 
@@ -89,6 +131,9 @@ class ThermalPrintService {
     required ThermalPrintSettings settings,
     required ThermalReceiptDocument document,
   }) async {
+    await LicenseLocalService.ensureFeatureAllowed(
+      LicenseFeature.printReceipt,
+    );
     if (!settings.enabled) {
       throw const ThermalPrintException('ยังไม่ได้เปิดใช้งาน direct thermal print');
     }
@@ -147,7 +192,7 @@ class ThermalPrintService {
 
     writeln(_divider(lineWidth));
     write(const [0x1B, 0x45, 0x01]);
-    writeln(_fitCenter('ใบเสร็จรับเงิน', lineWidth));
+    writeln(_fitCenter(doc.title, lineWidth));
     write(const [0x1B, 0x45, 0x00]);
     write(const [0x1B, 0x61, 0x00]); // left
 
@@ -191,6 +236,9 @@ class ThermalPrintService {
     if (doc.discount > 0) {
       writeln(_pair('ส่วนลด', '-${_baht(doc.discount)}', lineWidth));
     }
+    if (doc.serviceCharge > 0) {
+      writeln(_pair('Service charge', _baht(doc.serviceCharge), lineWidth));
+    }
     for (final coupon in doc.coupons) {
       final label = 'คูปอง ${coupon.code}';
       writeln(_pair(label, '-${_baht(coupon.discount)}', lineWidth));
@@ -227,6 +275,11 @@ class ThermalPrintService {
     write(const [0x1B, 0x45, 0x00]);
     writeln(_fitCenter('(THANK YOU)', lineWidth));
     writeln(_fitCenter('โปรดเก็บใบเสร็จไว้เป็นหลักฐาน', lineWidth));
+    if (doc.footerNote != null && doc.footerNote!.trim().isNotEmpty) {
+      for (final line in _wrapText(doc.footerNote!.trim(), lineWidth)) {
+        writeln(_fitCenter(line, lineWidth));
+      }
+    }
     writeln('');
     writeln('');
     write(const [0x1D, 0x56, 0x41, 0x10]); // cut
@@ -312,4 +365,101 @@ class ThermalPrintService {
 
   String _money(double value) => value.toStringAsFixed(2);
   String _baht(double value) => '฿${_money(value)}';
+
+  // ── Kitchen Ticket ──────────────────────────────────────────────────────────
+
+  Future<void> printKitchenTicket({
+    required ThermalPrintSettings settings,
+    required KitchenTicketDocument document,
+  }) async {
+    if (!settings.canPrintDirect) return;
+    final bytes = _buildKitchenTicketBytes(document, settings.charactersPerLine);
+    Socket? socket;
+    try {
+      socket = await Socket.connect(
+        settings.host.trim(),
+        settings.port,
+        timeout: const Duration(seconds: 5),
+      );
+      socket.add(bytes);
+      await socket.flush();
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    } on SocketException {
+      // silent fail — ไม่ block การสั่งอาหาร
+    } on TimeoutException {
+      // silent fail
+    } finally {
+      await socket?.close();
+    }
+  }
+
+  List<int> _buildKitchenTicketBytes(KitchenTicketDocument doc, int lineWidth) {
+    final bytes = <int>[];
+    void write(List<int> data) => bytes.addAll(data);
+    void writeln(String text) => write([...utf8.encode('$text\n')]);
+
+    write(const [0x1B, 0x40]); // init
+    // ── header ──
+    write(const [0x1B, 0x61, 0x01]); // center
+    write(const [0x1D, 0x21, 0x11]); // double width+height
+    write(const [0x1B, 0x45, 0x01]); // bold on
+    writeln('ORDER TICKET');
+    write(const [0x1D, 0x21, 0x00]); // normal size
+    write(const [0x1B, 0x45, 0x00]); // bold off
+    writeln(_fitCenter('TABLE: ${doc.tableName}', lineWidth));
+    writeln(_fitCenter('#${doc.orderNo}  ${doc.orderTime}', lineWidth));
+    writeln(_divider(lineWidth));
+
+    // ── items ──
+    write(const [0x1B, 0x61, 0x00]); // left align
+
+    // group by station
+    final stations = <String, List<KitchenTicketItem>>{};
+    for (final item in doc.items) {
+      final s = (item.station ?? 'kitchen').toLowerCase();
+      (stations[s] ??= []).add(item);
+    }
+    const stationOrder = ['kitchen', 'bar', 'dessert', 'cashier'];
+    final keys = [
+      ...stationOrder.where(stations.containsKey),
+      ...stations.keys.where((k) => !stationOrder.contains(k)),
+    ];
+
+    for (final station in keys) {
+      if (keys.length > 1) {
+        write(const [0x1B, 0x45, 0x01]);
+        writeln('[ ${_stationLabel(station)} ]');
+        write(const [0x1B, 0x45, 0x00]);
+      }
+      for (final item in stations[station]!) {
+        final courseTag = item.courseNo > 1 ? '[C${item.courseNo}] ' : '';
+        final qty = _formatQty(item.quantity);
+        final qtyPad = '$courseTag$qty ${item.unit}';
+        // Bold item name
+        write(const [0x1B, 0x45, 0x01]);
+        writeln(_pair(item.name, qtyPad, lineWidth));
+        write(const [0x1B, 0x45, 0x00]);
+        if (item.specialInstructions != null &&
+            item.specialInstructions!.trim().isNotEmpty) {
+          writeln('  * ${item.specialInstructions!.trim()}');
+        }
+      }
+      writeln('');
+    }
+
+    writeln(_divider(lineWidth));
+    // cut paper
+    write(const [0x1D, 0x56, 0x42, 0x00]);
+    return bytes;
+  }
+
+  String _stationLabel(String station) {
+    switch (station) {
+      case 'kitchen': return 'KITCHEN';
+      case 'bar': return 'BAR';
+      case 'dessert': return 'DESSERT';
+      case 'cashier': return 'CASHIER';
+      default: return station.toUpperCase();
+    }
+  }
 }

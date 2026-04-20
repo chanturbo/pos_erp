@@ -12,11 +12,15 @@
 //   )
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import '../../core/services/license/license_local_service.dart';
+import '../../core/services/license/license_models.dart';
+import '../../core/services/license/license_service.dart';
 import 'pdf_export_service.dart';
 import 'package:pdf/widgets.dart' as pw;
 
-class PdfReportButton extends StatefulWidget {
+class PdfReportButton extends ConsumerStatefulWidget {
   /// ข้อความเมื่อไม่มีข้อมูล เช่น 'ไม่มีข้อมูลสินค้า'
   final String emptyMessage;
 
@@ -42,10 +46,10 @@ class PdfReportButton extends StatefulWidget {
   });
 
   @override
-  State<PdfReportButton> createState() => _PdfReportButtonState();
+  ConsumerState<PdfReportButton> createState() => _PdfReportButtonState();
 }
 
-class _PdfReportButtonState extends State<PdfReportButton> {
+class _PdfReportButtonState extends ConsumerState<PdfReportButton> {
   bool _loading = false;
 
   @override
@@ -132,6 +136,20 @@ class _PdfReportButtonState extends State<PdfReportButton> {
       return;
     }
 
+    final status = ref.read(licenseServiceProvider).asData?.value;
+    if (status != null && !status.canUseFeature(LicenseFeature.exportReport)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('หมดช่วงทดลองแล้ว ต้องมี License ก่อนส่งออกรายงาน'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        Navigator.of(context).pushNamed('/license');
+      }
+      return;
+    }
+
     setState(() => _loading = true);
     try {
       final fname = widget.filename();
@@ -173,6 +191,13 @@ class _PdfReportButtonState extends State<PdfReportButton> {
               ),
             );
           }
+      }
+    } on LicenseRestrictionException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message), backgroundColor: Colors.red),
+        );
+        Navigator.of(context).pushNamed('/license');
       }
     } catch (e) {
       if (mounted) {

@@ -15,6 +15,7 @@ import '../../../customers/presentation/providers/customer_provider.dart'; // �
 import '../../../ar/presentation/providers/ar_invoice_provider.dart';
 import '../../../settings/presentation/pages/settings_page.dart';
 import '../../../promotions/presentation/providers/promotion_provider.dart';
+import '../../../restaurant/data/models/restaurant_order_context.dart';
 import '../providers/cart_provider.dart';
 import '../providers/sales_provider.dart';
 import '../../../dashboard/presentation/providers/dashboard_provider.dart';
@@ -22,7 +23,10 @@ import '../../../inventory/presentation/providers/stock_provider.dart';
 import '../../../products/presentation/providers/product_provider.dart';
 import '../../../branches/presentation/providers/branch_provider.dart';
 import '../../../../core/config/app_mode.dart';
+import '../../../../core/services/license/license_models.dart';
+import '../../../../core/services/license/license_service.dart';
 import '../../../../core/services/pending_sales_queue_service.dart';
+import '../../../restaurant/presentation/providers/table_provider.dart';
 import '../../../../shared/services/thermal_print_service.dart';
 import '../../../../shared/services/mobile_scanner_service.dart';
 import '../../../../shared/pdf/receipt_pdf_builder.dart';
@@ -63,9 +67,8 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
   @override
   void initState() {
     super.initState();
-    final cartState = ref.read(cartProvider);
-    _receivedAmount = cartState.total;
-    _receivedController.text = cartState.total.toStringAsFixed(2);
+    _receivedAmount = _grossTotal;
+    _receivedController.text = _grossTotal.toStringAsFixed(2);
 
     // โฟกัสและเลือกทั้งหมดหลัง frame แรก
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -80,6 +83,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
   }
 
   Future<void> _loadCustomerPoints() async {
+    if (!_supportsAdjustments) return;
     final cartState = ref.read(cartProvider);
     final customerId = cartState.customerId;
     if (customerId == null || customerId == 'WALK_IN' || customerId.isEmpty) {
@@ -117,14 +121,31 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
   }
 
   /// คำนวณยอดหลังหักแต้ม
+  RestaurantOrderContext? get _restaurantContext =>
+      ref.read(restaurantOrderContextProvider);
+
+  bool get _supportsAdjustments => _restaurantContext?.totalOverride == null;
+
+  double get _grossTotal =>
+      _restaurantContext?.totalOverride ?? ref.read(cartProvider).total;
+
+  double get _subtotalBeforeAdjustments =>
+      _restaurantContext?.subtotalOverride ?? ref.read(cartProvider).subtotal;
+
+  double get _discountAmount =>
+      _restaurantContext?.discountOverride ??
+      ref.read(cartProvider).totalDiscount;
+
+  double get _serviceChargeAmount =>
+      _restaurantContext?.serviceChargeOverride ?? 0;
+
   double get _netTotal {
-    final cartState = ref.read(cartProvider);
-    return (cartState.total - _pointsUsed).clamp(0.0, double.infinity);
+    if (!_supportsAdjustments) return _grossTotal;
+    return (_grossTotal - _pointsUsed).clamp(0.0, double.infinity);
   }
 
   void _applyPoints(int points) {
-    final cartState = ref.read(cartProvider);
-    final maxPoints = cartState.total.floor().clamp(0, _customerPoints);
+    final maxPoints = _grossTotal.floor().clamp(0, _customerPoints);
     final used = points.clamp(0, maxPoints);
     setState(() {
       _pointsUsed = used;
@@ -152,6 +173,14 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
       _isValidatingCoupon = true;
       _couponError = null;
     });
+
+    if (!_supportsAdjustments) {
+      setState(() {
+        _couponError = 'บิลร้านอาหารที่ส่งเข้าระบบแล้วไม่สามารถแก้คูปองในหน้านี้ได้';
+        _isValidatingCoupon = false;
+      });
+      return;
+    }
 
     try {
       final result = await ref
@@ -243,6 +272,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
   }
 
   void _removeCoupon(String code) {
+    if (!_supportsAdjustments) return;
     ref.read(cartProvider.notifier).removeCoupon(code);
     setState(() => _couponError = null);
     // re-clamp pointsUsed in case total changed
@@ -268,6 +298,8 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
   Widget build(BuildContext context) {
     ref.watch(posContextBootstrapProvider);
     final cartState = ref.watch(cartProvider);
+    final restaurantContext = ref.watch(restaurantOrderContextProvider);
+    final supportsAdjustments = restaurantContext?.totalOverride == null;
     final settings = ref.watch(settingsProvider);
     final promptPayId = settings.promptPayId.trim();
     final hasPromptPay = PromptPayUtils.isValidPromptPayId(promptPayId);
@@ -275,7 +307,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
     return Scaffold(
       appBar: AppBar(
         leading: buildMobileHomeLeading(context),
-        title: const Text('ชำระเงิน'),
+        title: Text(restaurantContext?.paymentTitle ?? 'ชำระเงิน'),
       ),
       body: SingleChildScrollView(
         child: Padding(
@@ -352,10 +384,20 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                                 letterSpacing: 1,
                               ),
                             ),
-                            if (cartState.totalDiscount > 0) ...[
+                            if (_discountAmount > 0) ...[
                               const SizedBox(height: 4),
                               Text(
-                                'ส่วนลด ฿${cartState.totalDiscount.toStringAsFixed(2)}',
+                                'ส่วนลด ฿${_discountAmount.toStringAsFixed(2)}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.white.withValues(alpha: 0.7),
+                                ),
+                              ),
+                            ],
+                            if (_serviceChargeAmount > 0) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                'Service charge ฿${_serviceChargeAmount.toStringAsFixed(2)}',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: Colors.white.withValues(alpha: 0.7),
@@ -380,30 +422,34 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                   const SizedBox(height: 16),
 
                   // ── คูปองส่วนลด ────────────────────────────────
-                  _CouponSection(
-                    controller: _couponController,
-                    isValidating: _isValidatingCoupon,
-                    errorText: _couponError,
-                    appliedCoupons: cartState.appliedCoupons,
-                    onApply: _applyCoupon,
-                    onRemove: _removeCoupon,
-                    onScan: _scanCoupon,
-                  ),
-                  const SizedBox(height: 12),
+                  if (supportsAdjustments) ...[
+                    _CouponSection(
+                      controller: _couponController,
+                      isValidating: _isValidatingCoupon,
+                      errorText: _couponError,
+                      appliedCoupons: cartState.appliedCoupons,
+                      onApply: _applyCoupon,
+                      onRemove: _removeCoupon,
+                      onScan: _scanCoupon,
+                    ),
+                    const SizedBox(height: 12),
+                  ],
 
                   // ── แลกแต้ม (เฉพาะสมาชิก) ──────────────────────
-                  if (cartState.customerId != null &&
+                  if (supportsAdjustments &&
+                      cartState.customerId != null &&
                       cartState.customerId != 'WALK_IN' &&
                       cartState.customerId!.isNotEmpty)
                     _PointsSection(
                       customerPoints: _customerPoints,
                       pointsUsed: _pointsUsed,
-                      cartTotal: cartState.total,
+                      cartTotal: _grossTotal,
                       isLoading: _isLoadingPoints,
                       onApply: _applyPoints,
                       onClear: () => _applyPoints(0),
                     ),
-                  if (cartState.customerId != null &&
+                  if (supportsAdjustments &&
+                      cartState.customerId != null &&
                       cartState.customerId != 'WALK_IN' &&
                       cartState.customerId!.isNotEmpty)
                     const SizedBox(height: 12),
@@ -497,7 +543,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                         final isDark =
                             Theme.of(context).brightness == Brightness.dark;
                         // สร้าง list จากยอดจริง: พอดียอด → กลมขึ้นไปเรื่อย ๆ
-                        final total = cartState.total;
+                        final total = _grossTotal;
                         final amounts = _buildQuickAmounts(total);
                         return Wrap(
                           spacing: 8,
@@ -682,7 +728,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                     if (hasPromptPay)
                       _PromptPayQrSection(
                         promptPayId: promptPayId,
-                        amount: cartState.total,
+                        amount: _grossTotal,
                       )
                     else
                       Builder(
@@ -803,7 +849,6 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                           (_paymentType == 'CASH' && _change < 0) ||
                           (_paymentType == 'CREDIT' && _netTotal > availableCredit) ||
                           _isProcessing;
-                      final cartState = ref.watch(cartProvider);
 
                       final isDark =
                           Theme.of(context).brightness == Brightness.dark;
@@ -870,7 +915,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                                         if (_paymentType == 'CASH' &&
                                             !isDisabled)
                                           Text(
-                                            '฿${cartState.total.toStringAsFixed(2)}',
+                                            '฿${_grossTotal.toStringAsFixed(2)}',
                                             style: const TextStyle(
                                               fontSize: 12,
                                               color: Colors.white70,
@@ -920,7 +965,28 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
     return result;
   }
 
+  bool _ensureLicenseFeature(LicenseFeature feature, String message) {
+    final status = ref.read(licenseServiceProvider).asData?.value;
+    if (status != null && !status.canUseFeature(feature)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message), backgroundColor: Colors.red),
+        );
+        Navigator.of(context).pushNamed('/license');
+      }
+      return false;
+    }
+    return true;
+  }
+
   Future<void> _handlePayment() async {
+    if (!_ensureLicenseFeature(
+      LicenseFeature.openSale,
+      'หมดช่วงทดลองแล้ว ต้องมี License ก่อนเปิดบิลหรือขายสินค้า',
+    )) {
+      return;
+    }
+
     setState(() => _isProcessing = true);
 
     try {
@@ -929,6 +995,16 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
       final apiClient = ref.read(apiClientProvider);
       final selectedBranch = ref.read(selectedBranchProvider);
       final selectedWarehouse = ref.read(selectedWarehouseProvider);
+      final restaurantContext = ref.read(restaurantOrderContextProvider);
+      final currentOrderId = restaurantContext?.currentOrderId;
+      final targetOrderIds = restaurantContext != null
+          ? (restaurantContext.currentOrderIds.isNotEmpty
+              ? restaurantContext.currentOrderIds
+              : [
+                  if (currentOrderId != null && currentOrderId.isNotEmpty)
+                    currentOrderId,
+                ])
+          : const <String>[];
       // ✅ เก็บ netTotal ก่อน clear cart — getter _netTotal อ่านจาก cart
       final netTotal = _netTotal;
 
@@ -945,16 +1021,38 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
         return;
       }
 
+      if (restaurantContext != null &&
+          (currentOrderId == null || currentOrderId.isEmpty)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('กรุณาส่งออเดอร์เข้าครัวก่อนปิดบิล'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        setState(() => _isProcessing = false);
+        return;
+      }
+
       final orderData = {
         'customer_id': cartState.customerId,
         'customer_name': cartState.customerName,
         'user_id': authState.user?.userId ?? 'USR001',
         'branch_id': selectedBranch.branchId,
         'warehouse_id': selectedWarehouse.warehouseId,
-        'subtotal': cartState.subtotal,
+        if (restaurantContext != null) ...{
+          'table_id': restaurantContext.tableId,
+          'session_id': restaurantContext.sessionId,
+          'service_type': restaurantContext.serviceType,
+          'party_size': restaurantContext.guestCount,
+        },
+        'subtotal': _subtotalBeforeAdjustments,
         'discount_amount':
-            cartState.totalDiscount + cartState.totalCouponDiscount,
-        'coupon_discount': cartState.totalCouponDiscount,
+            _discountAmount +
+                (_supportsAdjustments ? cartState.totalCouponDiscount : 0),
+        'coupon_discount':
+            _supportsAdjustments ? cartState.totalCouponDiscount : 0.0,
         'points_used': _pointsUsed,
         'amount_before_vat': _netTotal,
         'vat_amount': 0.0,
@@ -978,6 +1076,17 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                 'discount_percent': 0.0,
                 'discount_amount': 0.0,
                 'amount': item.amount,
+                'special_instructions': item.note,
+                'course_no': item.courseNo,
+                'modifiers': item.modifiers
+                    .map(
+                      (modifier) => {
+                        'modifier_id': modifier.modifierId,
+                        'modifier_name': modifier.modifierName,
+                        'price_adjustment': modifier.priceAdjustment,
+                      },
+                    )
+                    .toList(),
               },
             )
             .toList(),
@@ -1004,7 +1113,19 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
 
       print('📦 Sending order: total=${orderData['total_amount']}');
 
-      final response = await apiClient.post('/api/sales', data: orderData);
+      final response = targetOrderIds.isNotEmpty
+          ? await apiClient.post(
+              '/api/sales/${targetOrderIds.first}/complete',
+              data: {
+                'payment_type': _paymentType,
+                'paid_amount': _paymentType == 'CASH'
+                    ? _receivedAmount
+                    : (_paymentType == 'CREDIT' ? 0.0 : _netTotal),
+                'change_amount': _paymentType == 'CASH' ? _change : 0.0,
+                'additional_order_ids': targetOrderIds.skip(1).toList(),
+              },
+            )
+          : await apiClient.post('/api/sales', data: orderData);
 
       print('✅ Response: ${response.statusCode}');
 
@@ -1019,17 +1140,19 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
         final earnedPoints = dataMap['earned_points'] as int? ?? 0;
 
         // ── Mark all coupons as used ──────────────────────────────
-        for (final coupon in cartState.appliedCoupons) {
-          try {
-            await apiClient.put(
-              '/api/promotions/coupons/${coupon.code.toUpperCase()}/use',
-              data: {'customer_id': cartState.customerId, 'order_no': orderNo},
-            );
-          } catch (e) {
-            print('⚠️ Could not mark coupon ${coupon.code} as used: $e');
+        if (_supportsAdjustments) {
+          for (final coupon in cartState.appliedCoupons) {
+            try {
+              await apiClient.put(
+                '/api/promotions/coupons/${coupon.code.toUpperCase()}/use',
+                data: {'customer_id': cartState.customerId, 'order_no': orderNo},
+              );
+            } catch (e) {
+              print('⚠️ Could not mark coupon ${coupon.code} as used: $e');
+            }
           }
         }
-        if (cartState.appliedCoupons.isNotEmpty) {
+        if (_supportsAdjustments && cartState.appliedCoupons.isNotEmpty) {
           ref.read(couponListProvider.notifier).refresh();
         }
 
@@ -1051,7 +1174,9 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
               'paid_amount': 0,
               'status': 'UNPAID',
               'reference_type': 'SALE',
-              'reference_id': orderId.isNotEmpty ? orderId : orderNo,
+                  'reference_id': orderId.isNotEmpty
+                      ? orderId
+                      : (targetOrderIds.isNotEmpty ? targetOrderIds.first : orderNo),
               'remark': 'ขายเชื่อ #$orderNo',
               'items': cartState.items
                   .map((item) => {
@@ -1073,7 +1198,27 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
           }
         }
 
+        if (restaurantContext != null) {
+          try {
+            final billRes = await apiClient.get('/api/tables/${restaurantContext.tableId}/bill');
+            final billData = billRes.data is Map ? billRes.data as Map : {};
+            final billPayload =
+                billData['data'] is Map ? billData['data'] as Map : {};
+            final remainingItems = billPayload['items'] as List? ?? const [];
+            if (remainingItems.isEmpty) {
+              await apiClient.post(
+                '/api/tables/${restaurantContext.tableId}/close',
+                data: {},
+              );
+            }
+            ref.invalidate(tableListProvider);
+          } catch (e) {
+            print('⚠️ Could not close restaurant table after payment: $e');
+          }
+        }
+
         ref.read(cartProvider.notifier).clear();
+        ref.read(restaurantOrderContextProvider.notifier).state = null;
 
         // ✅ refresh sales list & dashboard หลังบันทึกออเดอร์สำเร็จ
         ref.invalidate(salesHistoryProvider);
@@ -1107,8 +1252,9 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                 customerName: cartState.customerName,
                 items: cartState.items,
                 freeItems: cartState.freeItems,
-                subtotal: cartState.subtotal,
-                discount: cartState.totalDiscount,
+                subtotal: _subtotalBeforeAdjustments,
+                discount: _discountAmount,
+                serviceCharge: _serviceChargeAmount,
                 appliedCoupons: cartState.appliedCoupons,
                 total: netTotal,
                 paymentType: _paymentType,
@@ -1116,6 +1262,9 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                 changeAmount: changeAmount,
                 earnedPoints: earnedPoints,
                 pointsUsed: _pointsUsed,
+                receiptTitle: restaurantContext?.splitLabel != null
+                    ? 'ใบเสร็จรับเงิน (${restaurantContext!.splitLabel})'
+                    : 'ใบเสร็จรับเงิน',
                 pointsBalance:
                     (cartState.customerId != null &&
                         cartState.customerId != 'WALK_IN' &&
@@ -1136,8 +1285,12 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
     } on DioException catch (e) {
       print('❌ Payment error: $e');
 
+      final currentOrderId =
+          ref.read(restaurantOrderContextProvider)?.currentOrderId;
+
       final shouldQueue =
           AppModeConfig.isClient &&
+          (currentOrderId == null || currentOrderId.isEmpty) &&
           (e.response == null ||
               e.type == DioExceptionType.connectionError ||
               e.type == DioExceptionType.connectionTimeout ||
@@ -1149,6 +1302,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
         final authState = ref.read(authProvider);
         final selectedBranch = ref.read(selectedBranchProvider);
         final selectedWarehouse = ref.read(selectedWarehouseProvider);
+        final restaurantContext = ref.read(restaurantOrderContextProvider);
 
         if (selectedBranch != null && selectedWarehouse != null) {
           final fallbackOrderData = {
@@ -1157,6 +1311,12 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
             'user_id': authState.user?.userId ?? 'USR001',
             'branch_id': selectedBranch.branchId,
             'warehouse_id': selectedWarehouse.warehouseId,
+            if (restaurantContext != null) ...{
+              'table_id': restaurantContext.tableId,
+              'session_id': restaurantContext.sessionId,
+              'service_type': restaurantContext.serviceType,
+              'party_size': restaurantContext.guestCount,
+            },
             'subtotal': cartState.subtotal,
             'discount_amount':
                 cartState.totalDiscount + cartState.totalCouponDiscount,
@@ -1186,6 +1346,17 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                     'discount_percent': 0.0,
                     'discount_amount': 0.0,
                     'amount': item.amount,
+                    'special_instructions': item.note,
+                'course_no': item.courseNo,
+                    'modifiers': item.modifiers
+                        .map(
+                          (modifier) => {
+                            'modifier_id': modifier.modifierId,
+                            'modifier_name': modifier.modifierName,
+                            'price_adjustment': modifier.priceAdjustment,
+                          },
+                        )
+                        .toList(),
                   },
                 )
                 .toList(),
@@ -1214,6 +1385,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
               .read(pendingSalesQueueServiceProvider)
               .enqueueOrder(fallbackOrderData);
           ref.read(cartProvider.notifier).clear();
+          ref.read(restaurantOrderContextProvider.notifier).state = null;
           ref.invalidate(syncStatusProvider);
 
           if (mounted) {
@@ -1833,8 +2005,10 @@ class ReceiptPage extends ConsumerStatefulWidget {
   final List<CartItem> freeItems;
   final double subtotal;
   final double discount;
+  final double serviceCharge;
   final List<AppliedCoupon> appliedCoupons;
   final double total;
+  final String receiptTitle;
   final String paymentType;
   final double paidAmount;
   final double changeAmount;
@@ -1849,7 +2023,9 @@ class ReceiptPage extends ConsumerStatefulWidget {
     required this.items,
     required this.subtotal,
     required this.discount,
+    this.serviceCharge = 0,
     required this.total,
+    this.receiptTitle = 'ใบเสร็จรับเงิน',
     required this.paymentType,
     required this.paidAmount,
     required this.changeAmount,
@@ -1877,6 +2053,20 @@ class _ReceiptPageState extends ConsumerState<ReceiptPage> {
   bool _isPrinting = false;
   bool _autoPrintTriggered = false;
 
+  bool _ensureLicenseFeature(LicenseFeature feature, String message) {
+    final status = ref.read(licenseServiceProvider).asData?.value;
+    if (status != null && !status.canUseFeature(feature)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message), backgroundColor: Colors.red),
+        );
+        Navigator.of(context).pushNamed('/license');
+      }
+      return false;
+    }
+    return true;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -1903,6 +2093,7 @@ class _ReceiptPageState extends ConsumerState<ReceiptPage> {
       address: settings.address,
       phone: settings.phone,
       taxId: settings.taxId,
+      title: widget.receiptTitle,
       orderNo: widget.orderNo,
       orderDate: dateFmt.format(widget.orderDate),
       customerName: widget.customerName,
@@ -1927,6 +2118,7 @@ class _ReceiptPageState extends ConsumerState<ReceiptPage> {
           .toList(),
       subtotal: widget.subtotal,
       discount: widget.discount,
+      serviceCharge: widget.serviceCharge,
       coupons: widget.appliedCoupons
           .map(
             (c) => ReceiptCoupon(
@@ -1961,6 +2153,12 @@ class _ReceiptPageState extends ConsumerState<ReceiptPage> {
   }
 
   Future<void> _printNative() async {
+    if (!_ensureLicenseFeature(
+      LicenseFeature.printReceipt,
+      'หมดช่วงทดลองแล้ว ต้องมี License ก่อนพิมพ์ใบเสร็จ',
+    )) {
+      return;
+    }
     if (_isPrinting) return;
     setState(() => _isPrinting = true);
     try {
@@ -2157,6 +2355,7 @@ class _ReceiptPageState extends ConsumerState<ReceiptPage> {
                 address: settings.address,
                 phone: settings.phone,
                 taxId: settings.taxId,
+                title: widget.receiptTitle,
                 orderNo: widget.orderNo,
                 orderDate: dateFmt.format(widget.orderDate),
                 customerName: widget.customerName,
@@ -2181,6 +2380,7 @@ class _ReceiptPageState extends ConsumerState<ReceiptPage> {
                     .toList(),
                 subtotal: widget.subtotal,
                 discount: widget.discount,
+                serviceCharge: widget.serviceCharge,
                 coupons: widget.appliedCoupons
                     .map(
                       (c) => ReceiptCoupon(

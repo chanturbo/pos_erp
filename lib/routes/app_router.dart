@@ -3,10 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/config/app_mode.dart';
 import '../features/auth/presentation/pages/login_page.dart';
 import '../features/auth/presentation/providers/auth_provider.dart'; // ✅ เพิ่ม สำหรับ _RootRedirect
-import '../features/home/presentation/pages/home_page.dart';
 import '../features/license/presentation/pages/license_page.dart';
+import '../features/restaurant/presentation/pages/table_overview_page.dart';
+import '../features/restaurant/presentation/pages/kitchen_display_page.dart';
 import '../features/sales/presentation/pages/mobile_order_page.dart';
 import '../features/sales/presentation/pages/pos_page.dart';
+import '../features/setup/presentation/pages/setup_onboarding_page.dart';
 import '../shared/utils/app_transitions.dart'; // ✅ Phase 4
 
 /// ╔══════════════════════════════════════════════════════════════╗
@@ -25,6 +27,9 @@ class AppRouter {
   static const String pos = '/pos';
   static const String mobileOrder = '/mobile-order';
   static const String license = '/license';
+  static const String setup = '/setup';
+  static const String tableOverview = '/restaurant/tables';
+  static const String kitchenDisplay = '/restaurant/kitchen';
 
   /// Cashier role IDs — ตรงกับ roleId ใน database
   static const _cashierRoles = {'CASHIER', 'SALE', 'POS'};
@@ -54,7 +59,7 @@ class AppRouter {
             page: const MobileOrderPage(),
           );
         }
-        return FadeSlideRoute(settings: settings, page: const HomePage());
+        return FadeSlideRoute(settings: settings, page: const SetupGatePage());
 
       // ── POS ───────────────────────────────────────────────
       // รับ arguments: true = isCashierMode (ส่งมาจาก login_page)
@@ -85,6 +90,25 @@ class AppRouter {
         return FadeSlideRoute(
           settings: settings,
           page: const LicenseRegistrationPage(),
+        );
+
+      case setup:
+        return FadeSlideRoute(
+          settings: settings,
+          page: const SetupOnboardingPage(),
+        );
+
+      // ── Restaurant ────────────────────────────────────────
+      case tableOverview:
+        return SlideRightRoute(
+          settings: settings,
+          page: const TableOverviewPage(),
+        );
+
+      case kitchenDisplay:
+        return SlideRightRoute(
+          settings: settings,
+          page: const KitchenDisplayPage(),
         );
 
       // ── Default ───────────────────────────────────────────

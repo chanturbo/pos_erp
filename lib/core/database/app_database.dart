@@ -54,6 +54,8 @@ part 'app_database.g.dart';
     // Tables (ร้านอาหาร)
     Zones,
     DiningTables,
+    TableSessions,
+    TableReservations,
 
     // Customers & Suppliers
     CustomerGroups,
@@ -151,7 +153,7 @@ class AppDatabase extends _$AppDatabase {
   ''';
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration {
@@ -197,6 +199,56 @@ class AppDatabase extends _$AppDatabase {
         if (from < 7) {
           await customStatement(_createCustomerDividendRunsTable);
           await customStatement(_createCustomerDividendRunItemsTable);
+        }
+        if (from < 8) {
+          // Phase R0: Restaurant Module preparation
+          await customStatement('''
+            ALTER TABLE branches ADD COLUMN business_mode TEXT NOT NULL DEFAULT 'RETAIL'
+          ''').catchError((_) {});
+          await customStatement('''
+            ALTER TABLE products ADD COLUMN service_mode TEXT NOT NULL DEFAULT 'RETAIL'
+          ''').catchError((_) {});
+          await customStatement('''
+            ALTER TABLE products ADD COLUMN prep_station TEXT
+          ''').catchError((_) {});
+          await customStatement('''
+            ALTER TABLE products ADD COLUMN requires_preparation INTEGER NOT NULL DEFAULT 0
+          ''').catchError((_) {});
+          await customStatement('''
+            ALTER TABLE products ADD COLUMN dine_in_available INTEGER NOT NULL DEFAULT 0
+          ''').catchError((_) {});
+          await customStatement('''
+            ALTER TABLE products ADD COLUMN takeaway_available INTEGER NOT NULL DEFAULT 0
+          ''').catchError((_) {});
+          await customStatement('''
+            ALTER TABLE sales_orders ADD COLUMN session_id TEXT
+          ''').catchError((_) {});
+          await customStatement('''
+            ALTER TABLE sales_orders ADD COLUMN service_type TEXT
+          ''').catchError((_) {});
+          await m.createTable(tableSessions);
+        }
+        if (from < 9) {
+          // Phase R3: Billing Flow — service charge
+          await customStatement('''
+            ALTER TABLE sales_orders ADD COLUMN service_charge_rate REAL NOT NULL DEFAULT 0
+          ''').catchError((_) {});
+          await customStatement('''
+            ALTER TABLE sales_orders ADD COLUMN service_charge_amount REAL NOT NULL DEFAULT 0
+          ''').catchError((_) {});
+        }
+        if (from < 10) {
+          // Phase R4: Advanced Restaurant Operations
+          await customStatement('''
+            ALTER TABLE table_sessions ADD COLUMN waiter_id TEXT
+          ''').catchError((_) {});
+          await customStatement('''
+            ALTER TABLE table_sessions ADD COLUMN waiter_name TEXT
+          ''').catchError((_) {});
+          await customStatement('''
+            ALTER TABLE sales_order_items ADD COLUMN course_no INTEGER NOT NULL DEFAULT 1
+          ''').catchError((_) {});
+          await m.createTable(tableReservations);
         }
       },
     );

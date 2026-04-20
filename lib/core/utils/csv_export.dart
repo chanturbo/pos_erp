@@ -5,6 +5,9 @@ import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:intl/intl.dart';
 
+import '../services/license/license_local_service.dart';
+import '../services/license/license_models.dart';
+
 class CsvExport {
   /// Export data to CSV
   static Future<String?> exportToCsv({
@@ -14,6 +17,10 @@ class CsvExport {
     bool chooseLocation = false,
   }) async {
     try {
+      await LicenseLocalService.ensureFeatureAllowed(
+        LicenseFeature.exportReport,
+      );
+
       // สร้าง CSV content
       final csvContent = StringBuffer();
 

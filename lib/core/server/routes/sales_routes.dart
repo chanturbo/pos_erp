@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 import 'package:drift/drift.dart' hide JsonKey;
+import 'package:uuid/uuid.dart';
 import '../../database/app_database.dart';
 import '../middleware/auth_middleware.dart';
 import '../../utils/input_validators.dart';
@@ -51,6 +52,10 @@ class SalesRoutes {
                   'discount_amount': o.discountAmount,
                   'net_amount': o.totalAmount,
                   'payment_type': o.paymentType,
+                  'table_id': o.tableId,
+                  'session_id': o.sessionId,
+                  'service_type': o.serviceType,
+                  'party_size': o.partySize,
                   'status': o.status,
                 },
               )
@@ -121,6 +126,17 @@ class SalesRoutes {
         }
       }
 
+      final itemIds = items.map((i) => i.itemId).toList();
+      final modifierRows = itemIds.isNotEmpty
+          ? await (db.select(db.orderItemModifiers)
+                ..where((m) => m.orderItemId.isIn(itemIds)))
+              .get()
+          : <OrderItemModifier>[];
+      final modifiersByItem = <String, List<OrderItemModifier>>{};
+      for (final modifier in modifierRows) {
+        modifiersByItem.putIfAbsent(modifier.orderItemId, () => []).add(modifier);
+      }
+
       return Response.ok(
         jsonEncode({
           'success': true,
@@ -136,6 +152,10 @@ class SalesRoutes {
             'coupon_codes': couponCodes.isEmpty ? null : couponCodes,
             'coupon_promotion_names':
                 couponPromoNames.isEmpty ? null : couponPromoNames,
+            'table_id': order.tableId,
+            'session_id': order.sessionId,
+            'service_type': order.serviceType,
+            'party_size': order.partySize,
             'total_amount': order.totalAmount,
             'payment_type': order.paymentType,
             'paid_amount': order.paidAmount,
@@ -149,9 +169,22 @@ class SalesRoutes {
                       'product_id': i.productId,
                       'product_code': i.productCode,
                       'product_name': i.productName,
+                      'unit': i.unit,
                       'quantity': i.quantity,
                       'unit_price': i.unitPrice,
                       'amount': i.amount,
+                      'special_instructions': i.specialInstructions,
+                      'course_no': i.courseNo,
+                      'kitchen_status': i.kitchenStatus,
+                      'modifiers': (modifiersByItem[i.itemId] ?? const <OrderItemModifier>[])
+                          .map(
+                            (m) => {
+                              'modifier_id': m.modifierId,
+                              'modifier_name': m.modifierName,
+                              'price_adjustment': m.priceAdjustment,
+                            },
+                          )
+                          .toList(),
                       'is_free_item': i.isFreeItem,
                       'promotion_id': i.promotionId,
                       'promotion_name': i.promotionId != null
@@ -226,6 +259,7 @@ class SalesRoutes {
       final orderId = 'SO$ts';
       final orderNo = 'SO-$datePart-$ts';
       final warehouseId = data['warehouse_id'] as String? ?? 'WH001';
+      final tableId = data['table_id'] as String?;
 
       // ✅ ใช้ user จาก token แทน hardcode / client-supplied
       final userId = authUser.userId;
@@ -247,6 +281,20 @@ class SalesRoutes {
       // กำหนดสถานะ order: 'OPEN' = จองสต๊อก, 'COMPLETED' = ตัดสต๊อกทันที (POS)
       final orderStatus = data['status'] as String? ?? 'COMPLETED';
       final isOpenOrder = orderStatus == 'OPEN';
+
+      if (isOpenOrder && tableId != null && tableId.trim().isNotEmpty) {
+        final table = await (db.select(db.diningTables)
+              ..where((t) => t.tableId.equals(tableId)))
+            .getSingleOrNull();
+        if (table == null) {
+          throw _ValidationException('ไม่พบโต๊ะ $tableId');
+        }
+        if (table.currentOrderId != null && table.currentOrderId!.trim().isNotEmpty) {
+          throw _ValidationException(
+            'โต๊ะนี้มีออเดอร์ที่ส่งเข้าครัวแล้ว กรุณาปิดบิลหรือยกเลิกออเดอร์เดิมก่อน',
+          );
+        }
+      }
 
       await db.transaction(() async {
         // --- Stock check ภายใน transaction (ใช้ available = balance - reserved) ---
@@ -288,6 +336,11 @@ class SalesRoutes {
                 branchId: Value(branchId),
                 warehouseId: Value(warehouseId),
                 userId: Value(userId),
+                tableId: Value(data['table_id'] as String?),
+                sessionId: Value(data['session_id'] as String?),
+                partySize:
+                    Value((data['party_size'] as num?)?.toInt() ?? 0),
+                serviceType: Value(data['service_type'] as String?),
                 subtotal: Value((data['subtotal'] as num?)?.toDouble() ?? 0),
                 discountAmount: Value((data['discount_amount'] as num?)?.toDouble() ?? 0),
                 couponDiscount: Value((data['coupon_discount'] as num?)?.toDouble() ?? 0),
@@ -335,10 +388,34 @@ class SalesRoutes {
                   discountPercent: Value((item['discount_percent'] as num?)?.toDouble() ?? 0),
                   discountAmount: Value((item['discount_amount'] as num?)?.toDouble() ?? 0),
                   amount: Value((item['amount'] as num).toDouble()),
-                  cost: Value(cogsAmt), // ✅ COGS = avgCost × qty
+                  cost: Value(cogsAmt),
                   warehouseId: Value(warehouseId),
+                  specialInstructions: Value(item['special_instructions'] as String?),
+                  courseNo: Value(item['course_no'] as int? ?? 1),
+                  kitchenStatus: Value(isOpenOrder
+                      ? (item['course_no'] as int? ?? 1) > 1 ? 'HELD' : 'PENDING'
+                      : 'SERVED'),
                 ),
               );
+
+          final modifiers = (item['modifiers'] as List?) ?? const [];
+          for (final modifierRaw in modifiers) {
+            final modifier = Map<String, dynamic>.from(modifierRaw as Map);
+            final modifierId = modifier['modifier_id'] as String? ?? '';
+            if (modifierId.isEmpty) continue;
+            await db.into(db.orderItemModifiers).insert(
+                  OrderItemModifiersCompanion(
+                    itemModifierId: Value(const Uuid().v4()),
+                    orderItemId: Value(itemId),
+                    modifierId: Value(modifierId),
+                    modifierName:
+                        Value(modifier['modifier_name'] as String? ?? ''),
+                    priceAdjustment: Value(
+                      (modifier['price_adjustment'] as num?)?.toDouble() ?? 0,
+                    ),
+                  ),
+                );
+          }
 
           final product = await (db.select(db.products)
                 ..where((t) => t.productId.equals(productId)))
@@ -439,6 +516,14 @@ class SalesRoutes {
       });
 
       print('✅ Transaction committed: $orderNo');
+
+      if (isOpenOrder && tableId != null && tableId.trim().isNotEmpty) {
+        await (db.update(db.diningTables)..where((t) => t.tableId.equals(tableId)))
+            .write(DiningTablesCompanion(
+          currentOrderId: Value(orderId),
+          lastOccupiedAt: Value(now),
+        ));
+      }
 
       // ── Increment currentUses for applied promotions ────────────
       final promotionIdList = data['promotion_ids'] as List? ?? [];
@@ -582,24 +667,15 @@ class SalesRoutes {
             headers: {'Content-Type': 'application/json'});
       }
 
-      final order = await (db.select(db.salesOrders)
+      final primaryOrder = await (db.select(db.salesOrders)
             ..where((t) => t.orderId.equals(id)))
           .getSingleOrNull();
 
-      if (order == null) {
+      if (primaryOrder == null) {
         return Response.notFound(
           jsonEncode({'success': false, 'message': 'ไม่พบใบขาย'}),
           headers: {'Content-Type': 'application/json'},
         );
-      }
-
-      if (order.status != 'OPEN') {
-        return Response(400,
-            body: jsonEncode({
-              'success': false,
-              'message': 'ใบขายต้องอยู่ในสถานะ OPEN เท่านั้น (ปัจจุบัน: ${order.status})',
-            }),
-            headers: {'Content-Type': 'application/json'});
       }
 
       final payload = await request.readAsString();
@@ -607,71 +683,127 @@ class SalesRoutes {
           ? jsonDecode(payload) as Map<String, dynamic>
           : <String, dynamic>{};
 
-      final items = await (db.select(db.salesOrderItems)
-            ..where((t) => t.orderId.equals(id)))
+      final additionalOrderIds = (data['additional_order_ids'] as List?)
+              ?.map((e) => e.toString())
+              .where((e) => e.isNotEmpty)
+              .toList() ??
+          <String>[];
+      final targetOrderIds = {id, ...additionalOrderIds}.toList();
+      final orders = await (db.select(db.salesOrders)
+            ..where((t) => t.orderId.isIn(targetOrderIds)))
           .get();
 
+      if (orders.length != targetOrderIds.length) {
+        throw _ValidationException('ไม่พบ order บางรายการที่ต้องการปิดบิล');
+      }
+      for (final order in orders) {
+        if (order.status != 'OPEN') {
+          throw _ValidationException(
+            'ใบขายต้องอยู่ในสถานะ OPEN เท่านั้น (ปัจจุบัน: ${order.status})',
+          );
+        }
+        if (primaryOrder.tableId != order.tableId ||
+            primaryOrder.sessionId != order.sessionId) {
+          throw _ValidationException('สามารถปิดหลายบิลพร้อมกันได้เฉพาะในโต๊ะ/รอบเดียวกัน');
+        }
+      }
+
       final ts = DateTime.now().millisecondsSinceEpoch;
-      final datePart =
-          '${order.orderDate.year}${order.orderDate.month.toString().padLeft(2, '0')}${order.orderDate.day.toString().padLeft(2, '0')}';
 
       await db.transaction(() async {
-        // ตัดสต๊อก + คืนการจอง ต่อรายการ
-        for (final item in items) {
-          final product = await (db.select(db.products)
-                ..where((t) => t.productId.equals(item.productId)))
-              .getSingleOrNull();
+        for (final order in orders) {
+          final items = await (db.select(db.salesOrderItems)
+                ..where((t) => t.orderId.equals(order.orderId)))
+              .get();
+          final datePart =
+              '${order.orderDate.year}${order.orderDate.month.toString().padLeft(2, '0')}${order.orderDate.day.toString().padLeft(2, '0')}';
 
-          if (product != null && product.isStockControl) {
-            // ── WAC: ดึง avg_cost ณ เวลา complete (อาจต่างจากตอน OPEN) ──
-            final avgCost  = await _getAvgCost(item.productId, order.warehouseId);
-            final cogsAmt  = avgCost * item.quantity;
+          // ตัดสต๊อก + คืนการจอง ต่อรายการ
+          for (final item in items) {
+            final product = await (db.select(db.products)
+                  ..where((t) => t.productId.equals(item.productId)))
+                .getSingleOrNull();
 
-            final movementNo = 'SM-$datePart-$ts-${item.lineNo}';
-            await db.into(db.stockMovements).insert(
-                  StockMovementsCompanion(
-                    movementId: Value('${id}_C${item.lineNo}'),
-                    movementNo: Value(movementNo),
-                    movementDate: Value(DateTime.now()),
-                    movementType: const Value('SALE'),
-                    productId: Value(item.productId),
-                    warehouseId: Value(order.warehouseId),
-                    userId: Value(authUser.userId),
-                    quantity: Value(-item.quantity),
-                    unitCost: Value(avgCost), // ✅ WAC ตอนขาย
-                    referenceNo: Value(order.orderNo),
-                    remark: const Value('ขายสินค้า (complete)'),
-                  ),
-                );
+            if (product != null && product.isStockControl) {
+              final avgCost = await _getAvgCost(item.productId, order.warehouseId);
+              final cogsAmt = avgCost * item.quantity;
 
-            // ✅ อัปเดต cost (COGS) ใน sales_order_items ด้วย avg_cost จริง
-            await (db.update(db.salesOrderItems)
-                  ..where((t) => t.itemId.equals(item.itemId)))
-                .write(SalesOrderItemsCompanion(cost: Value(cogsAmt)));
+              final movementNo = 'SM-$datePart-$ts-${order.orderId}-${item.lineNo}';
+              await db.into(db.stockMovements).insert(
+                    StockMovementsCompanion(
+                      movementId: Value('${order.orderId}_C${item.lineNo}'),
+                      movementNo: Value(movementNo),
+                      movementDate: Value(DateTime.now()),
+                      movementType: const Value('SALE'),
+                      productId: Value(item.productId),
+                      warehouseId: Value(order.warehouseId),
+                      userId: Value(authUser.userId),
+                      quantity: Value(-item.quantity),
+                      unitCost: Value(avgCost),
+                      referenceNo: Value(order.orderNo),
+                      remark: const Value('ขายสินค้า (complete)'),
+                    ),
+                  );
 
-            // คืนการจอง + อัปเดต qty จริง
-            await _releaseReservation(order.warehouseId, item.productId, item.quantity);
-            await _upsertStockBalance(order.warehouseId, item.productId, -item.quantity, 0);
-            print('✅ Complete: ${item.productId} -${item.quantity} @ cost $avgCost, released reserve');
+              await (db.update(db.salesOrderItems)
+                    ..where((t) => t.itemId.equals(item.itemId)))
+                  .write(SalesOrderItemsCompanion(cost: Value(cogsAmt)));
+
+              await _releaseReservation(
+                  order.warehouseId, item.productId, item.quantity);
+              await _upsertStockBalance(
+                  order.warehouseId, item.productId, -item.quantity, 0);
+              print(
+                  '✅ Complete: ${item.productId} -${item.quantity} @ cost $avgCost, released reserve');
+            }
           }
+
+          final paidAmountRaw =
+              (data['paid_amount'] as num?)?.toDouble() ?? order.paidAmount;
+          final baseTotal = orders.fold<double>(0, (sum, o) => sum + o.totalAmount);
+          final allocatedPaidAmount = orders.length == 1
+              ? paidAmountRaw
+              : (baseTotal > 0
+                  ? (paidAmountRaw * (order.totalAmount / baseTotal)).toDouble()
+                  : 0.0);
+          final changeAmountRaw =
+              (data['change_amount'] as num?)?.toDouble() ?? order.changeAmount;
+          final allocatedChangeAmount =
+              order.orderId == primaryOrder.orderId ? changeAmountRaw : 0.0;
+
+          await (db.update(db.salesOrders)
+                ..where((t) => t.orderId.equals(order.orderId)))
+              .write(SalesOrdersCompanion(
+            status: const Value('COMPLETED'),
+            paymentType: Value(data['payment_type'] as String? ?? order.paymentType),
+            paidAmount: Value(allocatedPaidAmount),
+            changeAmount: Value(allocatedChangeAmount),
+            updatedAt: Value(DateTime.now()),
+          ));
         }
 
-        // อัปเดตสถานะ order + payment info
-        await (db.update(db.salesOrders)
-              ..where((t) => t.orderId.equals(id)))
-            .write(SalesOrdersCompanion(
-          status: const Value('COMPLETED'),
-          paymentType: Value(data['payment_type'] as String? ?? order.paymentType),
-          paidAmount: Value((data['paid_amount'] as num?)?.toDouble() ?? order.paidAmount),
-          changeAmount: Value((data['change_amount'] as num?)?.toDouble() ?? order.changeAmount),
-          updatedAt: Value(DateTime.now()),
-        ));
+        if (primaryOrder.tableId != null && primaryOrder.tableId!.trim().isNotEmpty) {
+          await (db.update(db.diningTables)
+                ..where((t) => t.tableId.equals(primaryOrder.tableId!)))
+              .write(const DiningTablesCompanion(
+            currentOrderId: Value(null),
+          ));
+        }
       });
 
-      print('✅ SalesRoutes: Order $id completed');
+      print('✅ SalesRoutes: Orders ${targetOrderIds.join(",")} completed');
 
       return Response.ok(
-        jsonEncode({'success': true, 'message': 'ชำระเงินสำเร็จ สต๊อกได้รับการอัพเดทแล้ว'}),
+        jsonEncode({
+          'success': true,
+          'message': 'ชำระเงินสำเร็จ สต๊อกได้รับการอัพเดทแล้ว',
+          'data': {
+            'order_id': primaryOrder.orderId,
+            'order_no': primaryOrder.orderNo,
+            'completed_order_ids': targetOrderIds,
+            'status': 'COMPLETED',
+          },
+        }),
         headers: {'Content-Type': 'application/json'},
       );
     } on _ValidationException catch (e) {
@@ -733,6 +865,14 @@ class SalesRoutes {
           status: const Value('CANCELLED'),
           updatedAt: Value(DateTime.now()),
         ));
+
+        if (order.tableId != null && order.tableId!.trim().isNotEmpty) {
+          await (db.update(db.diningTables)
+                ..where((t) => t.tableId.equals(order.tableId!)))
+              .write(const DiningTablesCompanion(
+            currentOrderId: Value(null),
+          ));
+        }
       });
 
       print('✅ SalesRoutes: Order $id cancelled, reservations released');

@@ -1,5 +1,40 @@
 import 'dart:convert';
 
+class BackupAppMeta {
+  final String? firstLaunchDate;
+  final String? deviceId;
+  final String? checksum;
+  final String? licensedEmail;
+
+  const BackupAppMeta({
+    this.firstLaunchDate,
+    this.deviceId,
+    this.checksum,
+    this.licensedEmail,
+  });
+
+  bool get hasLicenseMetadata =>
+      (firstLaunchDate?.trim().isNotEmpty ?? false) &&
+      (deviceId?.trim().isNotEmpty ?? false) &&
+      (checksum?.trim().isNotEmpty ?? false);
+
+  Map<String, dynamic> toJson() => {
+        'first_launch_date': firstLaunchDate,
+        'device_id': deviceId,
+        'checksum': checksum,
+        'licensed_email': licensedEmail,
+      };
+
+  factory BackupAppMeta.fromJson(Map<String, dynamic> json) {
+    return BackupAppMeta(
+      firstLaunchDate: json['first_launch_date'] as String?,
+      deviceId: json['device_id'] as String?,
+      checksum: json['checksum'] as String?,
+      licensedEmail: json['licensed_email'] as String?,
+    );
+  }
+}
+
 class BackupManifestFileEntry {
   final String path;
   final int size;
@@ -42,6 +77,7 @@ class BackupManifest {
   final int fileCount;
   final int totalBytes;
   final List<BackupManifestFileEntry> files;
+  final BackupAppMeta? appMeta;
 
   const BackupManifest({
     required this.formatVersion,
@@ -59,6 +95,7 @@ class BackupManifest {
     required this.fileCount,
     required this.totalBytes,
     required this.files,
+    this.appMeta,
   });
 
   Map<String, dynamic> toJson() => {
@@ -76,6 +113,7 @@ class BackupManifest {
     'product_images_folder': productImagesFolder,
     'file_count': fileCount,
     'total_bytes': totalBytes,
+    'app_meta': appMeta?.toJson(),
     'files': files.map((file) => file.toJson()).toList(),
   };
 
@@ -96,6 +134,13 @@ class BackupManifest {
       productImagesFolder: json['product_images_folder'] as String?,
       fileCount: (json['file_count'] as num?)?.toInt() ?? 0,
       totalBytes: (json['total_bytes'] as num?)?.toInt() ?? 0,
+      appMeta: json['app_meta'] is Map<String, dynamic>
+          ? BackupAppMeta.fromJson(json['app_meta'] as Map<String, dynamic>)
+          : json['app_meta'] is Map
+              ? BackupAppMeta.fromJson(
+                  Map<String, dynamic>.from(json['app_meta'] as Map),
+                )
+              : null,
       files: rawFiles
           .map(
             (item) =>

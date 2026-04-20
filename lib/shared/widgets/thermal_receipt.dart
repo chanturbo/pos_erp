@@ -57,6 +57,8 @@ class ThermalReceiptWidget extends StatelessWidget {
   final String         address;
   final String         phone;
   final String         taxId;
+  final String         title;
+  final String?        footerNote;
   final String         orderNo;
   final String         orderDate;
   final String?        customerName;
@@ -64,6 +66,7 @@ class ThermalReceiptWidget extends StatelessWidget {
   final List<ReceiptFreeItem> freeItems;
   final double         subtotal;
   final double         discount;
+  final double         serviceCharge;
   final List<ReceiptCoupon> coupons;
   final double         total;
   final String         paymentLabel;
@@ -82,11 +85,14 @@ class ThermalReceiptWidget extends StatelessWidget {
     required this.address,
     required this.phone,
     required this.taxId,
+    this.title         = 'ใบเสร็จรับเงิน',
+    this.footerNote,
     required this.orderNo,
     required this.orderDate,
     required this.items,
     required this.subtotal,
     required this.discount,
+    this.serviceCharge = 0,
     required this.total,
     required this.paymentLabel,
     required this.paymentType,
@@ -170,13 +176,14 @@ class ThermalReceiptWidget extends StatelessWidget {
                 _dashed(),
 
                 // ── หัวใบเสร็จ ──────────────────────────────────
-                const Text(
-                  'ใบเสร็จรับเงิน',
-                  style: TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
                 ),
                 const SizedBox(height: 6),
                 _row('เลขที่', orderNo),
@@ -265,6 +272,8 @@ class ThermalReceiptWidget extends StatelessWidget {
                 if (discount > 0)
                   _row('ส่วนลด', '-฿${numFmt.format(discount)}',
                       valueColor: Colors.red[700]),
+                if (serviceCharge > 0)
+                  _row('Service charge', '฿${numFmt.format(serviceCharge)}'),
                 ...coupons.map((c) => _row(
                       'คูปอง ${c.code}',
                       '-฿${numFmt.format(c.discount)}',
@@ -367,6 +376,18 @@ class ThermalReceiptWidget extends StatelessWidget {
                       fontSize: 10,
                       color: Colors.black38),
                 ),
+                if (footerNote != null && footerNote!.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    footerNote!,
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 10,
+                      color: Colors.black45,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
                 const SizedBox(height: 4),
               ],
             ),

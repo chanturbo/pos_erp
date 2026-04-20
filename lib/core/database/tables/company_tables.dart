@@ -30,9 +30,11 @@ class Branches extends Table {
   TextColumn get address => text().nullable()();
   TextColumn get phone => text().nullable().withLength(max: 50)();
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+  // retail | restaurant | hybrid
+  TextColumn get businessMode => text().withDefault(const Constant('RETAIL'))();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
-  
+
   @override
   Set<Column> get primaryKey => {branchId};
 }

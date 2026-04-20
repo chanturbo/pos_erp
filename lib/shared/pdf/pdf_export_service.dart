@@ -36,6 +36,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../core/services/license/license_local_service.dart';
+import '../../core/services/license/license_models.dart';
 import 'pdf_preview_dialog.dart';
 import '../widgets/app_dialogs.dart';
 
@@ -47,6 +49,9 @@ class PdfExportService {
     required String filename,
     required Future<pw.Document> Function() buildPdf,
   }) async {
+    await LicenseLocalService.ensureFeatureAllowed(
+      LicenseFeature.exportReport,
+    );
     final pdf = await buildPdf();
     final bytes = await pdf.save();
     final canPreview = await _canPreview(bytes);
@@ -99,6 +104,9 @@ class PdfExportService {
     required String filename,
     required Future<pw.Document> Function() buildPdf,
   }) async {
+    await LicenseLocalService.ensureFeatureAllowed(
+      LicenseFeature.exportReport,
+    );
     final pdf = await buildPdf();
     final bytes = await pdf.save();
 
@@ -121,6 +129,9 @@ class PdfExportService {
     bool chooseLocation = true,
     bool openAfterSave = true,
   }) async {
+    await LicenseLocalService.ensureFeatureAllowed(
+      LicenseFeature.exportReport,
+    );
     final pdf = await buildPdf();
     final bytes = await pdf.save();
     return saveBytes(

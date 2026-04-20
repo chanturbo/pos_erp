@@ -33,7 +33,13 @@ class LicenseKeyVerifier {
   // นำ public.pem มาวางที่นี่
   static const _publicKeyPem = '''
 -----BEGIN PUBLIC KEY-----
-REPLACE_WITH_YOUR_RSA_PUBLIC_KEY_FROM_openssl_rsa_-pubout
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwYOObGORFFdLvZDtRApd
+NjSCiownCImQG69zQZo/yz4kVqD9nWvrmyETuexFxWpUa89/0QspsNQ0i6Oj7hv8
+DRekGHSeJ9qshFPDni0plr2JV724pC9EuOBQqhqT5xOvEcqdgyJpeD8dIc0yrGG/
+DMsM334hCJtocQjY0htp0vNtj+C4cZg7M8Dvw4n5GBDGSq5sdvAXuggh1ywdG53w
+m9XsH7quJW+uvTQlrTHtsFasUuLd8msXTwuU+33ME8pVf2ZlWAYILF0Tc3h8Ts7w
+aIcPTuXTWLLnZp5JmIrzvoTbESl2UeKr0iNSq8i7jClnbKF6fuVDQ+HKmAknHO41
+iQIDAQAB
 -----END PUBLIC KEY-----
 ''';
 

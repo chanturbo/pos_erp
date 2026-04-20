@@ -57,6 +57,7 @@ class BranchRoutes {
           'address': b.address,
           'phone': b.phone,
           'is_active': b.isActive,
+          'business_mode': b.businessMode,
           'warehouse_count': wCount.length,
           'created_at': b.createdAt.toIso8601String(),
           'updated_at': b.updatedAt.toIso8601String(),
@@ -93,6 +94,7 @@ class BranchRoutes {
         'address': branch.address,
         'phone': branch.phone,
         'is_active': branch.isActive,
+        'business_mode': branch.businessMode,
         'created_at': branch.createdAt.toIso8601String(),
         'updated_at': branch.updatedAt.toIso8601String(),
         'warehouses': warehouses.map((w) => {
@@ -128,6 +130,8 @@ class BranchRoutes {
             address: Value(data['address'] as String?),
             phone: Value(data['phone'] as String?),
             isActive: Value(data['is_active'] as bool? ?? true),
+            businessMode: Value(
+                (data['business_mode'] as String?)?.toUpperCase() ?? 'RETAIL'),
           ));
 
       // สร้าง Warehouse default ให้ Branch ใหม่
@@ -158,6 +162,9 @@ class BranchRoutes {
         address: Value(data['address'] as String?),
         phone: Value(data['phone'] as String?),
         isActive: Value(data['is_active'] as bool? ?? true),
+        businessMode: data.containsKey('business_mode')
+            ? Value((data['business_mode'] as String).toUpperCase())
+            : const Value.absent(),
         updatedAt: Value(DateTime.now()),
       ));
       return _okMsg({}, 'Branch updated');

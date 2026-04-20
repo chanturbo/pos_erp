@@ -4,6 +4,7 @@ import '../../../branches/presentation/pages/sync_status_page.dart';
 import '../../../branches/presentation/providers/branch_provider.dart';
 import '../../../products/presentation/providers/product_provider.dart';
 import '../../../products/data/models/product_model.dart'; // ✅ สำหรับ bottom sheet
+import '../../../restaurant/data/models/restaurant_order_context.dart';
 import '../../../customers/data/models/customer_model.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/cart_provider.dart';
@@ -21,6 +22,7 @@ import '../../../../shared/widgets/cart_toast.dart';
 import '../../../promotions/data/models/promotion_model.dart';
 import '../../../promotions/presentation/providers/promotion_provider.dart';
 import '../../../inventory/presentation/providers/stock_provider.dart';
+import '../providers/sales_provider.dart';
 
 class PosPage extends ConsumerStatefulWidget {
   /// isCashierMode = true  → Cashier login โดยตรง
@@ -39,11 +41,15 @@ class _PosPageState extends ConsumerState<PosPage> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   List<PromotionModel> _buyXGetYPromos = [];
+  bool _restoredRestaurantOrder = false;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadPromos());
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _loadPromos();
+      await _restoreOpenRestaurantOrder();
+    });
   }
 
   @override
@@ -61,6 +67,87 @@ class _PosPageState extends ConsumerState<PosPage> {
           .toList();
     });
     _syncFreeItems();
+  }
+
+  Future<void> _restoreOpenRestaurantOrder() async {
+    if (_restoredRestaurantOrder) return;
+    _restoredRestaurantOrder = true;
+
+    final restaurantContext = ref.read(restaurantOrderContextProvider);
+    final currentOrderId = restaurantContext?.currentOrderId;
+    final cartState = ref.read(cartProvider);
+    if (restaurantContext == null ||
+        currentOrderId == null ||
+        currentOrderId.isEmpty ||
+        cartState.items.isNotEmpty ||
+        cartState.freeItems.isNotEmpty) {
+      return;
+    }
+
+    final order = await ref
+        .read(salesHistoryProvider.notifier)
+        .getOrderDetails(currentOrderId);
+    if (!mounted || order == null || order.items == null) return;
+
+    final regularItems = order.items!
+        .where((item) => !item.isFreeItem)
+        .map(
+          (item) => CartItem(
+            productId: item.productId,
+            productCode: item.productCode,
+            productName: item.productName,
+            unit: item.unit,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            amount: item.amount,
+            priceLevel1: item.unitPrice,
+            note: item.specialInstructions,
+            modifiers: item.modifiers
+                .map(
+                  (modifier) => CartItemModifier(
+                    modifierId: modifier.modifierId,
+                    modifierName: modifier.modifierName,
+                    priceAdjustment: modifier.priceAdjustment,
+                  ),
+                )
+                .toList(),
+          ),
+        )
+        .toList();
+
+    final freeItems = order.items!
+        .where((item) => item.isFreeItem)
+        .map(
+          (item) => CartItem(
+            productId: item.productId,
+            productCode: item.productCode,
+            productName: item.productName,
+            unit: item.unit,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            amount: item.amount,
+            promotionName: item.promotionName,
+            priceLevel1: item.unitPrice,
+          ),
+        )
+        .toList();
+
+    final totalDiscount = (order.subtotal - order.totalAmount).clamp(0, double.infinity);
+
+    ref.read(cartProvider.notifier).replaceCart(
+          CartState(
+            items: regularItems,
+            freeItems: freeItems,
+            customerId: order.customerId ?? 'WALK_IN',
+            customerName: order.customerName ?? 'ลูกค้าทั่วไป',
+            discountAmount: totalDiscount.toDouble(),
+          ),
+        );
+
+    ref.read(restaurantOrderContextProvider.notifier).state = restaurantContext.copyWith(
+          currentOrderId: order.orderId,
+          currentOrderNo: order.orderNo,
+        );
   }
 
   void _syncFreeItems() {
@@ -230,8 +317,18 @@ class _PosPageState extends ConsumerState<PosPage> {
     List<ProductModel> src, {
     Map<String, double> stockMap = const {},
   }) {
+    final restaurantContext = ref.read(restaurantOrderContextProvider);
+
     // ซ่อนสินค้าหมด (เฉพาะสินค้าที่ควบคุม stock และไม่อนุญาต stock ติดลบ)
     var result = src.where((p) {
+      if (restaurantContext != null) {
+        final serviceMode = p.serviceMode.toUpperCase();
+        final supportsDineIn =
+            serviceMode == 'RESTAURANT' || serviceMode == 'BOTH';
+        if (!supportsDineIn || !p.dineInAvailable) {
+          return false;
+        }
+      }
       if (p.isStockControl && !p.allowNegativeStock) {
         final qty = stockMap[p.productId] ?? 0;
         if (qty <= 0) return false;
@@ -279,6 +376,7 @@ class _PosPageState extends ConsumerState<PosPage> {
 
     final productAsync = ref.watch(productListProvider);
     final cartState = ref.watch(cartProvider);
+    final restaurantContext = ref.watch(restaurantOrderContextProvider);
     final selectedBranch = ref.watch(selectedBranchProvider);
     final selectedWarehouse = ref.watch(selectedWarehouseProvider);
     final user = widget.isCashierMode ? ref.watch(authProvider).user : null;
@@ -362,6 +460,10 @@ class _PosPageState extends ConsumerState<PosPage> {
                       ],
                       // Desktop: chips อยู่ใน toolbar โดยตรง
                       if (!isTablet) ...[
+                        if (restaurantContext != null) ...[
+                          _RestaurantContextChip(contextData: restaurantContext),
+                          const SizedBox(width: 8),
+                        ],
                         _CustomerChip(
                           cartState: cartState,
                           hasCustomer: hasCustomer,
@@ -474,6 +576,10 @@ class _PosPageState extends ConsumerState<PosPage> {
                         runSpacing: 8,
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
+                          if (restaurantContext != null)
+                            _RestaurantContextChip(
+                              contextData: restaurantContext,
+                            ),
                           _CustomerChip(
                             cartState: cartState,
                             hasCustomer: hasCustomer,
@@ -1000,6 +1106,45 @@ class _CustomerChip extends ConsumerWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _RestaurantContextChip extends StatelessWidget {
+  final RestaurantOrderContext contextData;
+
+  const _RestaurantContextChip({required this.contextData});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: Colors.orange.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: Colors.orange.withValues(alpha: 0.35),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.table_restaurant,
+            size: 13,
+            color: Colors.orange,
+          ),
+          const SizedBox(width: 5),
+          Text(
+            '${contextData.tableName} • ${contextData.guestCount} คน',
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: Colors.orange,
+            ),
+          ),
+        ],
       ),
     );
   }
