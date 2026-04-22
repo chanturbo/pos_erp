@@ -1,6 +1,7 @@
 // ignore_for_file: avoid_print
 
 import 'dart:convert';
+import 'package:crypto/crypto.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 import 'package:drift/drift.dart' hide JsonKey;
@@ -11,8 +12,15 @@ class TableRoutes {
   final AppDatabase db;
   TableRoutes(this.db);
 
+  /// In-memory counter incremented every time table status changes.
+  static int _tableVersion = 0;
+
+  static void bumpVersion() => _tableVersion++;
+
   Router get router {
     final r = Router();
+
+    r.get('/version', _getVersion);
 
     // Zones
     r.get('/zones', _listZones);
@@ -68,15 +76,19 @@ class TableRoutes {
         query.where((z) => z.branchId.equals(branchId));
       }
       final zones = await query.get();
-      return _ok(zones
-          .map((z) => {
+      return _ok(
+        zones
+            .map(
+              (z) => {
                 'zone_id': z.zoneId,
                 'zone_name': z.zoneName,
                 'branch_id': z.branchId,
                 'display_order': z.displayOrder,
                 'is_active': z.isActive,
-              })
-          .toList());
+              },
+            )
+            .toList(),
+      );
     } catch (e) {
       return _err(e);
     }
@@ -86,13 +98,17 @@ class TableRoutes {
     try {
       final body = jsonDecode(await req.readAsString()) as Map<String, dynamic>;
       final id = const Uuid().v4();
-      await db.into(db.zones).insert(ZonesCompanion(
-            zoneId: Value(id),
-            zoneName: Value(body['zone_name'] as String),
-            branchId: Value(body['branch_id'] as String),
-            displayOrder: Value(body['display_order'] as int? ?? 0),
-            isActive: Value(body['is_active'] as bool? ?? true),
-          ));
+      await db
+          .into(db.zones)
+          .insert(
+            ZonesCompanion(
+              zoneId: Value(id),
+              zoneName: Value(body['zone_name'] as String),
+              branchId: Value(body['branch_id'] as String),
+              displayOrder: Value(body['display_order'] as int? ?? 0),
+              isActive: Value(body['is_active'] as bool? ?? true),
+            ),
+          );
       return _ok({'zone_id': id}, statusCode: 201);
     } catch (e) {
       return _err(e);
@@ -102,18 +118,19 @@ class TableRoutes {
   Future<Response> _updateZone(Request req, String id) async {
     try {
       final body = jsonDecode(await req.readAsString()) as Map<String, dynamic>;
-      await (db.update(db.zones)..where((z) => z.zoneId.equals(id)))
-          .write(ZonesCompanion(
-        zoneName: body.containsKey('zone_name')
-            ? Value(body['zone_name'] as String)
-            : const Value.absent(),
-        displayOrder: body.containsKey('display_order')
-            ? Value(body['display_order'] as int)
-            : const Value.absent(),
-        isActive: body.containsKey('is_active')
-            ? Value(body['is_active'] as bool)
-            : const Value.absent(),
-      ));
+      await (db.update(db.zones)..where((z) => z.zoneId.equals(id))).write(
+        ZonesCompanion(
+          zoneName: body.containsKey('zone_name')
+              ? Value(body['zone_name'] as String)
+              : const Value.absent(),
+          displayOrder: body.containsKey('display_order')
+              ? Value(body['display_order'] as int)
+              : const Value.absent(),
+          isActive: body.containsKey('is_active')
+              ? Value(body['is_active'] as bool)
+              : const Value.absent(),
+        ),
+      );
       return _ok({'zone_id': id});
     } catch (e) {
       return _err(e);
@@ -141,12 +158,10 @@ class TableRoutes {
       final zoneMap = {for (final z in allZones) z.zoneId: z.zoneName};
 
       // โหลด active sessions (status = OPEN)
-      final activeSessions = await (db.select(db.tableSessions)
-            ..where((s) => s.status.equals('OPEN')))
-          .get();
-      final sessionByTable = {
-        for (final s in activeSessions) s.tableId: s,
-      };
+      final activeSessions = await (db.select(
+        db.tableSessions,
+      )..where((s) => s.status.equals('OPEN'))).get();
+      final sessionByTable = {for (final s in activeSessions) s.tableId: s};
 
       // query tables
       final query = db.select(db.diningTables)
@@ -161,33 +176,37 @@ class TableRoutes {
       // filter by branchId ผ่าน zone
       final branchZoneIds = branchId != null
           ? allZones
-              .where((z) => z.branchId == branchId)
-              .map((z) => z.zoneId)
-              .toSet()
+                .where((z) => z.branchId == branchId)
+                .map((z) => z.zoneId)
+                .toSet()
           : null;
 
-      final result = tables.where((t) {
-        if (branchZoneIds != null && !branchZoneIds.contains(t.zoneId)) {
-          return false;
-        }
-        return true;
-      }).map((t) {
-        final session = sessionByTable[t.tableId];
-        return {
-          'table_id': t.tableId,
-          'table_no': t.tableNo,
-          'table_display_name': t.tableDisplayName,
-          'zone_id': t.zoneId,
-          'zone_name': zoneMap[t.zoneId],
-          'capacity': t.capacity,
-          'status': t.status,
-          'current_order_id': t.currentOrderId,
-          'last_occupied_at': t.lastOccupiedAt?.toIso8601String(),
-          'active_session_id': session?.sessionId,
-          'active_guest_count': session?.guestCount,
-          'session_opened_at': session?.openedAt.toIso8601String(),
-        };
-      }).toList();
+      final result = tables
+          .where((t) {
+            if (branchZoneIds != null && !branchZoneIds.contains(t.zoneId)) {
+              return false;
+            }
+            return true;
+          })
+          .map((t) {
+            final session = sessionByTable[t.tableId];
+            return {
+              'table_id': t.tableId,
+              'table_no': t.tableNo,
+              'table_display_name': t.tableDisplayName,
+              'zone_id': t.zoneId,
+              'zone_name': zoneMap[t.zoneId],
+              'capacity': t.capacity,
+              'status': t.status,
+              'current_order_id': t.currentOrderId,
+              'last_occupied_at': t.lastOccupiedAt?.toIso8601String(),
+              'active_session_id': session?.sessionId,
+              'active_guest_count': session?.guestCount,
+              'session_opened_at': session?.openedAt.toIso8601String(),
+              'waiter_name': session?.waiterName,
+            };
+          })
+          .toList();
 
       return _ok(result);
     } catch (e) {
@@ -199,16 +218,20 @@ class TableRoutes {
     try {
       final body = jsonDecode(await req.readAsString()) as Map<String, dynamic>;
       final id = const Uuid().v4();
-      await db.into(db.diningTables).insert(DiningTablesCompanion(
-            tableId: Value(id),
-            tableNo: Value(body['table_no'] as String),
-            tableDisplayName: body.containsKey('table_display_name')
-                ? Value(body['table_display_name'] as String?)
-                : const Value.absent(),
-            zoneId: Value(body['zone_id'] as String),
-            capacity: Value(body['capacity'] as int? ?? 4),
-            status: const Value('AVAILABLE'),
-          ));
+      await db
+          .into(db.diningTables)
+          .insert(
+            DiningTablesCompanion(
+              tableId: Value(id),
+              tableNo: Value(body['table_no'] as String),
+              tableDisplayName: body.containsKey('table_display_name')
+                  ? Value(body['table_display_name'] as String?)
+                  : const Value.absent(),
+              zoneId: Value(body['zone_id'] as String),
+              capacity: Value(body['capacity'] as int? ?? 4),
+              status: const Value('AVAILABLE'),
+            ),
+          );
       return _ok({'table_id': id}, statusCode: 201);
     } catch (e) {
       return _err(e);
@@ -218,25 +241,27 @@ class TableRoutes {
   Future<Response> _updateTable(Request req, String id) async {
     try {
       final body = jsonDecode(await req.readAsString()) as Map<String, dynamic>;
-      await (db.update(db.diningTables)
-            ..where((t) => t.tableId.equals(id)))
-          .write(DiningTablesCompanion(
-        tableNo: body.containsKey('table_no')
-            ? Value(body['table_no'] as String)
-            : const Value.absent(),
-        tableDisplayName: body.containsKey('table_display_name')
-            ? Value(body['table_display_name'] as String?)
-            : const Value.absent(),
-        zoneId: body.containsKey('zone_id')
-            ? Value(body['zone_id'] as String)
-            : const Value.absent(),
-        capacity: body.containsKey('capacity')
-            ? Value(body['capacity'] as int)
-            : const Value.absent(),
-        status: body.containsKey('status')
-            ? Value(body['status'] as String)
-            : const Value.absent(),
-      ));
+      await (db.update(
+        db.diningTables,
+      )..where((t) => t.tableId.equals(id))).write(
+        DiningTablesCompanion(
+          tableNo: body.containsKey('table_no')
+              ? Value(body['table_no'] as String)
+              : const Value.absent(),
+          tableDisplayName: body.containsKey('table_display_name')
+              ? Value(body['table_display_name'] as String?)
+              : const Value.absent(),
+          zoneId: body.containsKey('zone_id')
+              ? Value(body['zone_id'] as String)
+              : const Value.absent(),
+          capacity: body.containsKey('capacity')
+              ? Value(body['capacity'] as int)
+              : const Value.absent(),
+          status: body.containsKey('status')
+              ? Value(body['status'] as String)
+              : const Value.absent(),
+        ),
+      );
       return _ok({'table_id': id});
     } catch (e) {
       return _err(e);
@@ -245,9 +270,9 @@ class TableRoutes {
 
   Future<Response> _deleteTable(Request req, String id) async {
     try {
-      await (db.delete(db.diningTables)
-            ..where((t) => t.tableId.equals(id)))
-          .go();
+      await (db.delete(
+        db.diningTables,
+      )..where((t) => t.tableId.equals(id))).go();
       return _ok({'deleted': id});
     } catch (e) {
       return _err(e);
@@ -259,22 +284,26 @@ class TableRoutes {
   Future<Response> _openTable(Request req, String id) async {
     try {
       // ตรวจสอบว่าโต๊ะมีอยู่
-      final table = await (db.select(db.diningTables)
-            ..where((t) => t.tableId.equals(id)))
-          .getSingleOrNull();
+      final table = await (db.select(
+        db.diningTables,
+      )..where((t) => t.tableId.equals(id))).getSingleOrNull();
 
       if (table == null) {
         return Response.notFound(
-            jsonEncode({'success': false, 'message': 'Table not found'}),
-            headers: {'content-type': 'application/json'});
+          jsonEncode({'success': false, 'message': 'Table not found'}),
+          headers: {'content-type': 'application/json'},
+        );
       }
 
       if (table.status == 'OCCUPIED') {
         return Response(
-            400,
-            body: jsonEncode(
-                {'success': false, 'message': 'Table is already occupied'}),
-            headers: {'content-type': 'application/json'});
+          400,
+          body: jsonEncode({
+            'success': false,
+            'message': 'Table is already occupied',
+          }),
+          headers: {'content-type': 'application/json'},
+        );
       }
 
       final body = jsonDecode(await req.readAsString()) as Map<String, dynamic>;
@@ -286,24 +315,41 @@ class TableRoutes {
       final openedAt = DateTime.now();
 
       // สร้าง session
-      await db.into(db.tableSessions).insert(TableSessionsCompanion(
-            sessionId: Value(sessionId),
-            tableId: Value(id),
-            branchId: Value(branchId),
-            openedAt: Value(openedAt),
-            guestCount: Value(guestCount),
-            status: const Value('OPEN'),
-            openedBy: Value(openedBy),
-          ));
+      await db
+          .into(db.tableSessions)
+          .insert(
+            TableSessionsCompanion(
+              sessionId: Value(sessionId),
+              tableId: Value(id),
+              branchId: Value(branchId),
+              openedAt: Value(openedAt),
+              guestCount: Value(guestCount),
+              status: const Value('OPEN'),
+              openedBy: Value(openedBy),
+            ),
+          );
 
       // อัปเดตสถานะโต๊ะ
-      await (db.update(db.diningTables)..where((t) => t.tableId.equals(id)))
-          .write(DiningTablesCompanion(
-        status: const Value('OCCUPIED'),
-        lastOccupiedAt: Value(openedAt),
-      ));
+      await (db.update(
+        db.diningTables,
+      )..where((t) => t.tableId.equals(id))).write(
+        DiningTablesCompanion(
+          status: const Value('OCCUPIED'),
+          lastOccupiedAt: Value(openedAt),
+        ),
+      );
+      await _logTableSessionEvent(
+        sessionId: sessionId,
+        tableId: id,
+        eventType: 'opened',
+        eventAt: openedAt,
+        description:
+            'เปิดโต๊ะ ${table.tableDisplayName ?? table.tableNo}${guestCount > 0 ? ' ($guestCount คน)' : ''}',
+        payload: {'guest_count': guestCount, 'opened_by': openedBy},
+      );
 
       print('✅ Opened table $id session=$sessionId guests=$guestCount');
+      TableRoutes.bumpVersion();
 
       return _ok({
         'session_id': sessionId,
@@ -324,40 +370,77 @@ class TableRoutes {
   Future<Response> _closeTable(Request req, String id) async {
     try {
       // ปิด active session ของโต๊ะนี้
-      final session = await (db.select(db.tableSessions)
-            ..where((s) => s.tableId.equals(id) & s.status.equals('OPEN')))
-          .getSingleOrNull();
+      final session =
+          await (db.select(db.tableSessions)
+                ..where((s) => s.tableId.equals(id) & s.status.equals('OPEN')))
+              .getSingleOrNull();
 
       if (session == null) {
         return Response(
-            400,
-            body: jsonEncode(
-                {'success': false, 'message': 'No active session for this table'}),
-            headers: {'content-type': 'application/json'});
+          400,
+          body: jsonEncode({
+            'success': false,
+            'message': 'No active session for this table',
+          }),
+          headers: {'content-type': 'application/json'},
+        );
       }
 
-      await (db.update(db.tableSessions)
-            ..where((s) => s.sessionId.equals(session.sessionId)))
-          .write(TableSessionsCompanion(
-        status: const Value('CLOSED'),
-        closedAt: Value(DateTime.now()),
-      ));
+      final openOrders =
+          await (db.select(db.salesOrders)..where(
+                (o) =>
+                    o.sessionId.equals(session.sessionId) &
+                    o.status.equals('OPEN'),
+              ))
+              .get();
+      if (openOrders.isNotEmpty) {
+        return Response(
+          409,
+          body: jsonEncode({
+            'success': false,
+            'message': 'ไม่สามารถปิดโต๊ะได้ เนื่องจากยังมี order ที่เปิดอยู่',
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+
+      final closedAt = DateTime.now();
+      await (db.update(
+        db.tableSessions,
+      )..where((s) => s.sessionId.equals(session.sessionId))).write(
+        TableSessionsCompanion(
+          status: const Value('CLOSED'),
+          closedAt: Value(closedAt),
+        ),
+      );
 
       // อัปเดตสถานะโต๊ะกลับเป็น AVAILABLE
-      await (db.update(db.diningTables)..where((t) => t.tableId.equals(id)))
-          .write(const DiningTablesCompanion(
-        status: Value('CLEANING'),
-        currentOrderId: Value(null),
-      ));
+      await (db.update(
+        db.diningTables,
+      )..where((t) => t.tableId.equals(id))).write(
+        const DiningTablesCompanion(
+          status: Value('CLEANING'),
+          currentOrderId: Value(null),
+        ),
+      );
+      await _logTableSessionEvent(
+        sessionId: session.sessionId,
+        tableId: id,
+        eventType: 'closed',
+        eventAt: closedAt,
+        description: 'ปิด session ของโต๊ะนี้แล้ว',
+        payload: {'status': 'CLOSED'},
+      );
 
       print('✅ Closed table $id session=${session.sessionId}');
+      TableRoutes.bumpVersion();
 
       return _ok({
         'session_id': session.sessionId,
         'table_id': id,
         'branch_id': session.branchId,
         'opened_at': session.openedAt.toIso8601String(),
-        'closed_at': DateTime.now().toIso8601String(),
+        'closed_at': closedAt.toIso8601String(),
         'guest_count': session.guestCount,
         'status': 'CLOSED',
         'opened_by': session.openedBy,
@@ -383,9 +466,10 @@ class TableRoutes {
         );
       }
 
-      final session = await (db.select(db.tableSessions)
-            ..where((s) => s.tableId.equals(id) & s.status.equals('OPEN')))
-          .getSingleOrNull();
+      final session =
+          await (db.select(db.tableSessions)
+                ..where((s) => s.tableId.equals(id) & s.status.equals('OPEN')))
+              .getSingleOrNull();
       if (session == null) {
         return Response(
           400,
@@ -397,9 +481,9 @@ class TableRoutes {
         );
       }
 
-      final targetTable = await (db.select(db.diningTables)
-            ..where((t) => t.tableId.equals(targetTableId)))
-          .getSingleOrNull();
+      final targetTable = await (db.select(
+        db.diningTables,
+      )..where((t) => t.tableId.equals(targetTableId))).getSingleOrNull();
       if (targetTable == null) {
         return Response.notFound(
           jsonEncode({'success': false, 'message': 'ไม่พบโต๊ะปลายทาง'}),
@@ -418,30 +502,55 @@ class TableRoutes {
       }
 
       await db.transaction(() async {
-        final sourceTable = await (db.select(db.diningTables)
-              ..where((t) => t.tableId.equals(id)))
-            .getSingleOrNull();
+        final sourceTable = await (db.select(
+          db.diningTables,
+        )..where((t) => t.tableId.equals(id))).getSingleOrNull();
 
         await (db.update(db.tableSessions)
               ..where((s) => s.sessionId.equals(session.sessionId)))
-            .write(TableSessionsCompanion(
-          tableId: Value(targetTableId),
-        ));
+            .write(TableSessionsCompanion(tableId: Value(targetTableId)));
 
-        await (db.update(db.diningTables)..where((t) => t.tableId.equals(id)))
-            .write(const DiningTablesCompanion(
-          status: Value('CLEANING'),
-          currentOrderId: Value(null),
-        ));
+        await (db.update(db.salesOrders)..where(
+              (o) =>
+                  o.sessionId.equals(session.sessionId) &
+                  o.status.equals('OPEN'),
+            ))
+            .write(SalesOrdersCompanion(tableId: Value(targetTableId)));
 
-        await (db.update(db.diningTables)
-              ..where((t) => t.tableId.equals(targetTableId)))
-            .write(DiningTablesCompanion(
-          status: const Value('OCCUPIED'),
-          lastOccupiedAt: Value(DateTime.now()),
-          currentOrderId: Value(sourceTable?.currentOrderId),
-        ));
+        await (db.update(
+          db.diningTables,
+        )..where((t) => t.tableId.equals(id))).write(
+          const DiningTablesCompanion(
+            status: Value('CLEANING'),
+            currentOrderId: Value(null),
+          ),
+        );
+
+        final targetOrders =
+            await (db.select(db.salesOrders)
+                  ..where(
+                    (o) =>
+                        o.sessionId.equals(session.sessionId) &
+                        o.tableId.equals(targetTableId) &
+                        o.status.equals('OPEN'),
+                  )
+                  ..orderBy([(o) => OrderingTerm.asc(o.createdAt)]))
+                .get();
+        await (db.update(
+          db.diningTables,
+        )..where((t) => t.tableId.equals(targetTableId))).write(
+          DiningTablesCompanion(
+            status: const Value('OCCUPIED'),
+            lastOccupiedAt: Value(DateTime.now()),
+            currentOrderId: Value(
+              targetOrders.isNotEmpty
+                  ? targetOrders.first.orderId
+                  : sourceTable?.currentOrderId,
+            ),
+          ),
+        );
       });
+      TableRoutes.bumpVersion();
 
       return _ok({
         'session_id': session.sessionId,
@@ -461,14 +570,16 @@ class TableRoutes {
 
   Future<Response> _getActiveSession(Request req, String id) async {
     try {
-      final session = await (db.select(db.tableSessions)
-            ..where((s) => s.tableId.equals(id) & s.status.equals('OPEN')))
-          .getSingleOrNull();
+      final session =
+          await (db.select(db.tableSessions)
+                ..where((s) => s.tableId.equals(id) & s.status.equals('OPEN')))
+              .getSingleOrNull();
 
       if (session == null) {
         return Response.notFound(
-            jsonEncode({'success': false, 'message': 'No active session'}),
-            headers: {'content-type': 'application/json'});
+          jsonEncode({'success': false, 'message': 'No active session'}),
+          headers: {'content-type': 'application/json'},
+        );
       }
 
       return _ok({
@@ -493,39 +604,50 @@ class TableRoutes {
   /// รวมรายการทั้งหมดจาก OPEN orders ของ session ปัจจุบัน
   Future<Response> _getBill(Request req, String id) async {
     try {
-      final session = await (db.select(db.tableSessions)
-            ..where((s) => s.tableId.equals(id) & s.status.equals('OPEN')))
-          .getSingleOrNull();
+      final session =
+          await (db.select(db.tableSessions)
+                ..where((s) => s.tableId.equals(id) & s.status.equals('OPEN')))
+              .getSingleOrNull();
       if (session == null) {
-        return Response(404,
-            body: jsonEncode(
-                {'success': false, 'message': 'ไม่มีโต๊ะที่เปิดอยู่'}),
-            headers: {'content-type': 'application/json'});
+        return Response(
+          404,
+          body: jsonEncode({
+            'success': false,
+            'message': 'ไม่มีโต๊ะที่เปิดอยู่',
+          }),
+          headers: {'content-type': 'application/json'},
+        );
       }
 
-      final orders = await (db.select(db.salesOrders)
-            ..where((o) =>
-                o.sessionId.equals(session.sessionId) &
-                o.status.equals('OPEN')))
-          .get();
+      final orders =
+          await (db.select(db.salesOrders)..where(
+                (o) =>
+                    o.sessionId.equals(session.sessionId) &
+                    o.status.equals('OPEN'),
+              ))
+              .get();
 
       if (orders.isEmpty) return _ok(_emptyBill(session.sessionId, id));
 
       final orderIds = orders.map((o) => o.orderId).toList();
-      final items = await (db.select(db.salesOrderItems)
-            ..where((i) =>
-                i.orderId.isIn(orderIds) &
-                i.kitchenStatus.isNotIn(['CANCELLED'])))
-          .get();
+      final items =
+          await (db.select(db.salesOrderItems)..where(
+                (i) =>
+                    i.orderId.isIn(orderIds) &
+                    i.kitchenStatus.isNotIn(['CANCELLED']),
+              ))
+              .get();
       final itemIds = items.map((i) => i.itemId).toList();
       final modifiers = itemIds.isNotEmpty
-          ? await (db.select(db.orderItemModifiers)
-                ..where((m) => m.orderItemId.isIn(itemIds)))
-              .get()
+          ? await (db.select(
+              db.orderItemModifiers,
+            )..where((m) => m.orderItemId.isIn(itemIds))).get()
           : <OrderItemModifier>[];
       final modifiersByItem = <String, List<OrderItemModifier>>{};
       for (final modifier in modifiers) {
-        modifiersByItem.putIfAbsent(modifier.orderItemId, () => []).add(modifier);
+        modifiersByItem
+            .putIfAbsent(modifier.orderItemId, () => [])
+            .add(modifier);
       }
 
       // รวมยอดทุก order
@@ -541,44 +663,66 @@ class TableRoutes {
         serviceChargeAmount += o.serviceChargeAmount;
       }
 
-      final grandTotal =
-          subtotal - discountAmount + serviceChargeAmount;
+      final grandTotal = subtotal - discountAmount + serviceChargeAmount;
+      final nonWalkInCustomers = orders
+          .where(
+            (o) =>
+                o.customerId != null &&
+                o.customerId!.isNotEmpty &&
+                o.customerId != 'WALK_IN',
+          )
+          .map((o) => (id: o.customerId!, name: o.customerName))
+          .toList();
+      final uniqueCustomerIds = nonWalkInCustomers
+          .map((customer) => customer.id)
+          .toSet();
+      final billCustomer = uniqueCustomerIds.length == 1
+          ? nonWalkInCustomers.first
+          : null;
 
       return _ok({
         'session_id': session.sessionId,
         'table_id': id,
         'guest_count': session.guestCount,
         'opened_at': session.openedAt.toIso8601String(),
+        'customer_id': billCustomer?.id,
+        'customer_name': billCustomer?.name,
         'order_ids': orderIds,
         'items': items
-            .map((i) => {
-                  'item_id': i.itemId,
-                  'order_id': i.orderId,
-                  'line_no': i.lineNo,
-                  'product_id': i.productId,
-                  'product_name': i.productName,
-                  'quantity': i.quantity,
-                  'unit': i.unit,
-                  'unit_price': i.unitPrice,
-                  'discount_amount': i.discountAmount,
-                  'amount': i.amount,
-                  'kitchen_status': i.kitchenStatus,
-                  'course_no': i.courseNo,
-                  'special_instructions': i.specialInstructions,
-                  'modifiers': (modifiersByItem[i.itemId] ?? const <OrderItemModifier>[])
-                      .map((m) => {
+            .map(
+              (i) => {
+                'item_id': i.itemId,
+                'order_id': i.orderId,
+                'line_no': i.lineNo,
+                'product_id': i.productId,
+                'product_name': i.productName,
+                'quantity': i.quantity,
+                'unit': i.unit,
+                'unit_price': i.unitPrice,
+                'discount_amount': i.discountAmount,
+                'amount': i.amount,
+                'kitchen_status': i.kitchenStatus,
+                'course_no': i.courseNo,
+                'special_instructions': i.specialInstructions,
+                'modifiers':
+                    (modifiersByItem[i.itemId] ?? const <OrderItemModifier>[])
+                        .map(
+                          (m) => {
                             'modifier_id': m.modifierId,
                             'modifier_name': m.modifierName,
                             'price_adjustment': m.priceAdjustment,
-                          })
-                      .toList(),
-                })
+                          },
+                        )
+                        .toList(),
+              },
+            )
             .toList(),
         'subtotal': subtotal,
         'discount_amount': discountAmount,
         'service_charge_rate': serviceChargeRate,
         'service_charge_amount': serviceChargeAmount,
         'grand_total': grandTotal,
+        'preview_token': _billToken(items),
       });
     } catch (e) {
       return _err(e);
@@ -586,38 +730,41 @@ class TableRoutes {
   }
 
   Map<String, dynamic> _emptyBill(String sessionId, String tableId) => {
-        'session_id': sessionId,
-        'table_id': tableId,
-        'guest_count': 0,
-        'opened_at': null,
-        'order_ids': <String>[],
-        'items': <dynamic>[],
-        'subtotal': 0.0,
-        'discount_amount': 0.0,
-        'service_charge_rate': 0.0,
-        'service_charge_amount': 0.0,
-        'grand_total': 0.0,
-      };
+    'session_id': sessionId,
+    'table_id': tableId,
+    'guest_count': 0,
+    'opened_at': null,
+    'customer_id': null,
+    'customer_name': null,
+    'order_ids': <String>[],
+    'items': <dynamic>[],
+    'subtotal': 0.0,
+    'discount_amount': 0.0,
+    'service_charge_rate': 0.0,
+    'service_charge_amount': 0.0,
+    'grand_total': 0.0,
+  };
 
   /// POST /api/tables/:id/bill/service-charge
   /// body: { "rate": 10 }  (เปอร์เซ็นต์)
   Future<Response> _setServiceCharge(Request req, String id) async {
     try {
-      final body =
-          jsonDecode(await req.readAsString()) as Map<String, dynamic>;
+      final body = jsonDecode(await req.readAsString()) as Map<String, dynamic>;
       final rate = (body['rate'] as num).toDouble();
 
-      final orders = await (db.select(db.salesOrders)
-            ..where((o) =>
-                o.tableId.equals(id) &
-                o.status.equals('OPEN')))
-          .get();
+      final orders = await (db.select(
+        db.salesOrders,
+      )..where((o) => o.tableId.equals(id) & o.status.equals('OPEN'))).get();
 
       if (orders.isEmpty) {
-        return Response(400,
-            body: jsonEncode(
-                {'success': false, 'message': 'ไม่มี order ที่เปิดอยู่'}),
-            headers: {'content-type': 'application/json'});
+        return Response(
+          400,
+          body: jsonEncode({
+            'success': false,
+            'message': 'ไม่มี order ที่เปิดอยู่',
+          }),
+          headers: {'content-type': 'application/json'},
+        );
       }
 
       await _recalculateServiceChargeForOrders(orders, rate);
@@ -633,59 +780,79 @@ class TableRoutes {
   /// หรือ { "splits": [{"label":"คน 1","item_ids":["...",...]}, ...] }
   Future<Response> _splitBill(Request req, String id) async {
     try {
-      final body =
-          jsonDecode(await req.readAsString()) as Map<String, dynamic>;
+      final body = jsonDecode(await req.readAsString()) as Map<String, dynamic>;
 
-      final session = await (db.select(db.tableSessions)
-            ..where((s) => s.tableId.equals(id) & s.status.equals('OPEN')))
-          .getSingleOrNull();
+      final session =
+          await (db.select(db.tableSessions)
+                ..where((s) => s.tableId.equals(id) & s.status.equals('OPEN')))
+              .getSingleOrNull();
       if (session == null) {
-        return Response(404,
-            body: jsonEncode({'success': false, 'message': 'ไม่มี session ที่เปิดอยู่'}),
-            headers: {'content-type': 'application/json'});
+        return Response(
+          404,
+          body: jsonEncode({
+            'success': false,
+            'message': 'ไม่มี session ที่เปิดอยู่',
+          }),
+          headers: {'content-type': 'application/json'},
+        );
       }
 
-      final orders = await (db.select(db.salesOrders)
-            ..where((o) =>
-                o.sessionId.equals(session.sessionId) &
-                o.status.equals('OPEN')))
-          .get();
+      final orders =
+          await (db.select(db.salesOrders)..where(
+                (o) =>
+                    o.sessionId.equals(session.sessionId) &
+                    o.status.equals('OPEN'),
+              ))
+              .get();
       final orderIds = orders.map((o) => o.orderId).toList();
-      final allItems = await (db.select(db.salesOrderItems)
-            ..where((i) =>
-                i.orderId.isIn(orderIds) &
-                i.kitchenStatus.isNotIn(['CANCELLED'])))
-          .get();
+      final allItems =
+          await (db.select(db.salesOrderItems)..where(
+                (i) =>
+                    i.orderId.isIn(orderIds) &
+                    i.kitchenStatus.isNotIn(['CANCELLED']),
+              ))
+              .get();
 
-      final totalSubtotal =
-          orders.fold<double>(0, (s, o) => s + o.subtotal);
-      final totalDiscount =
-          orders.fold<double>(0, (s, o) => s + o.discountAmount);
-      final totalSC =
-          orders.fold<double>(0, (s, o) => s + o.serviceChargeAmount);
+      final totalSubtotal = orders.fold<double>(0, (s, o) => s + o.subtotal);
+      final totalDiscount = orders.fold<double>(
+        0,
+        (s, o) => s + o.discountAmount,
+      );
+      final totalSC = orders.fold<double>(
+        0,
+        (s, o) => s + o.serviceChargeAmount,
+      );
       final grandTotal = totalSubtotal - totalDiscount + totalSC;
+      final previewToken = _billToken(allItems);
 
       // ── Equal split by count ──
       if (body.containsKey('count')) {
         final count = body['count'] as int;
         if (count < 1) {
-          return Response(400,
-              body: jsonEncode({'success': false, 'message': 'count ต้องมากกว่า 0'}),
-              headers: {'content-type': 'application/json'});
+          return Response(
+            400,
+            body: jsonEncode({
+              'success': false,
+              'message': 'count ต้องมากกว่า 0',
+            }),
+            headers: {'content-type': 'application/json'},
+          );
         }
         final perPerson = grandTotal / count;
         return _ok({
           'mode': 'equal',
+          'preview_token': previewToken,
           'count': count,
           'grand_total': grandTotal,
           'per_person': perPerson,
           'splits': List.generate(
-              count,
-              (i) => {
-                    'label': 'คน ${i + 1}',
-                    'amount': perPerson,
-                    'items': <dynamic>[],
-                  }),
+            count,
+            (i) => {
+              'label': 'คน ${i + 1}',
+              'amount': perPerson,
+              'items': <dynamic>[],
+            },
+          ),
         });
       }
 
@@ -695,11 +862,14 @@ class TableRoutes {
         final result = splitsRaw.map((s) {
           final split = s as Map<String, dynamic>;
           final label = split['label'] as String? ?? '';
-          final itemIds =
-              (split['item_ids'] as List).map((e) => e as String).toSet();
+          final itemIds = (split['item_ids'] as List)
+              .map((e) => e as String)
+              .toSet();
           final splitItems = allItems.where((i) => itemIds.contains(i.itemId));
-          final splitTotal =
-              splitItems.fold<double>(0, (sum, i) => sum + i.amount);
+          final splitTotal = splitItems.fold<double>(
+            0,
+            (sum, i) => sum + i.amount,
+          );
           // proportional service charge
           final scShare = grandTotal > 0
               ? splitTotal / (totalSubtotal - totalDiscount) * totalSC
@@ -707,12 +877,14 @@ class TableRoutes {
           return {
             'label': label,
             'items': splitItems
-                .map((i) => {
-                      'item_id': i.itemId,
-                      'product_name': i.productName,
-                      'quantity': i.quantity,
-                      'amount': i.amount,
-                    })
+                .map(
+                  (i) => {
+                    'item_id': i.itemId,
+                    'product_name': i.productName,
+                    'quantity': i.quantity,
+                    'amount': i.amount,
+                  },
+                )
                 .toList(),
             'subtotal': splitTotal,
             'service_charge': scShare,
@@ -720,13 +892,21 @@ class TableRoutes {
           };
         }).toList();
 
-        return _ok({'mode': 'by_item', 'splits': result});
+        return _ok({
+          'mode': 'by_item',
+          'preview_token': previewToken,
+          'splits': result,
+        });
       }
 
-      return Response(400,
-          body: jsonEncode(
-              {'success': false, 'message': 'ต้องระบุ count หรือ splits'}),
-          headers: {'content-type': 'application/json'});
+      return Response(
+        400,
+        body: jsonEncode({
+          'success': false,
+          'message': 'ต้องระบุ count หรือ splits',
+        }),
+        headers: {'content-type': 'application/json'},
+      );
     } catch (e) {
       return _err(e);
     }
@@ -744,8 +924,7 @@ class TableRoutes {
   /// }
   Future<Response> _applySplitBill(Request req, String id) async {
     try {
-      final body =
-          jsonDecode(await req.readAsString()) as Map<String, dynamic>;
+      final body = jsonDecode(await req.readAsString()) as Map<String, dynamic>;
       final splitsRaw = body['splits'] as List?;
       if (splitsRaw == null || splitsRaw.isEmpty) {
         return Response(
@@ -758,9 +937,10 @@ class TableRoutes {
         );
       }
 
-      final session = await (db.select(db.tableSessions)
-            ..where((s) => s.tableId.equals(id) & s.status.equals('OPEN')))
-          .getSingleOrNull();
+      final session =
+          await (db.select(db.tableSessions)
+                ..where((s) => s.tableId.equals(id) & s.status.equals('OPEN')))
+              .getSingleOrNull();
       if (session == null) {
         return Response(
           404,
@@ -772,10 +952,13 @@ class TableRoutes {
         );
       }
 
-      final openOrders = await (db.select(db.salesOrders)
-            ..where((o) =>
-                o.sessionId.equals(session.sessionId) & o.status.equals('OPEN')))
-          .get();
+      final openOrders =
+          await (db.select(db.salesOrders)..where(
+                (o) =>
+                    o.sessionId.equals(session.sessionId) &
+                    o.status.equals('OPEN'),
+              ))
+              .get();
       if (openOrders.isEmpty) {
         return Response(
           400,
@@ -788,11 +971,13 @@ class TableRoutes {
       }
 
       final orderIds = openOrders.map((o) => o.orderId).toList();
-      final sourceItems = await (db.select(db.salesOrderItems)
-            ..where((i) =>
-                i.orderId.isIn(orderIds) &
-                i.kitchenStatus.isNotIn(['CANCELLED'])))
-          .get();
+      final sourceItems =
+          await (db.select(db.salesOrderItems)..where(
+                (i) =>
+                    i.orderId.isIn(orderIds) &
+                    i.kitchenStatus.isNotIn(['CANCELLED']),
+              ))
+              .get();
       if (sourceItems.isEmpty) {
         return Response(
           400,
@@ -804,13 +989,32 @@ class TableRoutes {
         );
       }
 
+      // Optimistic lock: reject if bill changed since preview
+      final submittedToken = body['preview_token'] as String?;
+      if (submittedToken != null) {
+        final currentToken = _billToken(sourceItems);
+        if (submittedToken != currentToken) {
+          return Response(
+            409,
+            body: jsonEncode({
+              'success': false,
+              'message':
+                  'รายการบิลเปลี่ยนแปลงหลังจากดูตัวอย่าง กรุณาตรวจสอบและลองใหม่',
+            }),
+            headers: {'content-type': 'application/json'},
+          );
+        }
+      }
+
       final itemById = {for (final item in sourceItems) item.itemId: item};
-      final modifierRows = await (db.select(db.orderItemModifiers)
-            ..where((m) => m.orderItemId.isIn(itemById.keys)))
-          .get();
+      final modifierRows = await (db.select(
+        db.orderItemModifiers,
+      )..where((m) => m.orderItemId.isIn(itemById.keys))).get();
       final modifiersByItem = <String, List<OrderItemModifier>>{};
       for (final modifier in modifierRows) {
-        modifiersByItem.putIfAbsent(modifier.orderItemId, () => []).add(modifier);
+        modifiersByItem
+            .putIfAbsent(modifier.orderItemId, () => [])
+            .add(modifier);
       }
 
       final requestedByItem = <String, double>{};
@@ -831,10 +1035,7 @@ class TableRoutes {
             if (itemId == null || itemId.isEmpty || quantity <= 0) {
               throw Exception('ข้อมูล split item ไม่ถูกต้อง');
             }
-            normalizedItems.add({
-              'item_id': itemId,
-              'quantity': quantity,
-            });
+            normalizedItems.add({'item_id': itemId, 'quantity': quantity});
           }
         } else if (rawItemIds != null && rawItemIds.isNotEmpty) {
           for (final rawItemId in rawItemIds) {
@@ -861,15 +1062,14 @@ class TableRoutes {
           }
           final currentRequested = requestedByItem[itemId] ?? 0;
           if (currentRequested + quantity > source.quantity + 0.0001) {
-            throw Exception('จำนวนที่แยกของรายการ ${source.productName} เกินจำนวนเดิม');
+            throw Exception(
+              'จำนวนที่แยกของรายการ ${source.productName} เกินจำนวนเดิม',
+            );
           }
           requestedByItem[itemId] = currentRequested + quantity;
         }
 
-        normalizedSplits.add({
-          'label': label,
-          'items': normalizedItems,
-        });
+        normalizedSplits.add({'label': label, 'items': normalizedItems});
       }
 
       final serviceChargeRate = openOrders.isNotEmpty
@@ -881,12 +1081,17 @@ class TableRoutes {
       final ts = now.millisecondsSinceEpoch;
 
       await db.transaction(() async {
-        for (var splitIndex = 0; splitIndex < normalizedSplits.length; splitIndex++) {
+        for (
+          var splitIndex = 0;
+          splitIndex < normalizedSplits.length;
+          splitIndex++
+        ) {
           final split = normalizedSplits[splitIndex];
           final splitItems = split['items'] as List<Map<String, dynamic>>;
           if (splitItems.isEmpty) continue;
 
-          final firstSourceItem = itemById[splitItems.first['item_id'] as String]!;
+          final firstSourceItem =
+              itemById[splitItems.first['item_id'] as String]!;
           final templateOrder = openOrders.firstWhere(
             (order) => order.orderId == firstSourceItem.orderId,
             orElse: () => openOrders.first,
@@ -896,7 +1101,9 @@ class TableRoutes {
           final splitOrderNo =
               'SO-SPLIT-${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}-$ts-$splitIndex';
 
-          await db.into(db.salesOrders).insert(
+          await db
+              .into(db.salesOrders)
+              .insert(
                 SalesOrdersCompanion(
                   orderId: Value(splitOrderId),
                   orderNo: Value(splitOrderNo),
@@ -935,14 +1142,18 @@ class TableRoutes {
             final splitItem = splitItems[lineIndex];
             final sourceItem = itemById[splitItem['item_id'] as String]!;
             final quantity = splitItem['quantity'] as double;
-            final ratio = sourceItem.quantity == 0 ? 0 : quantity / sourceItem.quantity;
+            final ratio = sourceItem.quantity == 0
+                ? 0
+                : quantity / sourceItem.quantity;
             final newItemId = '${splitOrderId}_${lineIndex + 1}';
 
             final newDiscountAmount = sourceItem.discountAmount * ratio;
             final newAmount = sourceItem.amount * ratio;
             final newCost = sourceItem.cost * ratio;
 
-            await db.into(db.salesOrderItems).insert(
+            await db
+                .into(db.salesOrderItems)
+                .insert(
                   SalesOrderItemsCompanion(
                     itemId: Value(newItemId),
                     orderId: Value(splitOrderId),
@@ -967,16 +1178,19 @@ class TableRoutes {
                 );
 
             final sourceModifiers =
-                modifiersByItem[sourceItem.itemId] ?? const <OrderItemModifier>[];
-            for (var modifierIndex = 0;
-                modifierIndex < sourceModifiers.length;
-                modifierIndex++) {
+                modifiersByItem[sourceItem.itemId] ??
+                const <OrderItemModifier>[];
+            for (
+              var modifierIndex = 0;
+              modifierIndex < sourceModifiers.length;
+              modifierIndex++
+            ) {
               final modifier = sourceModifiers[modifierIndex];
-              await db.into(db.orderItemModifiers).insert(
+              await db
+                  .into(db.orderItemModifiers)
+                  .insert(
                     OrderItemModifiersCompanion(
-                      itemModifierId: Value(
-                        const Uuid().v4(),
-                      ),
+                      itemModifierId: Value(const Uuid().v4()),
                       orderItemId: Value(newItemId),
                       modifierId: Value(modifier.modifierId),
                       modifierName: Value(modifier.modifierName),
@@ -987,19 +1201,23 @@ class TableRoutes {
 
             final remainingQuantity = sourceItem.quantity - quantity;
             if (remainingQuantity <= 0.0001) {
-              await (db.delete(db.salesOrderItems)
-                    ..where((t) => t.itemId.equals(sourceItem.itemId)))
-                  .go();
+              await (db.delete(
+                db.salesOrderItems,
+              )..where((t) => t.itemId.equals(sourceItem.itemId))).go();
             } else {
               final remainingRatio = remainingQuantity / sourceItem.quantity;
-              await (db.update(db.salesOrderItems)
-                    ..where((t) => t.itemId.equals(sourceItem.itemId)))
-                  .write(SalesOrderItemsCompanion(
-                quantity: Value(remainingQuantity),
-                discountAmount: Value(sourceItem.discountAmount * remainingRatio),
-                amount: Value(sourceItem.amount * remainingRatio),
-                cost: Value(sourceItem.cost * remainingRatio),
-              ));
+              await (db.update(
+                db.salesOrderItems,
+              )..where((t) => t.itemId.equals(sourceItem.itemId))).write(
+                SalesOrderItemsCompanion(
+                  quantity: Value(remainingQuantity),
+                  discountAmount: Value(
+                    sourceItem.discountAmount * remainingRatio,
+                  ),
+                  amount: Value(sourceItem.amount * remainingRatio),
+                  cost: Value(sourceItem.cost * remainingRatio),
+                ),
+              );
             }
 
             touchedOrderIds.add(sourceItem.orderId);
@@ -1030,9 +1248,9 @@ class TableRoutes {
             serviceChargeRate: serviceChargeRate,
           );
 
-          final splitOrder = await (db.select(db.salesOrders)
-                ..where((o) => o.orderId.equals(splitOrderId)))
-              .getSingle();
+          final splitOrder = await (db.select(
+            db.salesOrders,
+          )..where((o) => o.orderId.equals(splitOrderId))).getSingle();
           createdSplits.add({
             'label': split['label'],
             'order_ids': [splitOrderId],
@@ -1045,16 +1263,18 @@ class TableRoutes {
         }
 
         for (final orderId in touchedOrderIds) {
-          final remainingItems = await (db.select(db.salesOrderItems)
-                ..where((i) => i.orderId.equals(orderId)))
-              .get();
+          final remainingItems = await (db.select(
+            db.salesOrderItems,
+          )..where((i) => i.orderId.equals(orderId))).get();
           if (remainingItems.isEmpty) {
-            await (db.update(db.salesOrders)
-                  ..where((o) => o.orderId.equals(orderId)))
-                .write(SalesOrdersCompanion(
-              status: const Value('CANCELLED'),
-              updatedAt: Value(DateTime.now()),
-            ));
+            await (db.update(
+              db.salesOrders,
+            )..where((o) => o.orderId.equals(orderId))).write(
+              SalesOrdersCompanion(
+                status: const Value('CANCELLED'),
+                updatedAt: Value(DateTime.now()),
+              ),
+            );
           } else {
             await _recalculateOrderTotals(
               orderId,
@@ -1068,15 +1288,20 @@ class TableRoutes {
           serviceChargeRate: serviceChargeRate,
         );
 
-        final remainingOpenOrders = await (db.select(db.salesOrders)
-              ..where((o) => o.tableId.equals(id) & o.status.equals('OPEN')))
-            .get();
-        await (db.update(db.diningTables)..where((t) => t.tableId.equals(id)))
-            .write(DiningTablesCompanion(
-          currentOrderId: Value(
-            remainingOpenOrders.isNotEmpty ? remainingOpenOrders.first.orderId : null,
+        final remainingOpenOrders = await (db.select(
+          db.salesOrders,
+        )..where((o) => o.tableId.equals(id) & o.status.equals('OPEN'))).get();
+        await (db.update(
+          db.diningTables,
+        )..where((t) => t.tableId.equals(id))).write(
+          DiningTablesCompanion(
+            currentOrderId: Value(
+              remainingOpenOrders.isNotEmpty
+                  ? remainingOpenOrders.first.orderId
+                  : null,
+            ),
           ),
-        ));
+        );
       });
 
       final total = createdSplits.fold<double>(
@@ -1100,67 +1325,125 @@ class TableRoutes {
   /// ย้าย items ทั้งหมดจาก source ไปรวมที่ order ปัจจุบันของ target
   Future<Response> _mergeTables(Request req) async {
     try {
-      final body =
-          jsonDecode(await req.readAsString()) as Map<String, dynamic>;
+      final body = jsonDecode(await req.readAsString()) as Map<String, dynamic>;
       final sourceId = body['source_table_id'] as String?;
       final targetId = body['target_table_id'] as String?;
 
       if (sourceId == null || targetId == null) {
-        return Response(400,
-            body: jsonEncode({
-              'success': false,
-              'message': 'ต้องระบุ source_table_id และ target_table_id',
-            }),
-            headers: {'content-type': 'application/json'});
+        return Response(
+          400,
+          body: jsonEncode({
+            'success': false,
+            'message': 'ต้องระบุ source_table_id และ target_table_id',
+          }),
+          headers: {'content-type': 'application/json'},
+        );
       }
 
-      final sourceSession = await (db.select(db.tableSessions)
-            ..where(
-                (s) => s.tableId.equals(sourceId) & s.status.equals('OPEN')))
-          .getSingleOrNull();
-      final targetSession = await (db.select(db.tableSessions)
-            ..where(
-                (s) => s.tableId.equals(targetId) & s.status.equals('OPEN')))
-          .getSingleOrNull();
+      final sourceSession =
+          await (db.select(db.tableSessions)..where(
+                (s) => s.tableId.equals(sourceId) & s.status.equals('OPEN'),
+              ))
+              .getSingleOrNull();
+      final targetSession =
+          await (db.select(db.tableSessions)..where(
+                (s) => s.tableId.equals(targetId) & s.status.equals('OPEN'),
+              ))
+              .getSingleOrNull();
 
       if (sourceSession == null || targetSession == null) {
-        return Response(400,
-            body: jsonEncode({
-              'success': false,
-              'message': 'ทั้งสองโต๊ะต้องเปิดอยู่',
-            }),
-            headers: {'content-type': 'application/json'});
+        return Response(
+          400,
+          body: jsonEncode({
+            'success': false,
+            'message': 'ทั้งสองโต๊ะต้องเปิดอยู่',
+          }),
+          headers: {'content-type': 'application/json'},
+        );
       }
 
       await db.transaction(() async {
+        await _logTableSessionEvent(
+          sessionId: sourceSession.sessionId,
+          tableId: sourceId,
+          eventType: 'merge_out',
+          description: 'รวมโต๊ะไปยัง $targetId',
+          payload: {
+            'source_table_id': sourceId,
+            'target_table_id': targetId,
+            'source_session_id': sourceSession.sessionId,
+            'target_session_id': targetSession.sessionId,
+          },
+        );
+        await _logTableSessionEvent(
+          sessionId: targetSession.sessionId,
+          tableId: targetId,
+          eventType: 'merge_in',
+          description: 'รับรวมโต๊ะจาก $sourceId',
+          payload: {
+            'source_table_id': sourceId,
+            'target_table_id': targetId,
+            'source_session_id': sourceSession.sessionId,
+            'target_session_id': targetSession.sessionId,
+          },
+        );
+
         // ย้าย orders ของ source ให้ชี้มาที่ targetSession
-        await (db.update(db.salesOrders)
-              ..where((o) =>
+        await (db.update(db.salesOrders)..where(
+              (o) =>
                   o.sessionId.equals(sourceSession.sessionId) &
-                  o.status.equals('OPEN')))
-            .write(SalesOrdersCompanion(
-          tableId: Value(targetId),
-          sessionId: Value(targetSession.sessionId),
-        ));
+                  o.status.equals('OPEN'),
+            ))
+            .write(
+              SalesOrdersCompanion(
+                tableId: Value(targetId),
+                sessionId: Value(targetSession.sessionId),
+              ),
+            );
 
         // ปิด source session
-        await (db.update(db.tableSessions)
-              ..where((s) => s.sessionId.equals(sourceSession.sessionId)))
-            .write(TableSessionsCompanion(
-          status: const Value('CLOSED'),
-          closedAt: Value(DateTime.now()),
-          note: const Value('ย้ายรวมโต๊ะ'),
-        ));
+        await (db.update(
+          db.tableSessions,
+        )..where((s) => s.sessionId.equals(sourceSession.sessionId))).write(
+          TableSessionsCompanion(
+            status: const Value('CLOSED'),
+            closedAt: Value(DateTime.now()),
+            note: const Value('ย้ายรวมโต๊ะ'),
+          ),
+        );
 
         // source table → CLEANING
-        await (db.update(db.diningTables)
-              ..where((t) => t.tableId.equals(sourceId)))
-            .write(const DiningTablesCompanion(
-          status: Value('CLEANING'),
-          currentOrderId: Value(null),
-        ));
+        await (db.update(
+          db.diningTables,
+        )..where((t) => t.tableId.equals(sourceId))).write(
+          const DiningTablesCompanion(
+            status: Value('CLEANING'),
+            currentOrderId: Value(null),
+          ),
+        );
+
+        final targetOrders =
+            await (db.select(db.salesOrders)
+                  ..where(
+                    (o) =>
+                        o.tableId.equals(targetId) &
+                        o.sessionId.equals(targetSession.sessionId) &
+                        o.status.equals('OPEN'),
+                  )
+                  ..orderBy([(o) => OrderingTerm.asc(o.createdAt)]))
+                .get();
+        await (db.update(
+          db.diningTables,
+        )..where((t) => t.tableId.equals(targetId))).write(
+          DiningTablesCompanion(
+            currentOrderId: Value(
+              targetOrders.isNotEmpty ? targetOrders.first.orderId : null,
+            ),
+          ),
+        );
       });
 
+      TableRoutes.bumpVersion();
       return _ok({
         'merged': true,
         'source_table_id': sourceId,
@@ -1172,23 +1455,68 @@ class TableRoutes {
     }
   }
 
+  // ── Version endpoint ─────────────────────────────────────────────────────
+
+  Future<Response> _getVersion(Request req) async => _ok({
+    'version': _tableVersion,
+    'ts': DateTime.now().millisecondsSinceEpoch,
+  });
+
   // ── Helpers ────────────────────────────────────────────────────────────────
 
+  /// Deterministic hash of the current open-bill items for optimistic locking.
+  String _billToken(List<SalesOrderItem> items) {
+    final sorted = [...items]..sort((a, b) => a.itemId.compareTo(b.itemId));
+    final payload = sorted
+        .map((i) => '${i.itemId}:${i.quantity}:${i.amount}')
+        .join(',');
+    return sha256.convert(utf8.encode(payload)).toString().substring(0, 16);
+  }
+
   Response _ok(dynamic data, {int statusCode = 200}) => Response(
-        statusCode,
-        body: jsonEncode({'success': true, 'data': data}),
-        headers: {'content-type': 'application/json'},
-      );
+    statusCode,
+    body: jsonEncode({'success': true, 'data': data}),
+    headers: {'content-type': 'application/json'},
+  );
+
+  Future<void> _logTableSessionEvent({
+    required String sessionId,
+    required String tableId,
+    required String eventType,
+    required String description,
+    Map<String, dynamic>? payload,
+    DateTime? eventAt,
+  }) async {
+    await db.customStatement(
+      '''
+      INSERT INTO table_session_events (
+        event_id,
+        session_id,
+        table_id,
+        event_type,
+        event_at,
+        description,
+        payload_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      ''',
+      <Object?>[
+        const Uuid().v4(),
+        sessionId,
+        tableId,
+        eventType,
+        (eventAt ?? DateTime.now()).toIso8601String(),
+        description,
+        payload == null ? null : jsonEncode(payload),
+      ],
+    );
+  }
 
   Future<void> _recalculateServiceChargeForOrders(
     List<SalesOrder> orders,
     double rate,
   ) async {
     for (final order in orders) {
-      await _recalculateOrderTotals(
-        order.orderId,
-        serviceChargeRate: rate,
-      );
+      await _recalculateOrderTotals(order.orderId, serviceChargeRate: rate);
     }
   }
 
@@ -1196,9 +1524,9 @@ class TableRoutes {
     String tableId, {
     required double serviceChargeRate,
   }) async {
-    final openOrders = await (db.select(db.salesOrders)
-          ..where((o) => o.tableId.equals(tableId) & o.status.equals('OPEN')))
-        .get();
+    final openOrders = await (db.select(
+      db.salesOrders,
+    )..where((o) => o.tableId.equals(tableId) & o.status.equals('OPEN'))).get();
     for (final order in openOrders) {
       await _recalculateOrderTotals(
         order.orderId,
@@ -1211,14 +1539,14 @@ class TableRoutes {
     String orderId, {
     double? serviceChargeRate,
   }) async {
-    final order = await (db.select(db.salesOrders)
-          ..where((o) => o.orderId.equals(orderId)))
-        .getSingleOrNull();
+    final order = await (db.select(
+      db.salesOrders,
+    )..where((o) => o.orderId.equals(orderId))).getSingleOrNull();
     if (order == null) return;
 
-    final items = await (db.select(db.salesOrderItems)
-          ..where((i) => i.orderId.equals(orderId)))
-        .get();
+    final items = await (db.select(
+      db.salesOrderItems,
+    )..where((i) => i.orderId.equals(orderId))).get();
 
     final subtotal = items.fold<double>(
       0,
@@ -1233,16 +1561,19 @@ class TableRoutes {
     final serviceChargeAmount = netAmount * rate / 100;
     final totalAmount = netAmount + order.vatAmount + serviceChargeAmount;
 
-    await (db.update(db.salesOrders)..where((o) => o.orderId.equals(orderId)))
-        .write(SalesOrdersCompanion(
-      subtotal: Value(subtotal),
-      discountAmount: Value(discountAmount),
-      amountBeforeVat: Value(netAmount),
-      serviceChargeRate: Value(rate),
-      serviceChargeAmount: Value(serviceChargeAmount),
-      totalAmount: Value(totalAmount),
-      updatedAt: Value(DateTime.now()),
-    ));
+    await (db.update(
+      db.salesOrders,
+    )..where((o) => o.orderId.equals(orderId))).write(
+      SalesOrdersCompanion(
+        subtotal: Value(subtotal),
+        discountAmount: Value(discountAmount),
+        amountBeforeVat: Value(netAmount),
+        serviceChargeRate: Value(rate),
+        serviceChargeAmount: Value(serviceChargeAmount),
+        totalAmount: Value(totalAmount),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
   }
 
   // ── R4: Waiter Assignment ─────────────────────────────────────────────────
@@ -1255,23 +1586,43 @@ class TableRoutes {
       final waiterId = body['waiter_id'] as String?;
       final waiterName = body['waiter_name'] as String?;
 
-      final session = await (db.select(db.tableSessions)
-            ..where((s) => s.tableId.equals(id) & s.status.equals('OPEN')))
-          .getSingleOrNull();
+      final session =
+          await (db.select(db.tableSessions)
+                ..where((s) => s.tableId.equals(id) & s.status.equals('OPEN')))
+              .getSingleOrNull();
       if (session == null) {
-        return Response(404,
-            body: jsonEncode({'success': false, 'message': 'ไม่พบ session ที่เปิดอยู่'}),
-            headers: {'content-type': 'application/json'});
+        return Response(
+          404,
+          body: jsonEncode({
+            'success': false,
+            'message': 'ไม่พบ session ที่เปิดอยู่',
+          }),
+          headers: {'content-type': 'application/json'},
+        );
       }
 
-      await (db.update(db.tableSessions)
-            ..where((s) => s.sessionId.equals(session.sessionId)))
-          .write(TableSessionsCompanion(
-        waiterId: Value(waiterId),
-        waiterName: Value(waiterName),
-      ));
+      await (db.update(
+        db.tableSessions,
+      )..where((s) => s.sessionId.equals(session.sessionId))).write(
+        TableSessionsCompanion(
+          waiterId: Value(waiterId),
+          waiterName: Value(waiterName),
+        ),
+      );
+      await _logTableSessionEvent(
+        sessionId: session.sessionId,
+        tableId: id,
+        eventType: 'waiter',
+        description: 'พนักงานเสิร์ฟ: ${waiterName ?? waiterId ?? '-'}',
+        payload: {'waiter_id': waiterId, 'waiter_name': waiterName},
+      );
 
-      return _ok({'session_id': session.sessionId, 'waiter_id': waiterId, 'waiter_name': waiterName});
+      TableRoutes.bumpVersion();
+      return _ok({
+        'session_id': session.sessionId,
+        'waiter_id': waiterId,
+        'waiter_name': waiterName,
+      });
     } catch (e) {
       return _err(e);
     }
@@ -1284,19 +1635,26 @@ class TableRoutes {
       final body = jsonDecode(await req.readAsString()) as Map<String, dynamic>;
       final guestCount = body['guest_count'] as int? ?? 1;
 
-      final session = await (db.select(db.tableSessions)
-            ..where((s) => s.tableId.equals(id) & s.status.equals('OPEN')))
-          .getSingleOrNull();
+      final session =
+          await (db.select(db.tableSessions)
+                ..where((s) => s.tableId.equals(id) & s.status.equals('OPEN')))
+              .getSingleOrNull();
       if (session == null) {
-        return Response(404,
-            body: jsonEncode({'success': false, 'message': 'ไม่พบ session ที่เปิดอยู่'}),
-            headers: {'content-type': 'application/json'});
+        return Response(
+          404,
+          body: jsonEncode({
+            'success': false,
+            'message': 'ไม่พบ session ที่เปิดอยู่',
+          }),
+          headers: {'content-type': 'application/json'},
+        );
       }
 
       await (db.update(db.tableSessions)
             ..where((s) => s.sessionId.equals(session.sessionId)))
           .write(TableSessionsCompanion(guestCount: Value(guestCount)));
 
+      TableRoutes.bumpVersion();
       return _ok({'session_id': session.sessionId, 'guest_count': guestCount});
     } catch (e) {
       return _err(e);
@@ -1313,37 +1671,57 @@ class TableRoutes {
       final body = jsonDecode(await req.readAsString()) as Map<String, dynamic>;
       final courseNo = body['course_no'] as int? ?? 1;
 
-      final session = await (db.select(db.tableSessions)
-            ..where((s) => s.tableId.equals(id) & s.status.equals('OPEN')))
-          .getSingleOrNull();
+      final session =
+          await (db.select(db.tableSessions)
+                ..where((s) => s.tableId.equals(id) & s.status.equals('OPEN')))
+              .getSingleOrNull();
       if (session == null) {
-        return Response(404,
-            body: jsonEncode({'success': false, 'message': 'ไม่พบ session ที่เปิดอยู่'}),
-            headers: {'content-type': 'application/json'});
+        return Response(
+          404,
+          body: jsonEncode({
+            'success': false,
+            'message': 'ไม่พบ session ที่เปิดอยู่',
+          }),
+          headers: {'content-type': 'application/json'},
+        );
       }
 
-      final orders = await (db.select(db.salesOrders)
-            ..where((o) =>
-                o.sessionId.equals(session.sessionId) & o.status.equals('OPEN')))
-          .get();
+      final orders =
+          await (db.select(db.salesOrders)..where(
+                (o) =>
+                    o.sessionId.equals(session.sessionId) &
+                    o.status.equals('OPEN'),
+              ))
+              .get();
       final orderIds = orders.map((o) => o.orderId).toList();
 
       int firedCount = 0;
       for (final orderId in orderIds) {
-        final items = await (db.select(db.salesOrderItems)
-              ..where((i) =>
-                  i.orderId.equals(orderId) &
-                  i.courseNo.equals(courseNo) &
-                  i.kitchenStatus.equals('HELD')))
-            .get();
+        final items =
+            await (db.select(db.salesOrderItems)..where(
+                  (i) =>
+                      i.orderId.equals(orderId) &
+                      i.courseNo.equals(courseNo) &
+                      i.kitchenStatus.equals('HELD'),
+                ))
+                .get();
         for (final item in items) {
-          await (db.update(db.salesOrderItems)
-                ..where((i) => i.itemId.equals(item.itemId)))
-              .write(const SalesOrderItemsCompanion(
-            kitchenStatus: Value('PENDING'),
-          ));
+          await (db.update(
+            db.salesOrderItems,
+          )..where((i) => i.itemId.equals(item.itemId))).write(
+            const SalesOrderItemsCompanion(kitchenStatus: Value('PENDING')),
+          );
           firedCount++;
         }
+      }
+      if (firedCount > 0) {
+        await _logTableSessionEvent(
+          sessionId: session.sessionId,
+          tableId: id,
+          eventType: 'fire_course',
+          description: 'ยิงคอร์ส $courseNo เข้าครัว ($firedCount รายการ)',
+          payload: {'course_no': courseNo, 'fired_count': firedCount},
+        );
       }
 
       return _ok({'fired': firedCount, 'course_no': courseNo, 'table_id': id});
@@ -1357,55 +1735,85 @@ class TableRoutes {
   // GET /api/tables/:id/timeline
   Future<Response> _getTimeline(Request req, String id) async {
     try {
-      final sessions = await (db.select(db.tableSessions)
-            ..where((s) => s.tableId.equals(id))
-            ..orderBy([
-              (s) => OrderingTerm(expression: s.openedAt, mode: OrderingMode.desc),
-            ]))
-          .get();
+      final sessions =
+          await (db.select(db.tableSessions)
+                ..where((s) => s.tableId.equals(id))
+                ..orderBy([
+                  (s) => OrderingTerm(
+                    expression: s.openedAt,
+                    mode: OrderingMode.desc,
+                  ),
+                ]))
+              .get();
       if (sessions.isEmpty) {
-        return Response(404,
-            body: jsonEncode({'success': false, 'message': 'ไม่พบ timeline ของโต๊ะนี้'}),
-            headers: {'content-type': 'application/json'});
+        return Response(
+          404,
+          body: jsonEncode({
+            'success': false,
+            'message': 'ไม่พบ timeline ของโต๊ะนี้',
+          }),
+          headers: {'content-type': 'application/json'},
+        );
       }
       final session = sessions.firstWhere(
         (s) => s.status == 'OPEN',
         orElse: () => sessions.first,
       );
 
-      final table = await (db.select(db.diningTables)
-            ..where((t) => t.tableId.equals(id)))
-          .getSingleOrNull();
+      final table = await (db.select(
+        db.diningTables,
+      )..where((t) => t.tableId.equals(id))).getSingleOrNull();
 
-      final orders = await (db.select(db.salesOrders)
-            ..where((o) => o.sessionId.equals(session.sessionId))
-            ..orderBy([(o) => OrderingTerm.asc(o.createdAt)]))
-          .get();
+      final orders =
+          await (db.select(db.salesOrders)
+                ..where((o) => o.sessionId.equals(session.sessionId))
+                ..orderBy([(o) => OrderingTerm.asc(o.createdAt)]))
+              .get();
 
       final events = <Map<String, dynamic>>[];
-
-      events.add({
-        'type': 'opened',
-        'timestamp': session.openedAt.toIso8601String(),
-        'description': 'เปิดโต๊ะ ${table?.tableDisplayName ?? id}'
-            '${session.guestCount > 0 ? ' (${session.guestCount} คน)' : ''}',
-        'data': {'guest_count': session.guestCount, 'opened_by': session.openedBy},
-      });
-
-      if (session.waiterId != null) {
+      final sessionEventRows = await db
+          .customSelect(
+            '''
+        SELECT event_type, event_at, description, payload_json
+        FROM table_session_events
+        WHERE session_id = ?
+        ORDER BY event_at ASC, created_at ASC
+        ''',
+            variables: [Variable.withString(session.sessionId)],
+          )
+          .get();
+      for (final row in sessionEventRows) {
+        final payloadJson = row.read<String?>('payload_json');
         events.add({
-          'type': 'waiter',
-          'timestamp': session.createdAt.toIso8601String(),
-          'description': 'พนักงานเสิร์ฟ: ${session.waiterName ?? session.waiterId}',
-          'data': {'waiter_id': session.waiterId, 'waiter_name': session.waiterName},
+          'type': row.read<String>('event_type'),
+          'timestamp': row.read<String>('event_at'),
+          'description': row.read<String>('description'),
+          'data': payloadJson != null && payloadJson.isNotEmpty
+              ? jsonDecode(payloadJson) as Map<String, dynamic>
+              : <String, dynamic>{},
+        });
+      }
+      final hasOpenedEvent = events.any((event) => event['type'] == 'opened');
+      if (!hasOpenedEvent) {
+        events.add({
+          'type': 'opened',
+          'timestamp': session.openedAt.toIso8601String(),
+          'description':
+              'เปิดโต๊ะ ${table?.tableDisplayName ?? id}'
+              '${session.guestCount > 0 ? ' (${session.guestCount} คน)' : ''}',
+          'data': {
+            'guest_count': session.guestCount,
+            'opened_by': session.openedBy,
+          },
         });
       }
 
       for (final order in orders) {
-        final items = await (db.select(db.salesOrderItems)
-              ..where((i) => i.orderId.equals(order.orderId))
-              ..orderBy([(i) => OrderingTerm.asc(i.lineNo)]))
-            .get();
+        final items =
+            await (db.select(db.salesOrderItems)
+                  ..where((i) => i.orderId.equals(order.orderId))
+                  ..orderBy([(i) => OrderingTerm.asc(i.lineNo)]))
+                .get();
 
         events.add({
           'type': 'order',
@@ -1416,12 +1824,16 @@ class TableRoutes {
             'order_no': order.orderNo,
             'item_count': items.length,
             'total': order.totalAmount,
-            'items': items.map((i) => {
-              'name': i.productName,
-              'qty': i.quantity,
-              'course_no': i.courseNo,
-              'kitchen_status': i.kitchenStatus,
-            }).toList(),
+            'items': items
+                .map(
+                  (i) => {
+                    'name': i.productName,
+                    'qty': i.quantity,
+                    'course_no': i.courseNo,
+                    'kitchen_status': i.kitchenStatus,
+                  },
+                )
+                .toList(),
           },
         });
 
@@ -1447,20 +1859,10 @@ class TableRoutes {
         }
       }
 
-      if (session.closedAt != null) {
-        events.add({
-          'type': 'closed',
-          'timestamp': session.closedAt!.toIso8601String(),
-          'description': 'ปิด session ของโต๊ะนี้แล้ว',
-          'data': {
-            'session_id': session.sessionId,
-            'status': session.status,
-          },
-        });
-      }
-
-      events.sort((a, b) =>
-          (a['timestamp'] as String).compareTo(b['timestamp'] as String));
+      events.sort(
+        (a, b) =>
+            (a['timestamp'] as String).compareTo(b['timestamp'] as String),
+      );
 
       return _ok({
         'session_id': session.sessionId,
@@ -1481,7 +1883,10 @@ class TableRoutes {
 
   // ── R4: Reservations ──────────────────────────────────────────────────────
 
-  Map<String, dynamic> _reservationToJson(TableReservation r, {String? tableName}) => {
+  Map<String, dynamic> _reservationToJson(
+    TableReservation r, {
+    String? tableName,
+  }) => {
     'reservation_id': r.reservationId,
     'table_id': r.tableId,
     'table_name': tableName,
@@ -1503,6 +1908,7 @@ class TableRoutes {
       final branchId = params['branch_id'];
       final dateStr = params['date'];
       final status = params['status'];
+      final searchQuery = (params['query'] ?? '').trim().toLowerCase();
 
       var query = db.select(db.tableReservations);
       query.where((r) {
@@ -1520,21 +1926,44 @@ class TableRoutes {
         if (date != null) {
           reservations = reservations.where((r) {
             final rt = r.reservationTime;
-            return rt.year == date.year && rt.month == date.month && rt.day == date.day;
+            return rt.year == date.year &&
+                rt.month == date.month &&
+                rt.day == date.day;
           }).toList();
         }
       }
 
-      final tableIds = reservations.map((r) => r.tableId).whereType<String>().toSet();
+      if (searchQuery.isNotEmpty) {
+        reservations = reservations.where((r) {
+          final customerName = r.customerName.toLowerCase();
+          final customerPhone = (r.customerPhone ?? '').toLowerCase();
+          return customerName.contains(searchQuery) ||
+              customerPhone.contains(searchQuery);
+        }).toList();
+      }
+
+      final tableIds = reservations
+          .map((r) => r.tableId)
+          .whereType<String>()
+          .toSet();
       final tableMap = <String, String>{};
       for (final tid in tableIds) {
-        final t = await (db.select(db.diningTables)..where((t) => t.tableId.equals(tid))).getSingleOrNull();
+        final t = await (db.select(
+          db.diningTables,
+        )..where((t) => t.tableId.equals(tid))).getSingleOrNull();
         if (t != null) tableMap[tid] = t.tableDisplayName ?? t.tableNo;
       }
 
-      return _ok(reservations
-          .map((r) => _reservationToJson(r, tableName: r.tableId != null ? tableMap[r.tableId] : null))
-          .toList());
+      return _ok(
+        reservations
+            .map(
+              (r) => _reservationToJson(
+                r,
+                tableName: r.tableId != null ? tableMap[r.tableId] : null,
+              ),
+            )
+            .toList(),
+      );
     } catch (e) {
       return _err(e);
     }
@@ -1545,23 +1974,29 @@ class TableRoutes {
     try {
       final body = jsonDecode(await req.readAsString()) as Map<String, dynamic>;
       final id = const Uuid().v4();
-      final reservationTime = DateTime.parse(body['reservation_time'] as String);
+      final reservationTime = DateTime.parse(
+        body['reservation_time'] as String,
+      );
 
-      await db.into(db.tableReservations).insert(TableReservationsCompanion(
-        reservationId: Value(id),
-        tableId: Value(body['table_id'] as String?),
-        branchId: Value(body['branch_id'] as String),
-        customerName: Value(body['customer_name'] as String),
-        customerPhone: Value(body['customer_phone'] as String?),
-        reservationTime: Value(reservationTime),
-        partySize: Value(body['party_size'] as int? ?? 2),
-        notes: Value(body['notes'] as String?),
-        status: const Value('PENDING'),
-      ));
+      await db
+          .into(db.tableReservations)
+          .insert(
+            TableReservationsCompanion(
+              reservationId: Value(id),
+              tableId: Value(body['table_id'] as String?),
+              branchId: Value(body['branch_id'] as String),
+              customerName: Value(body['customer_name'] as String),
+              customerPhone: Value(body['customer_phone'] as String?),
+              reservationTime: Value(reservationTime),
+              partySize: Value(body['party_size'] as int? ?? 2),
+              notes: Value(body['notes'] as String?),
+              status: const Value('PENDING'),
+            ),
+          );
 
-      final created = await (db.select(db.tableReservations)
-            ..where((r) => r.reservationId.equals(id)))
-          .getSingle();
+      final created = await (db.select(
+        db.tableReservations,
+      )..where((r) => r.reservationId.equals(id))).getSingle();
       return _ok(_reservationToJson(created), statusCode: 201);
     } catch (e) {
       return _err(e);
@@ -1573,17 +2008,31 @@ class TableRoutes {
     try {
       final body = jsonDecode(await req.readAsString()) as Map<String, dynamic>;
       final companion = TableReservationsCompanion(
-        tableId: body.containsKey('table_id') ? Value(body['table_id'] as String?) : const Value.absent(),
-        customerName: body.containsKey('customer_name') ? Value(body['customer_name'] as String) : const Value.absent(),
-        customerPhone: body.containsKey('customer_phone') ? Value(body['customer_phone'] as String?) : const Value.absent(),
+        tableId: body.containsKey('table_id')
+            ? Value(body['table_id'] as String?)
+            : const Value.absent(),
+        customerName: body.containsKey('customer_name')
+            ? Value(body['customer_name'] as String)
+            : const Value.absent(),
+        customerPhone: body.containsKey('customer_phone')
+            ? Value(body['customer_phone'] as String?)
+            : const Value.absent(),
         reservationTime: body.containsKey('reservation_time')
             ? Value(DateTime.parse(body['reservation_time'] as String))
             : const Value.absent(),
-        partySize: body.containsKey('party_size') ? Value(body['party_size'] as int) : const Value.absent(),
-        notes: body.containsKey('notes') ? Value(body['notes'] as String?) : const Value.absent(),
+        partySize: body.containsKey('party_size')
+            ? Value(body['party_size'] as int)
+            : const Value.absent(),
+        notes: body.containsKey('notes')
+            ? Value(body['notes'] as String?)
+            : const Value.absent(),
       );
-      await (db.update(db.tableReservations)..where((r) => r.reservationId.equals(rid))).write(companion);
-      final updated = await (db.select(db.tableReservations)..where((r) => r.reservationId.equals(rid))).getSingle();
+      await (db.update(
+        db.tableReservations,
+      )..where((r) => r.reservationId.equals(rid))).write(companion);
+      final updated = await (db.select(
+        db.tableReservations,
+      )..where((r) => r.reservationId.equals(rid))).getSingle();
       return _ok(_reservationToJson(updated));
     } catch (e) {
       return _err(e);
@@ -1591,9 +2040,12 @@ class TableRoutes {
   }
 
   Future<Response> _setReservationStatus(String rid, String newStatus) async {
-    await (db.update(db.tableReservations)..where((r) => r.reservationId.equals(rid)))
+    await (db.update(db.tableReservations)
+          ..where((r) => r.reservationId.equals(rid)))
         .write(TableReservationsCompanion(status: Value(newStatus)));
-    final updated = await (db.select(db.tableReservations)..where((r) => r.reservationId.equals(rid))).getSingle();
+    final updated = await (db.select(
+      db.tableReservations,
+    )..where((r) => r.reservationId.equals(rid))).getSingle();
     return _ok(_reservationToJson(updated));
   }
 
@@ -1609,7 +2061,31 @@ class TableRoutes {
   // POST /api/tables/reservations/:rid/cancel
   Future<Response> _cancelReservation(Request req, String rid) async {
     try {
-      return await _setReservationStatus(rid, 'CANCELLED');
+      final reservation = await (db.select(
+        db.tableReservations,
+      )..where((r) => r.reservationId.equals(rid))).getSingleOrNull();
+
+      await (db.update(db.tableReservations)
+            ..where((r) => r.reservationId.equals(rid)))
+          .write(const TableReservationsCompanion(status: Value('CANCELLED')));
+
+      // คืนสถานะโต๊ะเป็น AVAILABLE ถ้าโต๊ะยังอยู่ใน RESERVED
+      if (reservation?.tableId != null) {
+        final table =
+            await (db.select(db.diningTables)
+                  ..where((t) => t.tableId.equals(reservation!.tableId!)))
+                .getSingleOrNull();
+        if (table != null && table.status == 'RESERVED') {
+          await (db.update(db.diningTables)
+                ..where((t) => t.tableId.equals(table.tableId)))
+              .write(const DiningTablesCompanion(status: Value('AVAILABLE')));
+        }
+      }
+
+      final updated = await (db.select(
+        db.tableReservations,
+      )..where((r) => r.reservationId.equals(rid))).getSingle();
+      return _ok(_reservationToJson(updated));
     } catch (e) {
       return _err(e);
     }
@@ -1618,7 +2094,31 @@ class TableRoutes {
   // POST /api/tables/reservations/:rid/no-show
   Future<Response> _noShowReservation(Request req, String rid) async {
     try {
-      return await _setReservationStatus(rid, 'NO_SHOW');
+      final reservation = await (db.select(
+        db.tableReservations,
+      )..where((r) => r.reservationId.equals(rid))).getSingleOrNull();
+
+      await (db.update(db.tableReservations)
+            ..where((r) => r.reservationId.equals(rid)))
+          .write(const TableReservationsCompanion(status: Value('NO_SHOW')));
+
+      // ถ้าการจองผูกกับโต๊ะและโต๊ะยังอยู่ในสถานะ RESERVED → เปลี่ยนกลับเป็น AVAILABLE
+      if (reservation?.tableId != null) {
+        final table =
+            await (db.select(db.diningTables)
+                  ..where((t) => t.tableId.equals(reservation!.tableId!)))
+                .getSingleOrNull();
+        if (table != null && table.status == 'RESERVED') {
+          await (db.update(db.diningTables)
+                ..where((t) => t.tableId.equals(table.tableId)))
+              .write(const DiningTablesCompanion(status: Value('AVAILABLE')));
+        }
+      }
+
+      final updated = await (db.select(
+        db.tableReservations,
+      )..where((r) => r.reservationId.equals(rid))).getSingle();
+      return _ok(_reservationToJson(updated));
     } catch (e) {
       return _err(e);
     }
@@ -1630,88 +2130,141 @@ class TableRoutes {
     try {
       final body = jsonDecode(await req.readAsString()) as Map<String, dynamic>;
 
-      final reservation = await (db.select(db.tableReservations)
-            ..where((r) => r.reservationId.equals(rid)))
-          .getSingleOrNull();
+      final reservation = await (db.select(
+        db.tableReservations,
+      )..where((r) => r.reservationId.equals(rid))).getSingleOrNull();
       if (reservation == null) {
-        return Response(404,
-            body: jsonEncode({'success': false, 'message': 'ไม่พบการจอง'}),
-            headers: {'content-type': 'application/json'});
+        return Response(
+          404,
+          body: jsonEncode({'success': false, 'message': 'ไม่พบการจอง'}),
+          headers: {'content-type': 'application/json'},
+        );
       }
       if (reservation.status == 'CANCELLED' ||
           reservation.status == 'NO_SHOW') {
-        return Response(400,
-            body: jsonEncode({
-              'success': false,
-              'message': 'การจองนี้ไม่สามารถนำเข้านั่งได้แล้ว (${reservation.status})',
-            }),
-            headers: {'content-type': 'application/json'});
+        return Response(
+          400,
+          body: jsonEncode({
+            'success': false,
+            'message':
+                'การจองนี้ไม่สามารถนำเข้านั่งได้แล้ว (${reservation.status})',
+          }),
+          headers: {'content-type': 'application/json'},
+        );
       }
       if (reservation.status == 'SEATED') {
-        return Response(400,
-            body: jsonEncode({
-              'success': false,
-              'message': 'การจองนี้ถูกนำเข้านั่งแล้ว',
-            }),
-            headers: {'content-type': 'application/json'});
+        return Response(
+          400,
+          body: jsonEncode({
+            'success': false,
+            'message': 'การจองนี้ถูกนำเข้านั่งแล้ว',
+          }),
+          headers: {'content-type': 'application/json'},
+        );
       }
 
       final tableId = body['table_id'] as String? ?? reservation.tableId;
       if (tableId == null) {
-        return Response(400,
-            body: jsonEncode({'success': false, 'message': 'ต้องระบุ table_id'}),
-            headers: {'content-type': 'application/json'});
+        return Response(
+          400,
+          body: jsonEncode({'success': false, 'message': 'ต้องระบุ table_id'}),
+          headers: {'content-type': 'application/json'},
+        );
       }
 
-      final table = await (db.select(db.diningTables)
-            ..where((t) => t.tableId.equals(tableId)))
-          .getSingleOrNull();
+      final table = await (db.select(
+        db.diningTables,
+      )..where((t) => t.tableId.equals(tableId))).getSingleOrNull();
       if (table == null) {
-        return Response(404,
-            body: jsonEncode({'success': false, 'message': 'ไม่พบโต๊ะที่เลือก'}),
-            headers: {'content-type': 'application/json'});
+        return Response(
+          404,
+          body: jsonEncode({'success': false, 'message': 'ไม่พบโต๊ะที่เลือก'}),
+          headers: {'content-type': 'application/json'},
+        );
       }
-      final zone = await (db.select(db.zones)
-            ..where((z) => z.zoneId.equals(table.zoneId)))
-          .getSingleOrNull();
-      final existing = await (db.select(db.tableSessions)
-            ..where((s) => s.tableId.equals(tableId) & s.status.equals('OPEN')))
-          .getSingleOrNull();
+      final zone = await (db.select(
+        db.zones,
+      )..where((z) => z.zoneId.equals(table.zoneId))).getSingleOrNull();
+      final existing =
+          await (db.select(db.tableSessions)..where(
+                (s) => s.tableId.equals(tableId) & s.status.equals('OPEN'),
+              ))
+              .getSingleOrNull();
       if (existing != null) {
-        return Response(409,
-            body: jsonEncode({
-              'success': false,
-              'message': 'โต๊ะนี้มี session ที่เปิดอยู่แล้ว',
-            }),
-            headers: {'content-type': 'application/json'});
+        return Response(
+          409,
+          body: jsonEncode({
+            'success': false,
+            'message': 'โต๊ะนี้มี session ที่เปิดอยู่แล้ว',
+          }),
+          headers: {'content-type': 'application/json'},
+        );
       }
 
       final sessionId = const Uuid().v4();
       final branchId =
-          zone?.branchId ?? body['branch_id'] as String? ?? reservation.branchId;
-      await db.into(db.tableSessions).insert(TableSessionsCompanion(
-        sessionId: Value(sessionId),
-        tableId: Value(tableId),
-        branchId: Value(branchId),
-        guestCount: Value(reservation.partySize),
-        status: const Value('OPEN'),
-        openedBy: Value(body['opened_by'] as String?),
-        note: Value('มาจาก reservation ${reservation.reservationId}'),
-      ));
-      await (db.update(db.diningTables)..where((t) => t.tableId.equals(tableId)))
-          .write(DiningTablesCompanion(
-        status: const Value('OCCUPIED'),
-        lastOccupiedAt: Value(DateTime.now()),
-      ));
+          zone?.branchId ??
+          body['branch_id'] as String? ??
+          reservation.branchId;
+      await db
+          .into(db.tableSessions)
+          .insert(
+            TableSessionsCompanion(
+              sessionId: Value(sessionId),
+              tableId: Value(tableId),
+              branchId: Value(branchId),
+              guestCount: Value(reservation.partySize),
+              status: const Value('OPEN'),
+              openedBy: Value(body['opened_by'] as String?),
+              note: Value('มาจาก reservation ${reservation.reservationId}'),
+            ),
+          );
+      await (db.update(
+        db.diningTables,
+      )..where((t) => t.tableId.equals(tableId))).write(
+        DiningTablesCompanion(
+          status: const Value('OCCUPIED'),
+          lastOccupiedAt: Value(DateTime.now()),
+        ),
+      );
+      await _logTableSessionEvent(
+        sessionId: sessionId,
+        tableId: tableId,
+        eventType: 'opened',
+        description:
+            'เปิดโต๊ะจาก reservation ${reservation.customerName} (${reservation.partySize} คน)',
+        payload: {
+          'guest_count': reservation.partySize,
+          'reservation_id': reservation.reservationId,
+          'opened_by': body['opened_by'] as String?,
+        },
+      );
+      await _logTableSessionEvent(
+        sessionId: sessionId,
+        tableId: tableId,
+        eventType: 'reservation_seated',
+        description: 'นำลูกค้าจากการจองเข้านั่งแล้ว',
+        payload: {
+          'reservation_id': reservation.reservationId,
+          'customer_name': reservation.customerName,
+        },
+      );
 
-      await (db.update(db.tableReservations)..where((r) => r.reservationId.equals(rid)))
-          .write(TableReservationsCompanion(
-        status: const Value('SEATED'),
-        sessionId: Value(sessionId),
-        tableId: Value(tableId),
-      ));
+      await (db.update(
+        db.tableReservations,
+      )..where((r) => r.reservationId.equals(rid))).write(
+        TableReservationsCompanion(
+          status: const Value('SEATED'),
+          sessionId: Value(sessionId),
+          tableId: Value(tableId),
+        ),
+      );
 
-      return _ok({'reservation_id': rid, 'session_id': sessionId, 'table_id': tableId});
+      return _ok({
+        'reservation_id': rid,
+        'session_id': sessionId,
+        'table_id': tableId,
+      });
     } catch (e) {
       return _err(e);
     }

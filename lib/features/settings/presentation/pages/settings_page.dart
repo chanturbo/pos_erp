@@ -21,6 +21,7 @@ import '../../../../core/services/backup/backup_service.dart';
 import '../../../../core/services/backup/google_drive_backup_service.dart';
 import '../../../../core/services/backup/models/backup_result.dart';
 import '../../../../routes/app_router.dart';
+import '../../../../core/utils/crypto_utils.dart';
 import '../../shared/settings_defaults.dart';
 
 // ─────────────────────────────────────────────────────────────────
@@ -100,6 +101,8 @@ class SettingsState {
     this.managerPin = '',
     this.autoPrintKitchenTicket = false,
   });
+
+  bool get managerPinConfigured => managerPin.isNotEmpty;
 
   int get listPageSize => ResponsiveSettings.pick(
     mobile: listPageSizeMobile,
@@ -305,7 +308,10 @@ class SettingsNotifier extends Notifier<SettingsState> {
       await prefs.setDouble('default_service_charge_rate', defaultServiceChargeRate);
     }
     if (managerPin != null) {
-      await prefs.setString('manager_pin', managerPin);
+      final toStore = managerPin.isEmpty
+          ? ''
+          : CryptoUtils.hashPassword(managerPin);
+      await prefs.setString('manager_pin', toStore);
     }
     if (autoPrintKitchenTicket != null) {
       await prefs.setBool('auto_print_kitchen_ticket', autoPrintKitchenTicket);
@@ -1993,7 +1999,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   : 1)
           : '0',
     );
-    final pinCtrl = TextEditingController(text: settings.managerPin);
+    final pinCtrl = TextEditingController();
 
     return Column(
       children: [
@@ -2037,18 +2043,20 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           title: Text('Manager PIN (สำหรับยกเลิกรายการ)',
               style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
           subtitle: Text(
-            settings.managerPin.isEmpty ? 'ไม่ตั้ง PIN (ยกเลิกได้ทันที)' : 'ตั้ง PIN แล้ว',
+            settings.managerPinConfigured
+                ? 'ตั้ง PIN แล้ว (กรอก PIN ใหม่เพื่อเปลี่ยน)'
+                : 'ไม่ตั้ง PIN (ยกเลิกได้ทันที)',
             style: TextStyle(color: isDark ? Colors.white54 : AppTheme.textSub),
           ),
           trailing: SizedBox(
-            width: 120,
+            width: 140,
             child: TextFormField(
               controller: pinCtrl,
               obscureText: true,
               keyboardType: TextInputType.number,
               textAlign: TextAlign.center,
               decoration: InputDecoration(
-                hintText: 'ไม่ตั้งค่า',
+                hintText: settings.managerPinConfigured ? '••••' : 'ไม่ตั้งค่า',
                 isDense: true,
                 border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8)),

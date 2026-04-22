@@ -29,7 +29,6 @@ import '../../../dashboard/presentation/pages/dashboard_page.dart';
 import '../../../inventory/presentation/pages/stock_balance_page.dart';
 import '../../../inventory/presentation/pages/stock_adjustment_page.dart';
 import '../../../reports/presentation/pages/reports_page.dart';
-import '../../../reports/presentation/pages/customer_dividend_run_list_page.dart';
 import '../../../../core/shortcuts/keyboard_shortcuts.dart';
 import '../../../settings/presentation/pages/settings_page.dart';
 import '../../../settings/presentation/pages/role_permission_page.dart';
@@ -85,6 +84,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   List<_MenuSection> get _sections {
     final selectedBranch = ref.read(selectedBranchProvider);
     final showRestaurantSection = selectedBranch?.isRestaurantMode ?? true;
+    final showRetailSection = selectedBranch?.isRetailMode ?? true;
 
     return [
     _MenuSection('หลัก', [
@@ -156,12 +156,13 @@ class _HomePageState extends ConsumerState<HomePage> {
         ),
       ]),
     _MenuSection('การขาย', [
-      _MenuItem(
-        icon: Icons.shopping_cart,
-        title: 'หน้าขาย (POS)',
-        page: const PosPage(),
-        permissionKey: AppPermission.pos,
-      ),
+      if (showRetailSection)
+        _MenuItem(
+          icon: Icons.shopping_cart,
+          title: 'หน้าขาย (POS)',
+          page: const PosPage(),
+          permissionKey: AppPermission.pos,
+        ),
       _MenuItem(
         icon: Icons.receipt_long,
         title: 'รายการขาย',
@@ -261,12 +262,6 @@ class _HomePageState extends ConsumerState<HomePage> {
         title: 'รายงาน',
         page: const ReportsPage(),
         permissionKey: AppPermission.reports,
-      ),
-      _MenuItem(
-        icon: Icons.savings,
-        title: 'งวดปันผลลูกค้า',
-        page: const CustomerDividendRunListPage(),
-        permissionKey: AppPermission.customerDividend,
       ),
       _MenuItem(
         icon: Icons.store,

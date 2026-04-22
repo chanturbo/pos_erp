@@ -1,7 +1,9 @@
-// branch_form_page.dart — Week 7: Branch Create/Edit + Warehouse Management
+// branch_form_page.dart
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/utils/responsive_utils.dart';
 import '../../../../shared/widgets/mobile_home_button.dart';
 import '../../../restaurant/data/models/restaurant_enums.dart';
 import '../providers/branch_provider.dart';
@@ -60,49 +62,194 @@ class _BranchFormPageState extends ConsumerState<BranchFormPage>
     super.dispose();
   }
 
+  // ── Helpers ────────────────────────────────────────────────────────────────
+
+  Widget _panelCard(BuildContext context, {required Widget child, Key? key}) =>
+      Card(
+        key: key,
+        elevation: 0,
+        color: Theme.of(context).cardColor,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: AppTheme.borderColorOf(context)),
+        ),
+        child: child,
+      );
+
+  Widget _sectionTitle(
+    BuildContext context,
+    String title,
+    IconData icon,
+    Color color,
+  ) =>
+      Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: color, size: 18),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
+        ],
+      );
+
+  TextStyle _titleStyle(BuildContext context) => TextStyle(
+        fontSize: context.isMobile ? 13 : 14,
+        fontWeight: FontWeight.w700,
+        color: Theme.of(context).colorScheme.onSurface,
+      );
+
+  TextStyle _subtitleStyle(BuildContext context) => TextStyle(
+        fontSize: context.isMobile ? 11 : 12,
+        color: AppTheme.subtextColorOf(context),
+        fontWeight: FontWeight.w500,
+      );
+
+  // ── Build ──────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final topBarBg = isDark ? AppTheme.navyDark : AppTheme.navy;
+
     return Scaffold(
-      appBar: AppBar(
-        leading: buildMobileHomeLeading(context),
-        title: Text(isEdit ? 'แก้ไขสาขา' : 'เพิ่มสาขา'),
-        backgroundColor: Colors.indigo,
-        foregroundColor: Colors.white,
-        actions: [
-          if (_isLoading)
-            const Padding(
-                padding: EdgeInsets.all(16),
-                child: SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                        color: Colors.white, strokeWidth: 2)))
-          else
-            TextButton.icon(
-              onPressed: _save,
-              icon: const Icon(Icons.save, color: Colors.white),
-              label: const Text('บันทึก',
-                  style: TextStyle(color: Colors.white)),
-            ),
-        ],
-        bottom: TabBar(
-          controller: _tabCtrl,
-          indicatorColor: Colors.white,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          tabs: const [
-            Tab(icon: Icon(Icons.store), text: 'ข้อมูลสาขา'),
-            Tab(icon: Icon(Icons.warehouse), text: 'คลังสินค้า'),
-          ],
-        ),
-      ),
+      backgroundColor: AppTheme.surfaceColorOf(context),
       body: Form(
         key: _formKey,
-        child: TabBarView(
-          controller: _tabCtrl,
+        child: Column(
           children: [
-            _buildBranchTab(),
-            _buildWarehouseTab(),
+            // ── Top bar ──────────────────────────────────────────────────
+            Container(
+              color: topBarBg,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  if (context.isMobile)
+                    InkWell(
+                      onTap: () => navigateToMobileHome(context),
+                      borderRadius: BorderRadius.circular(8),
+                      child: const Padding(
+                        padding: EdgeInsets.all(6),
+                        child: Icon(Icons.home_rounded,
+                            color: Colors.white, size: 20),
+                      ),
+                    )
+                  else
+                    InkWell(
+                      onTap: () => Navigator.of(context).pop(),
+                      borderRadius: BorderRadius.circular(8),
+                      child: const Padding(
+                        padding: EdgeInsets.all(6),
+                        child: Icon(Icons.arrow_back,
+                            color: Colors.white, size: 20),
+                      ),
+                    ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: AppTheme.primary.withValues(alpha: 0.28),
+                      ),
+                    ),
+                    child: Icon(
+                      isEdit
+                          ? Icons.edit_outlined
+                          : Icons.add_business_outlined,
+                      color: AppTheme.primaryLight,
+                      size: 18,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    isEdit ? 'แก้ไขสาขา' : 'เพิ่มสาขา',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const Spacer(),
+                  if (_isLoading)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16),
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                            color: Colors.white, strokeWidth: 2),
+                      ),
+                    )
+                  else
+                    TextButton.icon(
+                      onPressed: _save,
+                      icon: const Icon(Icons.save_outlined,
+                          color: Colors.white, size: 18),
+                      label: const Text('บันทึก',
+                          style: TextStyle(color: Colors.white)),
+                    ),
+                  // Badge
+                  const SizedBox(width: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: AppTheme.primary.withValues(alpha: 0.5),
+                      ),
+                    ),
+                    child: const Text(
+                      'Branch',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.primaryLight,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // ── Tab bar ──────────────────────────────────────────────────
+            Container(
+              color: topBarBg,
+              child: TabBar(
+                controller: _tabCtrl,
+                indicatorColor: AppTheme.primaryLight,
+                labelColor: Colors.white,
+                unselectedLabelColor: Colors.white60,
+                tabs: const [
+                  Tab(icon: Icon(Icons.store_outlined), text: 'ข้อมูลสาขา'),
+                  Tab(icon: Icon(Icons.warehouse_outlined), text: 'คลังสินค้า'),
+                ],
+              ),
+            ),
+            // ── Content ──────────────────────────────────────────────────
+            Expanded(
+              child: TabBarView(
+                controller: _tabCtrl,
+                children: [
+                  _buildBranchTab(context),
+                  _buildWarehouseTab(context),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -110,133 +257,275 @@ class _BranchFormPageState extends ConsumerState<BranchFormPage>
   }
 
   // ── Branch Info Tab ────────────────────────────────────────────────────────
-  Widget _buildBranchTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          Card(
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12)),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('ข้อมูลทั่วไป',
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 15)),
-                  const SizedBox(height: 12),
-                  Row(
+  Widget _buildBranchTab(BuildContext context) {
+    return Align(
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: context.contentMaxWidth),
+        child: SingleChildScrollView(
+          padding: context.pagePadding,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── ข้อมูลทั่วไป ─────────────────────────────────────────
+              _panelCard(
+                context,
+                child: Padding(
+                  padding: context.cardPadding,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        flex: 1,
-                        child: TextFormField(
-                          controller: _codeCtrl,
-                          decoration: const InputDecoration(
-                            labelText: 'รหัสสาขา *',
-                            border: OutlineInputBorder(),
-                            hintText: 'BKK01',
+                      _sectionTitle(context, 'ข้อมูลทั่วไป',
+                          Icons.info_outline_rounded, AppTheme.primary),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            flex: 1,
+                            child: TextFormField(
+                              controller: _codeCtrl,
+                              decoration: const InputDecoration(
+                                labelText: 'รหัสสาขา *',
+                                border: OutlineInputBorder(),
+                                hintText: 'BKK01',
+                                prefixIcon:
+                                    Icon(Icons.qr_code_outlined),
+                              ),
+                              textCapitalization:
+                                  TextCapitalization.characters,
+                              validator: (v) =>
+                                  v == null || v.isEmpty
+                                      ? 'กรุณากรอกรหัส'
+                                      : null,
+                            ),
                           ),
-                          textCapitalization:
-                              TextCapitalization.characters,
-                          validator: (v) => v == null || v.isEmpty
-                              ? 'กรุณากรอกรหัส'
-                              : null,
+                          const SizedBox(width: 12),
+                          Expanded(
+                            flex: 2,
+                            child: TextFormField(
+                              controller: _nameCtrl,
+                              decoration: const InputDecoration(
+                                labelText: 'ชื่อสาขา *',
+                                border: OutlineInputBorder(),
+                                hintText: 'สาขากรุงเทพ',
+                                prefixIcon:
+                                    Icon(Icons.storefront_outlined),
+                              ),
+                              validator: (v) =>
+                                  v == null || v.isEmpty
+                                      ? 'กรุณากรอกชื่อ'
+                                      : null,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _phoneCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'เบอร์โทรศัพท์',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.phone_outlined),
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        flex: 2,
-                        child: TextFormField(
-                          controller: _nameCtrl,
-                          decoration: const InputDecoration(
-                            labelText: 'ชื่อสาขา *',
-                            border: OutlineInputBorder(),
-                            hintText: 'สาขากรุงเทพ',
-                          ),
-                          validator: (v) => v == null || v.isEmpty
-                              ? 'กรุณากรอกชื่อ'
-                              : null,
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _addressCtrl,
+                        maxLines: 3,
+                        decoration: const InputDecoration(
+                          labelText: 'ที่อยู่',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.location_on_outlined),
+                          alignLabelWithHint: true,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _phoneCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'เบอร์โทรศัพท์',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.phone),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _addressCtrl,
-                    maxLines: 3,
-                    decoration: const InputDecoration(
-                      labelText: 'ที่อยู่',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.location_on),
-                      alignLabelWithHint: true,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<BusinessMode>(
-                    initialValue: _businessMode,
-                    decoration: const InputDecoration(
-                      labelText: 'โหมดธุรกิจ',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.storefront_outlined),
-                    ),
-                    items: BusinessMode.values
-                        .map(
-                          (mode) => DropdownMenuItem(
-                            value: mode,
-                            child: Text(mode.label),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (value) {
-                      if (value == null) return;
-                      setState(() => _businessMode = value);
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  SwitchListTile(
-                    title: const Text('เปิดใช้งาน'),
-                    value: _isActive,
-                    activeThumbColor: Colors.indigo,
-                    onChanged: (v) => setState(() => _isActive = v),
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                ],
+                ),
               ),
-            ),
+              const SizedBox(height: 12),
+              // ── การตั้งค่า ────────────────────────────────────────────
+              _panelCard(
+                context,
+                child: Padding(
+                  padding: context.cardPadding,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _sectionTitle(context, 'การตั้งค่า',
+                          Icons.tune_rounded, AppTheme.infoColor),
+                      const SizedBox(height: 16),
+                      DropdownButtonFormField<BusinessMode>(
+                        initialValue: _businessMode,
+                        decoration: const InputDecoration(
+                          labelText: 'โหมดธุรกิจ',
+                          border: OutlineInputBorder(),
+                          prefixIcon:
+                              Icon(Icons.storefront_outlined),
+                        ),
+                        items: BusinessMode.values
+                            .map(
+                              (mode) => DropdownMenuItem(
+                                value: mode,
+                                child: Text(mode.label),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (value) {
+                          if (value == null) return;
+                          setState(() => _businessMode = value);
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                      // Business mode description
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: AppTheme.infoColor.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: AppTheme.infoColor.withValues(alpha: 0.2),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.info_outline,
+                                size: 15,
+                                color: AppTheme.infoColor
+                                    .withValues(alpha: 0.8)),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _businessModeDesc(_businessMode),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppTheme.subtextColorOf(context),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Divider(height: 24),
+                      Row(
+                        children: [
+                          Container(
+                            width: 34,
+                            height: 34,
+                            decoration: BoxDecoration(
+                              color: (_isActive
+                                      ? AppTheme.successColor
+                                      : Colors.grey)
+                                  .withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(
+                              _isActive
+                                  ? Icons.check_circle_outline
+                                  : Icons.pause_circle_outline,
+                              color: _isActive
+                                  ? AppTheme.successColor
+                                  : Colors.grey,
+                              size: 18,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment:
+                                  CrossAxisAlignment.start,
+                              children: [
+                                Text('สถานะสาขา',
+                                    style: _titleStyle(context)),
+                                Text(
+                                  _isActive
+                                      ? 'เปิดใช้งานอยู่'
+                                      : 'ปิดใช้งาน',
+                                  style: _subtitleStyle(context),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Switch(
+                            value: _isActive,
+                            activeThumbColor: AppTheme.primary,
+                            onChanged: (v) =>
+                                setState(() => _isActive = v),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 
+  String _businessModeDesc(BusinessMode mode) => switch (mode) {
+        BusinessMode.retail =>
+          'ระบบขายปลีกทั่วไป — ใช้หน้า POS สำหรับบันทึกการขาย',
+        BusinessMode.restaurant =>
+          'ร้านอาหาร — ใช้ระบบโต๊ะ/ออเดอร์/KDS แทนหน้า POS',
+        BusinessMode.hybrid =>
+          'ผสม — มีทั้งหน้า POS และระบบร้านอาหารพร้อมกัน',
+      };
+
   // ── Warehouse Tab ──────────────────────────────────────────────────────────
-  Widget _buildWarehouseTab() {
+  Widget _buildWarehouseTab(BuildContext context) {
     if (!isEdit) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.info_outline, size: 48, color: Colors.grey),
-              SizedBox(height: 12),
-              Text(
-                'บันทึกสาขาก่อน จึงจะสามารถเพิ่มคลังสินค้าได้\n(ระบบจะสร้างคลังหลักให้อัตโนมัติ)',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey),
+      return Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: context.contentMaxWidth),
+          child: Padding(
+            padding: context.pagePadding,
+            child: _panelCard(
+              context,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 24, vertical: 36),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          color: AppTheme.infoColor.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: const Icon(Icons.warehouse_outlined,
+                            color: AppTheme.infoColor, size: 28),
+                      ),
+                      const SizedBox(height: 14),
+                      Text('บันทึกสาขาก่อน',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurface,
+                          )),
+                      const SizedBox(height: 6),
+                      Text(
+                        'บันทึกข้อมูลสาขาก่อน จึงจะสามารถเพิ่มคลังสินค้าได้\n(ระบบจะสร้างคลังหลักให้อัตโนมัติ)',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                            color: AppTheme.subtextColorOf(context),
+                            fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ],
+            ),
           ),
         ),
       );
@@ -252,123 +541,184 @@ class _BranchFormPageState extends ConsumerState<BranchFormPage>
             .where((w) => w.branchId == widget.branch!.branchId)
             .toList();
 
-        return Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Add warehouse form
-              Card(
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('เพิ่มคลังสินค้า',
-                          style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14)),
-                      const SizedBox(height: 10),
-                      Row(
+        return Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints:
+                BoxConstraints(maxWidth: context.contentMaxWidth),
+            child: SingleChildScrollView(
+              padding: context.pagePadding,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ── Add warehouse form ───────────────────────────────
+                  _panelCard(
+                    context,
+                    child: Padding(
+                      padding: context.cardPadding,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            flex: 1,
-                            child: TextField(
-                              controller: _whCodeCtrl,
-                              decoration: const InputDecoration(
-                                labelText: 'รหัส',
-                                border: OutlineInputBorder(),
-                                hintText: 'WH01',
-                              ),
-                            ),
+                          _sectionTitle(
+                            context,
+                            'เพิ่มคลังสินค้า',
+                            Icons.add_box_outlined,
+                            AppTheme.primary,
                           ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            flex: 2,
-                            child: TextField(
-                              controller: _whNameCtrl,
-                              decoration: const InputDecoration(
-                                labelText: 'ชื่อคลัง',
-                                border: OutlineInputBorder(),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                flex: 1,
+                                child: TextField(
+                                  controller: _whCodeCtrl,
+                                  decoration: const InputDecoration(
+                                    labelText: 'รหัสคลัง',
+                                    border: OutlineInputBorder(),
+                                    hintText: 'WH01',
+                                    prefixIcon:
+                                        Icon(Icons.qr_code_outlined),
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          ElevatedButton(
-                            onPressed: _addWarehouse,
-                            style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.indigo,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                    vertical: 16)),
-                            child: const Text('เพิ่ม'),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                flex: 2,
+                                child: TextField(
+                                  controller: _whNameCtrl,
+                                  decoration: const InputDecoration(
+                                    labelText: 'ชื่อคลัง',
+                                    border: OutlineInputBorder(),
+                                    prefixIcon: Icon(
+                                        Icons.warehouse_outlined),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              FilledButton.icon(
+                                onPressed: _addWarehouse,
+                                icon: const Icon(Icons.add, size: 16),
+                                label: const Text('เพิ่ม'),
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: AppTheme.primary,
+                                  padding:
+                                      const EdgeInsets.symmetric(
+                                          horizontal: 16,
+                                          vertical: 14),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                    ],
+                    ),
                   ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text('คลังสินค้าทั้งหมด (${myWarehouses.length})',
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 14)),
-              const SizedBox(height: 8),
-              Expanded(
-                child: myWarehouses.isEmpty
-                    ? Center(
-                        child: Text('ยังไม่มีคลังสินค้า',
-                            style: TextStyle(color: Colors.grey[500])))
-                    : ListView.builder(
-                        itemCount: myWarehouses.length,
-                        itemBuilder: (ctx, i) {
-                          final wh = myWarehouses[i];
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            child: ListTile(
-                              leading: Container(
-                                width: 40,
-                                height: 40,
-                                decoration: BoxDecoration(
-                                  color: Colors.indigo.withValues(alpha:0.1),
-                                  borderRadius:
-                                      BorderRadius.circular(8),
-                                ),
-                                child: const Icon(Icons.warehouse,
-                                    color: Colors.indigo, size: 20),
-                              ),
-                              title: Text(wh.warehouseName),
-                              subtitle: Text(wh.warehouseCode),
-                              trailing: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: wh.isActive
-                                      ? Colors.green.withValues(alpha:0.1)
-                                      : Colors.grey.withValues(alpha:0.1),
-                                  borderRadius:
-                                      BorderRadius.circular(10),
-                                ),
+                  const SizedBox(height: 12),
+                  // ── Warehouse list ───────────────────────────────────
+                  _panelCard(
+                    context,
+                    child: Padding(
+                      padding: context.cardPadding,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _sectionTitle(
+                            context,
+                            'คลังสินค้าทั้งหมด (${myWarehouses.length})',
+                            Icons.warehouse_outlined,
+                            AppTheme.infoColor,
+                          ),
+                          const SizedBox(height: 12),
+                          if (myWarehouses.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 24),
+                              child: Center(
                                 child: Text(
-                                  wh.isActive ? 'เปิด' : 'ปิด',
-                                  style: TextStyle(
-                                      fontSize: 12,
-                                      color: wh.isActive
-                                          ? Colors.green
-                                          : Colors.grey),
+                                  'ยังไม่มีคลังสินค้า',
+                                  style:
+                                      _subtitleStyle(context),
                                 ),
                               ),
+                            )
+                          else
+                            Column(
+                              children: [
+                                for (var i = 0;
+                                    i < myWarehouses.length;
+                                    i++) ...[
+                                  _warehouseRow(
+                                      context, myWarehouses[i]),
+                                  if (i != myWarehouses.length - 1)
+                                    Divider(
+                                      height: 1,
+                                      color: AppTheme.borderColorOf(
+                                          context),
+                                    ),
+                                ],
+                              ],
                             ),
-                          );
-                        },
+                        ],
                       ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
               ),
-            ],
+            ),
           ),
         );
       },
+    );
+  }
+
+  Widget _warehouseRow(BuildContext context, WarehouseModel wh) {
+    final isActive = wh.isActive;
+    final statusColor =
+        isActive ? AppTheme.successColor : Colors.grey.shade600;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: AppTheme.primary.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.warehouse_outlined,
+                color: AppTheme.primary, size: 18),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(wh.warehouseName, style: _titleStyle(context)),
+                Text(wh.warehouseCode, style: _subtitleStyle(context)),
+              ],
+            ),
+          ),
+          Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: statusColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              isActive ? 'เปิดใช้งาน' : 'ปิดใช้งาน',
+              style: TextStyle(
+                fontSize: 11,
+                color: statusColor,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -387,9 +737,8 @@ class _BranchFormPageState extends ConsumerState<BranchFormPage>
       createdAt: DateTime.now(),
     );
 
-    final ok = await ref
-        .read(warehouseListProvider.notifier)
-        .createWarehouse(wh);
+    final ok =
+        await ref.read(warehouseListProvider.notifier).createWarehouse(wh);
 
     if (ok && mounted) {
       _whCodeCtrl.clear();
@@ -405,13 +754,13 @@ class _BranchFormPageState extends ConsumerState<BranchFormPage>
 
     final now = DateTime.now();
     final branch = BranchModel(
-      branchId: widget.branch?.branchId ??
-          'BR${now.millisecondsSinceEpoch}',
+      branchId: widget.branch?.branchId ?? 'BR${now.millisecondsSinceEpoch}',
       companyId: widget.branch?.companyId ?? 'COMP001',
       branchCode: _codeCtrl.text.trim().toUpperCase(),
       branchName: _nameCtrl.text.trim(),
-      address:
-          _addressCtrl.text.trim().isNotEmpty ? _addressCtrl.text.trim() : null,
+      address: _addressCtrl.text.trim().isNotEmpty
+          ? _addressCtrl.text.trim()
+          : null,
       phone: _phoneCtrl.text.trim().isNotEmpty
           ? _phoneCtrl.text.trim()
           : null,
@@ -423,26 +772,21 @@ class _BranchFormPageState extends ConsumerState<BranchFormPage>
 
     bool ok;
     if (isEdit) {
-      ok = await ref
-          .read(branchListProvider.notifier)
-          .updateBranch(branch);
+      ok = await ref.read(branchListProvider.notifier).updateBranch(branch);
     } else {
-      ok = await ref
-          .read(branchListProvider.notifier)
-          .createBranch(branch);
+      ok = await ref.read(branchListProvider.notifier).createBranch(branch);
     }
 
     setState(() => _isLoading = false);
 
     if (mounted) {
       if (ok) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(
-                isEdit ? 'อัพเดทสาขาแล้ว' : 'สร้างสาขาแล้ว')));
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(isEdit ? 'อัพเดทสาขาแล้ว' : 'สร้างสาขาแล้ว')));
         Navigator.pop(context);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('เกิดข้อผิดพลาด กรุณาลองใหม่')));
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('เกิดข้อผิดพลาด กรุณาลองใหม่')));
       }
     }
   }

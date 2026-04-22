@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/widgets/busy_overlay.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../branches/presentation/providers/branch_provider.dart';
 import '../../../sales/presentation/pages/pos_page.dart';
@@ -12,8 +13,10 @@ import '../providers/table_provider.dart';
 import '../widgets/table_card.dart';
 import '../widgets/open_table_dialog.dart';
 import 'billing_page.dart';
+import 'floor_plan_page.dart';
 import 'reservations_page.dart';
 import 'table_timeline_page.dart';
+import 'waiter_management_page.dart';
 
 class TableOverviewPage extends ConsumerStatefulWidget {
   const TableOverviewPage({super.key});
@@ -23,8 +26,13 @@ class TableOverviewPage extends ConsumerStatefulWidget {
 }
 
 class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
+  String? _busyMessage;
+
+  bool get _isBusy => _busyMessage != null;
+
   @override
   Widget build(BuildContext context) {
+    ref.watch(tableStatusPollingProvider);
     final tablesAsync = ref.watch(tableListProvider);
     final zonesAsync = ref.watch(zoneListProvider);
     final selectedZone = ref.watch(selectedZoneFilterProvider);
@@ -39,26 +47,66 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
           IconButton(
             icon: const Icon(Icons.event_note),
             tooltip: 'การจองโต๊ะ',
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ReservationsPage()),
-            ),
+            onPressed: _isBusy
+                ? null
+                : () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const ReservationsPage()),
+                  ),
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: () {
-              final branchId = ref.read(selectedBranchProvider)?.branchId;
-              ref.read(tableListProvider.notifier).refresh(branchId: branchId);
-              ref.read(zoneListProvider.notifier).refresh();
-            },
+            onPressed: _isBusy
+                ? null
+                : () => _runBusy('กำลังรีเฟรชข้อมูลโต๊ะ...', () async {
+                    final branchId = ref.read(selectedBranchProvider)?.branchId;
+                    await ref
+                        .read(tableListProvider.notifier)
+                        .refresh(branchId: branchId);
+                    await ref.read(zoneListProvider.notifier).refresh();
+                  }),
             tooltip: 'รีเฟรช',
           ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert),
             onSelected: (v) {
               if (v == 'zones') _showZoneManagerDialog(context);
+              if (v == 'floor_plan') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const FloorPlanPage()),
+                );
+              }
+              if (v == 'waiters') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const WaiterManagementPage(),
+                  ),
+                );
+              }
             },
             itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: 'floor_plan',
+                child: Row(
+                  children: [
+                    Icon(Icons.map_outlined, size: 18),
+                    SizedBox(width: 8),
+                    Text('ผังโต๊ะ / รวมโต๊ะ'),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'waiters',
+                child: Row(
+                  children: [
+                    Icon(Icons.badge_outlined, size: 18),
+                    SizedBox(width: 8),
+                    Text('จัดการพนักงานเสิร์ฟ'),
+                  ],
+                ),
+              ),
               PopupMenuItem(
                 value: 'zones',
                 child: Row(
@@ -73,116 +121,132 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
           ),
         ],
       ),
-      body: Column(
+      body: Stack(
         children: [
-          // ── Status Legend ──────────────────────────────────────────
-          _StatusLegend(),
-          const SizedBox(height: 4),
+          AbsorbPointer(
+            absorbing: _isBusy,
+            child: Column(
+              children: [
+                // ── Status Legend ──────────────────────────────────────────
+                _StatusLegend(),
+                const SizedBox(height: 4),
 
-          // ── Zone Filter ────────────────────────────────────────────
-          zonesAsync.when(
-            data: (zones) => zones.isEmpty
-                ? const SizedBox.shrink()
-                : _ZoneFilterBar(zones: zones),
-            loading: () => const SizedBox.shrink(),
-            error: (_, _) => const SizedBox.shrink(),
-          ),
-
-          // ── Table Grid ────────────────────────────────────────────
-          Expanded(
-            child: tablesAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.error_outline,
-                        size: 48, color: AppTheme.errorColor),
-                    const SizedBox(height: 12),
-                    Text('ไม่สามารถโหลดข้อมูลได้',
-                        style: TextStyle(color: AppTheme.errorColor)),
-                    const SizedBox(height: 8),
-                    FilledButton.icon(
-                      onPressed: () => ref
-                          .read(tableListProvider.notifier)
-                          .refresh(
-                            branchId:
-                                ref.read(selectedBranchProvider)?.branchId,
-                          ),
-                      icon: const Icon(Icons.refresh, size: 16),
-                      label: const Text('ลองใหม่'),
-                    ),
-                  ],
+                // ── Zone Filter ────────────────────────────────────────────
+                zonesAsync.when(
+                  data: (zones) => zones.isEmpty
+                      ? const SizedBox.shrink()
+                      : _ZoneFilterBar(zones: zones),
+                  loading: () => const SizedBox.shrink(),
+                  error: (_, _) => const SizedBox.shrink(),
                 ),
-              ),
-              data: (tables) {
-                final filtered = selectedZone == null
-                    ? tables
-                    : tables
-                        .where((t) => t.zoneId == selectedZone)
-                        .toList();
 
-                if (filtered.isEmpty) {
-                  return _EmptyState(
-                    onAdd: () => _showAddTableDialog(context),
-                  );
-                }
-
-                // จัดกลุ่มตาม zone
-                final byZone = <String, List<DiningTableModel>>{};
-                for (final t in filtered) {
-                  (byZone[t.zoneId] ??= []).add(t);
-                }
-
-                return RefreshIndicator(
-                  onRefresh: () => ref
-                      .read(tableListProvider.notifier)
-                      .refresh(
-                        branchId: ref.read(selectedBranchProvider)?.branchId,
-                      ),
-                  child: ListView(
-                    padding: const EdgeInsets.all(16),
-                    children: byZone.entries.map((entry) {
-                      final zoneName =
-                          entry.value.first.zoneName ?? entry.key;
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                // ── Table Grid ────────────────────────────────────────────
+                Expanded(
+                  child: tablesAsync.when(
+                    loading: () =>
+                        const Center(child: CircularProgressIndicator()),
+                    error: (e, _) => Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          _ZoneHeader(zoneName: zoneName),
-                          const SizedBox(height: 8),
-                          GridView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            gridDelegate:
-                                const SliverGridDelegateWithMaxCrossAxisExtent(
-                              maxCrossAxisExtent: 160,
-                              mainAxisExtent: 150,
-                              crossAxisSpacing: 10,
-                              mainAxisSpacing: 10,
-                            ),
-                            itemCount: entry.value.length,
-                            itemBuilder: (ctx, i) {
-                              final table = entry.value[i];
-                              return TableCard(
-                                table: table,
-                                onTap: () =>
-                                    _handleTableTap(context, table),
-                              );
-                            },
+                          Icon(
+                            Icons.error_outline,
+                            size: 48,
+                            color: AppTheme.errorColor,
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 12),
+                          Text(
+                            'ไม่สามารถโหลดข้อมูลได้',
+                            style: TextStyle(color: AppTheme.errorColor),
+                          ),
+                          const SizedBox(height: 8),
+                          FilledButton.icon(
+                            onPressed: () => ref
+                                .read(tableListProvider.notifier)
+                                .refresh(
+                                  branchId: ref
+                                      .read(selectedBranchProvider)
+                                      ?.branchId,
+                                ),
+                            icon: const Icon(Icons.refresh, size: 16),
+                            label: const Text('ลองใหม่'),
+                          ),
                         ],
+                      ),
+                    ),
+                    data: (tables) {
+                      final filtered = selectedZone == null
+                          ? tables
+                          : tables
+                                .where((t) => t.zoneId == selectedZone)
+                                .toList();
+
+                      if (filtered.isEmpty) {
+                        return _EmptyState(
+                          onAdd: () => _showAddTableDialog(context),
+                        );
+                      }
+
+                      final byZone = <String, List<DiningTableModel>>{};
+                      for (final t in filtered) {
+                        (byZone[t.zoneId] ??= []).add(t);
+                      }
+
+                      return RefreshIndicator(
+                        onRefresh: () => ref
+                            .read(tableListProvider.notifier)
+                            .refresh(
+                              branchId: ref
+                                  .read(selectedBranchProvider)
+                                  ?.branchId,
+                            ),
+                        child: ListView(
+                          padding: const EdgeInsets.all(16),
+                          children: byZone.entries.map((entry) {
+                            final zoneName =
+                                entry.value.first.zoneName ?? entry.key;
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _ZoneHeader(zoneName: zoneName),
+                                const SizedBox(height: 8),
+                                GridView.builder(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  gridDelegate:
+                                      const SliverGridDelegateWithMaxCrossAxisExtent(
+                                        maxCrossAxisExtent: 160,
+                                        mainAxisExtent: 150,
+                                        crossAxisSpacing: 10,
+                                        mainAxisSpacing: 10,
+                                      ),
+                                  itemCount: entry.value.length,
+                                  itemBuilder: (ctx, i) {
+                                    final table = entry.value[i];
+                                    return TableCard(
+                                      table: table,
+                                      onTap: () =>
+                                          _handleTableTap(context, table),
+                                    );
+                                  },
+                                ),
+                                const SizedBox(height: 20),
+                              ],
+                            );
+                          }).toList(),
+                        ),
                       );
-                    }).toList(),
+                    },
                   ),
-                );
-              },
+                ),
+              ],
             ),
           ),
+          BusyOverlay(message: _busyMessage),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showAddTableDialog(context),
+        onPressed: _isBusy ? null : () => _showAddTableDialog(context),
         backgroundColor: AppTheme.primaryColor,
         icon: const Icon(Icons.add),
         label: const Text('เพิ่มโต๊ะ'),
@@ -190,21 +254,33 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
     );
   }
 
+  Future<T> _runBusy<T>(String message, Future<T> Function() action) async {
+    setState(() => _busyMessage = message);
+    try {
+      return await action();
+    } finally {
+      if (mounted) {
+        setState(() => _busyMessage = null);
+      }
+    }
+  }
+
   // ── Tap handler ───────────────────────────────────────────────────────────
 
   Future<void> _handleTableTap(
-      BuildContext context, DiningTableModel table) async {
+    BuildContext context,
+    DiningTableModel table,
+  ) async {
     if (table.isDisabled) return;
 
-    if (table.isAvailable || table.isCleaning) {
+    if (table.isAvailable) {
       await _openTable(context, table);
     } else if (table.isOccupied) {
       await _showOccupiedOptions(context, table);
     }
   }
 
-  Future<void> _openTable(
-      BuildContext context, DiningTableModel table) async {
+  Future<void> _openTable(BuildContext context, DiningTableModel table) async {
     final branchId = ref.read(selectedBranchProvider)?.branchId ?? '';
     final authState = ref.read(authProvider);
     final openedBy = authState.user?.userId;
@@ -215,54 +291,52 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
         table: table,
         branchId: branchId,
         onConfirm: (guestCount) async {
-          final session = await ref.read(tableListProvider.notifier).openTable(
-                tableId: table.tableId,
-                guestCount: guestCount,
-                branchId: branchId,
-                openedBy: openedBy,
-              );
-          if (session == null && context.mounted) {
-            showDialog(
-              context: context,
-              builder: (_) => AlertDialog(
-                title: const Text('เปิดโต๊ะไม่สำเร็จ'),
-                content: const Text('กรุณาลองใหม่อีกครั้ง'),
-                actions: [
-                  TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('ตกลง')),
-                ],
-              ),
-            );
-          }
+          final session = await _runBusy(
+            'กำลังเปิดโต๊ะ ${table.displayName}...',
+            () => ref
+                .read(tableListProvider.notifier)
+                .openTable(
+                  tableId: table.tableId,
+                  guestCount: guestCount,
+                  branchId: branchId,
+                  openedBy: openedBy,
+                ),
+          );
+          return session != null;
         },
       ),
     );
 
     if (confirmed == true && context.mounted) {
-      final session = await ref
-          .read(tableListProvider.notifier)
-          .getActiveSession(table.tableId);
+      final session = await _runBusy(
+        'กำลังโหลด session โต๊ะ...',
+        () => ref
+            .read(tableListProvider.notifier)
+            .getActiveSession(table.tableId),
+      );
       if (!mounted) return;
       if (session != null) {
         _openOrderPage(table, session);
+        ScaffoldMessenger.of(this.context).showSnackBar(
+          SnackBar(
+            content: Text('เปิดโต๊ะ ${table.displayName} แล้ว'),
+            backgroundColor: AppTheme.successColor,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
-      ScaffoldMessenger.of(this.context).showSnackBar(
-        SnackBar(
-          content: Text('เปิดโต๊ะ ${table.displayName} แล้ว'),
-          backgroundColor: AppTheme.successColor,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
     }
   }
 
   Future<void> _showOccupiedOptions(
-      BuildContext context, DiningTableModel table) async {
+    BuildContext context,
+    DiningTableModel table,
+  ) async {
     await showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
       builder: (_) => _TableOptionsSheet(
         table: table,
         onViewBill: () {
@@ -289,17 +363,48 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
         },
         onClose: () async {
           Navigator.pop(context);
-          final ok = await ref
-              .read(tableListProvider.notifier)
-              .closeTable(table.tableId);
+          final confirmed = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('ยืนยันการปิดโต๊ะ'),
+              content: Text(
+                'ปิดโต๊ะ ${table.displayName} ตอนนี้หรือไม่?\nหากยังมีบิลเปิดอยู่ ระบบจะไม่อนุญาตให้ปิดโต๊ะ',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('ยกเลิก'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppTheme.errorColor,
+                  ),
+                  child: const Text('ปิดโต๊ะ'),
+                ),
+              ],
+            ),
+          );
+          if (confirmed != true) return;
+
+          final result = await _runBusy(
+            'กำลังปิดโต๊ะ ${table.displayName}...',
+            () =>
+                ref.read(tableListProvider.notifier).closeTable(table.tableId),
+          );
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(ok
-                    ? 'ปิดโต๊ะ ${table.displayName} แล้ว'
-                    : 'ปิดโต๊ะไม่สำเร็จ'),
-                backgroundColor:
-                    ok ? AppTheme.successColor : AppTheme.errorColor,
+                content: Text(
+                  result.success
+                      ? 'ปิดโต๊ะ ${table.displayName} แล้ว'
+                      : (result.message?.trim().isNotEmpty ?? false)
+                      ? result.message!
+                      : 'ปิดโต๊ะไม่สำเร็จ',
+                ),
+                backgroundColor: result.success
+                    ? AppTheme.successColor
+                    : AppTheme.errorColor,
                 behavior: SnackBarBehavior.floating,
               ),
             );
@@ -330,7 +435,9 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
   }
 
   Future<void> _showUpdateGuestCountDialog(
-      BuildContext context, DiningTableModel table) async {
+    BuildContext context,
+    DiningTableModel table,
+  ) async {
     int count = table.activeGuestCount ?? 1;
     await showDialog(
       context: context,
@@ -354,8 +461,13 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
                   border: Border.all(color: AppTheme.borderColor),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Text('$count',
-                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                child: Text(
+                  '$count',
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
               const SizedBox(width: 12),
               IconButton(
@@ -375,17 +487,30 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
             FilledButton(
               onPressed: () async {
                 Navigator.pop(ctx);
-                final ok = await ref
-                    .read(tableListProvider.notifier)
-                    .updateGuestCount(table.tableId, count);
+                final ok = await _runBusy(
+                  'กำลังอัปเดตจำนวนลูกค้า...',
+                  () => ref
+                      .read(tableListProvider.notifier)
+                      .updateGuestCount(table.tableId, count),
+                );
                 if (!mounted) return;
-                ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(
-                  content: Text(ok ? 'อัปเดตจำนวนลูกค้าเป็น $count คนแล้ว' : 'อัปเดตไม่สำเร็จ'),
-                  backgroundColor: ok ? AppTheme.successColor : AppTheme.errorColor,
-                  behavior: SnackBarBehavior.floating,
-                ));
+                ScaffoldMessenger.of(this.context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      ok
+                          ? 'อัปเดตจำนวนลูกค้าเป็น $count คนแล้ว'
+                          : 'อัปเดตไม่สำเร็จ',
+                    ),
+                    backgroundColor: ok
+                        ? AppTheme.successColor
+                        : AppTheme.errorColor,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
               },
-              style: FilledButton.styleFrom(backgroundColor: AppTheme.primaryColor),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppTheme.primaryColor,
+              ),
               child: const Text('บันทึก'),
             ),
           ],
@@ -395,7 +520,9 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
   }
 
   Future<void> _showAssignWaiterDialog(
-      BuildContext context, DiningTableModel table) async {
+    BuildContext context,
+    DiningTableModel table,
+  ) async {
     final nameCtrl = TextEditingController();
     await showDialog(
       context: context,
@@ -422,9 +549,12 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
               Navigator.pop(ctx);
               if (name.isEmpty) return;
               try {
-                await ref
-                    .read(tableListProvider.notifier)
-                    .assignWaiter(table.tableId, name);
+                await _runBusy(
+                  'กำลังกำหนดพนักงานเสิร์ฟ...',
+                  () => ref
+                      .read(tableListProvider.notifier)
+                      .assignWaiter(table.tableId, name),
+                );
                 if (mounted) {
                   ScaffoldMessenger.of(this.context).showSnackBar(
                     SnackBar(
@@ -446,7 +576,8 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
               }
             },
             style: FilledButton.styleFrom(
-                backgroundColor: AppTheme.primaryColor),
+              backgroundColor: AppTheme.primaryColor,
+            ),
             child: const Text('บันทึก'),
           ),
         ],
@@ -470,8 +601,9 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
   }
 
   void _openOrderPage(DiningTableModel table, TableSessionModel session) {
-    ref.read(restaurantOrderContextProvider.notifier).state =
-        RestaurantOrderContext(
+    ref
+        .read(restaurantOrderContextProvider.notifier)
+        .state = RestaurantOrderContext(
       tableId: table.tableId,
       tableName: table.displayName,
       sessionId: session.sessionId,
@@ -480,10 +612,7 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
       serviceType: 'DINE_IN',
       currentOrderId: table.currentOrderId,
     );
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const PosPage()),
-    );
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const PosPage()));
   }
 
   Future<void> _showTransferTableDialog(
@@ -491,10 +620,11 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
     DiningTableModel table,
   ) async {
     final tables = ref.read(tableListProvider).asData?.value ?? [];
-    final availableTargets = tables
-        .where((item) => item.tableId != table.tableId && item.isAvailable)
-        .toList()
-      ..sort((a, b) => a.tableNo.compareTo(b.tableNo));
+    final availableTargets =
+        tables
+            .where((item) => item.tableId != table.tableId && item.isAvailable)
+            .toList()
+          ..sort((a, b) => a.tableNo.compareTo(b.tableNo));
 
     if (availableTargets.isEmpty) {
       if (!context.mounted) return;
@@ -538,12 +668,15 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
             ),
             FilledButton(
               onPressed: () async {
-                final session = await ref
-                    .read(tableListProvider.notifier)
-                    .transferTable(
-                      fromTableId: table.tableId,
-                      targetTableId: selectedTableId,
-                    );
+                final session = await _runBusy(
+                  'กำลังย้ายโต๊ะ...',
+                  () => ref
+                      .read(tableListProvider.notifier)
+                      .transferTable(
+                        fromTableId: table.tableId,
+                        targetTableId: selectedTableId,
+                      ),
+                );
                 if (dialogContext.mounted) {
                   Navigator.pop(dialogContext);
                 }
@@ -582,8 +715,9 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
             content: const Text('กรุณาเพิ่มโซนก่อนเพิ่มโต๊ะ'),
             actions: [
               TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('ตกลง')),
+                onPressed: () => Navigator.pop(context),
+                child: const Text('ตกลง'),
+              ),
             ],
           ),
         );
@@ -601,8 +735,9 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) => AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           title: const Text('เพิ่มโต๊ะ'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -630,8 +765,12 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
                   border: OutlineInputBorder(),
                 ),
                 items: zones
-                    .map((z) => DropdownMenuItem(
-                        value: z.zoneId, child: Text(z.zoneName)))
+                    .map(
+                      (z) => DropdownMenuItem(
+                        value: z.zoneId,
+                        child: Text(z.zoneName),
+                      ),
+                    )
                     .toList(),
                 onChanged: (v) =>
                     setS(() => selectedZoneId = v ?? selectedZoneId),
@@ -644,8 +783,12 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
                   DropdownButton<int>(
                     value: capacity,
                     items: [2, 4, 6, 8, 10, 12]
-                        .map((n) => DropdownMenuItem(
-                            value: n, child: Text('$n ที่นั่ง')))
+                        .map(
+                          (n) => DropdownMenuItem(
+                            value: n,
+                            child: Text('$n ที่นั่ง'),
+                          ),
+                        )
                         .toList(),
                     onChanged: (v) => setS(() => capacity = v ?? capacity),
                   ),
@@ -660,7 +803,8 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
             ),
             FilledButton(
               style: FilledButton.styleFrom(
-                  backgroundColor: AppTheme.primaryColor),
+                backgroundColor: AppTheme.primaryColor,
+              ),
               onPressed: () async {
                 final no = tableNoCtrl.text.trim();
                 if (no.isEmpty) return;
@@ -676,8 +820,9 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
                     );
                 if (ctx.mounted) Navigator.pop(ctx);
                 if (!ok && context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                      content: Text('เพิ่มโต๊ะไม่สำเร็จ')));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('เพิ่มโต๊ะไม่สำเร็จ')),
+                  );
                 }
               },
               child: const Text('เพิ่ม'),
@@ -700,8 +845,9 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
         builder: (ctx, setS) {
           final zonesAsync = ref.watch(zoneListProvider);
           return AlertDialog(
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
             title: const Text('จัดการโซน'),
             content: SizedBox(
               width: 360,
@@ -713,8 +859,10 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
                     data: (zones) => zones.isEmpty
                         ? const Padding(
                             padding: EdgeInsets.symmetric(vertical: 8),
-                            child: Text('ยังไม่มีโซน',
-                                style: TextStyle(color: Colors.grey)),
+                            child: Text(
+                              'ยังไม่มีโซน',
+                              style: TextStyle(color: Colors.grey),
+                            ),
                           )
                         : ListView.builder(
                             shrinkWrap: true,
@@ -723,8 +871,11 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
                               dense: true,
                               title: Text(zones[i].zoneName),
                               trailing: IconButton(
-                                icon: const Icon(Icons.delete_outline,
-                                    color: Colors.red, size: 20),
+                                icon: const Icon(
+                                  Icons.delete_outline,
+                                  color: Colors.red,
+                                  size: 20,
+                                ),
                                 onPressed: () async {
                                   await ref
                                       .read(zoneListProvider.notifier)
@@ -755,8 +906,9 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
                       const SizedBox(width: 8),
                       FilledButton(
                         style: FilledButton.styleFrom(
-                            backgroundColor: AppTheme.primaryColor,
-                            minimumSize: const Size(48, 40)),
+                          backgroundColor: AppTheme.primaryColor,
+                          minimumSize: const Size(48, 40),
+                        ),
                         onPressed: () => _addZone(nameCtrl, branchId),
                         child: const Icon(Icons.add, size: 18),
                       ),
@@ -767,8 +919,9 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
             ),
             actions: [
               TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('ปิด')),
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('ปิด'),
+              ),
             ],
           );
         },
@@ -779,10 +932,9 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
   Future<void> _addZone(TextEditingController ctrl, String branchId) async {
     final name = ctrl.text.trim();
     if (name.isEmpty) return;
-    final ok = await ref.read(zoneListProvider.notifier).createZone(
-          zoneName: name,
-          branchId: branchId,
-        );
+    final ok = await ref
+        .read(zoneListProvider.notifier)
+        .createZone(zoneName: name, branchId: branchId);
     if (ok) ctrl.clear();
   }
 }
@@ -792,20 +944,20 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
 class _StatusLegend extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
-        color: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Row(
-          children: [
-            _LegendDot(color: AppTheme.successColor, label: 'ว่าง'),
-            const SizedBox(width: 16),
-            const _LegendDot(color: Color(0xFFFF9800), label: 'มีลูกค้า'),
-            const SizedBox(width: 16),
-            _LegendDot(color: AppTheme.infoColor, label: 'จอง'),
-            const SizedBox(width: 16),
-            _LegendDot(color: AppTheme.warningColor, label: 'กำลังเก็บ'),
-          ],
-        ),
-      );
+    color: Colors.white,
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    child: Row(
+      children: [
+        _LegendDot(color: AppTheme.successColor, label: 'ว่าง'),
+        const SizedBox(width: 16),
+        const _LegendDot(color: Color(0xFFFF9800), label: 'มีลูกค้า'),
+        const SizedBox(width: 16),
+        _LegendDot(color: AppTheme.infoColor, label: 'จอง'),
+        const SizedBox(width: 16),
+        _LegendDot(color: AppTheme.warningColor, label: 'กำลังเก็บ'),
+      ],
+    ),
+  );
 }
 
 class _LegendDot extends StatelessWidget {
@@ -815,16 +967,16 @@ class _LegendDot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Row(
-        children: [
-          Container(
-            width: 10,
-            height: 10,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-          ),
-          const SizedBox(width: 4),
-          Text(label, style: const TextStyle(fontSize: 12)),
-        ],
-      );
+    children: [
+      Container(
+        width: 10,
+        height: 10,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      ),
+      const SizedBox(width: 4),
+      Text(label, style: const TextStyle(fontSize: 12)),
+    ],
+  );
 }
 
 class _ZoneFilterBar extends ConsumerWidget {
@@ -847,13 +999,14 @@ class _ZoneFilterBar extends ConsumerWidget {
             onTap: () =>
                 ref.read(selectedZoneFilterProvider.notifier).state = null,
           ),
-          ...zones.map((z) => _ZoneChip(
-                label: z.zoneName,
-                selected: selected == z.zoneId,
-                onTap: () => ref
-                    .read(selectedZoneFilterProvider.notifier)
-                    .state = z.zoneId,
-              )),
+          ...zones.map(
+            (z) => _ZoneChip(
+              label: z.zoneName,
+              selected: selected == z.zoneId,
+              onTap: () => ref.read(selectedZoneFilterProvider.notifier).state =
+                  z.zoneId,
+            ),
+          ),
         ],
       ),
     );
@@ -864,34 +1017,35 @@ class _ZoneChip extends StatelessWidget {
   final String label;
   final bool selected;
   final VoidCallback onTap;
-  const _ZoneChip(
-      {required this.label, required this.selected, required this.onTap});
+  const _ZoneChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) => GestureDetector(
-        onTap: onTap,
-        child: Container(
-          margin: const EdgeInsets.only(right: 8),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-          decoration: BoxDecoration(
-            color: selected ? AppTheme.primaryColor : Colors.grey.shade100,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color:
-                  selected ? AppTheme.primaryColor : Colors.grey.shade300,
-            ),
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 13,
-              color: selected ? Colors.white : Colors.black87,
-              fontWeight:
-                  selected ? FontWeight.w600 : FontWeight.normal,
-            ),
-          ),
+    onTap: onTap,
+    child: Container(
+      margin: const EdgeInsets.only(right: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+      decoration: BoxDecoration(
+        color: selected ? AppTheme.primaryColor : Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: selected ? AppTheme.primaryColor : Colors.grey.shade300,
         ),
-      );
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 13,
+          color: selected ? Colors.white : Colors.black87,
+          fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+        ),
+      ),
+    ),
+  );
 }
 
 class _ZoneHeader extends StatelessWidget {
@@ -900,23 +1054,22 @@ class _ZoneHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Row(
-        children: [
-          Container(
-            width: 4,
-            height: 18,
-            decoration: BoxDecoration(
-              color: AppTheme.primaryColor,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            zoneName,
-            style: const TextStyle(
-                fontSize: 15, fontWeight: FontWeight.bold),
-          ),
-        ],
-      );
+    children: [
+      Container(
+        width: 4,
+        height: 18,
+        decoration: BoxDecoration(
+          color: AppTheme.primaryColor,
+          borderRadius: BorderRadius.circular(2),
+        ),
+      ),
+      const SizedBox(width: 8),
+      Text(
+        zoneName,
+        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+      ),
+    ],
+  );
 }
 
 class _EmptyState extends StatelessWidget {
@@ -925,29 +1078,30 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.table_restaurant,
-                size: 64, color: Colors.grey.shade400),
-            const SizedBox(height: 16),
-            Text('ยังไม่มีโต๊ะ',
-                style: TextStyle(
-                    fontSize: 18, color: Colors.grey.shade600)),
-            const SizedBox(height: 8),
-            Text('กดปุ่ม + เพื่อเพิ่มโต๊ะ',
-                style: TextStyle(color: Colors.grey.shade500)),
-            const SizedBox(height: 24),
-            FilledButton.icon(
-              onPressed: onAdd,
-              icon: const Icon(Icons.add),
-              label: const Text('เพิ่มโต๊ะ'),
-              style: FilledButton.styleFrom(
-                  backgroundColor: AppTheme.primaryColor),
-            ),
-          ],
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(Icons.table_restaurant, size: 64, color: Colors.grey.shade400),
+        const SizedBox(height: 16),
+        Text(
+          'ยังไม่มีโต๊ะ',
+          style: TextStyle(fontSize: 18, color: Colors.grey.shade600),
         ),
-      );
+        const SizedBox(height: 8),
+        Text(
+          'กดปุ่ม + เพื่อเพิ่มโต๊ะ',
+          style: TextStyle(color: Colors.grey.shade500),
+        ),
+        const SizedBox(height: 24),
+        FilledButton.icon(
+          onPressed: onAdd,
+          icon: const Icon(Icons.add),
+          label: const Text('เพิ่มโต๊ะ'),
+          style: FilledButton.styleFrom(backgroundColor: AppTheme.primaryColor),
+        ),
+      ],
+    ),
+  );
 }
 
 class _TableOptionsSheet extends StatelessWidget {
@@ -971,124 +1125,125 @@ class _TableOptionsSheet extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'โต๊ะ ${table.displayName}',
-              style: const TextStyle(
-                  fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            if (table.activeGuestCount != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(
-                  '${table.activeGuestCount} คน • เปิดเมื่อ ${_formatTime(table.sessionOpenedAt)}',
-                  style: TextStyle(color: Colors.grey.shade600),
-                ),
-            ),
-            const SizedBox(height: 20),
-            ListTile(
-              leading: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppTheme.successColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(Icons.receipt, color: AppTheme.successColor),
+  Widget build(BuildContext context) => SingleChildScrollView(
+    child: Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'โต๊ะ ${table.displayName}',
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          if (table.activeGuestCount != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                '${table.activeGuestCount} คน • เปิดเมื่อ ${_formatTime(table.sessionOpenedAt)}',
+                style: TextStyle(color: Colors.grey.shade600),
               ),
-              title: const Text('ดูบิล / ชำระเงิน'),
-              subtitle: const Text('pre-bill, service charge, แยกบิล'),
-              onTap: onViewBill,
             ),
-            ListTile(
-              leading: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  Icons.receipt_long_outlined,
-                  color: AppTheme.primaryColor,
-                ),
+          const SizedBox(height: 20),
+          ListTile(
+            leading: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppTheme.successColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
               ),
-              title: const Text('รับออเดอร์ต่อ'),
-              subtitle: const Text('เปิดหน้า POS สำหรับโต๊ะนี้'),
-              onTap: onTakeOrder,
+              child: Icon(Icons.receipt, color: AppTheme.successColor),
             ),
-            ListTile(
-              leading: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppTheme.errorColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(Icons.close, color: AppTheme.errorColor),
+            title: const Text('ดูบิล / ชำระเงิน'),
+            subtitle: const Text('pre-bill, service charge, แยกบิล'),
+            onTap: onViewBill,
+          ),
+          ListTile(
+            leading: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
               ),
-              title: const Text('ปิดโต๊ะ'),
-              subtitle: const Text('ปิดรอบและเปลี่ยนสถานะเป็นกำลังเก็บ'),
-              onTap: onClose,
-            ),
-            ListTile(
-              leading: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppTheme.infoColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(Icons.swap_horiz, color: AppTheme.infoColor),
+              child: Icon(
+                Icons.receipt_long_outlined,
+                color: AppTheme.primaryColor,
               ),
-              title: const Text('ย้ายโต๊ะ'),
-              subtitle: const Text('ย้าย session ไปยังโต๊ะว่าง'),
-              onTap: onTransfer,
             ),
-            ListTile(
-              leading: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.purple.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.badge, color: Colors.purple),
+            title: const Text('รับออเดอร์ต่อ'),
+            subtitle: const Text('เปิดหน้า POS สำหรับโต๊ะนี้'),
+            onTap: onTakeOrder,
+          ),
+          ListTile(
+            leading: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppTheme.errorColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
               ),
-              title: const Text('กำหนดพนักงาน'),
-              subtitle: const Text('ระบุพนักงานเสิร์ฟดูแลโต๊ะนี้'),
-              onTap: onAssignWaiter,
+              child: Icon(Icons.close, color: AppTheme.errorColor),
             ),
-            ListTile(
-              leading: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.teal.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.timeline, color: Colors.teal),
+            title: const Text('ปิดโต๊ะ'),
+            subtitle: const Text('ปิดรอบและเปลี่ยนสถานะเป็นกำลังเก็บ'),
+            onTap: onClose,
+          ),
+          ListTile(
+            leading: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppTheme.infoColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
               ),
-              title: const Text('ดู Timeline'),
-              subtitle: const Text('ประวัติการสั่งอาหารในรอบนี้'),
-              onTap: onViewTimeline,
+              child: Icon(Icons.swap_horiz, color: AppTheme.infoColor),
             ),
-            ListTile(
-              leading: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.indigo.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.people_outline, color: Colors.indigo),
+            title: const Text('ย้ายโต๊ะ'),
+            subtitle: const Text('ย้าย session ไปยังโต๊ะว่าง'),
+            onTap: onTransfer,
+          ),
+          ListTile(
+            leading: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.purple.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
               ),
-              title: const Text('อัปเดตจำนวนลูกค้า'),
-              subtitle: Text('ปัจจุบัน: ${table.activeGuestCount ?? 1} คน'),
-              onTap: onUpdateGuestCount,
+              child: const Icon(Icons.badge, color: Colors.purple),
             ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      );
+            title: const Text('กำหนดพนักงาน'),
+            subtitle: const Text('ระบุพนักงานเสิร์ฟดูแลโต๊ะนี้'),
+            onTap: onAssignWaiter,
+          ),
+          ListTile(
+            leading: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.teal.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.timeline, color: Colors.teal),
+            ),
+            title: const Text('ดู Timeline'),
+            subtitle: const Text('ประวัติการสั่งอาหารในรอบนี้'),
+            onTap: onViewTimeline,
+          ),
+          ListTile(
+            leading: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.indigo.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.people_outline, color: Colors.indigo),
+            ),
+            title: const Text('อัปเดตจำนวนลูกค้า'),
+            subtitle: Text('ปัจจุบัน: ${table.activeGuestCount ?? 1} คน'),
+            onTap: onUpdateGuestCount,
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    ),
+  );
 
   String _formatTime(DateTime? dt) {
     if (dt == null) return '-';

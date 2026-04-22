@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import '../../data/models/kitchen_queue_model.dart';
 import '../../../../shared/theme/app_theme.dart';
 
+/// จำนวนนาทีที่ถือว่า HELD course ค้างนาน (เตือน)
+const int kHeldOverdueMinutes = 30;
+
 class KitchenOrderCard extends StatelessWidget {
   final KitchenOrderGroup group;
   final void Function(String itemId, String newStatus) onStatusChange;
@@ -147,7 +150,6 @@ class _ItemRow extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Status dot
               Padding(
                 padding: const EdgeInsets.only(top: 3, right: 8),
                 child: Container(
@@ -159,49 +161,67 @@ class _ItemRow extends StatelessWidget {
                   ),
                 ),
               ),
-              // Product name
               Expanded(
-                child: Text(
-                  item.productName,
-                  style: const TextStyle(
-                      fontSize: 14, fontWeight: FontWeight.w600),
-                ),
-              ),
-              // Course badge (only if course > 1 or HELD)
-              if (item.courseNo > 1 || item.isHeld) ...[
-                Container(
-                  margin: const EdgeInsets.only(right: 6),
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.blue.shade300),
-                  ),
-                  child: Text(
-                    item.isHeld ? 'C${item.courseNo} HOLD' : 'C${item.courseNo}',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.blue.shade700,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.productName,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
-                ),
-              ],
-              // Qty badge
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  'x${_fmtQty(item.quantity)} ${item.unit}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: statusColor,
-                  ),
+                    const SizedBox(height: 4),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        if (item.courseNo > 1 || item.isHeld)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.blue.shade300),
+                            ),
+                            child: Text(
+                              item.isHeld
+                                  ? 'C${item.courseNo} HOLD'
+                                  : 'C${item.courseNo}',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.blue.shade700,
+                              ),
+                            ),
+                          ),
+                        if (item.isHeld)
+                          _HeldOverdueBadge(createdAt: item.createdAt),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: statusColor.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            'x${_fmtQty(item.quantity)} ${item.unit}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: statusColor,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -273,12 +293,12 @@ class _ActionButtons extends StatelessWidget {
             Colors.blueGrey, onFireCourse),
         'PENDING' => _btn('เริ่มทำ', Icons.play_arrow,
             const Color(0xFF1565C0), () => onStatusChange('PREPARING')),
-        'PREPARING' => Row(
-            mainAxisSize: MainAxisSize.min,
+        'PREPARING' => Wrap(
+            spacing: 8,
+            runSpacing: 8,
             children: [
               _outlineBtn('ย้อนกลับ', Icons.undo, Colors.grey.shade600,
                   () => onStatusChange('PENDING')),
-              const SizedBox(width: 8),
               _btn('พร้อมเสิร์ฟ', Icons.check, AppTheme.successColor,
                   () => onStatusChange('READY')),
             ],
@@ -382,4 +402,73 @@ class _KdsTheme {
   final Color headerBg;
   final Color border;
   const _KdsTheme({required this.headerBg, required this.border});
+}
+
+// ── Held overdue badge (live timer) ──────────────────────────────────────────
+
+class _HeldOverdueBadge extends StatefulWidget {
+  final DateTime createdAt;
+  const _HeldOverdueBadge({required this.createdAt});
+
+  @override
+  State<_HeldOverdueBadge> createState() => _HeldOverdueBadgeState();
+}
+
+class _HeldOverdueBadgeState extends State<_HeldOverdueBadge> {
+  late Timer _timer;
+  late Duration _held;
+
+  @override
+  void initState() {
+    super.initState();
+    _held = DateTime.now().difference(widget.createdAt);
+    _timer = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (mounted) {
+        setState(() => _held = DateTime.now().difference(widget.createdAt));
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final minutes = _held.inMinutes;
+    if (minutes < kHeldOverdueMinutes) return const SizedBox.shrink();
+
+    final isVeryLate = minutes >= kHeldOverdueMinutes * 2;
+    final color = isVeryLate ? AppTheme.errorColor : AppTheme.warningColor;
+    final label = minutes >= 60
+        ? '${minutes ~/ 60}ชม.${minutes % 60}น.'
+        : '$minutesน.';
+
+    return Container(
+      margin: const EdgeInsets.only(right: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.6)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.warning_amber_rounded, size: 10, color: color),
+          const SizedBox(width: 3),
+          Text(
+            'ค้าง $label',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

@@ -679,16 +679,23 @@ class ReportRoutes {
 
       final results = await db.customSelect('''
         SELECT
-          sm.product_id,
-          sm.product_name,
+          sm.movement_id,
+          sm.movement_no,
           sm.movement_type,
+          sm.product_id,
+          COALESCE(p.product_name, sm.product_id) AS product_name,
+          sm.warehouse_id,
+          COALESCE(w.warehouse_name, sm.warehouse_id) AS warehouse_name,
           sm.quantity,
-          sm.balance_after,
+          sm.unit_cost,
           sm.reference_type,
           sm.reference_id,
+          sm.reference_no,
           sm.remark,
           sm.created_at
         FROM stock_movements sm
+        LEFT JOIN products p ON p.product_id = sm.product_id
+        LEFT JOIN warehouses w ON w.warehouse_id = sm.warehouse_id
         $where
         ORDER BY sm.created_at DESC
         LIMIT 200
@@ -697,13 +704,18 @@ class ReportRoutes {
       return _okList(
         results.map(
           (r) => {
+            'movement_id': r.read<String>('movement_id'),
+            'movement_no': r.read<String>('movement_no'),
+            'movement_type': r.read<String>('movement_type'),
             'product_id': r.read<String>('product_id'),
             'product_name': r.read<String>('product_name'),
-            'movement_type': r.read<String>('movement_type'),
+            'warehouse_id': r.read<String>('warehouse_id'),
+            'warehouse_name': r.read<String>('warehouse_name'),
             'quantity': r.read<double>('quantity'),
-            'balance_after': r.read<double>('balance_after'),
+            'unit_cost': r.read<double>('unit_cost'),
             'reference_type': r.readNullable<String>('reference_type'),
             'reference_id': r.readNullable<String>('reference_id'),
+            'reference_no': r.readNullable<String>('reference_no'),
             'remark': r.readNullable<String>('remark'),
             'created_at': r.read<DateTime>('created_at').toIso8601String(),
           },

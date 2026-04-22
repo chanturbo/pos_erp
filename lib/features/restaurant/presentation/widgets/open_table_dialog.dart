@@ -6,7 +6,7 @@ import '../../../../shared/theme/app_theme.dart';
 class OpenTableDialog extends ConsumerStatefulWidget {
   final DiningTableModel table;
   final String branchId;
-  final Future<void> Function(int guestCount) onConfirm;
+  final Future<bool> Function(int guestCount) onConfirm;
 
   const OpenTableDialog({
     super.key,
@@ -22,6 +22,7 @@ class OpenTableDialog extends ConsumerStatefulWidget {
 class _OpenTableDialogState extends ConsumerState<OpenTableDialog> {
   int _guestCount = 1;
   bool _loading = false;
+  String? _errorText;
 
   @override
   Widget build(BuildContext context) {
@@ -35,16 +36,21 @@ class _OpenTableDialogState extends ConsumerState<OpenTableDialog> {
               color: AppTheme.primaryColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(Icons.table_restaurant,
-                color: AppTheme.primaryColor, size: 20),
+            child: Icon(
+              Icons.table_restaurant,
+              color: AppTheme.primaryColor,
+              size: 20,
+            ),
           ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('เปิดโต๊ะ',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                const Text(
+                  'เปิดโต๊ะ',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
                 Text(
                   widget.table.displayName,
                   style: TextStyle(fontSize: 13, color: AppTheme.subtextColor),
@@ -75,13 +81,15 @@ class _OpenTableDialogState extends ConsumerState<OpenTableDialog> {
                 height: 48,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  border:
-                      Border.all(color: AppTheme.borderColor),
+                  border: Border.all(color: AppTheme.borderColor),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   '$_guestCount',
-                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
               const SizedBox(width: 16),
@@ -97,9 +105,23 @@ class _OpenTableDialogState extends ConsumerState<OpenTableDialog> {
           Center(
             child: Text(
               'ความจุโต๊ะ ${widget.table.capacity} ที่นั่ง',
-              style: const TextStyle(fontSize: 12, color: AppTheme.subtextColor),
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppTheme.subtextColor,
+              ),
             ),
           ),
+          if (_errorText != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              _errorText!,
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppTheme.errorColor,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
         ],
       ),
       actions: [
@@ -117,20 +139,35 @@ class _OpenTableDialogState extends ConsumerState<OpenTableDialog> {
                 )
               : const Icon(Icons.check, size: 18),
           label: Text(_loading ? 'กำลังเปิด...' : 'เปิดโต๊ะ'),
-          style: FilledButton.styleFrom(
-              backgroundColor: AppTheme.primaryColor),
+          style: FilledButton.styleFrom(backgroundColor: AppTheme.primaryColor),
         ),
       ],
     );
   }
 
   Future<void> _confirm() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _errorText = null;
+    });
     try {
-      await widget.onConfirm(_guestCount);
-      if (mounted) Navigator.pop(context, true);
+      final ok = await widget.onConfirm(_guestCount);
+      if (!mounted) return;
+      if (ok) {
+        Navigator.pop(context, true);
+      } else {
+        setState(() {
+          _loading = false;
+          _errorText = 'เปิดโต๊ะไม่สำเร็จ กรุณาลองใหม่อีกครั้ง';
+        });
+      }
     } catch (_) {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _errorText = 'เปิดโต๊ะไม่สำเร็จ กรุณาลองใหม่อีกครั้ง';
+        });
+      }
     }
   }
 }
@@ -142,22 +179,20 @@ class _CountButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => InkWell(
-        onTap: onTap,
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(8),
+    child: Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: onTap != null ? AppTheme.primaryColor : Colors.grey.shade300,
         borderRadius: BorderRadius.circular(8),
-        child: Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: onTap != null
-                ? AppTheme.primaryColor
-                : Colors.grey.shade300,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(
-            icon,
-            color: onTap != null ? Colors.white : Colors.grey.shade500,
-            size: 20,
-          ),
-        ),
-      );
+      ),
+      child: Icon(
+        icon,
+        color: onTap != null ? Colors.white : Colors.grey.shade500,
+        size: 20,
+      ),
+    ),
+  );
 }

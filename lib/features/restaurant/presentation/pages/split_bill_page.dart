@@ -35,7 +35,7 @@ class _SplitBillPageState extends ConsumerState<SplitBillPage>
   bool _loadingEqual = false;
 
   int _personCount = 2;
-  late Map<int, Set<String>> _assignments;
+  late Map<String, List<double>> _assignments;
   SplitResult? _itemResult;
   bool _loadingItem = false;
 
@@ -47,7 +47,70 @@ class _SplitBillPageState extends ConsumerState<SplitBillPage>
   }
 
   void _resetAssignments() {
-    _assignments = {for (int i = 0; i < _personCount; i++) i: {}};
+    _assignments = {
+      for (final item in widget.bill.items)
+        item.itemId: List.filled(_personCount, 0),
+    };
+  }
+
+  void _changeAssignmentQuantity(
+    BillItemModel item,
+    int personIdx,
+    double delta,
+  ) {
+    final current = List<double>.from(
+      _assignments[item.itemId] ?? List.filled(_personCount, 0),
+    );
+    final allocatedElsewhere = current.asMap().entries.fold<double>(
+      0,
+      (sum, entry) => entry.key == personIdx ? sum : sum + entry.value,
+    );
+    final maxAllowed = (item.quantity - allocatedElsewhere).clamp(
+      0.0,
+      double.infinity,
+    );
+    final nextValue = (current[personIdx] + delta).clamp(0.0, maxAllowed);
+    if ((nextValue - current[personIdx]).abs() < 0.0001) return;
+
+    setState(() {
+      current[personIdx] = nextValue;
+      _assignments[item.itemId] = current;
+      _itemResult = null;
+    });
+  }
+
+  void _assignRemainingQuantity(BillItemModel item, int personIdx) {
+    final current = List<double>.from(
+      _assignments[item.itemId] ?? List.filled(_personCount, 0),
+    );
+    final allocatedElsewhere = current.asMap().entries.fold<double>(
+      0,
+      (sum, entry) => entry.key == personIdx ? sum : sum + entry.value,
+    );
+    final remaining = (item.quantity - allocatedElsewhere).clamp(
+      0.0,
+      double.infinity,
+    );
+
+    setState(() {
+      current[personIdx] = remaining;
+      _assignments[item.itemId] = current;
+      _itemResult = null;
+    });
+  }
+
+  double _quantityStepFor(BillItemModel item) {
+    final quantity = item.quantity;
+    if ((quantity - quantity.truncateToDouble()).abs() > 0.0001) {
+      return 0.5;
+    }
+    return quantity <= 1 ? 0.5 : 1;
+  }
+
+  String _formatQuantity(double value) {
+    return value == value.truncateToDouble()
+        ? value.toStringAsFixed(0)
+        : value.toStringAsFixed(1);
   }
 
   @override
@@ -82,6 +145,7 @@ class _SplitBillPageState extends ConsumerState<SplitBillPage>
               _equalResult = null;
             }),
             onCalculate: _applyEqualSplit,
+            onConfirm: _confirmEqualSplit,
             onPaySplit: _paySplit,
           ),
           _ItemSplitTab(
@@ -95,13 +159,18 @@ class _SplitBillPageState extends ConsumerState<SplitBillPage>
               _resetAssignments();
               _itemResult = null;
             }),
-            onAssign: (itemId, personIdx) => setState(() {
-              for (final assigned in _assignments.values) {
-                assigned.remove(itemId);
-              }
-              _assignments[personIdx]?.add(itemId);
-              _itemResult = null;
-            }),
+            onDecreaseQuantity: (item, personIdx) => _changeAssignmentQuantity(
+              item,
+              personIdx,
+              -_quantityStepFor(item),
+            ),
+            onIncreaseQuantity: (item, personIdx) => _changeAssignmentQuantity(
+              item,
+              personIdx,
+              _quantityStepFor(item),
+            ),
+            onAssignRemaining: _assignRemainingQuantity,
+            formatQuantity: _formatQuantity,
             onCalculate: _applyItemSplit,
             onPaySplit: _paySplit,
           ),
@@ -112,9 +181,31 @@ class _SplitBillPageState extends ConsumerState<SplitBillPage>
 
   Future<void> _applyEqualSplit() async {
     setState(() => _loadingEqual = true);
-    final result = await ref.read(billProvider.notifier).applySplit(
+    final result = await ref
+        .read(billProvider.notifier)
+        .splitEqual(widget.tableContext.tableId, _splitCount);
+    setState(() {
+      _equalResult = result;
+      _loadingEqual = false;
+    });
+    if (result == null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('ไม่สามารถดูตัวอย่างการแยกบิลได้')),
+      );
+    }
+  }
+
+  Future<void> _confirmEqualSplit() async {
+    final preview = _equalResult;
+    if (preview == null) return;
+
+    setState(() => _loadingEqual = true);
+    final result = await ref
+        .read(billProvider.notifier)
+        .applySplit(
           widget.tableContext.tableId,
-          _buildBalancedSplits(),
+          _buildSplitsFromPreview(preview),
+          previewToken: preview.previewToken ?? widget.bill.previewToken,
         );
     setState(() {
       _equalResult = result;
@@ -122,83 +213,79 @@ class _SplitBillPageState extends ConsumerState<SplitBillPage>
     });
     if (result == null && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('ไม่สามารถสร้างบิลแยกได้')),
+        const SnackBar(
+          content: Text(
+            'ไม่สามารถสร้างบิลแยกได้ หรือรายการเปลี่ยนแปลงระหว่างที่ใช้งาน',
+          ),
+        ),
       );
     }
   }
 
   Future<void> _applyItemSplit() async {
-    final allAssigned = widget.bill.items.every(
-      (item) => _assignments.values.any((set) => set.contains(item.itemId)),
-    );
+    final allAssigned = widget.bill.items.every((item) {
+      final assigned = _assignments[item.itemId] ?? const <double>[];
+      final totalAssigned = assigned.fold<double>(
+        0,
+        (sum, value) => sum + value,
+      );
+      return (totalAssigned - item.quantity).abs() < 0.0001;
+    });
     if (!allAssigned) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('กรุณากำหนดทุกรายการให้ครบก่อน')),
+        const SnackBar(content: Text('กรุณาแจกแจงจำนวนของทุกรายการให้ครบก่อน')),
       );
       return;
     }
 
     final splits = List.generate(_personCount, (i) {
-      final assignedIds = _assignments[i] ?? const <String>{};
-      return {
-        'label': 'คน ${i + 1}',
-        'items': assignedIds
-            .map(
-              (itemId) => {
-                'item_id': itemId,
-                'quantity': widget.bill.items
-                    .firstWhere((item) => item.itemId == itemId)
-                    .quantity,
-              },
-            )
-            .toList(),
-      };
+      final assignedItems = widget.bill.items
+          .map((item) {
+            final quantity = (_assignments[item.itemId] ?? const <double>[])[i];
+            if (quantity <= 0) return null;
+            return {'item_id': item.itemId, 'quantity': quantity};
+          })
+          .whereType<Map<String, dynamic>>()
+          .toList();
+      return {'label': 'คน ${i + 1}', 'items': assignedItems};
     });
 
     setState(() => _loadingItem = true);
     final result = await ref
         .read(billProvider.notifier)
-        .applySplit(widget.tableContext.tableId, splits);
+        .applySplit(
+          widget.tableContext.tableId,
+          splits,
+          previewToken: widget.bill.previewToken,
+        );
     setState(() {
       _itemResult = result;
       _loadingItem = false;
     });
     if (result == null && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('ไม่สามารถสร้างบิลแยกได้')),
+        const SnackBar(
+          content: Text(
+            'ไม่สามารถสร้างบิลแยกได้ หรือรายการเปลี่ยนแปลงระหว่างที่ใช้งาน',
+          ),
+        ),
       );
     }
   }
 
-  List<Map<String, dynamic>> _buildBalancedSplits() {
-    final buckets = List.generate(
-      _splitCount,
-      (index) => <String, dynamic>{
-        'label': 'คน ${index + 1}',
-        'items': <Map<String, dynamic>>[],
-        'sum': 0.0,
-      },
-    );
-
-    final sortedItems = [...widget.bill.items]
-      ..sort((a, b) => b.amount.compareTo(a.amount));
-
-    for (final item in sortedItems) {
-      buckets.sort(
-        (a, b) => ((a['sum'] as double).compareTo(b['sum'] as double)),
-      );
-      (buckets.first['items'] as List<Map<String, dynamic>>).add({
-        'item_id': item.itemId,
-        'quantity': item.quantity,
-      });
-      buckets.first['sum'] = (buckets.first['sum'] as double) + item.amount;
-    }
-
-    return buckets
+  List<Map<String, dynamic>> _buildSplitsFromPreview(SplitResult preview) {
+    return preview.splits
         .map(
-          (bucket) => {
-            'label': bucket['label'],
-            'items': bucket['items'],
+          (split) => {
+            'label': split.label,
+            'items': split.items
+                .map(
+                  (item) => {
+                    'item_id': item['item_id'],
+                    'quantity': item['quantity'],
+                  },
+                )
+                .toList(),
           },
         )
         .toList();
@@ -206,6 +293,7 @@ class _SplitBillPageState extends ConsumerState<SplitBillPage>
 
   void _paySplit(SplitPortion portion) {
     if (portion.orderIds.isEmpty) return;
+    final currentCart = ref.read(cartProvider);
 
     final items = portion.items
         .map(
@@ -219,8 +307,9 @@ class _SplitBillPageState extends ConsumerState<SplitBillPage>
             amount: (item['amount'] as num?)?.toDouble() ?? 0,
             priceLevel1: (item['unit_price'] as num?)?.toDouble() ?? 0,
             note: item['special_instructions'] as String?,
-            modifiers: ((item['modifiers'] as List?) ?? const [])
-                .map((modifier) {
+            modifiers: ((item['modifiers'] as List?) ?? const []).map((
+              modifier,
+            ) {
               final data = Map<String, dynamic>.from(modifier as Map);
               return CartItemModifier(
                 modifierId: data['modifier_id'] as String? ?? '',
@@ -234,23 +323,25 @@ class _SplitBillPageState extends ConsumerState<SplitBillPage>
         .toList();
 
     ref.read(cartProvider.notifier).replaceCart(
-          CartState(
-            items: items,
-            customerId: 'WALK_IN',
-            customerName: 'ลูกค้าทั่วไป',
-          ),
-        );
-    ref.read(restaurantOrderContextProvider.notifier).state =
-        widget.tableContext.copyWith(
-      currentOrderId: portion.orderIds.first,
-      currentOrderIds: portion.orderIds,
-      subtotalOverride: portion.subtotal,
-      discountOverride: portion.discountAmount,
-      serviceChargeOverride: portion.serviceCharge,
-      totalOverride: portion.total,
-      paymentTitle: 'ชำระบิลแยก',
-      splitLabel: portion.label,
+      CartState(
+        items: items,
+        customerId: currentCart.customerId,
+        customerName: currentCart.customerName,
+        customerPriceLevel: currentCart.customerPriceLevel,
+      ),
     );
+    ref.read(restaurantOrderContextProvider.notifier).state = widget
+        .tableContext
+        .copyWith(
+          currentOrderId: portion.orderIds.first,
+          currentOrderIds: portion.orderIds,
+          subtotalOverride: portion.subtotal,
+          discountOverride: portion.discountAmount,
+          serviceChargeOverride: portion.serviceCharge,
+          totalOverride: portion.total,
+          paymentTitle: 'ชำระบิลแยก',
+          splitLabel: portion.label,
+        );
 
     Navigator.pushReplacement(
       context,
@@ -266,6 +357,7 @@ class _EqualSplitTab extends StatelessWidget {
   final bool loading;
   final void Function(int) onCountChanged;
   final VoidCallback onCalculate;
+  final VoidCallback onConfirm;
   final void Function(SplitPortion) onPaySplit;
 
   const _EqualSplitTab({
@@ -275,8 +367,12 @@ class _EqualSplitTab extends StatelessWidget {
     required this.loading,
     required this.onCountChanged,
     required this.onCalculate,
+    required this.onConfirm,
     required this.onPaySplit,
   });
+
+  bool get _isPreviewOnly =>
+      result != null && result!.splits.every((split) => split.orderIds.isEmpty);
 
   @override
   Widget build(BuildContext context) {
@@ -298,7 +394,9 @@ class _EqualSplitTab extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     IconButton.filled(
-                      onPressed: count > 2 ? () => onCountChanged(count - 1) : null,
+                      onPressed: count > 2
+                          ? () => onCountChanged(count - 1)
+                          : null,
                       icon: const Icon(Icons.remove),
                     ),
                     Padding(
@@ -312,7 +410,9 @@ class _EqualSplitTab extends StatelessWidget {
                       ),
                     ),
                     IconButton.filled(
-                      onPressed: count < 20 ? () => onCountChanged(count + 1) : null,
+                      onPressed: count < 20
+                          ? () => onCountChanged(count + 1)
+                          : null,
                       icon: const Icon(Icons.add),
                     ),
                   ],
@@ -340,13 +440,30 @@ class _EqualSplitTab extends StatelessWidget {
                   ),
                 )
               : const Icon(Icons.call_split),
-          label: const Text('สร้างบิลแยก'),
-          style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(48),
-          ),
+          label: const Text('ดูตัวอย่างบิลแยก'),
+          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
         ),
+        if (_isPreviewOnly) ...[
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: loading ? null : onConfirm,
+            icon: const Icon(Icons.check_circle_outline),
+            label: const Text('ยืนยันสร้างบิลแยก'),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+            ),
+          ),
+        ],
         if (result != null) ...[
           const SizedBox(height: 16),
+          if (_isPreviewOnly)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 8),
+              child: Text(
+                'นี่คือการแบ่งแบบตัวอย่าง ระบบจะสร้าง order จริงเมื่อกดยืนยัน',
+                style: TextStyle(color: Colors.black54),
+              ),
+            ),
           ...result!.splits.asMap().entries.map((entry) {
             final split = entry.value;
             return Card(
@@ -381,8 +498,9 @@ class _EqualSplitTab extends StatelessWidget {
             (split) => Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: FilledButton.icon(
-                onPressed:
-                    split.orderIds.isEmpty ? null : () => onPaySplit(split),
+                onPressed: split.orderIds.isEmpty
+                    ? null
+                    : () => onPaySplit(split),
                 icon: const Icon(Icons.payment),
                 label: Text('ชำระ ${split.label}'),
               ),
@@ -397,11 +515,14 @@ class _EqualSplitTab extends StatelessWidget {
 class _ItemSplitTab extends StatelessWidget {
   final BillModel bill;
   final int personCount;
-  final Map<int, Set<String>> assignments;
+  final Map<String, List<double>> assignments;
   final SplitResult? result;
   final bool loading;
   final void Function(int) onPersonCountChanged;
-  final void Function(String itemId, int personIdx) onAssign;
+  final void Function(BillItemModel item, int personIdx) onDecreaseQuantity;
+  final void Function(BillItemModel item, int personIdx) onIncreaseQuantity;
+  final void Function(BillItemModel item, int personIdx) onAssignRemaining;
+  final String Function(double quantity) formatQuantity;
   final VoidCallback onCalculate;
   final void Function(SplitPortion) onPaySplit;
 
@@ -412,7 +533,10 @@ class _ItemSplitTab extends StatelessWidget {
     required this.result,
     required this.loading,
     required this.onPersonCountChanged,
-    required this.onAssign,
+    required this.onDecreaseQuantity,
+    required this.onIncreaseQuantity,
+    required this.onAssignRemaining,
+    required this.formatQuantity,
     required this.onCalculate,
     required this.onPaySplit,
   });
@@ -449,65 +573,99 @@ class _ItemSplitTab extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         const Text(
-          'กดที่รายการเพื่อกำหนดว่าใครจ่าย',
+          'ระบุจำนวนต่อคนในแต่ละรายการให้รวมครบตามจำนวนเดิม',
           style: TextStyle(color: Colors.black54, fontSize: 12),
         ),
         const SizedBox(height: 8),
         ...bill.items.map((item) {
-          final assignedTo = assignments.entries
-              .where((entry) => entry.value.contains(item.itemId))
-              .map((entry) => entry.key)
-              .firstOrNull;
+          final assignedQuantities =
+              assignments[item.itemId] ?? List.filled(personCount, 0);
+          final allocated = assignedQuantities.fold<double>(
+            0,
+            (sum, value) => sum + value,
+          );
+          final remaining = (item.quantity - allocated).clamp(
+            0.0,
+            double.infinity,
+          );
 
           return Card(
             margin: const EdgeInsets.only(bottom: 6),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: Row(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          item.productName,
-                          style: const TextStyle(fontWeight: FontWeight.w500),
-                        ),
-                        Text(
-                          'x${item.quantity.toStringAsFixed(item.quantity == item.quantity.truncateToDouble() ? 0 : 1)}  ฿${_fmt.format(item.amount)}',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.black54,
-                          ),
-                        ),
-                      ],
+                  Text(
+                    item.productName,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'จำนวนเดิม ${formatQuantity(item.quantity)} ${item.unit}  •  ฿${_fmt.format(item.amount)}',
+                    style: const TextStyle(fontSize: 12, color: Colors.black54),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    remaining > 0.0001
+                        ? 'เหลืออีก ${formatQuantity(remaining)} ${item.unit}'
+                        : 'แจกแจงครบแล้ว',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: remaining > 0.0001
+                          ? AppTheme.errorColor
+                          : AppTheme.successColor,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
-                  Wrap(
-                    spacing: 4,
-                    children: List.generate(personCount, (i) {
-                      final selected = assignedTo == i;
-                      return GestureDetector(
-                        onTap: () => onAssign(item.itemId, i),
-                        child: CircleAvatar(
-                          radius: 14,
-                          backgroundColor: selected
-                              ? AppTheme.primaryColor
-                              : Colors.grey.shade200,
-                          child: Text(
-                            '${i + 1}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: selected ? Colors.white : Colors.black54,
-                              fontWeight: selected
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
+                  const SizedBox(height: 10),
+                  ...List.generate(personCount, (i) {
+                    final quantity = assignedQuantities[i];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 54,
+                            child: Text(
+                              'คน ${i + 1}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
-                        ),
-                      );
-                    }),
-                  ),
+                          IconButton(
+                            tooltip: 'ลด ${item.productName} คน ${i + 1}',
+                            onPressed: () => onDecreaseQuantity(item, i),
+                            icon: const Icon(Icons.remove_circle_outline),
+                          ),
+                          Container(
+                            constraints: const BoxConstraints(minWidth: 52),
+                            alignment: Alignment.center,
+                            child: Text(
+                              formatQuantity(quantity),
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: 'เพิ่ม ${item.productName} คน ${i + 1}',
+                            onPressed: () => onIncreaseQuantity(item, i),
+                            icon: const Icon(Icons.add_circle_outline),
+                          ),
+                          const SizedBox(width: 8),
+                          if (remaining > 0.0001)
+                            OutlinedButton(
+                              onPressed: () => onAssignRemaining(item, i),
+                              child: const Text('รับที่เหลือ'),
+                            ),
+                        ],
+                      ),
+                    );
+                  }),
                 ],
               ),
             ),
@@ -527,37 +685,33 @@ class _ItemSplitTab extends StatelessWidget {
                 )
               : const Icon(Icons.call_split),
           label: const Text('สร้างบิลแยก'),
-          style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(48),
-          ),
+          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
         ),
         if (result != null) ...[
           const SizedBox(height: 16),
           ...result!.splits.asMap().entries.map((entry) {
             final split = entry.value;
-            final children = split.items
-                .map(
-                  (item) => ListTile(
-                    dense: true,
-                    title: Text(item['product_name'] as String? ?? ''),
-                    trailing: Text(
-                      '฿${_fmt.format((item['amount'] as num?)?.toDouble() ?? 0)}',
-                    ),
+            final children = <Widget>[
+              ...split.items.map(
+                (item) => ListTile(
+                  dense: true,
+                  title: Text(item['product_name'] as String? ?? ''),
+                  trailing: Text(
+                    '฿${_fmt.format((item['amount'] as num?)?.toDouble() ?? 0)}',
                   ),
-                )
-                .toList()
-                .cast<Widget>();
-            children.add(
+                ),
+              ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                 child: FilledButton.icon(
-                  onPressed:
-                      split.orderIds.isEmpty ? null : () => onPaySplit(split),
+                  onPressed: split.orderIds.isEmpty
+                      ? null
+                      : () => onPaySplit(split),
                   icon: const Icon(Icons.payment),
                   label: Text('ชำระ ${split.label}'),
                 ),
               ),
-            );
+            ];
 
             return Card(
               color: AppTheme.primaryColor.withValues(alpha: 0.08),

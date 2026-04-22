@@ -915,7 +915,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                                         if (_paymentType == 'CASH' &&
                                             !isDisabled)
                                           Text(
-                                            '฿${_grossTotal.toStringAsFixed(2)}',
+                                            '฿${_netTotal.toStringAsFixed(2)}',
                                             style: const TextStyle(
                                               fontSize: 12,
                                               color: Colors.white70,
@@ -1003,8 +1003,9 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
               : [
                   if (currentOrderId != null && currentOrderId.isNotEmpty)
                     currentOrderId,
-                ])
+              ])
           : const <String>[];
+      String? restaurantPostPaymentWarning;
       // ✅ เก็บ netTotal ก่อน clear cart — getter _netTotal อ่านจาก cart
       final netTotal = _netTotal;
 
@@ -1206,14 +1207,23 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                 billData['data'] is Map ? billData['data'] as Map : {};
             final remainingItems = billPayload['items'] as List? ?? const [];
             if (remainingItems.isEmpty) {
-              await apiClient.post(
+              final closeRes = await apiClient.post(
                 '/api/tables/${restaurantContext.tableId}/close',
                 data: {},
               );
+              if (closeRes.statusCode != 200) {
+                final closeData =
+                    closeRes.data is Map ? closeRes.data as Map : const {};
+                restaurantPostPaymentWarning =
+                    closeData['message'] as String? ??
+                    'ชำระเงินสำเร็จแล้ว แต่ระบบปิดโต๊ะให้อัตโนมัติไม่สำเร็จ';
+              }
             }
             ref.invalidate(tableListProvider);
           } catch (e) {
             print('⚠️ Could not close restaurant table after payment: $e');
+            restaurantPostPaymentWarning =
+                'ชำระเงินสำเร็จแล้ว แต่ระบบปิดโต๊ะให้อัตโนมัติไม่สำเร็จ';
           }
         }
 
@@ -1242,8 +1252,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
             : 0.0;
 
         if (mounted) {
-          // ✅ ไปหน้าใบเสร็จแทน dialog
-          await Navigator.pushReplacement(
+          final receiptAction = await Navigator.push<ReceiptExitAction>(
             context,
             MaterialPageRoute(
               builder: (_) => ReceiptPage(
@@ -1271,9 +1280,12 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                         cartState.customerId!.isNotEmpty)
                     ? _customerPoints - _pointsUsed + earnedPoints
                     : null,
+                postPaymentWarning: restaurantPostPaymentWarning,
               ),
             ),
           );
+          if (!mounted) return;
+          Navigator.of(context).pop(receiptAction);
         }
       } else {
         // ✅ อ่าน error message จาก API แต่ไม่ expose raw exception
@@ -2015,6 +2027,7 @@ class ReceiptPage extends ConsumerStatefulWidget {
   final int earnedPoints;
   final int pointsUsed;
   final int? pointsBalance;
+  final String? postPaymentWarning;
 
   const ReceiptPage({
     super.key,
@@ -2035,6 +2048,7 @@ class ReceiptPage extends ConsumerStatefulWidget {
     this.earnedPoints = 0,
     this.pointsUsed = 0,
     this.pointsBalance,
+    this.postPaymentWarning,
   });
 
   static String _paymentLabel(String type) => switch (type) {
@@ -2425,6 +2439,43 @@ class _ReceiptPageState extends ConsumerState<ReceiptPage> {
                               ? 'เปิด auto print แล้ว ระบบจะพยายามส่งใบเสร็จไปที่ ${settings.thermalPrinterHost}:${settings.thermalPrinterPort}'
                               : 'เปิด direct thermal print แล้ว สามารถกดไอคอนพิมพ์ด้านบนเพื่อส่งไปที่ ${settings.thermalPrinterHost}:${settings.thermalPrinterPort}',
                           style: const TextStyle(fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
+              if (widget.postPaymentWarning != null &&
+                  widget.postPaymentWarning!.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Container(
+                  width: 340,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF4E5),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFF0B95A)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(
+                        Icons.warning_amber_rounded,
+                        color: Color(0xFF8A5A00),
+                        size: 18,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          widget.postPaymentWarning!,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF6B4A00),
+                          ),
                         ),
                       ),
                     ],

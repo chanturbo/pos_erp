@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../core/utils/crypto_utils.dart';
 import '../../../../shared/services/thermal_print_service.dart';
 import '../../../../shared/widgets/thermal_receipt.dart';
 import '../../../settings/presentation/pages/settings_page.dart';
@@ -37,7 +38,8 @@ class _BillingPageState extends ConsumerState<BillingPage> {
       final defaultRate = ref.read(settingsProvider).defaultServiceChargeRate;
       if (defaultRate > 0) {
         _scController.text = defaultRate.toStringAsFixed(
-            defaultRate == defaultRate.truncateToDouble() ? 0 : 1);
+          defaultRate == defaultRate.truncateToDouble() ? 0 : 1,
+        );
       }
       ref.read(billingTableIdProvider.notifier).state =
           widget.tableContext.tableId;
@@ -63,7 +65,10 @@ class _BillingPageState extends ConsumerState<BillingPage> {
             Text('ใบแจ้งราคา — ${ctx.tableName}'),
             Text(
               '${ctx.guestCount} คน · ${ctx.serviceType}',
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.normal),
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.normal,
+              ),
             ),
           ],
         ),
@@ -75,9 +80,39 @@ class _BillingPageState extends ConsumerState<BillingPage> {
         ],
       ),
       body: billAsync.when(
-        loading: () =>
-            const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.receipt_long_outlined,
+                  size: 48,
+                  color: AppTheme.errorColor,
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'โหลดบิลไม่สำเร็จ',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '$e',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.black54),
+                ),
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  onPressed: () => ref.read(billProvider.notifier).refresh(),
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('ลองใหม่'),
+                ),
+              ],
+            ),
+          ),
+        ),
         data: (bill) {
           if (bill == null || bill.isEmpty) {
             return const _EmptyBill();
@@ -105,8 +140,9 @@ class _BillingPageState extends ConsumerState<BillingPage> {
         .read(billProvider.notifier)
         .fireCourse(widget.tableContext.tableId, courseNo);
     if (!ok && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Fire course ไม่สำเร็จ')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Fire course ไม่สำเร็จ')));
     }
     if (ok && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -122,7 +158,7 @@ class _BillingPageState extends ConsumerState<BillingPage> {
     final settings = ref.read(settingsProvider);
     final reasonCtrl = TextEditingController();
     final pinCtrl = TextEditingController();
-    final hasPin = settings.managerPin.isNotEmpty;
+    final hasPin = settings.managerPinConfigured;
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -168,7 +204,11 @@ class _BillingPageState extends ConsumerState<BillingPage> {
           FilledButton(
             onPressed: () {
               if (reasonCtrl.text.trim().isEmpty) return;
-              if (hasPin && pinCtrl.text != settings.managerPin) {
+              if (hasPin &&
+                  !_matchesManagerPin(
+                    pinCtrl.text.trim(),
+                    settings.managerPin,
+                  )) {
                 ScaffoldMessenger.of(ctx).showSnackBar(
                   const SnackBar(
                     content: Text('PIN ไม่ถูกต้อง'),
@@ -185,18 +225,32 @@ class _BillingPageState extends ConsumerState<BillingPage> {
         ],
       ),
     );
-    reasonCtrl.dispose();
-    pinCtrl.dispose();
-
     if (confirmed != true || !mounted) return;
-    final ok = await ref.read(billProvider.notifier).voidItem(item.itemId);
+
+    final reason = reasonCtrl.text.trim();
+    final managerPin = pinCtrl.text.trim();
+    final ok = await ref
+        .read(billProvider.notifier)
+        .voidItem(
+          item.itemId,
+          reason: reason,
+          managerPin: hasPin ? managerPin : null,
+        );
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(ok ? 'ยกเลิกรายการ ${item.productName} แล้ว' : 'ยกเลิกไม่สำเร็จ'),
+        content: Text(
+          ok ? 'ยกเลิกรายการ ${item.productName} แล้ว' : 'ยกเลิกไม่สำเร็จ',
+        ),
         backgroundColor: ok ? AppTheme.errorColor : Colors.grey,
       ),
     );
+  }
+
+  bool _matchesManagerPin(String inputPin, String storedPin) {
+    if (storedPin.isEmpty) return inputPin.isEmpty;
+    return storedPin == inputPin ||
+        CryptoUtils.verifyPassword(inputPin, storedPin);
   }
 
   Future<void> _applyServiceCharge(BillModel bill) async {
@@ -208,7 +262,8 @@ class _BillingPageState extends ConsumerState<BillingPage> {
     setState(() => _applyingSC = false);
     if (!ok && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('ไม่สามารถตั้ง service charge ได้')));
+        const SnackBar(content: Text('ไม่สามารถตั้ง service charge ได้')),
+      );
     }
   }
 
@@ -216,10 +271,8 @@ class _BillingPageState extends ConsumerState<BillingPage> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => SplitBillPage(
-          bill: bill,
-          tableContext: widget.tableContext,
-        ),
+        builder: (_) =>
+            SplitBillPage(bill: bill, tableContext: widget.tableContext),
       ),
     );
   }
@@ -228,16 +281,19 @@ class _BillingPageState extends ConsumerState<BillingPage> {
     final tableListAsync = ref.read(tableListProvider);
     final tables = tableListAsync.asData?.value ?? [];
     final occupied = tables
-        .where((t) =>
-            t.status == 'OCCUPIED' &&
-            t.tableId != widget.tableContext.tableId)
+        .where(
+          (t) =>
+              t.status == 'OCCUPIED' &&
+              t.tableId != widget.tableContext.tableId,
+        )
         .toList();
 
     if (!mounted) return;
 
     if (occupied.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('ไม่มีโต๊ะอื่นที่เปิดอยู่')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('ไม่มีโต๊ะอื่นที่เปิดอยู่')));
       return;
     }
 
@@ -248,23 +304,37 @@ class _BillingPageState extends ConsumerState<BillingPage> {
 
     if (selected == null || !mounted) return;
 
-    final ok = await ref.read(mergeTablesProvider.notifier).merge(
+    final ok = await ref
+        .read(mergeTablesProvider.notifier)
+        .merge(
           sourceTableId: widget.tableContext.tableId,
           targetTableId: selected,
         );
 
     if (!mounted) return;
     if (ok) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('รวมโต๊ะสำเร็จ')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('รวมโต๊ะสำเร็จ')));
       Navigator.pop(context);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('ไม่สามารถรวมโต๊ะได้')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('ไม่สามารถรวมโต๊ะได้')));
     }
   }
 
   void _proceedToPayment(BillModel bill) {
+    final currentCart = ref.read(cartProvider);
+    final billingCustomerId = bill.customerId;
+    final billingCustomerName = bill.customerName;
+    final shouldReuseCartCustomer =
+        billingCustomerId == null || billingCustomerId.isEmpty;
+    final preservedPriceLevel =
+        shouldReuseCartCustomer ||
+            billingCustomerId == currentCart.customerId
+        ? currentCart.customerPriceLevel
+        : 1;
     final items = bill.items
         .map(
           (item) => CartItem(
@@ -291,26 +361,36 @@ class _BillingPageState extends ConsumerState<BillingPage> {
         )
         .toList();
 
-    ref.read(cartProvider.notifier).replaceCart(
+    ref
+        .read(cartProvider.notifier)
+        .replaceCart(
           CartState(
             items: items,
-            customerId: 'WALK_IN',
-            customerName: 'ลูกค้าทั่วไป',
+            customerId:
+                billingCustomerId ??
+                currentCart.customerId ??
+                'WALK_IN',
+            customerName:
+                billingCustomerName ??
+                currentCart.customerName ??
+                'ลูกค้าทั่วไป',
+            customerPriceLevel: preservedPriceLevel,
           ),
         );
 
     final firstOrderId = bill.orderIds.isNotEmpty ? bill.orderIds.first : null;
-    ref.read(restaurantOrderContextProvider.notifier).state =
-        widget.tableContext.copyWith(
-      currentOrderId: firstOrderId,
-      currentOrderIds: bill.orderIds,
-      subtotalOverride: bill.subtotal,
-      discountOverride: bill.discountAmount,
-      serviceChargeOverride: bill.serviceChargeAmount,
-      totalOverride: bill.grandTotal,
-      paymentTitle: 'ชำระบิลรวม',
-      splitLabel: null,
-    );
+    ref.read(restaurantOrderContextProvider.notifier).state = widget
+        .tableContext
+        .copyWith(
+          currentOrderId: firstOrderId,
+          currentOrderIds: bill.orderIds,
+          subtotalOverride: bill.subtotal,
+          discountOverride: bill.discountAmount,
+          serviceChargeOverride: bill.serviceChargeAmount,
+          totalOverride: bill.grandTotal,
+          paymentTitle: 'ชำระบิลรวม',
+          splitLabel: null,
+        );
 
     Navigator.push(
       context,
@@ -338,7 +418,8 @@ class _BillingPageState extends ConsumerState<BillingPage> {
           taxId: settings.taxId,
           orderNo: 'PRE-${widget.tableContext.tableName}',
           orderDate: DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now()),
-          customerName: '${widget.tableContext.tableName} • ${widget.tableContext.guestCount} คน',
+          customerName:
+              '${widget.tableContext.tableName} • ${widget.tableContext.guestCount} คน',
           items: bill.items
               .map(
                 (item) => ReceiptItem(
@@ -367,9 +448,9 @@ class _BillingPageState extends ConsumerState<BillingPage> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('พิมพ์ pre-bill ไม่สำเร็จ: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('พิมพ์ pre-bill ไม่สำเร็จ: $e')));
     }
   }
 }
@@ -423,33 +504,37 @@ class _BillBody extends StatelessWidget {
                 final courses = heldByCourse.keys.toList()..sort();
                 return Column(
                   children: [
-                    ...courses.map((courseNo) => _SectionCard(
-                          title: 'Course $courseNo — รอ Fire',
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              ...heldByCourse[courseNo]!.map(
-                                (item) => _ItemRow(
-                                  item: item,
-                                  onVoid: () => onVoidItem(item),
+                    ...courses.map(
+                      (courseNo) => _SectionCard(
+                        title: 'Course $courseNo — รอ Fire',
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            ...heldByCourse[courseNo]!.map(
+                              (item) => _ItemRow(
+                                item: item,
+                                onVoid: () => onVoidItem(item),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            SizedBox(
+                              width: double.infinity,
+                              child: FilledButton.icon(
+                                onPressed: () => onFireCourse(courseNo),
+                                icon: const Icon(
+                                  Icons.local_fire_department,
+                                  size: 18,
+                                ),
+                                label: Text('Fire Course $courseNo'),
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: Colors.deepOrange,
                                 ),
                               ),
-                              const SizedBox(height: 8),
-                              SizedBox(
-                                width: double.infinity,
-                                child: FilledButton.icon(
-                                  onPressed: () => onFireCourse(courseNo),
-                                  icon: const Icon(Icons.local_fire_department,
-                                      size: 18),
-                                  label: Text('Fire Course $courseNo'),
-                                  style: FilledButton.styleFrom(
-                                    backgroundColor: Colors.deepOrange,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        )),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                     const SizedBox(height: 12),
                   ],
                 );
@@ -462,10 +547,12 @@ class _BillBody extends StatelessWidget {
                   children: [
                     ...bill.items
                         .where((i) => !i.isHeld)
-                        .map((item) => _ItemRow(
-                              item: item,
-                              onVoid: () => onVoidItem(item),
-                            )),
+                        .map(
+                          (item) => _ItemRow(
+                            item: item,
+                            onVoid: () => onVoidItem(item),
+                          ),
+                        ),
                   ],
                 ),
               ),
@@ -480,7 +567,8 @@ class _BillBody extends StatelessWidget {
                       child: TextField(
                         controller: scController,
                         keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true),
+                          decimal: true,
+                        ),
                         decoration: const InputDecoration(
                           suffixText: '%',
                           labelText: 'อัตรา',
@@ -497,7 +585,10 @@ class _BillBody extends StatelessWidget {
                               width: 16,
                               height: 16,
                               child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.white))
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
                           : const Text('ใช้'),
                     ),
                   ],
@@ -512,15 +603,23 @@ class _BillBody extends StatelessWidget {
                   children: [
                     _SummaryRow('ยอดก่อนส่วนลด', bill.subtotal),
                     if (bill.discountAmount > 0)
-                      _SummaryRow('ส่วนลด', -bill.discountAmount,
-                          color: AppTheme.errorColor),
+                      _SummaryRow(
+                        'ส่วนลด',
+                        -bill.discountAmount,
+                        color: AppTheme.errorColor,
+                      ),
                     if (bill.hasServiceCharge)
                       _SummaryRow(
-                          'Service Charge (${bill.serviceChargeRate.toStringAsFixed(0)}%)',
-                          bill.serviceChargeAmount),
+                        'Service Charge (${bill.serviceChargeRate.toStringAsFixed(0)}%)',
+                        bill.serviceChargeAmount,
+                      ),
                     const Divider(),
-                    _SummaryRow('ยอดสุทธิ', bill.grandTotal,
-                        bold: true, large: true),
+                    _SummaryRow(
+                      'ยอดสุทธิ',
+                      bill.grandTotal,
+                      bold: true,
+                      large: true,
+                    ),
                   ],
                 ),
               ),
@@ -610,7 +709,10 @@ class _ItemRow extends StatelessWidget {
                     item.specialInstructions!.isNotEmpty)
                   Text(
                     item.specialInstructions!,
-                    style: TextStyle(fontSize: 11, color: AppTheme.warningColor),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppTheme.warningColor,
+                    ),
                   ),
                 ...item.modifiers.map(
                   (modifier) => Text(
@@ -623,7 +725,10 @@ class _ItemRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          Text('฿${_fmt.format(item.amount)}', style: const TextStyle(fontSize: 14)),
+          Text(
+            '฿${_fmt.format(item.amount)}',
+            style: const TextStyle(fontSize: 14),
+          ),
           if (onVoid != null) ...[
             const SizedBox(width: 4),
             InkWell(
@@ -631,7 +736,11 @@ class _ItemRow extends StatelessWidget {
               borderRadius: BorderRadius.circular(6),
               child: Padding(
                 padding: const EdgeInsets.all(4),
-                child: Icon(Icons.delete_outline, size: 18, color: Colors.red.shade400),
+                child: Icon(
+                  Icons.delete_outline,
+                  size: 18,
+                  color: Colors.red.shade400,
+                ),
               ),
             ),
           ],
@@ -653,8 +762,13 @@ class _SummaryRow extends StatelessWidget {
   final bool bold;
   final bool large;
 
-  const _SummaryRow(this.label, this.amount,
-      {this.color, this.bold = false, this.large = false});
+  const _SummaryRow(
+    this.label,
+    this.amount, {
+    this.color,
+    this.bold = false,
+    this.large = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -685,20 +799,21 @@ class _SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Card(
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 13)),
-              const SizedBox(height: 8),
-              child,
-            ],
+    child: Padding(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
           ),
-        ),
-      );
+          const SizedBox(height: 8),
+          child,
+        ],
+      ),
+    ),
+  );
 }
 
 // ── Empty state ───────────────────────────────────────────────────────────────
@@ -708,16 +823,18 @@ class _EmptyBill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => const Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.receipt_long_outlined, size: 64, color: Colors.black26),
-            SizedBox(height: 12),
-            Text('ยังไม่มีรายการสั่งอาหาร',
-                style: TextStyle(color: Colors.black45)),
-          ],
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.receipt_long_outlined, size: 64, color: Colors.black26),
+        SizedBox(height: 12),
+        Text(
+          'ยังไม่มีรายการสั่งอาหาร',
+          style: TextStyle(color: Colors.black45),
         ),
-      );
+      ],
+    ),
+  );
 }
 
 // ── Merge table dialog ────────────────────────────────────────────────────────
@@ -728,26 +845,27 @@ class _MergeTableDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-        title: const Text('รวมบิลไปที่โต๊ะ'),
-        content: SizedBox(
-          width: 280,
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: tables.length,
-            itemBuilder: (_, i) {
-              final t = tables[i];
-              return ListTile(
-                leading: const Icon(Icons.table_restaurant),
-                title: Text(t.tableName ?? t.tableNo),
-                onTap: () => Navigator.pop(context, t.tableId),
-              );
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('ยกเลิก')),
-        ],
-      );
+    title: const Text('รวมบิลไปที่โต๊ะ'),
+    content: SizedBox(
+      width: 280,
+      child: ListView.builder(
+        shrinkWrap: true,
+        itemCount: tables.length,
+        itemBuilder: (_, i) {
+          final t = tables[i];
+          return ListTile(
+            leading: const Icon(Icons.table_restaurant),
+            title: Text(t.tableName ?? t.tableNo),
+            onTap: () => Navigator.pop(context, t.tableId),
+          );
+        },
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('ยกเลิก'),
+      ),
+    ],
+  );
 }

@@ -6,7 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../data/models/kitchen_queue_model.dart';
 import '../providers/kitchen_provider.dart';
-import '../widgets/kitchen_order_card.dart';
+import '../widgets/kitchen_order_card.dart'
+    show KitchenOrderCard, kHeldOverdueMinutes;
 
 class KitchenDisplayPage extends ConsumerStatefulWidget {
   const KitchenDisplayPage({super.key});
@@ -19,6 +20,7 @@ class _KitchenDisplayPageState extends ConsumerState<KitchenDisplayPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   bool _isFullScreen = false;
+  int _lastStationIndex = 0;
 
   static const _stations = [
     _StationTab(key: null, label: 'ทั้งหมด', icon: Icons.grid_view),
@@ -35,10 +37,12 @@ class _KitchenDisplayPageState extends ConsumerState<KitchenDisplayPage>
   }
 
   void _onTabChanged() {
-    if (!_tabController.indexIsChanging) return;
+    if (_tabController.index == _lastStationIndex) return;
+    _lastStationIndex = _tabController.index;
     final station = _stations[_tabController.index].key;
     ref.read(selectedKitchenStationProvider.notifier).state = station;
     ref.read(kitchenQueueProvider.notifier).refresh();
+    ref.read(kitchenSummaryProvider.notifier).refresh();
   }
 
   void _toggleFullScreen() {
@@ -70,15 +74,21 @@ class _KitchenDisplayPageState extends ConsumerState<KitchenDisplayPage>
       appBar: AppBar(
         backgroundColor: const Color(0xFF16213E),
         foregroundColor: Colors.white,
-        title: const Text('Kitchen Display', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text(
+          'Kitchen Display',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         actions: [
-          _RefreshButton(onTap: () {
-            ref.read(kitchenQueueProvider.notifier).refresh();
-            ref.read(kitchenSummaryProvider.notifier).refresh();
-          }),
+          _RefreshButton(
+            onTap: () {
+              ref.read(kitchenQueueProvider.notifier).refresh();
+              ref.read(kitchenSummaryProvider.notifier).refresh();
+            },
+          ),
           IconButton(
             icon: Icon(
-                _isFullScreen ? Icons.fullscreen_exit : Icons.fullscreen),
+              _isFullScreen ? Icons.fullscreen_exit : Icons.fullscreen,
+            ),
             tooltip: _isFullScreen ? 'ออกจาก Full Screen' : 'Full Screen',
             onPressed: _toggleFullScreen,
           ),
@@ -112,7 +122,9 @@ class _KitchenDisplayPageState extends ConsumerState<KitchenDisplayPage>
       ),
       body: TabBarView(
         controller: _tabController,
-        children: _stations.map((s) => _StationView(stationKey: s.key)).toList(),
+        children: _stations
+            .map((s) => _StationView(stationKey: s.key))
+            .toList(),
       ),
     );
   }
@@ -129,9 +141,8 @@ class _StationView extends ConsumerWidget {
     final queueAsync = ref.watch(kitchenQueueProvider);
 
     return queueAsync.when(
-      loading: () => const Center(
-        child: CircularProgressIndicator(color: Colors.white),
-      ),
+      loading: () =>
+          const Center(child: CircularProgressIndicator(color: Colors.white)),
       error: (e, _) => Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -147,21 +158,23 @@ class _StationView extends ConsumerWidget {
         final filtered = stationKey == null
             ? items
             : items
-                .where((i) => i.prepStation?.toLowerCase() == stationKey)
-                .toList();
+                  .where((i) => i.prepStation?.toLowerCase() == stationKey)
+                  .toList();
 
         if (filtered.isEmpty) {
           return const _EmptyKitchen();
         }
 
-        final held =
-            filtered.where((i) => i.kitchenStatus == 'HELD').toList();
-        final pending =
-            filtered.where((i) => i.kitchenStatus == 'PENDING').toList();
-        final preparing =
-            filtered.where((i) => i.kitchenStatus == 'PREPARING').toList();
-        final ready =
-            filtered.where((i) => i.kitchenStatus == 'READY').toList();
+        final held = filtered.where((i) => i.kitchenStatus == 'HELD').toList();
+        final pending = filtered
+            .where((i) => i.kitchenStatus == 'PENDING')
+            .toList();
+        final preparing = filtered
+            .where((i) => i.kitchenStatus == 'PREPARING')
+            .toList();
+        final ready = filtered
+            .where((i) => i.kitchenStatus == 'READY')
+            .toList();
 
         return Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -172,36 +185,43 @@ class _StationView extends ConsumerWidget {
                 count: held.length,
                 color: Colors.blueGrey.shade700,
                 items: held,
-                onStatusChange: (id, s) => _updateStatus(ref, id, s),
+                overdueCount: held
+                    .where(
+                      (i) =>
+                          DateTime.now().difference(i.createdAt).inMinutes >=
+                          kHeldOverdueMinutes,
+                    )
+                    .length,
+                onStatusChange: (id, s) => _updateStatus(context, ref, id, s),
                 onFireCourse: (tableId, courseNo) =>
-                    _fireCourse(ref, tableId, courseNo),
+                    _fireCourse(context, ref, tableId, courseNo),
               ),
             _Column(
               title: 'รอทำ',
               count: pending.length,
               color: const Color(0xFF616161),
               items: pending,
-              onStatusChange: (id, s) => _updateStatus(ref, id, s),
+              onStatusChange: (id, s) => _updateStatus(context, ref, id, s),
               onFireCourse: (tableId, courseNo) =>
-                  _fireCourse(ref, tableId, courseNo),
+                  _fireCourse(context, ref, tableId, courseNo),
             ),
             _Column(
               title: 'กำลังทำ',
               count: preparing.length,
               color: const Color(0xFF1565C0),
               items: preparing,
-              onStatusChange: (id, s) => _updateStatus(ref, id, s),
+              onStatusChange: (id, s) => _updateStatus(context, ref, id, s),
               onFireCourse: (tableId, courseNo) =>
-                  _fireCourse(ref, tableId, courseNo),
+                  _fireCourse(context, ref, tableId, courseNo),
             ),
             _Column(
               title: 'พร้อมเสิร์ฟ',
               count: ready.length,
               color: AppTheme.successColor,
               items: ready,
-              onStatusChange: (id, s) => _updateStatus(ref, id, s),
+              onStatusChange: (id, s) => _updateStatus(context, ref, id, s),
               onFireCourse: (tableId, courseNo) =>
-                  _fireCourse(ref, tableId, courseNo),
+                  _fireCourse(context, ref, tableId, courseNo),
             ),
           ],
         );
@@ -209,12 +229,38 @@ class _StationView extends ConsumerWidget {
     );
   }
 
-  void _updateStatus(WidgetRef ref, String itemId, String newStatus) {
-    ref.read(kitchenQueueProvider.notifier).updateStatus(itemId, newStatus);
+  Future<void> _updateStatus(
+    BuildContext context,
+    WidgetRef ref,
+    String itemId,
+    String newStatus,
+  ) async {
+    final ok = await ref
+        .read(kitchenQueueProvider.notifier)
+        .updateStatus(itemId, newStatus);
+    if (!context.mounted || ok) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('อัปเดตสถานะรายการในครัวไม่สำเร็จ')),
+    );
   }
 
-  void _fireCourse(WidgetRef ref, String tableId, int courseNo) {
-    ref.read(kitchenQueueProvider.notifier).fireCourse(tableId, courseNo);
+  Future<void> _fireCourse(
+    BuildContext context,
+    WidgetRef ref,
+    String tableId,
+    int courseNo,
+  ) async {
+    final ok = await ref
+        .read(kitchenQueueProvider.notifier)
+        .fireCourse(tableId, courseNo);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          ok ? 'Fire course $courseNo แล้ว' : 'Fire course $courseNo ไม่สำเร็จ',
+        ),
+      ),
+    );
   }
 }
 
@@ -225,6 +271,7 @@ class _Column extends StatelessWidget {
   final int count;
   final Color color;
   final List<KitchenQueueItemModel> items;
+  final int overdueCount;
   final void Function(String itemId, String newStatus) onStatusChange;
   final void Function(String tableId, int courseNo) onFireCourse;
 
@@ -233,6 +280,7 @@ class _Column extends StatelessWidget {
     required this.count,
     required this.color,
     required this.items,
+    this.overdueCount = 0,
     required this.onStatusChange,
     required this.onFireCourse,
   });
@@ -250,18 +298,59 @@ class _Column extends StatelessWidget {
             color: color.withValues(alpha: 0.85),
             child: Row(
               children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
+                Expanded(
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      if (overdueCount > 0)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppTheme.warningColor.withValues(alpha: 0.9),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.warning_amber_rounded,
+                                size: 11,
+                                color: Colors.white,
+                              ),
+                              const SizedBox(width: 3),
+                              Text(
+                                '$overdueCount ค้าง',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
                   ),
                 ),
-                const Spacer(),
+                const SizedBox(width: 8),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.black26,
                     borderRadius: BorderRadius.circular(12),
@@ -269,9 +358,10 @@ class _Column extends StatelessWidget {
                   child: Text(
                     '$count',
                     style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13),
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
                   ),
                 ),
               ],
@@ -313,18 +403,18 @@ class _EmptyKitchen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => const Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.check_circle_outline, color: Colors.white24, size: 64),
-            SizedBox(height: 16),
-            Text(
-              'ไม่มีรายการที่รอดำเนินการ',
-              style: TextStyle(color: Colors.white38, fontSize: 16),
-            ),
-          ],
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.check_circle_outline, color: Colors.white24, size: 64),
+        SizedBox(height: 16),
+        Text(
+          'ไม่มีรายการที่รอดำเนินการ',
+          style: TextStyle(color: Colors.white38, fontSize: 16),
         ),
-      );
+      ],
+    ),
+  );
 }
 
 // ── Refresh button ────────────────────────────────────────────────────────────
@@ -345,7 +435,9 @@ class _RefreshButtonState extends State<_RefreshButton>
   void initState() {
     super.initState();
     _ctrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 600));
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
   }
 
   @override
@@ -361,13 +453,13 @@ class _RefreshButtonState extends State<_RefreshButton>
 
   @override
   Widget build(BuildContext context) => RotationTransition(
-        turns: _ctrl,
-        child: IconButton(
-          icon: const Icon(Icons.refresh),
-          tooltip: 'รีเฟรช',
-          onPressed: _tap,
-        ),
-      );
+    turns: _ctrl,
+    child: IconButton(
+      icon: const Icon(Icons.refresh),
+      tooltip: 'รีเฟรช',
+      onPressed: _tap,
+    ),
+  );
 }
 
 // ── Badge ─────────────────────────────────────────────────────────────────────
@@ -378,17 +470,20 @@ class _Badge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-        decoration: BoxDecoration(
-          color: AppTheme.errorColor,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Text(
-          '$count',
-          style: const TextStyle(
-              color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-        ),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+    decoration: BoxDecoration(
+      color: AppTheme.errorColor,
+      borderRadius: BorderRadius.circular(10),
+    ),
+    child: Text(
+      '$count',
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 11,
+        fontWeight: FontWeight.bold,
+      ),
+    ),
+  );
 }
 
 // ── Data ──────────────────────────────────────────────────────────────────────
@@ -397,5 +492,9 @@ class _StationTab {
   final String? key;
   final String label;
   final IconData icon;
-  const _StationTab({required this.key, required this.label, required this.icon});
+  const _StationTab({
+    required this.key,
+    required this.label,
+    required this.icon,
+  });
 }

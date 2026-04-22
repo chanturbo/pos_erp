@@ -29,7 +29,7 @@ class TableCard extends StatelessWidget {
           border: Border.all(color: colors.border, width: 1.5),
           boxShadow: [
             BoxShadow(
-              color: colors.border.withValues(alpha:0.2),
+              color: colors.border.withValues(alpha: 0.2),
               blurRadius: 4,
               offset: const Offset(0, 2),
             ),
@@ -64,7 +64,10 @@ class TableCard extends StatelessWidget {
               if (table.zoneName != null)
                 Text(
                   table.zoneName!,
-                  style: TextStyle(fontSize: 11, color: colors.text.withValues(alpha:0.6)),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: colors.text.withValues(alpha: 0.6),
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -83,14 +86,15 @@ class TableCard extends StatelessWidget {
                   _InfoRow(
                     icon: Icons.timer_outlined,
                     label: _formatDuration(
-                        DateTime.now().difference(table.sessionOpenedAt!)),
+                      DateTime.now().difference(table.sessionOpenedAt!),
+                    ),
                     color: colors.text,
                   ),
               ] else ...[
                 _InfoRow(
                   icon: Icons.chair_outlined,
                   label: '${table.capacity} ที่นั่ง',
-                  color: colors.text.withValues(alpha:0.7),
+                  color: colors.text.withValues(alpha: 0.7),
                 ),
               ],
 
@@ -98,8 +102,7 @@ class TableCard extends StatelessWidget {
 
               // ── Status badge ──
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
                   color: colors.badge,
                   borderRadius: BorderRadius.circular(20),
@@ -216,24 +219,35 @@ class _StatusDot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        width: 10,
-        height: 10,
-        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-      );
+    width: 10,
+    height: 10,
+    decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+  );
 }
 
 class _InfoRow extends StatelessWidget {
   final IconData icon;
   final String label;
   final Color color;
-  const _InfoRow({required this.icon, required this.label, required this.color});
+  const _InfoRow({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) => Row(
-        children: [
-          Icon(icon, size: 13, color: color),
-          const SizedBox(width: 4),
-          Text(label, style: TextStyle(fontSize: 12, color: color)),
-        ],
-      );
+    children: [
+      Icon(icon, size: 13, color: color),
+      const SizedBox(width: 4),
+      Expanded(
+        child: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(fontSize: 12, color: color),
+        ),
+      ),
+    ],
+  );
 }

@@ -36,6 +36,7 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
   late DateTime? _dateTo = widget.initialDateTo;
   String _paymentFilter = 'ALL'; // ALL | CASH | CARD | TRANSFER
   String _statusFilter = 'ALL'; // ALL | COMPLETED | PENDING | CANCELLED
+  String _orderTypeFilter = 'ALL'; // ALL | RETAIL | RESTAURANT
 
   // ── Sort ────────────────────────────────────────────────────────
   String _sortColumn = 'date'; // date | orderNo | customer | amount | status
@@ -93,6 +94,9 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
       if (_statusFilter != 'ALL' && o.status != _statusFilter) {
         return false;
       }
+      // order type
+      if (_orderTypeFilter == 'RETAIL' && o.tableId != null) return false;
+      if (_orderTypeFilter == 'RESTAURANT' && o.tableId == null) return false;
       return true;
     }).toList();
   }
@@ -145,7 +149,8 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
       _dateFrom != null ||
       _dateTo != null ||
       _paymentFilter != 'ALL' ||
-      _statusFilter != 'ALL';
+      _statusFilter != 'ALL' ||
+      _orderTypeFilter != 'ALL';
 
   void _clearFilters() {
     setState(() {
@@ -153,6 +158,7 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
       _dateTo = null;
       _paymentFilter = 'ALL';
       _statusFilter = 'ALL';
+      _orderTypeFilter = 'ALL';
       _currentPage = 1;
     });
   }
@@ -240,6 +246,20 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                   _currentPage = 1;
                 }),
               ),
+              const SizedBox(width: 8),
+              _DropdownChip<String>(
+                icon: Icons.storefront_outlined,
+                value: _orderTypeFilter,
+                items: const [
+                  ('ALL', 'ทุกประเภทร้าน'),
+                  ('RETAIL', '🛒 ค้าปลีก'),
+                  ('RESTAURANT', '🍽️ ร้านอาหาร'),
+                ],
+                onChanged: (v) => setState(() {
+                  _orderTypeFilter = v;
+                  _currentPage = 1;
+                }),
+              ),
             ],
           )
         : null;
@@ -275,6 +295,7 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
               dateTo: _dateTo,
               paymentFilter: _paymentFilter,
               statusFilter: _statusFilter,
+              orderTypeFilter: _orderTypeFilter,
               onPickFrom: () => _pickDate(true),
               onPickTo: () => _pickDate(false),
               onClearFrom: () => setState(() {
@@ -291,6 +312,10 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
               }),
               onStatusChanged: (v) => setState(() {
                 _statusFilter = v;
+                _currentPage = 1;
+              }),
+              onOrderTypeChanged: (v) => setState(() {
+                _orderTypeFilter = v;
                 _currentPage = 1;
               }),
             ),
@@ -683,24 +708,28 @@ class _FilterBar extends StatelessWidget {
   final DateTime? dateTo;
   final String paymentFilter;
   final String statusFilter;
+  final String orderTypeFilter;
   final VoidCallback onPickFrom;
   final VoidCallback onPickTo;
   final VoidCallback onClearFrom;
   final VoidCallback onClearTo;
   final ValueChanged<String> onPaymentChanged;
   final ValueChanged<String> onStatusChanged;
+  final ValueChanged<String> onOrderTypeChanged;
 
   const _FilterBar({
     required this.dateFrom,
     required this.dateTo,
     required this.paymentFilter,
     required this.statusFilter,
+    required this.orderTypeFilter,
     required this.onPickFrom,
     required this.onPickTo,
     required this.onClearFrom,
     required this.onClearTo,
     required this.onPaymentChanged,
     required this.onStatusChanged,
+    required this.onOrderTypeChanged,
   });
 
   static final _fmt = DateFormat('dd/MM/yy');
@@ -765,6 +794,18 @@ class _FilterBar extends StatelessWidget {
               ('CANCELLED', '❌ ยกเลิก'),
             ],
             onChanged: onStatusChanged,
+          ),
+
+          // ── ประเภทร้าน ────────────────────────────────────────
+          _DropdownChip<String>(
+            icon: Icons.storefront_outlined,
+            value: orderTypeFilter,
+            items: const [
+              ('ALL', 'ทุกประเภทร้าน'),
+              ('RETAIL', '🛒 ค้าปลีก'),
+              ('RESTAURANT', '🍽️ ร้านอาหาร'),
+            ],
+            onChanged: onOrderTypeChanged,
           ),
         ],
       ),
@@ -1205,31 +1246,42 @@ class _SalesOrderRowState extends State<_SalesOrderRow> {
               // ── ลูกค้า ─────────────────────────────────────────
               SizedBox(
                 width: w[2],
-                child: o.customerName != null
-                    ? Row(
-                        children: [
-                          const Icon(
-                            Icons.person_outline,
-                            size: 13,
-                            color: AppTheme.textSub,
-                          ),
-                          const SizedBox(width: 4),
-                          Flexible(
-                            child: Text(
-                              o.customerName!,
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: colors.text,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    o.customerName != null
+                        ? Row(
+                            children: [
+                              const Icon(
+                                Icons.person_outline,
+                                size: 13,
+                                color: AppTheme.textSub,
                               ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  o.customerName!,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: colors.text,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          )
+                        : Text(
+                            o.tableId != null ? 'Walk-in (โต๊ะ)' : 'Walk-in',
+                            style: const TextStyle(
+                                fontSize: 12, color: AppTheme.textSub),
                           ),
-                        ],
-                      )
-                    : const Text(
-                        'Walk-in',
-                        style: TextStyle(fontSize: 12, color: AppTheme.textSub),
-                      ),
+                    if (o.serviceType != null) ...[
+                      const SizedBox(height: 3),
+                      _ServiceTypeBadge(serviceType: o.serviceType!),
+                    ],
+                  ],
+                ),
               ),
 
               // ── ประเภทชำระ ─────────────────────────────────────
@@ -1372,6 +1424,44 @@ class _StatusBadge extends StatelessWidget {
             decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           ),
           const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ServiceTypeBadge extends StatelessWidget {
+  final String serviceType;
+  const _ServiceTypeBadge({required this.serviceType});
+
+  @override
+  Widget build(BuildContext context) {
+    final (label, color, icon) = switch (serviceType.toUpperCase()) {
+      'DINE_IN' => ('ทานที่ร้าน', const Color(0xFF6A1B9A), Icons.table_restaurant),
+      'TAKEAWAY' => ('ซื้อกลับ', AppTheme.warning, Icons.takeout_dining),
+      'DELIVERY' => ('ส่งถึงบ้าน', AppTheme.info, Icons.delivery_dining),
+      _ => (serviceType, AppTheme.textSub, Icons.storefront_outlined),
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 10, color: color),
+          const SizedBox(width: 3),
           Text(
             label,
             style: TextStyle(

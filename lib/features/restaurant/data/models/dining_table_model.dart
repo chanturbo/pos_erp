@@ -60,6 +60,7 @@ class DiningTableModel {
   final String? activeSessionId;
   final int? activeGuestCount;
   final DateTime? sessionOpenedAt;
+  final String? waiterName;
 
   const DiningTableModel({
     required this.tableId,
@@ -74,6 +75,7 @@ class DiningTableModel {
     this.activeSessionId,
     this.activeGuestCount,
     this.sessionOpenedAt,
+    this.waiterName,
   });
 
   String get displayName => tableDisplayName ?? tableNo;
@@ -102,6 +104,7 @@ class DiningTableModel {
         sessionOpenedAt: json['session_opened_at'] != null
             ? DateTime.tryParse(json['session_opened_at'] as String)
             : null,
+        waiterName: json['waiter_name'] as String?,
       );
 
   Map<String, dynamic> toJson() => {
@@ -117,6 +120,7 @@ class DiningTableModel {
         'active_session_id': activeSessionId,
         'active_guest_count': activeGuestCount,
         'session_opened_at': sessionOpenedAt?.toIso8601String(),
+        'waiter_name': waiterName,
       };
 
   DiningTableModel copyWith({
@@ -132,6 +136,7 @@ class DiningTableModel {
     String? activeSessionId,
     int? activeGuestCount,
     DateTime? sessionOpenedAt,
+    String? waiterName,
   }) =>
       DiningTableModel(
         tableId: tableId ?? this.tableId,
@@ -146,5 +151,6 @@ class DiningTableModel {
         activeSessionId: activeSessionId ?? this.activeSessionId,
         activeGuestCount: activeGuestCount ?? this.activeGuestCount,
         sessionOpenedAt: sessionOpenedAt ?? this.sessionOpenedAt,
+        waiterName: waiterName ?? this.waiterName,
       );
 }

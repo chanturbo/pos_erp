@@ -1,5 +1,6 @@
 // ignore_for_file: avoid_print
 
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import '../../../../core/client/api_client.dart';
@@ -8,10 +9,18 @@ import '../../../branches/presentation/providers/branch_provider.dart';
 import '../../data/models/dining_table_model.dart';
 import '../../data/models/table_session_model.dart';
 
+class TableActionResult {
+  const TableActionResult({required this.success, this.message});
+
+  final bool success;
+  final String? message;
+}
+
 // ── Zone List ─────────────────────────────────────────────────────────────────
 
-final zoneListProvider =
-    AsyncNotifierProvider<ZoneNotifier, List<ZoneModel>>(ZoneNotifier.new);
+final zoneListProvider = AsyncNotifierProvider<ZoneNotifier, List<ZoneModel>>(
+  ZoneNotifier.new,
+);
 
 class ZoneNotifier extends AsyncNotifier<List<ZoneModel>> {
   @override
@@ -51,11 +60,14 @@ class ZoneNotifier extends AsyncNotifier<List<ZoneModel>> {
   }) async {
     try {
       final api = ref.read(apiClientProvider);
-      final res = await api.post('/api/tables/zones', data: {
-        'zone_name': zoneName,
-        'branch_id': branchId,
-        'display_order': displayOrder,
-      });
+      final res = await api.post(
+        '/api/tables/zones',
+        data: {
+          'zone_name': zoneName,
+          'branch_id': branchId,
+          'display_order': displayOrder,
+        },
+      );
       if (res.statusCode == 201) {
         await refresh();
         return true;
@@ -67,8 +79,12 @@ class ZoneNotifier extends AsyncNotifier<List<ZoneModel>> {
     }
   }
 
-  Future<bool> updateZone(String zoneId,
-      {String? zoneName, int? displayOrder, bool? isActive}) async {
+  Future<bool> updateZone(
+    String zoneId, {
+    String? zoneName,
+    int? displayOrder,
+    bool? isActive,
+  }) async {
     try {
       final api = ref.read(apiClientProvider);
       final body = <String, dynamic>{};
@@ -101,7 +117,8 @@ class ZoneNotifier extends AsyncNotifier<List<ZoneModel>> {
 
 final tableListProvider =
     AsyncNotifierProvider<TableNotifier, List<DiningTableModel>>(
-        TableNotifier.new);
+      TableNotifier.new,
+    );
 
 class TableNotifier extends AsyncNotifier<List<DiningTableModel>> {
   @override
@@ -137,12 +154,15 @@ class TableNotifier extends AsyncNotifier<List<DiningTableModel>> {
   }) async {
     try {
       final api = ref.read(apiClientProvider);
-      final res = await api.post('/api/tables/', data: {
-        'table_no': tableNo,
-        'zone_id': zoneId,
-        'table_display_name': tableDisplayName,
-        'capacity': capacity,
-      });
+      final res = await api.post(
+        '/api/tables/',
+        data: {
+          'table_no': tableNo,
+          'zone_id': zoneId,
+          'table_display_name': tableDisplayName,
+          'capacity': capacity,
+        },
+      );
       if (res.statusCode == 201) {
         final selectedBranch = ref.read(selectedBranchProvider);
         await refresh(branchId: selectedBranch?.branchId);
@@ -167,7 +187,9 @@ class TableNotifier extends AsyncNotifier<List<DiningTableModel>> {
       final api = ref.read(apiClientProvider);
       final body = <String, dynamic>{};
       if (tableNo != null) body['table_no'] = tableNo;
-      if (tableDisplayName != null) body['table_display_name'] = tableDisplayName;
+      if (tableDisplayName != null) {
+        body['table_display_name'] = tableDisplayName;
+      }
       if (zoneId != null) body['zone_id'] = zoneId;
       if (capacity != null) body['capacity'] = capacity;
       if (status != null) body['status'] = status;
@@ -204,15 +226,19 @@ class TableNotifier extends AsyncNotifier<List<DiningTableModel>> {
   }) async {
     try {
       final api = ref.read(apiClientProvider);
-      final res = await api.post('/api/tables/$tableId/open', data: {
-        'guest_count': guestCount,
-        'branch_id': branchId,
-        'opened_by': openedBy,
-      });
+      final res = await api.post(
+        '/api/tables/$tableId/open',
+        data: {
+          'guest_count': guestCount,
+          'branch_id': branchId,
+          'opened_by': openedBy,
+        },
+      );
       if (res.statusCode == 201) {
         await refresh(branchId: branchId);
         return TableSessionModel.fromJson(
-            res.data['data'] as Map<String, dynamic>);
+          res.data['data'] as Map<String, dynamic>,
+        );
       }
       return null;
     } catch (e) {
@@ -221,19 +247,24 @@ class TableNotifier extends AsyncNotifier<List<DiningTableModel>> {
     }
   }
 
-  Future<bool> closeTable(String tableId) async {
+  Future<TableActionResult> closeTable(String tableId) async {
     try {
       final api = ref.read(apiClientProvider);
       final res = await api.post('/api/tables/$tableId/close', data: {});
       if (res.statusCode == 200) {
         final selectedBranch = ref.read(selectedBranchProvider);
         await refresh(branchId: selectedBranch?.branchId);
-        return true;
+        return const TableActionResult(success: true);
       }
-      return false;
+      return TableActionResult(
+        success: false,
+        message: res.data is Map<String, dynamic>
+            ? res.data['message'] as String?
+            : null,
+      );
     } catch (e) {
       print('❌ closeTable error: $e');
-      return false;
+      return TableActionResult(success: false, message: '$e');
     }
   }
 
@@ -243,7 +274,8 @@ class TableNotifier extends AsyncNotifier<List<DiningTableModel>> {
       final res = await api.get('/api/tables/$tableId/session');
       if (res.statusCode == 200) {
         return TableSessionModel.fromJson(
-            res.data['data'] as Map<String, dynamic>);
+          res.data['data'] as Map<String, dynamic>,
+        );
       }
       return null;
     } catch (e) {
@@ -257,9 +289,10 @@ class TableNotifier extends AsyncNotifier<List<DiningTableModel>> {
   }) async {
     try {
       final api = ref.read(apiClientProvider);
-      final res = await api.post('/api/tables/$fromTableId/transfer', data: {
-        'target_table_id': targetTableId,
-      });
+      final res = await api.post(
+        '/api/tables/$fromTableId/transfer',
+        data: {'target_table_id': targetTableId},
+      );
       if (res.statusCode == 200) {
         final selectedBranch = ref.read(selectedBranchProvider);
         await refresh(branchId: selectedBranch?.branchId);
@@ -277,9 +310,10 @@ class TableNotifier extends AsyncNotifier<List<DiningTableModel>> {
   Future<void> assignWaiter(String tableId, String waiterName) async {
     try {
       final api = ref.read(apiClientProvider);
-      await api.post('/api/tables/$tableId/assign-waiter', data: {
-        'waiter_name': waiterName,
-      });
+      await api.post(
+        '/api/tables/$tableId/assign-waiter',
+        data: {'waiter_name': waiterName},
+      );
     } catch (e) {
       print('❌ assignWaiter error: $e');
       rethrow;
@@ -289,10 +323,13 @@ class TableNotifier extends AsyncNotifier<List<DiningTableModel>> {
   Future<bool> updateGuestCount(String tableId, int guestCount) async {
     try {
       final api = ref.read(apiClientProvider);
-      final res = await api.post('/api/tables/$tableId/update-guest-count',
-          data: {'guest_count': guestCount});
+      final res = await api.post(
+        '/api/tables/$tableId/update-guest-count',
+        data: {'guest_count': guestCount},
+      );
       if (res.statusCode == 200) {
-        await refresh(branchId: null);
+        final selectedBranch = ref.read(selectedBranchProvider);
+        await refresh(branchId: selectedBranch?.branchId);
         return true;
       }
       return false;
@@ -306,3 +343,28 @@ class TableNotifier extends AsyncNotifier<List<DiningTableModel>> {
 // ── Selected zone filter ────────────────────────────────────────────────────
 
 final selectedZoneFilterProvider = StateProvider<String?>((ref) => null);
+
+// ── Real-time table status polling ──────────────────────────────────────────
+// Polls GET /api/tables/version every 5 seconds.
+// When the version changes, triggers a full table list refresh.
+
+final tableStatusPollingProvider = Provider.autoDispose<void>((ref) {
+  final timer = Timer.periodic(const Duration(seconds: 5), (_) async {
+    try {
+      final api = ref.read(apiClientProvider);
+      final res = await api.get('/api/tables/version');
+      if (res.statusCode != 200) return;
+      final version = res.data['data']['version'] as int?;
+      if (version == null) return;
+
+      final current = ref.read(_lastTableVersionProvider);
+      if (current != -1 && version != current) {
+        ref.read(tableListProvider.notifier).refresh();
+      }
+      ref.read(_lastTableVersionProvider.notifier).state = version;
+    } catch (_) {}
+  });
+  ref.onDispose(timer.cancel);
+});
+
+final _lastTableVersionProvider = StateProvider<int>((ref) => -1);

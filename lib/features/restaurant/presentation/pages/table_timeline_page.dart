@@ -267,6 +267,8 @@ class _TimelineItem extends StatelessWidget {
         'opened' => (AppTheme.successColor, Icons.door_front_door),
         'order' => (AppTheme.primaryColor, Icons.receipt_long),
         'item_status' => (Colors.teal, Icons.restaurant),
+        'merge_in' => (Colors.indigo, Icons.merge_type),
+        'merge_out' => (Colors.deepOrange, Icons.merge_type),
         'waiter' => (Colors.purple, Icons.badge),
         'billed' => (Colors.orange, Icons.receipt),
         'closed' => (Colors.grey, Icons.door_back_door),

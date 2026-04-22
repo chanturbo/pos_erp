@@ -152,8 +152,21 @@ class AppDatabase extends _$AppDatabase {
     )
   ''';
 
+  static const _createTableSessionEventsTable = '''
+    CREATE TABLE IF NOT EXISTS table_session_events (
+      event_id TEXT PRIMARY KEY NOT NULL,
+      session_id TEXT NOT NULL,
+      table_id TEXT NOT NULL,
+      event_type TEXT NOT NULL,
+      event_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      description TEXT NOT NULL,
+      payload_json TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  ''';
+
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   @override
   MigrationStrategy get migration {
@@ -162,6 +175,7 @@ class AppDatabase extends _$AppDatabase {
         await m.createAll();
         await customStatement(_createCustomerDividendRunsTable);
         await customStatement(_createCustomerDividendRunItemsTable);
+        await customStatement(_createTableSessionEventsTable);
       },
       onUpgrade: (Migrator m, int from, int to) async {
         if (from < 2) {
@@ -249,6 +263,9 @@ class AppDatabase extends _$AppDatabase {
             ALTER TABLE sales_order_items ADD COLUMN course_no INTEGER NOT NULL DEFAULT 1
           ''').catchError((_) {});
           await m.createTable(tableReservations);
+        }
+        if (from < 11) {
+          await customStatement(_createTableSessionEventsTable);
         }
       },
     );

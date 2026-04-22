@@ -59,6 +59,8 @@ class BillModel {
   final String tableId;
   final int guestCount;
   final DateTime? openedAt;
+  final String? customerId;
+  final String? customerName;
   final List<String> orderIds;
   final List<BillItemModel> items;
   final double subtotal;
@@ -66,12 +68,15 @@ class BillModel {
   final double serviceChargeRate;
   final double serviceChargeAmount;
   final double grandTotal;
+  final String? previewToken;
 
   const BillModel({
     required this.sessionId,
     required this.tableId,
     required this.guestCount,
     this.openedAt,
+    this.customerId,
+    this.customerName,
     required this.orderIds,
     required this.items,
     required this.subtotal,
@@ -79,6 +84,7 @@ class BillModel {
     required this.serviceChargeRate,
     required this.serviceChargeAmount,
     required this.grandTotal,
+    this.previewToken,
   });
 
   factory BillModel.fromJson(Map<String, dynamic> json) => BillModel(
@@ -88,6 +94,8 @@ class BillModel {
         openedAt: json['opened_at'] != null
             ? DateTime.tryParse(json['opened_at'] as String)
             : null,
+        customerId: json['customer_id'] as String?,
+        customerName: json['customer_name'] as String?,
         orderIds: (json['order_ids'] as List).map((e) => e as String).toList(),
         items: (json['items'] as List)
             .map((j) => BillItemModel.fromJson(j as Map<String, dynamic>))
@@ -97,6 +105,7 @@ class BillModel {
         serviceChargeRate: (json['service_charge_rate'] as num).toDouble(),
         serviceChargeAmount: (json['service_charge_amount'] as num).toDouble(),
         grandTotal: (json['grand_total'] as num).toDouble(),
+        previewToken: json['preview_token'] as String?,
       );
 
   bool get isEmpty => items.isEmpty;
@@ -110,6 +119,7 @@ class SplitResult {
   final double grandTotal;
   final double perPerson; // มีเฉพาะ mode = equal
   final List<SplitPortion> splits;
+  final String? previewToken;
 
   const SplitResult({
     required this.mode,
@@ -117,6 +127,7 @@ class SplitResult {
     required this.grandTotal,
     required this.perPerson,
     required this.splits,
+    this.previewToken,
   });
 
   factory SplitResult.fromJson(Map<String, dynamic> json) => SplitResult(
@@ -130,6 +141,7 @@ class SplitResult {
         splits: (json['splits'] as List)
             .map((j) => SplitPortion.fromJson(j as Map<String, dynamic>))
             .toList(),
+        previewToken: json['preview_token'] as String?,
       );
 }
 

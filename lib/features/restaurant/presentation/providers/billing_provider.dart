@@ -11,8 +11,9 @@ final billingTableIdProvider = StateProvider<String?>((ref) => null);
 
 // ── Bill provider ─────────────────────────────────────────────────────────────
 
-final billProvider =
-    AsyncNotifierProvider<BillNotifier, BillModel?>(BillNotifier.new);
+final billProvider = AsyncNotifierProvider<BillNotifier, BillModel?>(
+  BillNotifier.new,
+);
 
 class BillNotifier extends AsyncNotifier<BillModel?> {
   @override
@@ -32,7 +33,10 @@ class BillNotifier extends AsyncNotifier<BillModel?> {
     if (res.statusCode == 200) {
       return BillModel.fromJson(res.data['data'] as Map<String, dynamic>);
     }
-    return null;
+    final message = res.data is Map<String, dynamic>
+        ? res.data['message'] as String? ?? 'โหลดบิลไม่สำเร็จ'
+        : 'โหลดบิลไม่สำเร็จ';
+    throw Exception(message);
   }
 
   Future<void> refresh() async {
@@ -70,8 +74,7 @@ class BillNotifier extends AsyncNotifier<BillModel?> {
         data: {'count': count},
       );
       if (res.statusCode == 200) {
-        return SplitResult.fromJson(
-            res.data['data'] as Map<String, dynamic>);
+        return SplitResult.fromJson(res.data['data'] as Map<String, dynamic>);
       }
       return null;
     } catch (e) {
@@ -82,7 +85,9 @@ class BillNotifier extends AsyncNotifier<BillModel?> {
 
   /// Split bill แบบกำหนด items ต่อคน
   Future<SplitResult?> splitByItems(
-      String tableId, List<Map<String, dynamic>> splits) async {
+    String tableId,
+    List<Map<String, dynamic>> splits,
+  ) async {
     try {
       final api = ref.read(apiClientProvider);
       final res = await api.post(
@@ -90,8 +95,7 @@ class BillNotifier extends AsyncNotifier<BillModel?> {
         data: {'splits': splits},
       );
       if (res.statusCode == 200) {
-        return SplitResult.fromJson(
-            res.data['data'] as Map<String, dynamic>);
+        return SplitResult.fromJson(res.data['data'] as Map<String, dynamic>);
       }
       return null;
     } catch (e) {
@@ -120,12 +124,21 @@ class BillNotifier extends AsyncNotifier<BillModel?> {
   }
 
   /// Void a single item with a reason
-  Future<bool> voidItem(String itemId) async {
+  Future<bool> voidItem(
+    String itemId, {
+    required String reason,
+    String? managerPin,
+  }) async {
     try {
       final api = ref.read(apiClientProvider);
       final res = await api.put(
         '/api/kitchen/items/$itemId/status',
-        data: {'status': 'CANCELLED'},
+        data: {
+          'status': 'CANCELLED',
+          'reason': reason,
+          if (managerPin != null && managerPin.isNotEmpty)
+            'manager_pin': managerPin,
+        },
       );
       if (res.statusCode == 200) {
         await refresh();
@@ -139,17 +152,19 @@ class BillNotifier extends AsyncNotifier<BillModel?> {
   }
 
   Future<SplitResult?> applySplit(
-      String tableId, List<Map<String, dynamic>> splits) async {
+    String tableId,
+    List<Map<String, dynamic>> splits, {
+    String? previewToken,
+  }) async {
     try {
       final api = ref.read(apiClientProvider);
       final res = await api.post(
         '/api/tables/$tableId/bill/split/apply',
-        data: {'splits': splits},
+        data: {'splits': splits, 'preview_token': ?previewToken},
       );
       if (res.statusCode == 200) {
         await refresh();
-        return SplitResult.fromJson(
-            res.data['data'] as Map<String, dynamic>);
+        return SplitResult.fromJson(res.data['data'] as Map<String, dynamic>);
       }
       return null;
     } catch (e) {
@@ -161,16 +176,18 @@ class BillNotifier extends AsyncNotifier<BillModel?> {
 
 // ── Merge provider ────────────────────────────────────────────────────────────
 
-final mergeTablesProvider =
-    AsyncNotifierProvider<MergeTablesNotifier, void>(MergeTablesNotifier.new);
+final mergeTablesProvider = AsyncNotifierProvider<MergeTablesNotifier, void>(
+  MergeTablesNotifier.new,
+);
 
 class MergeTablesNotifier extends AsyncNotifier<void> {
   @override
   Future<void> build() async {}
 
-  Future<bool> merge(
-      {required String sourceTableId,
-      required String targetTableId}) async {
+  Future<bool> merge({
+    required String sourceTableId,
+    required String targetTableId,
+  }) async {
     try {
       final api = ref.read(apiClientProvider);
       final res = await api.post(

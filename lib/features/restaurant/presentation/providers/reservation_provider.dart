@@ -6,13 +6,18 @@ import '../../../../core/client/api_client.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../branches/presentation/providers/branch_provider.dart';
 import '../../data/models/reservation_model.dart';
+import 'table_provider.dart';
 
-final reservationDateProvider = StateProvider<DateTime>((ref) => DateTime.now());
+final reservationDateProvider = StateProvider<DateTime>(
+  (ref) => DateTime.now(),
+);
 final reservationStatusFilterProvider = StateProvider<String?>((ref) => null);
+final reservationSearchQueryProvider = StateProvider<String>((ref) => '');
 
 final reservationsProvider =
     AsyncNotifierProvider<ReservationsNotifier, List<ReservationModel>>(
-        ReservationsNotifier.new);
+      ReservationsNotifier.new,
+    );
 
 class ReservationsNotifier extends AsyncNotifier<List<ReservationModel>> {
   @override
@@ -21,13 +26,20 @@ class ReservationsNotifier extends AsyncNotifier<List<ReservationModel>> {
     if (auth.isRestoring || !auth.isAuthenticated) return [];
     final date = ref.watch(reservationDateProvider);
     final status = ref.watch(reservationStatusFilterProvider);
+    final searchQuery = ref.watch(reservationSearchQueryProvider);
     final branch = ref.watch(selectedBranchProvider);
-    return _load(date: date, status: status, branchId: branch?.branchId);
+    return _load(
+      date: date,
+      status: status,
+      searchQuery: searchQuery,
+      branchId: branch?.branchId,
+    );
   }
 
   Future<List<ReservationModel>> _load({
     required DateTime date,
     String? status,
+    String? searchQuery,
     String? branchId,
   }) async {
     final api = ref.read(apiClientProvider);
@@ -37,6 +49,10 @@ class ReservationsNotifier extends AsyncNotifier<List<ReservationModel>> {
     var url = '/api/tables/reservations?date=$y-$m-$d';
     if (branchId != null) url += '&branch_id=$branchId';
     if (status != null) url += '&status=$status';
+    final trimmedQuery = (searchQuery ?? '').trim();
+    if (trimmedQuery.isNotEmpty) {
+      url += '&query=${Uri.encodeQueryComponent(trimmedQuery)}';
+    }
 
     final res = await api.get(url);
     if (res.statusCode != 200) return [];
@@ -49,10 +65,17 @@ class ReservationsNotifier extends AsyncNotifier<List<ReservationModel>> {
   Future<void> refresh() async {
     final date = ref.read(reservationDateProvider);
     final status = ref.read(reservationStatusFilterProvider);
+    final searchQuery = ref.read(reservationSearchQueryProvider);
     final branch = ref.read(selectedBranchProvider);
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(
-        () => _load(date: date, status: status, branchId: branch?.branchId));
+      () => _load(
+        date: date,
+        status: status,
+        searchQuery: searchQuery,
+        branchId: branch?.branchId,
+      ),
+    );
   }
 
   Future<ReservationModel?> create(Map<String, dynamic> body) async {
@@ -64,7 +87,8 @@ class ReservationsNotifier extends AsyncNotifier<List<ReservationModel>> {
       if (res.statusCode == 200 || res.statusCode == 201) {
         await refresh();
         return ReservationModel.fromJson(
-            res.data['data'] as Map<String, dynamic>);
+          res.data['data'] as Map<String, dynamic>,
+        );
       }
       return null;
     } catch (e) {
@@ -83,38 +107,59 @@ class ReservationsNotifier extends AsyncNotifier<List<ReservationModel>> {
     }
   }
 
-  Future<void> confirm(String id) async {
+  Future<bool> confirm(String id) async {
     try {
       final api = ref.read(apiClientProvider);
-      await api.post('/api/tables/reservations/$id/confirm', data: {});
+      final res = await api.post(
+        '/api/tables/reservations/$id/confirm',
+        data: {},
+      );
+      if (res.statusCode != 200) return false;
       await refresh();
+      return true;
     } catch (e) {
       print('❌ confirmReservation error: $e');
+      return false;
     }
   }
 
-  Future<void> cancel(String id) async {
+  Future<bool> cancel(String id) async {
     try {
       final api = ref.read(apiClientProvider);
-      await api.post('/api/tables/reservations/$id/cancel', data: {});
+      final res = await api.post(
+        '/api/tables/reservations/$id/cancel',
+        data: {},
+      );
+      if (res.statusCode != 200) return false;
       await refresh();
+      return true;
     } catch (e) {
       print('❌ cancelReservation error: $e');
+      return false;
     }
   }
 
-  Future<void> noShow(String id) async {
+  Future<bool> noShow(String id) async {
     try {
       final api = ref.read(apiClientProvider);
-      await api.post('/api/tables/reservations/$id/no-show', data: {});
+      final res = await api.post(
+        '/api/tables/reservations/$id/no-show',
+        data: {},
+      );
+      if (res.statusCode != 200) return false;
       await refresh();
+      return true;
     } catch (e) {
       print('❌ noShowReservation error: $e');
+      return false;
     }
   }
 
   Future<Map<String, dynamic>?> seat(
-      String id, String tableId, String branchId) async {
+    String id,
+    String tableId,
+    String branchId,
+  ) async {
     try {
       final api = ref.read(apiClientProvider);
       final res = await api.post(
@@ -123,6 +168,7 @@ class ReservationsNotifier extends AsyncNotifier<List<ReservationModel>> {
       );
       if (res.statusCode == 200) {
         await refresh();
+        await ref.read(tableListProvider.notifier).refresh(branchId: branchId);
         return res.data['data'] as Map<String, dynamic>?;
       }
       return null;
@@ -135,15 +181,16 @@ class ReservationsNotifier extends AsyncNotifier<List<ReservationModel>> {
 
 // ── Kitchen Analytics ─────────────────────────────────────────────────────────
 
-final kitchenAnalyticsDateProvider =
-    StateProvider<DateTime>((ref) => DateTime.now());
+final kitchenAnalyticsDateProvider = StateProvider<DateTime>(
+  (ref) => DateTime.now(),
+);
 
 final kitchenAnalyticsProvider =
     AsyncNotifierProvider<KitchenAnalyticsNotifier, Map<String, dynamic>?>(
-        KitchenAnalyticsNotifier.new);
+      KitchenAnalyticsNotifier.new,
+    );
 
-class KitchenAnalyticsNotifier
-    extends AsyncNotifier<Map<String, dynamic>?> {
+class KitchenAnalyticsNotifier extends AsyncNotifier<Map<String, dynamic>?> {
   @override
   Future<Map<String, dynamic>?> build() async {
     final auth = ref.watch(authProvider);
@@ -177,10 +224,10 @@ class KitchenAnalyticsNotifier
 
 final tableTimelineProvider =
     FutureProvider.family<Map<String, dynamic>?, String>((ref, tableId) async {
-  final auth = ref.watch(authProvider);
-  if (auth.isRestoring || !auth.isAuthenticated) return null;
-  final api = ref.read(apiClientProvider);
-  final res = await api.get('/api/tables/$tableId/timeline');
-  if (res.statusCode != 200) return null;
-  return res.data['data'] as Map<String, dynamic>?;
-});
+      final auth = ref.watch(authProvider);
+      if (auth.isRestoring || !auth.isAuthenticated) return null;
+      final api = ref.read(apiClientProvider);
+      final res = await api.get('/api/tables/$tableId/timeline');
+      if (res.statusCode != 200) return null;
+      return res.data['data'] as Map<String, dynamic>?;
+    });

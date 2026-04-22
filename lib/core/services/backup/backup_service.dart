@@ -6,6 +6,7 @@ import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:cryptography/cryptography.dart';
+import 'package:drift/drift.dart' show driftRuntimeOptions;
 import 'package:drift/native.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -491,6 +492,7 @@ class BackupService {
 
     try {
       await sourceDb.copy(tempDbFile.path);
+      driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
       final inspectDb = AppDatabase.forTesting(
         NativeDatabase(
           tempDbFile,
@@ -523,6 +525,7 @@ class BackupService {
         );
       } finally {
         await inspectDb.close();
+        driftRuntimeOptions.dontWarnAboutMultipleDatabases = false;
       }
     } catch (e) {
       throw BackupException('ตรวจสอบข้อมูลใน backup ไม่สำเร็จ: $e');
