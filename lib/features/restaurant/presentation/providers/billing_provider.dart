@@ -4,10 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import '../../../../core/client/api_client.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../data/models/restaurant_order_context.dart';
 import '../../data/models/bill_model.dart';
 
-// ── ตัวกรอง tableId ──────────────────────────────────────────────────────────
-final billingTableIdProvider = StateProvider<String?>((ref) => null);
+// ── Billing context ───────────────────────────────────────────────────────────
+final billingContextProvider =
+    StateProvider<RestaurantOrderContext?>((ref) => null);
 
 // ── Bill provider ─────────────────────────────────────────────────────────────
 
@@ -21,17 +23,26 @@ class BillNotifier extends AsyncNotifier<BillModel?> {
     final auth = ref.watch(authProvider);
     if (auth.isRestoring || !auth.isAuthenticated) return null;
 
-    final tableId = ref.watch(billingTableIdProvider);
-    if (tableId == null) return null;
+    final context = ref.watch(billingContextProvider);
+    if (context == null) return null;
 
-    return _load(tableId);
+    return _load(context);
   }
 
-  Future<BillModel?> _load(String tableId) async {
+  Future<BillModel?> _load(RestaurantOrderContext context) async {
     final api = ref.read(apiClientProvider);
-    final res = await api.get('/api/tables/$tableId/bill');
+    final orderId = context.currentOrderId;
+    if (!context.hasTable && (orderId == null || orderId.isEmpty)) {
+      throw Exception('ไม่พบเลขออเดอร์สำหรับโหลดบิลซื้อกลับบ้าน');
+    }
+    final res = context.hasTable
+        ? await api.get('/api/tables/${context.tableId}/bill')
+        : await api.get('/api/sales/$orderId');
     if (res.statusCode == 200) {
-      return BillModel.fromJson(res.data['data'] as Map<String, dynamic>);
+      final data = res.data['data'] as Map<String, dynamic>;
+      return context.hasTable
+          ? BillModel.fromJson(data)
+          : BillModel.fromSalesOrderJson(data);
     }
     final message = res.data is Map<String, dynamic>
         ? res.data['message'] as String? ?? 'โหลดบิลไม่สำเร็จ'
@@ -40,10 +51,10 @@ class BillNotifier extends AsyncNotifier<BillModel?> {
   }
 
   Future<void> refresh() async {
-    final tableId = ref.read(billingTableIdProvider);
-    if (tableId == null) return;
+    final context = ref.read(billingContextProvider);
+    if (context == null) return;
     state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() => _load(tableId));
+    state = await AsyncValue.guard(() => _load(context));
   }
 
   /// ตั้ง service charge rate (%)

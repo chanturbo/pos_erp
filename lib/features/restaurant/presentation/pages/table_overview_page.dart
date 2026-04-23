@@ -6,6 +6,7 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../branches/presentation/providers/branch_provider.dart';
 import '../../../sales/presentation/pages/pos_page.dart';
 import '../../../sales/presentation/providers/cart_provider.dart';
+import '../../../sales/presentation/providers/sales_provider.dart';
 import '../../data/models/dining_table_model.dart';
 import '../../data/models/restaurant_order_context.dart';
 import '../../data/models/table_session_model.dart';
@@ -15,6 +16,7 @@ import '../widgets/open_table_dialog.dart';
 import 'billing_page.dart';
 import 'floor_plan_page.dart';
 import 'reservations_page.dart';
+import 'takeaway_orders_page.dart';
 import 'table_timeline_page.dart';
 import 'waiter_management_page.dart';
 
@@ -33,9 +35,11 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
   @override
   Widget build(BuildContext context) {
     ref.watch(tableStatusPollingProvider);
+    ref.watch(takeawayPollingProvider(null));
     final tablesAsync = ref.watch(tableListProvider);
     final zonesAsync = ref.watch(zoneListProvider);
     final selectedZone = ref.watch(selectedZoneFilterProvider);
+    final takeawayPendingCount = ref.watch(takeawayOpenOrdersCountProvider);
 
     return Scaffold(
       backgroundColor: AppTheme.surfaceColor,
@@ -44,6 +48,55 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
         backgroundColor: AppTheme.navyColor,
         foregroundColor: Colors.white,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.takeout_dining),
+            tooltip: 'ซื้อกลับบ้าน',
+            onPressed: _isBusy ? null : _startTakeawayOrder,
+          ),
+          IconButton(
+            icon: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Icon(Icons.receipt_long),
+                if (takeawayPendingCount > 0)
+                  Positioned(
+                    right: -6,
+                    top: -6,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 5,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryColor,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      constraints: const BoxConstraints(minWidth: 18),
+                      child: Text(
+                        takeawayPendingCount > 99
+                            ? '99+'
+                            : '$takeawayPendingCount',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            tooltip: 'บิลซื้อกลับบ้านค้าง',
+            onPressed: _isBusy
+                ? null
+                : () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const TakeawayOrdersPage(),
+                    ),
+                  ),
+          ),
           IconButton(
             icon: const Icon(Icons.event_note),
             tooltip: 'การจองโต๊ะ',
@@ -225,8 +278,16 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
                                     final table = entry.value[i];
                                     return TableCard(
                                       table: table,
-                                      onTap: () =>
-                                          _handleTableTap(context, table),
+                                      onTap: table.isCleaning
+                                          ? null
+                                          : () =>
+                                                _handleTableTap(context, table),
+                                      onCleaningCompleted: table.isCleaning
+                                          ? () => _markTableCleaningCompleted(
+                                              context,
+                                              table,
+                                            )
+                                          : null,
                                     );
                                   },
                                 ),
@@ -278,6 +339,54 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
     } else if (table.isOccupied) {
       await _showOccupiedOptions(context, table);
     }
+  }
+
+  Future<void> _markTableCleaningCompleted(
+    BuildContext context,
+    DiningTableModel table,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('ทำความสะอาดเสร็จแล้ว'),
+        content: Text(
+          'ยืนยันว่าโต๊ะ ${table.displayName} พร้อมใช้งานแล้ว และต้องการเปลี่ยนสถานะเป็นว่างหรือไม่?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('ยกเลิก'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppTheme.successColor,
+            ),
+            child: const Text('ทำความสะอาดเสร็จแล้ว'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    final ok = await _runBusy(
+      'กำลังเปลี่ยนสถานะโต๊ะ ${table.displayName} เป็นว่าง...',
+      () => ref
+          .read(tableListProvider.notifier)
+          .updateTable(table.tableId, status: 'AVAILABLE'),
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(this.context).showSnackBar(
+      SnackBar(
+        content: Text(
+          ok
+              ? 'โต๊ะ ${table.displayName} พร้อมใช้งานแล้ว'
+              : 'เปลี่ยนสถานะโต๊ะไม่สำเร็จ',
+        ),
+        backgroundColor: ok ? AppTheme.successColor : AppTheme.errorColor,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   Future<void> _openTable(BuildContext context, DiningTableModel table) async {
@@ -598,6 +707,52 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
       context,
       MaterialPageRoute(builder: (_) => BillingPage(tableContext: ctx)),
     );
+  }
+
+  Future<void> _startTakeawayOrder() async {
+    final cartState = ref.read(cartProvider);
+    final hasPendingCart =
+        cartState.items.isNotEmpty ||
+        cartState.freeItems.isNotEmpty ||
+        cartState.appliedCoupons.isNotEmpty ||
+        cartState.discountAmount > 0 ||
+        cartState.discountPercent > 0;
+
+    if (hasPendingCart) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('เริ่มออเดอร์ซื้อกลับบ้านใหม่'),
+          content: const Text(
+            'มีรายการค้างอยู่ในตะกร้า การเริ่มออเดอร์ซื้อกลับบ้านใหม่จะล้างตะกร้าปัจจุบัน ต้องการดำเนินการต่อหรือไม่?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('ยกเลิก'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppTheme.primaryColor,
+              ),
+              child: const Text('เริ่มใหม่'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+    }
+
+    ref.read(cartProvider.notifier).clear();
+    ref
+        .read(restaurantOrderContextProvider.notifier)
+        .state = RestaurantOrderContext.takeaway(
+      branchId: ref.read(selectedBranchProvider)?.branchId ?? '',
+    );
+
+    if (!mounted) return;
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const PosPage()));
   }
 
   void _openOrderPage(DiningTableModel table, TableSessionModel session) {

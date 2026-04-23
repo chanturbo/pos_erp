@@ -1043,8 +1043,12 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
         'branch_id': selectedBranch.branchId,
         'warehouse_id': selectedWarehouse.warehouseId,
         if (restaurantContext != null) ...{
-          'table_id': restaurantContext.tableId,
-          'session_id': restaurantContext.sessionId,
+          'table_id': restaurantContext.hasTable
+              ? restaurantContext.tableId
+              : null,
+          'session_id': restaurantContext.hasSession
+              ? restaurantContext.sessionId
+              : null,
           'service_type': restaurantContext.serviceType,
           'party_size': restaurantContext.guestCount,
         },
@@ -1199,16 +1203,19 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
           }
         }
 
-        if (restaurantContext != null) {
+        if (restaurantContext?.hasTable ?? false) {
+          final tableContext = restaurantContext!;
           try {
-            final billRes = await apiClient.get('/api/tables/${restaurantContext.tableId}/bill');
+            final billRes = await apiClient.get(
+              '/api/tables/${tableContext.tableId}/bill',
+            );
             final billData = billRes.data is Map ? billRes.data as Map : {};
             final billPayload =
                 billData['data'] is Map ? billData['data'] as Map : {};
             final remainingItems = billPayload['items'] as List? ?? const [];
             if (remainingItems.isEmpty) {
               final closeRes = await apiClient.post(
-                '/api/tables/${restaurantContext.tableId}/close',
+                '/api/tables/${tableContext.tableId}/close',
                 data: {},
               );
               if (closeRes.statusCode != 200) {
@@ -1324,8 +1331,12 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
             'branch_id': selectedBranch.branchId,
             'warehouse_id': selectedWarehouse.warehouseId,
             if (restaurantContext != null) ...{
-              'table_id': restaurantContext.tableId,
-              'session_id': restaurantContext.sessionId,
+              'table_id': restaurantContext.hasTable
+                  ? restaurantContext.tableId
+                  : null,
+              'session_id': restaurantContext.hasSession
+                  ? restaurantContext.sessionId
+                  : null,
               'service_type': restaurantContext.serviceType,
               'party_size': restaurantContext.guestCount,
             },

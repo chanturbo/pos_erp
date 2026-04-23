@@ -1130,14 +1130,18 @@ class _RestaurantContextChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
-            Icons.table_restaurant,
+          Icon(
+            contextData.isTakeaway
+                ? Icons.takeout_dining
+                : Icons.table_restaurant,
             size: 13,
             color: Colors.orange,
           ),
           const SizedBox(width: 5),
           Text(
-            '${contextData.tableName} • ${contextData.guestCount} คน',
+            contextData.isTakeaway
+                ? contextData.displayName
+                : '${contextData.displayName} • ${contextData.guestCount} คน',
             style: const TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,

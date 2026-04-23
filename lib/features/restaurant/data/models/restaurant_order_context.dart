@@ -15,6 +15,13 @@ class RestaurantOrderContext {
   final String? paymentTitle;
   final String? splitLabel;
 
+  bool get hasTable => tableId.trim().isNotEmpty;
+  bool get hasSession => sessionId.trim().isNotEmpty;
+  bool get isTakeaway => serviceType.toUpperCase() == 'TAKEAWAY';
+  String get displayName => tableName.trim().isNotEmpty
+      ? tableName
+      : (isTakeaway ? 'ซื้อกลับบ้าน' : 'ไม่ระบุโต๊ะ');
+
   const RestaurantOrderContext({
     required this.tableId,
     required this.tableName,
@@ -32,6 +39,23 @@ class RestaurantOrderContext {
     this.paymentTitle,
     this.splitLabel,
   });
+
+  factory RestaurantOrderContext.takeaway({
+    required String branchId,
+    int guestCount = 1,
+    String? currentOrderId,
+    String? currentOrderNo,
+  }) =>
+      RestaurantOrderContext(
+        tableId: '',
+        tableName: 'ซื้อกลับบ้าน',
+        sessionId: '',
+        branchId: branchId,
+        guestCount: guestCount,
+        serviceType: 'TAKEAWAY',
+        currentOrderId: currentOrderId,
+        currentOrderNo: currentOrderNo,
+      );
 
   Map<String, dynamic> toJson() => {
         'table_id': tableId,

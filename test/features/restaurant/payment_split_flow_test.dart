@@ -94,6 +94,55 @@ class _FakePaymentSplitApiClient extends ApiClient {
       });
     }
 
+    if (path == '/api/sales/SO-TAKEAWAY-1') {
+      return _response(path, 200, {
+        'success': true,
+        'data': {
+          'order_id': 'SO-TAKEAWAY-1',
+          'order_no': 'TK-001',
+          'order_date': DateTime(2026, 4, 20, 12, 0).toIso8601String(),
+          'customer_id': 'CUS1',
+          'customer_name': 'สมาชิกทอง',
+          'subtotal': 150,
+          'discount_amount': 0,
+          'coupon_discount': 0,
+          'coupon_codes': const <String>[],
+          'table_id': null,
+          'session_id': null,
+          'service_type': 'TAKEAWAY',
+          'party_size': 1,
+          'service_charge_rate': 0,
+          'service_charge_amount': 0,
+          'total_amount': 150,
+          'payment_type': 'PENDING',
+          'paid_amount': 0,
+          'change_amount': 0,
+          'points_used': 0,
+          'status': 'OPEN',
+          'items': [
+            {
+              'item_id': 'IT-TK-1',
+              'order_id': 'SO-TAKEAWAY-1',
+              'line_no': 1,
+              'product_id': 'P1',
+              'product_code': 'P1',
+              'product_name': 'Pad Thai',
+              'unit': 'plate',
+              'quantity': 1,
+              'unit_price': 150,
+              'amount': 150,
+              'discount_amount': 0,
+              'special_instructions': null,
+              'course_no': 1,
+              'kitchen_status': 'PENDING',
+              'modifiers': const [],
+              'is_free_item': false,
+            },
+          ],
+        },
+      });
+    }
+
     throw UnimplementedError('Unhandled GET $path');
   }
 
@@ -304,6 +353,17 @@ class _FakePaymentSplitApiClient extends ApiClient {
       });
     }
 
+    if (path == '/api/sales/SO-TAKEAWAY-1/complete') {
+      return _response(path, 200, {
+        'success': true,
+        'data': {
+          'order_no': 'TK-001',
+          'order_id': 'SO-TAKEAWAY-1',
+          'earned_points': 0,
+        },
+      });
+    }
+
     if (path == '/api/tables/TB1/close') {
       return closeSucceeds
           ? _response(path, 200, {'success': true})
@@ -499,6 +559,12 @@ final _tableContext = RestaurantOrderContext(
   guestCount: 2,
   currentOrderId: 'SO1',
   currentOrderIds: const ['SO1'],
+);
+
+final _takeawayContext = RestaurantOrderContext.takeaway(
+  branchId: 'BR1',
+  currentOrderId: 'SO-TAKEAWAY-1',
+  currentOrderNo: 'TK-001',
 );
 
 void main() {
@@ -714,6 +780,34 @@ void main() {
       expect(find.byType(PaymentPage), findsOneWidget);
     });
 
+    testWidgets('takeaway billing page loads by order id and hides table actions', (
+      tester,
+    ) async {
+      final fakeApi = _FakePaymentSplitApiClient();
+      final container = _createContainer(
+        apiClient: fakeApi,
+        cartState: CartState(
+          items: const [],
+          customerId: 'WALK_IN',
+          customerName: 'ลูกค้าทั่วไป',
+        ),
+      );
+
+      await _pumpWithContainer(
+        tester,
+        container: container,
+        child: BillingPage(tableContext: _takeawayContext),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(fakeApi.getCalls, contains('/api/sales/SO-TAKEAWAY-1'));
+      expect(find.text('รวมโต๊ะ'), findsNothing);
+      expect(find.text('แยกบิล'), findsNothing);
+      expect(find.text('Service Charge'), findsNothing);
+      expect(find.textContaining('ซื้อกลับบ้าน'), findsWidgets);
+    });
+
     testWidgets('payment receipt propagates open new bill action', (
       tester,
     ) async {
@@ -796,6 +890,64 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.textContaining('ปิดอัตโนมัติไม่สำเร็จ'), findsOneWidget);
+    });
+
+    testWidgets('takeaway payment completes without table bill or close calls', (
+      tester,
+    ) async {
+      final fakeApi = _FakePaymentSplitApiClient();
+      final container = _createContainer(
+        apiClient: fakeApi,
+        cartState: CartState(
+          items: [
+            CartItem(
+              productId: 'P1',
+              productCode: 'P1',
+              productName: 'Pad Thai',
+              unit: 'plate',
+              quantity: 1,
+              unitPrice: 150,
+              amount: 150,
+              priceLevel1: 150,
+            ),
+          ],
+          customerId: 'CUS1',
+          customerName: 'สมาชิกทอง',
+          customerPriceLevel: 3,
+        ),
+        restaurantContext: _takeawayContext.copyWith(
+          subtotalOverride: 150,
+          totalOverride: 150,
+          serviceChargeOverride: 0,
+          discountOverride: 0,
+          paymentTitle: 'ชำระบิลซื้อกลับบ้าน',
+          currentOrderIds: const ['SO-TAKEAWAY-1'],
+        ),
+      );
+
+      await _pumpWithContainer(
+        tester,
+        container: container,
+        child: const PaymentPage(),
+      );
+
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('ชำระเงิน').first);
+      await tester.pumpAndSettle();
+
+      expect(
+        fakeApi.postCalls,
+        contains('/api/sales/SO-TAKEAWAY-1/complete'),
+      );
+      expect(
+        fakeApi.getCalls.where((call) => call.startsWith('/api/tables/')),
+        isEmpty,
+      );
+      expect(
+        fakeApi.postCalls.where((call) => call.startsWith('/api/tables/')),
+        isEmpty,
+      );
+      expect(find.text('เปิดบิลใหม่'), findsOneWidget);
     });
   });
 }

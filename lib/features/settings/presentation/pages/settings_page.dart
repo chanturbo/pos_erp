@@ -65,6 +65,9 @@ class SettingsState {
   final double defaultServiceChargeRate;
   final String managerPin;
   final bool autoPrintKitchenTicket;
+  final bool takeawayAutoRefreshEnabled;
+  final int takeawayPollingIntervalSeconds;
+  final bool restaurantAlertSoundEnabled;
 
   SettingsState({
     this.companyName = '',
@@ -100,6 +103,9 @@ class SettingsState {
     this.defaultServiceChargeRate = 0,
     this.managerPin = '',
     this.autoPrintKitchenTicket = false,
+    this.takeawayAutoRefreshEnabled = true,
+    this.takeawayPollingIntervalSeconds = 15,
+    this.restaurantAlertSoundEnabled = true,
   });
 
   bool get managerPinConfigured => managerPin.isNotEmpty;
@@ -156,6 +162,9 @@ class SettingsState {
     double? defaultServiceChargeRate,
     String? managerPin,
     bool? autoPrintKitchenTicket,
+    bool? takeawayAutoRefreshEnabled,
+    int? takeawayPollingIntervalSeconds,
+    bool? restaurantAlertSoundEnabled,
   }) {
     return SettingsState(
       companyName: companyName ?? this.companyName,
@@ -194,9 +203,17 @@ class SettingsState {
       thermalPrinterHost: thermalPrinterHost ?? this.thermalPrinterHost,
       thermalPrinterPort: thermalPrinterPort ?? this.thermalPrinterPort,
       thermalPaperWidthMm: thermalPaperWidthMm ?? this.thermalPaperWidthMm,
-      defaultServiceChargeRate: defaultServiceChargeRate ?? this.defaultServiceChargeRate,
+      defaultServiceChargeRate:
+          defaultServiceChargeRate ?? this.defaultServiceChargeRate,
       managerPin: managerPin ?? this.managerPin,
-      autoPrintKitchenTicket: autoPrintKitchenTicket ?? this.autoPrintKitchenTicket,
+      autoPrintKitchenTicket:
+          autoPrintKitchenTicket ?? this.autoPrintKitchenTicket,
+      takeawayAutoRefreshEnabled:
+          takeawayAutoRefreshEnabled ?? this.takeawayAutoRefreshEnabled,
+      takeawayPollingIntervalSeconds:
+          takeawayPollingIntervalSeconds ?? this.takeawayPollingIntervalSeconds,
+      restaurantAlertSoundEnabled:
+          restaurantAlertSoundEnabled ?? this.restaurantAlertSoundEnabled,
     );
   }
 }
@@ -282,7 +299,8 @@ class SettingsNotifier extends Notifier<SettingsState> {
       desktopUseTcpPrint:
           prefs.getBool('desktop_use_tcp_print') ?? state.desktopUseTcpPrint,
       mobileUseNativePrint:
-          prefs.getBool('mobile_use_native_print') ?? state.mobileUseNativePrint,
+          prefs.getBool('mobile_use_native_print') ??
+          state.mobileUseNativePrint,
       thermalPrinterHost:
           prefs.getString('thermal_printer_host') ?? state.thermalPrinterHost,
       thermalPrinterPort:
@@ -290,11 +308,21 @@ class SettingsNotifier extends Notifier<SettingsState> {
       thermalPaperWidthMm:
           prefs.getInt('thermal_paper_width_mm') ?? state.thermalPaperWidthMm,
       defaultServiceChargeRate:
-          prefs.getDouble('default_service_charge_rate') ?? state.defaultServiceChargeRate,
-      managerPin:
-          prefs.getString('manager_pin') ?? state.managerPin,
+          prefs.getDouble('default_service_charge_rate') ??
+          state.defaultServiceChargeRate,
+      managerPin: prefs.getString('manager_pin') ?? state.managerPin,
       autoPrintKitchenTicket:
-          prefs.getBool('auto_print_kitchen_ticket') ?? state.autoPrintKitchenTicket,
+          prefs.getBool('auto_print_kitchen_ticket') ??
+          state.autoPrintKitchenTicket,
+      takeawayAutoRefreshEnabled:
+          prefs.getBool('takeaway_auto_refresh_enabled') ??
+          state.takeawayAutoRefreshEnabled,
+      takeawayPollingIntervalSeconds:
+          prefs.getInt('takeaway_polling_interval_seconds') ??
+          state.takeawayPollingIntervalSeconds,
+      restaurantAlertSoundEnabled:
+          prefs.getBool('restaurant_alert_sound_enabled') ??
+          state.restaurantAlertSoundEnabled,
     );
   }
 
@@ -302,10 +330,16 @@ class SettingsNotifier extends Notifier<SettingsState> {
     double? defaultServiceChargeRate,
     String? managerPin,
     bool? autoPrintKitchenTicket,
+    bool? takeawayAutoRefreshEnabled,
+    int? takeawayPollingIntervalSeconds,
+    bool? restaurantAlertSoundEnabled,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     if (defaultServiceChargeRate != null) {
-      await prefs.setDouble('default_service_charge_rate', defaultServiceChargeRate);
+      await prefs.setDouble(
+        'default_service_charge_rate',
+        defaultServiceChargeRate,
+      );
     }
     if (managerPin != null) {
       final toStore = managerPin.isEmpty
@@ -316,10 +350,31 @@ class SettingsNotifier extends Notifier<SettingsState> {
     if (autoPrintKitchenTicket != null) {
       await prefs.setBool('auto_print_kitchen_ticket', autoPrintKitchenTicket);
     }
+    if (takeawayAutoRefreshEnabled != null) {
+      await prefs.setBool(
+        'takeaway_auto_refresh_enabled',
+        takeawayAutoRefreshEnabled,
+      );
+    }
+    if (takeawayPollingIntervalSeconds != null) {
+      await prefs.setInt(
+        'takeaway_polling_interval_seconds',
+        takeawayPollingIntervalSeconds,
+      );
+    }
+    if (restaurantAlertSoundEnabled != null) {
+      await prefs.setBool(
+        'restaurant_alert_sound_enabled',
+        restaurantAlertSoundEnabled,
+      );
+    }
     state = state.copyWith(
       defaultServiceChargeRate: defaultServiceChargeRate,
       managerPin: managerPin,
       autoPrintKitchenTicket: autoPrintKitchenTicket,
+      takeawayAutoRefreshEnabled: takeawayAutoRefreshEnabled,
+      takeawayPollingIntervalSeconds: takeawayPollingIntervalSeconds,
+      restaurantAlertSoundEnabled: restaurantAlertSoundEnabled,
     );
   }
 
@@ -1517,10 +1572,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               settings.desktopUseTcpPrint
                   ? 'เปิดอยู่: กดพิมพ์จะแสดง dialog กรอก IP:Port เหมือน Android'
                   : 'ปิดอยู่: กดพิมพ์จะเปิด native print dialog ของ OS',
-              style: TextStyle(color: isDark ? Colors.white70 : AppTheme.textSub),
+              style: TextStyle(
+                color: isDark ? Colors.white70 : AppTheme.textSub,
+              ),
             ),
-            secondary: const Icon(Icons.swap_horiz_outlined,
-                color: AppTheme.primary),
+            secondary: const Icon(
+              Icons.swap_horiz_outlined,
+              color: AppTheme.primary,
+            ),
             value: settings.desktopUseTcpPrint,
             activeThumbColor: AppTheme.primary,
             onChanged: (value) {
@@ -1543,9 +1602,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               settings.mobileUseNativePrint
                   ? 'เปิดอยู่: ใช้ Android Print / AirPrint เลือก printer จาก OS'
                   : 'ปิดอยู่: กดพิมพ์จะแสดง dialog กรอก IP:Port (ESC/POS TCP)',
-              style: TextStyle(color: isDark ? Colors.white70 : AppTheme.textSub),
+              style: TextStyle(
+                color: isDark ? Colors.white70 : AppTheme.textSub,
+              ),
             ),
-            secondary: const Icon(Icons.print_outlined, color: AppTheme.primary),
+            secondary: const Icon(
+              Icons.print_outlined,
+              color: AppTheme.primary,
+            ),
             value: settings.mobileUseNativePrint,
             activeThumbColor: AppTheme.primary,
             onChanged: (value) {
@@ -1638,7 +1702,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           label: 'บันทึกการตั้งค่าเครื่องพิมพ์',
           icon: Icons.save_outlined,
           onPressed: () async {
-            final port = int.tryParse(_thermalPrinterPortController.text.trim());
+            final port = int.tryParse(
+              _thermalPrinterPortController.text.trim(),
+            );
             if (port == null || port <= 0) {
               _showError('กรุณาระบุพอร์ตเครื่องพิมพ์ให้ถูกต้อง');
               return;
@@ -1996,18 +2062,22 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               settings.defaultServiceChargeRate ==
                       settings.defaultServiceChargeRate.truncateToDouble()
                   ? 0
-                  : 1)
+                  : 1,
+            )
           : '0',
     );
     final pinCtrl = TextEditingController();
+    const pollingIntervals = [5, 10, 15, 30, 60];
 
     return Column(
       children: [
         ListTile(
           contentPadding: EdgeInsets.zero,
           leading: const Icon(Icons.percent, color: Colors.orange),
-          title: Text('Service Charge เริ่มต้น (%)',
-              style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+          title: Text(
+            'Service Charge เริ่มต้น (%)',
+            style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+          ),
           subtitle: Text(
             settings.defaultServiceChargeRate > 0
                 ? 'ใช้ ${settings.defaultServiceChargeRate.toStringAsFixed(1)}% อัตโนมัติเมื่อเปิดบิล'
@@ -2018,14 +2088,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             width: 90,
             child: TextFormField(
               controller: scCtrl,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               textAlign: TextAlign.center,
               decoration: InputDecoration(
                 suffixText: '%',
                 isDense: true,
                 border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8)),
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
               onFieldSubmitted: (v) {
                 final rate = double.tryParse(v) ?? 0;
@@ -2040,8 +2112,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         ListTile(
           contentPadding: EdgeInsets.zero,
           leading: const Icon(Icons.lock_outline, color: Colors.purple),
-          title: Text('Manager PIN (สำหรับยกเลิกรายการ)',
-              style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+          title: Text(
+            'Manager PIN (สำหรับยกเลิกรายการ)',
+            style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+          ),
           subtitle: Text(
             settings.managerPinConfigured
                 ? 'ตั้ง PIN แล้ว (กรอก PIN ใหม่เพื่อเปลี่ยน)'
@@ -2059,7 +2133,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 hintText: settings.managerPinConfigured ? '••••' : 'ไม่ตั้งค่า',
                 isDense: true,
                 border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8)),
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
               onFieldSubmitted: (v) {
                 ref
@@ -2073,8 +2148,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           secondary: const Icon(Icons.print_outlined, color: Colors.teal),
-          title: Text('พิมพ์ใบสั่งครัวอัตโนมัติ',
-              style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+          title: Text(
+            'พิมพ์ใบสั่งครัวอัตโนมัติ',
+            style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+          ),
           subtitle: Text(
             settings.autoPrintKitchenTicket
                 ? 'พิมพ์ Kitchen Ticket ทุกครั้งที่ส่งออเดอร์'
@@ -2085,6 +2162,99 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           onChanged: (v) => ref
               .read(settingsProvider.notifier)
               .updateRestaurantSettings(autoPrintKitchenTicket: v),
+        ),
+        const Divider(height: 1),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          secondary: const Icon(Icons.sync_outlined, color: Colors.indigo),
+          title: Text(
+            'รีเฟรชบิลกลับบ้านอัตโนมัติ',
+            style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+          ),
+          subtitle: Text(
+            settings.takeawayAutoRefreshEnabled
+                ? 'Home, โต๊ะอาหาร และหน้าบิลกลับบ้านจะอัปเดตตามรอบเวลาเดียวกัน'
+                : 'อัปเดตเฉพาะตอนกดรีเฟรชเอง',
+            style: TextStyle(color: isDark ? Colors.white54 : AppTheme.textSub),
+          ),
+          value: settings.takeawayAutoRefreshEnabled,
+          onChanged: (v) => ref
+              .read(settingsProvider.notifier)
+              .updateRestaurantSettings(takeawayAutoRefreshEnabled: v),
+        ),
+        if (settings.takeawayAutoRefreshEnabled) ...[
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'ช่วงเวลา polling',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'ใช้ค่าเดียวกันสำหรับ badge และรายการ takeaway',
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark ? Colors.white54 : AppTheme.textSub,
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: pollingIntervals
+                  .map(
+                    (seconds) => _paginationChip(
+                      label: '$seconds วิ',
+                      selected:
+                          settings.takeawayPollingIntervalSeconds == seconds,
+                      isDark: isDark,
+                      onTap: () async {
+                        await ref
+                            .read(settingsProvider.notifier)
+                            .updateRestaurantSettings(
+                              takeawayPollingIntervalSeconds: seconds,
+                            );
+                        if (mounted) _showSuccess('บันทึกการตั้งค่าแล้ว');
+                      },
+                    ),
+                  )
+                  .toList(),
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+        const Divider(height: 1),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          secondary: const Icon(
+            Icons.notifications_active_outlined,
+            color: Colors.deepOrange,
+          ),
+          title: Text(
+            'เปิดเสียงแจ้งเตือนร้านอาหาร',
+            style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+          ),
+          subtitle: Text(
+            settings.restaurantAlertSoundEnabled
+                ? 'เล่นเสียงเมื่อมีบิล takeaway ใหม่หรือ ticket ครัวใหม่'
+                : 'ปิดเสียงไว้ แต่ยังแสดง badge / highlight / snackbar ตามปกติ',
+            style: TextStyle(color: isDark ? Colors.white54 : AppTheme.textSub),
+          ),
+          value: settings.restaurantAlertSoundEnabled,
+          onChanged: (v) => ref
+              .read(settingsProvider.notifier)
+              .updateRestaurantSettings(restaurantAlertSoundEnabled: v),
         ),
       ],
     );
@@ -2331,7 +2501,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final boxColor = isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF8FAFC);
     final borderColor = isDark ? Colors.white12 : AppTheme.border;
 
-    final (icon, color, title, subtitle) = switch (_masterBackgroundHostRunning) {
+    final (
+      icon,
+      color,
+      title,
+      subtitle,
+    ) = switch (_masterBackgroundHostRunning) {
       true => (
         Icons.verified_rounded,
         AppTheme.successColor,

@@ -160,6 +160,8 @@ class SalesRoutes {
             'session_id': order.sessionId,
             'service_type': order.serviceType,
             'party_size': order.partySize,
+            'service_charge_rate': order.serviceChargeRate,
+            'service_charge_amount': order.serviceChargeAmount,
             'total_amount': order.totalAmount,
             'payment_type': order.paymentType,
             'paid_amount': order.paidAmount,

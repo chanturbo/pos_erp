@@ -6,12 +6,14 @@ class TableCard extends StatelessWidget {
   final DiningTableModel table;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
+  final VoidCallback? onCleaningCompleted;
 
   const TableCard({
     super.key,
     required this.table,
     this.onTap,
     this.onLongPress,
+    this.onCleaningCompleted,
   });
 
   @override
@@ -100,22 +102,44 @@ class TableCard extends StatelessWidget {
 
               const SizedBox(height: 6),
 
-              // ── Status badge ──
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: colors.badge,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  _statusLabel(table.status),
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: colors.badgeText,
+              if (table.isCleaning && onCleaningCompleted != null)
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: onCleaningCompleted,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.successColor,
+                      side: BorderSide(color: AppTheme.successColor),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      visualDensity: VisualDensity.compact,
+                      textStyle: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    icon: const Icon(Icons.check_circle_outline, size: 15),
+                    label: const Text('ทำความสะอาดเสร็จแล้ว'),
+                  ),
+                )
+              else
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: colors.badge,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    _statusLabel(table.status),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: colors.badgeText,
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
         ),

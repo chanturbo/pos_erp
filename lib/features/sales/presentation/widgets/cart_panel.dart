@@ -89,9 +89,10 @@ class _CartPanelState extends ConsumerState<CartPanel> {
     if (restaurantContext == null) return;
     if (restaurantContext.currentOrderId != null &&
         restaurantContext.currentOrderId!.isNotEmpty) {
+      final orderLabel = restaurantContext.displayName;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('โต๊ะนี้ส่งออเดอร์เข้าครัวแล้ว'),
+        SnackBar(
+          content: Text('$orderLabel ส่งออเดอร์เข้าครัวแล้ว'),
           backgroundColor: Colors.orange,
         ),
       );
@@ -117,8 +118,10 @@ class _CartPanelState extends ConsumerState<CartPanel> {
       'user_id': authState.user?.userId ?? 'USR001',
       'branch_id': selectedBranch.branchId,
       'warehouse_id': selectedWarehouse.warehouseId,
-      'table_id': restaurantContext.tableId,
-      'session_id': restaurantContext.sessionId,
+      'table_id': restaurantContext.hasTable ? restaurantContext.tableId : null,
+      'session_id': restaurantContext.hasSession
+          ? restaurantContext.sessionId
+          : null,
       'service_type': restaurantContext.serviceType,
       'party_size': restaurantContext.guestCount,
       'subtotal': cartState.subtotal,
@@ -204,7 +207,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
           paperWidthMm: settings.thermalPaperWidthMm,
         );
         final ticket = KitchenTicketDocument(
-          tableName: restaurantContext.tableName,
+          tableName: restaurantContext.displayName,
           orderNo: orderNo ?? orderId,
           orderTime: DateFormat('HH:mm').format(DateTime.now()),
           items: cartState.items.map((item) => KitchenTicketItem(

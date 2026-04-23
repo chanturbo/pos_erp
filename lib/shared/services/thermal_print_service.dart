@@ -406,7 +406,12 @@ class ThermalPrintService {
     writeln('ORDER TICKET');
     write(const [0x1D, 0x21, 0x00]); // normal size
     write(const [0x1B, 0x45, 0x00]); // bold off
-    writeln(_fitCenter('TABLE: ${doc.tableName}', lineWidth));
+    final destination = doc.tableName.trim().isEmpty ? 'ไม่ระบุโต๊ะ' : doc.tableName.trim();
+    final isTakeaway =
+        destination.toUpperCase() == 'TAKEAWAY' || destination == 'ซื้อกลับบ้าน';
+    writeln(
+      _fitCenter(isTakeaway ? 'TAKEAWAY' : 'TABLE: $destination', lineWidth),
+    );
     writeln(_fitCenter('#${doc.orderNo}  ${doc.orderTime}', lineWidth));
     writeln(_divider(lineWidth));
 

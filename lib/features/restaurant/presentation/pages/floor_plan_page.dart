@@ -127,6 +127,8 @@ class _FloorPlanPageState extends ConsumerState<FloorPlanPage> {
                               mergeSource: _mergeSource,
                               mergeTarget: _mergeTarget,
                               onTableTap: (t) => _handleTableTap(t),
+                              onCleaningCompleted: (t) =>
+                                  _markTableCleaningCompleted(t),
                             );
                           }).toList(),
                         ),
@@ -199,6 +201,56 @@ class _FloorPlanPageState extends ConsumerState<FloorPlanPage> {
         _mergeTarget = table;
       }
     });
+  }
+
+  Future<void> _markTableCleaningCompleted(DiningTableModel table) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('ทำความสะอาดเสร็จแล้ว'),
+        content: Text(
+          'ยืนยันว่าโต๊ะ ${table.displayName} พร้อมใช้งานแล้ว และต้องการเปลี่ยนสถานะเป็นว่างหรือไม่?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('ยกเลิก'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppTheme.successColor,
+            ),
+            child: const Text('ทำความสะอาดเสร็จแล้ว'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _busyMessage = 'กำลังเปลี่ยนสถานะโต๊ะ ${table.displayName} เป็นว่าง...');
+    try {
+      final ok = await ref.read(tableListProvider.notifier).updateTable(
+            table.tableId,
+            status: 'AVAILABLE',
+          );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            ok
+                ? 'โต๊ะ ${table.displayName} พร้อมใช้งานแล้ว'
+                : 'เปลี่ยนสถานะโต๊ะไม่สำเร็จ',
+          ),
+          backgroundColor: ok ? AppTheme.successColor : AppTheme.errorColor,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _busyMessage = null);
+      }
+    }
   }
 
   Future<void> _confirmMerge() async {
@@ -334,6 +386,7 @@ class _ZoneSection extends StatelessWidget {
   final DiningTableModel? mergeSource;
   final DiningTableModel? mergeTarget;
   final void Function(DiningTableModel) onTableTap;
+  final void Function(DiningTableModel)? onCleaningCompleted;
 
   const _ZoneSection({
     required this.zoneName,
@@ -342,6 +395,7 @@ class _ZoneSection extends StatelessWidget {
     required this.mergeSource,
     required this.mergeTarget,
     required this.onTableTap,
+    this.onCleaningCompleted,
   });
 
   @override
@@ -359,7 +413,12 @@ class _ZoneSection extends StatelessWidget {
                       mergeMode: mergeMode,
                       isSource: mergeSource?.tableId == t.tableId,
                       isTarget: mergeTarget?.tableId == t.tableId,
-                      onTap: () => onTableTap(t),
+                      onTap: t.isCleaning && !mergeMode
+                          ? () {}
+                          : () => onTableTap(t),
+                      onCleaningCompleted: t.isCleaning && !mergeMode
+                          ? () => onCleaningCompleted?.call(t)
+                          : null,
                     ))
                 .toList(),
           ),
@@ -376,6 +435,7 @@ class _FloorTableCard extends StatelessWidget {
   final bool isSource;
   final bool isTarget;
   final VoidCallback onTap;
+  final VoidCallback? onCleaningCompleted;
 
   const _FloorTableCard({
     required this.table,
@@ -383,6 +443,7 @@ class _FloorTableCard extends StatelessWidget {
     required this.isSource,
     required this.isTarget,
     required this.onTap,
+    this.onCleaningCompleted,
   });
 
   @override
@@ -573,27 +634,47 @@ class _FloorTableCard extends StatelessWidget {
                   const Spacer(),
 
                   // Status label
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: (mergeMode && !table.isOccupied
-                              ? Colors.grey
-                              : statusColor)
-                          .withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      _statusLabel(),
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: mergeMode && !table.isOccupied
-                            ? Colors.grey.shade400
-                            : statusColor,
-                        fontWeight: FontWeight.w600,
+                  if (table.isCleaning && onCleaningCompleted != null)
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: onCleaningCompleted,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppTheme.successColor,
+                          side: BorderSide(color: AppTheme.successColor),
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          minimumSize: const Size(0, 28),
+                          visualDensity: VisualDensity.compact,
+                          textStyle: const TextStyle(
+                            fontSize: 8,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        child: const Text('ทำความสะอาดเสร็จแล้ว'),
+                      ),
+                    )
+                  else
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: (mergeMode && !table.isOccupied
+                                ? Colors.grey
+                                : statusColor)
+                            .withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        _statusLabel(),
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: mergeMode && !table.isOccupied
+                              ? Colors.grey.shade400
+                              : statusColor,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
-                  ),
                 ],
               ),
             ),

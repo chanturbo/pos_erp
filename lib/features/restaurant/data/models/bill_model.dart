@@ -55,6 +55,7 @@ class BillItemModel {
 }
 
 class BillModel {
+  final String? orderNo;
   final String sessionId;
   final String tableId;
   final int guestCount;
@@ -71,6 +72,7 @@ class BillModel {
   final String? previewToken;
 
   const BillModel({
+    this.orderNo,
     required this.sessionId,
     required this.tableId,
     required this.guestCount,
@@ -88,8 +90,9 @@ class BillModel {
   });
 
   factory BillModel.fromJson(Map<String, dynamic> json) => BillModel(
-        sessionId: json['session_id'] as String,
-        tableId: json['table_id'] as String,
+        orderNo: json['order_no'] as String?,
+        sessionId: json['session_id'] as String? ?? '',
+        tableId: json['table_id'] as String? ?? '',
         guestCount: json['guest_count'] as int? ?? 0,
         openedAt: json['opened_at'] != null
             ? DateTime.tryParse(json['opened_at'] as String)
@@ -108,8 +111,35 @@ class BillModel {
         previewToken: json['preview_token'] as String?,
       );
 
+  factory BillModel.fromSalesOrderJson(Map<String, dynamic> json) => BillModel(
+        orderNo: json['order_no'] as String?,
+        sessionId: json['session_id'] as String? ?? '',
+        tableId: json['table_id'] as String? ?? '',
+        guestCount: (json['party_size'] as num?)?.toInt() ?? 1,
+        customerId: json['customer_id'] as String?,
+        customerName: json['customer_name'] as String?,
+        orderIds: [
+          if ((json['order_id'] as String?)?.isNotEmpty ?? false)
+            json['order_id'] as String,
+        ],
+        items: ((json['items'] as List?) ?? const [])
+            .map((j) => BillItemModel.fromJson(j as Map<String, dynamic>))
+            .toList(),
+        subtotal:
+            (json['subtotal'] as num?)?.toDouble() ??
+            (json['total_amount'] as num?)?.toDouble() ??
+            0,
+        discountAmount: (json['discount_amount'] as num?)?.toDouble() ?? 0,
+        serviceChargeRate:
+            (json['service_charge_rate'] as num?)?.toDouble() ?? 0,
+        serviceChargeAmount:
+            (json['service_charge_amount'] as num?)?.toDouble() ?? 0,
+        grandTotal: (json['total_amount'] as num?)?.toDouble() ?? 0,
+      );
+
   bool get isEmpty => items.isEmpty;
   bool get hasServiceCharge => serviceChargeRate > 0;
+  bool get hasTable => tableId.trim().isNotEmpty;
 }
 
 /// ผลลัพธ์จากการ split bill

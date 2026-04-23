@@ -23,8 +23,10 @@ import '../../../restaurant/presentation/pages/table_overview_page.dart';
 import '../../../restaurant/presentation/pages/kitchen_display_page.dart';
 import '../../../restaurant/presentation/pages/kitchen_analytics_page.dart';
 import '../../../restaurant/presentation/pages/reservations_page.dart';
+import '../../../restaurant/presentation/pages/takeaway_orders_page.dart';
 import '../../../sales/presentation/pages/pos_page.dart';
 import '../../../sales/presentation/pages/sales_history_page.dart';
+import '../../../sales/presentation/providers/sales_provider.dart';
 import '../../../dashboard/presentation/pages/dashboard_page.dart';
 import '../../../inventory/presentation/pages/stock_balance_page.dart';
 import '../../../inventory/presentation/pages/stock_adjustment_page.dart';
@@ -45,6 +47,7 @@ class _MenuItem {
   final IconData icon;
   final String title;
   final Widget page;
+  final String? badgeId;
 
   /// permission key — null หมายถึงแสดงเสมอ (เช่น Dashboard สำหรับ Admin)
   final String? permissionKey;
@@ -54,6 +57,7 @@ class _MenuItem {
     required this.title,
     required this.page,
     this.permissionKey,
+    this.badgeId,
   });
 }
 
@@ -87,213 +91,220 @@ class _HomePageState extends ConsumerState<HomePage> {
     final showRetailSection = selectedBranch?.isRetailMode ?? true;
 
     return [
-    _MenuSection('หลัก', [
-      _MenuItem(
-        icon: Icons.dashboard,
-        title: 'แดชบอร์ด',
-        permissionKey: AppPermission.dashboard,
-        page: DashboardPage(
-          showBackButton: false,
-          onGoToPos: () => context.isTabletOrWider
-              ? _selectItem(1)
-              : _push(context, const PosPage()),
-          onGoToSalesHistory: () =>
-              _showOverridePage(const SalesHistoryPage(), 2),
-          onGoToProducts: () => context.hasPermanentSidebar
-              ? _selectItem(4)
-              : _push(context, const ProductListPage()),
-          onGoToCustomers: () => context.hasPermanentSidebar
-              ? _selectItem(7)
-              : _push(context, const CustomerListPage()),
-          onGoToTodaySales: () {
-            final today = DateTime.now();
-            _showOverridePage(
-              SalesHistoryPage(
-                initialDateFrom: DateTime(today.year, today.month, today.day),
-                initialDateTo: DateTime(today.year, today.month, today.day),
-              ),
-              2, // highlight "รายการขาย"
-            );
-          },
-          onGoToMonthSales: () {
-            final today = DateTime.now();
-            _showOverridePage(
-              SalesHistoryPage(
-                initialDateFrom: DateTime(today.year, today.month, 1),
-                initialDateTo: DateTime(today.year, today.month, today.day),
-              ),
-              2, // highlight "รายการขาย"
-            );
-          },
-        ),
-      ),
-    ]),
-    if (showRestaurantSection)
-      _MenuSection('ร้านอาหาร', [
+      _MenuSection('หลัก', [
         _MenuItem(
-          icon: Icons.table_restaurant,
-          title: 'โต๊ะอาหาร',
-          page: const TableOverviewPage(),
-          permissionKey: AppPermission.pos,
-        ),
-        _MenuItem(
-          icon: Icons.kitchen,
-          title: 'หน้าจอครัว (KDS)',
-          page: const KitchenDisplayPage(),
-          permissionKey: AppPermission.pos,
-        ),
-        _MenuItem(
-          icon: Icons.event_note,
-          title: 'การจองโต๊ะ',
-          page: const ReservationsPage(),
-          permissionKey: AppPermission.pos,
-        ),
-        _MenuItem(
-          icon: Icons.analytics,
-          title: 'Kitchen Analytics',
-          page: const KitchenAnalyticsPage(),
-          permissionKey: AppPermission.pos,
+          icon: Icons.dashboard,
+          title: 'แดชบอร์ด',
+          permissionKey: AppPermission.dashboard,
+          page: DashboardPage(
+            showBackButton: false,
+            onGoToPos: () => context.isTabletOrWider
+                ? _selectItem(1)
+                : _push(context, const PosPage()),
+            onGoToSalesHistory: () =>
+                _showOverridePage(const SalesHistoryPage(), 2),
+            onGoToProducts: () => context.hasPermanentSidebar
+                ? _selectItem(4)
+                : _push(context, const ProductListPage()),
+            onGoToCustomers: () => context.hasPermanentSidebar
+                ? _selectItem(7)
+                : _push(context, const CustomerListPage()),
+            onGoToTodaySales: () {
+              final today = DateTime.now();
+              _showOverridePage(
+                SalesHistoryPage(
+                  initialDateFrom: DateTime(today.year, today.month, today.day),
+                  initialDateTo: DateTime(today.year, today.month, today.day),
+                ),
+                2, // highlight "รายการขาย"
+              );
+            },
+            onGoToMonthSales: () {
+              final today = DateTime.now();
+              _showOverridePage(
+                SalesHistoryPage(
+                  initialDateFrom: DateTime(today.year, today.month, 1),
+                  initialDateTo: DateTime(today.year, today.month, today.day),
+                ),
+                2, // highlight "รายการขาย"
+              );
+            },
+          ),
         ),
       ]),
-    _MenuSection('การขาย', [
-      if (showRetailSection)
+      if (showRestaurantSection)
+        _MenuSection('ร้านอาหาร', [
+          _MenuItem(
+            icon: Icons.table_restaurant,
+            title: 'โต๊ะอาหาร',
+            page: const TableOverviewPage(),
+            permissionKey: AppPermission.pos,
+          ),
+          _MenuItem(
+            icon: Icons.kitchen,
+            title: 'หน้าจอครัว (KDS)',
+            page: const KitchenDisplayPage(),
+            permissionKey: AppPermission.pos,
+          ),
+          _MenuItem(
+            icon: Icons.event_note,
+            title: 'การจองโต๊ะ',
+            page: const ReservationsPage(),
+            permissionKey: AppPermission.pos,
+          ),
+          _MenuItem(
+            icon: Icons.receipt_long,
+            title: 'บิลกลับบ้านค้าง',
+            page: const TakeawayOrdersPage(),
+            permissionKey: AppPermission.pos,
+            badgeId: 'takeaway_pending',
+          ),
+          _MenuItem(
+            icon: Icons.analytics,
+            title: 'Kitchen Analytics',
+            page: const KitchenAnalyticsPage(),
+            permissionKey: AppPermission.pos,
+          ),
+        ]),
+      _MenuSection('การขาย', [
+        if (showRetailSection)
+          _MenuItem(
+            icon: Icons.shopping_cart,
+            title: 'หน้าขาย (POS)',
+            page: const PosPage(),
+            permissionKey: AppPermission.pos,
+          ),
         _MenuItem(
-          icon: Icons.shopping_cart,
-          title: 'หน้าขาย (POS)',
-          page: const PosPage(),
-          permissionKey: AppPermission.pos,
+          icon: Icons.receipt_long,
+          title: 'รายการขาย',
+          page: const SalesHistoryPage(),
+          permissionKey: AppPermission.salesHistory,
         ),
-      _MenuItem(
-        icon: Icons.receipt_long,
-        title: 'รายการขาย',
-        page: const SalesHistoryPage(),
-        permissionKey: AppPermission.salesHistory,
-      ),
-      _MenuItem(
-        icon: Icons.local_offer,
-        title: 'โปรโมชั่น',
-        page: const PromotionListPage(),
-        permissionKey: AppPermission.promotions,
-      ),
-    ]),
-    _MenuSection('คลังสินค้า', [
-      _MenuItem(
-        icon: Icons.inventory,
-        title: 'สินค้า',
-        page: const ProductListPage(),
-        permissionKey: AppPermission.products,
-      ),
-      _MenuItem(
-        icon: Icons.warehouse,
-        title: 'สต๊อกสินค้า',
-        page: const StockBalancePage(),
-        permissionKey: AppPermission.stock,
-      ),
-      _MenuItem(
-        icon: Icons.tune,
-        title: 'ปรับสต๊อก',
-        page: const StockAdjustmentPage(),
-        permissionKey: AppPermission.stockAdjust,
-      ),
-    ]),
-    _MenuSection('ผู้ติดต่อ', [
-      _MenuItem(
-        icon: Icons.people,
-        title: 'ลูกค้า',
-        page: const CustomerListPage(),
-        permissionKey: AppPermission.customers,
-      ),
-      _MenuItem(
-        icon: Icons.business,
-        title: 'ซัพพลายเออร์',
-        page: const SupplierListPage(),
-        permissionKey: AppPermission.suppliers,
-      ),
-    ]),
-    _MenuSection('จัดซื้อ', [
-      _MenuItem(
-        icon: Icons.shopping_bag,
-        title: 'ซื้อสินค้า',
-        page: const PurchaseOrderListPage(),
-        permissionKey: AppPermission.purchaseOrder,
-      ),
-      _MenuItem(
-        icon: Icons.inventory_2,
-        title: 'รับสินค้า',
-        page: const GoodsReceiptListPage(),
-        permissionKey: AppPermission.goodsReceipt,
-      ),
-      _MenuItem(
-        icon: Icons.assignment_return,
-        title: 'คืนสินค้า',
-        page: const PurchaseReturnListPage(),
-        permissionKey: AppPermission.purchaseReturn,
-      ),
-    ]),
-    _MenuSection('บัญชี', [
-      _MenuItem(
-        icon: Icons.receipt,
-        title: 'ใบแจ้งหนี้ AP(ซัพฯ)',
-        page: const ApInvoiceListPage(),
-        permissionKey: AppPermission.apInvoice,
-      ),
-      _MenuItem(
-        icon: Icons.payments,
-        title: 'จ่ายเงิน AP',
-        page: const ApPaymentListPage(),
-        permissionKey: AppPermission.apPayment,
-      ),
-      _MenuItem(
-        icon: Icons.request_page,
-        title: 'ใบแจ้งหนี้ AR(ลูกค้า)',
-        page: const ArInvoiceListPage(),
-        permissionKey: AppPermission.arInvoice,
-      ),
-      _MenuItem(
-        icon: Icons.price_check,
-        title: 'รับเงิน AR',
-        page: const ArReceiptListPage(),
-        permissionKey: AppPermission.arReceipt,
-      ),
-    ]),
-    _MenuSection('ระบบ', [
-      _MenuItem(
-        icon: Icons.assessment,
-        title: 'รายงาน',
-        page: const ReportsPage(),
-        permissionKey: AppPermission.reports,
-      ),
-      _MenuItem(
-        icon: Icons.store,
-        title: 'จัดการสาขา',
-        page: const BranchListPage(),
-        permissionKey: AppPermission.branch,
-      ),
-      _MenuItem(
-        icon: Icons.sync_alt,
-        title: 'การเชื่อมต่อ/ซิงก์',
-        page: const SyncStatusPage(),
-        permissionKey: AppPermission.sync,
-      ),
-      _MenuItem(
-        icon: Icons.settings,
-        title: 'ตั้งค่า',
-        page: const SettingsPage(),
-        permissionKey: AppPermission.settings,
-      ),
-      _MenuItem(
-        icon: Icons.admin_panel_settings,
-        title: 'จัดการสิทธิ์',
-        page: const RolePermissionPage(),
-        permissionKey: AppPermission.rolePermissions,
-      ),
-      _MenuItem(
-        icon: Icons.manage_accounts,
-        title: 'จัดการผู้ใช้งาน',
-        page: const UserListPage(),
-        permissionKey: AppPermission.userManagement,
-      ),
-    ]),
+        _MenuItem(
+          icon: Icons.local_offer,
+          title: 'โปรโมชั่น',
+          page: const PromotionListPage(),
+          permissionKey: AppPermission.promotions,
+        ),
+      ]),
+      _MenuSection('คลังสินค้า', [
+        _MenuItem(
+          icon: Icons.inventory,
+          title: 'สินค้า',
+          page: const ProductListPage(),
+          permissionKey: AppPermission.products,
+        ),
+        _MenuItem(
+          icon: Icons.warehouse,
+          title: 'สต๊อกสินค้า',
+          page: const StockBalancePage(),
+          permissionKey: AppPermission.stock,
+        ),
+        _MenuItem(
+          icon: Icons.tune,
+          title: 'ปรับสต๊อก',
+          page: const StockAdjustmentPage(),
+          permissionKey: AppPermission.stockAdjust,
+        ),
+      ]),
+      _MenuSection('ผู้ติดต่อ', [
+        _MenuItem(
+          icon: Icons.people,
+          title: 'ลูกค้า',
+          page: const CustomerListPage(),
+          permissionKey: AppPermission.customers,
+        ),
+        _MenuItem(
+          icon: Icons.business,
+          title: 'ซัพพลายเออร์',
+          page: const SupplierListPage(),
+          permissionKey: AppPermission.suppliers,
+        ),
+      ]),
+      _MenuSection('จัดซื้อ', [
+        _MenuItem(
+          icon: Icons.shopping_bag,
+          title: 'ซื้อสินค้า',
+          page: const PurchaseOrderListPage(),
+          permissionKey: AppPermission.purchaseOrder,
+        ),
+        _MenuItem(
+          icon: Icons.inventory_2,
+          title: 'รับสินค้า',
+          page: const GoodsReceiptListPage(),
+          permissionKey: AppPermission.goodsReceipt,
+        ),
+        _MenuItem(
+          icon: Icons.assignment_return,
+          title: 'คืนสินค้า',
+          page: const PurchaseReturnListPage(),
+          permissionKey: AppPermission.purchaseReturn,
+        ),
+      ]),
+      _MenuSection('บัญชี', [
+        _MenuItem(
+          icon: Icons.receipt,
+          title: 'ใบแจ้งหนี้ AP(ซัพฯ)',
+          page: const ApInvoiceListPage(),
+          permissionKey: AppPermission.apInvoice,
+        ),
+        _MenuItem(
+          icon: Icons.payments,
+          title: 'จ่ายเงิน AP',
+          page: const ApPaymentListPage(),
+          permissionKey: AppPermission.apPayment,
+        ),
+        _MenuItem(
+          icon: Icons.request_page,
+          title: 'ใบแจ้งหนี้ AR(ลูกค้า)',
+          page: const ArInvoiceListPage(),
+          permissionKey: AppPermission.arInvoice,
+        ),
+        _MenuItem(
+          icon: Icons.price_check,
+          title: 'รับเงิน AR',
+          page: const ArReceiptListPage(),
+          permissionKey: AppPermission.arReceipt,
+        ),
+      ]),
+      _MenuSection('ระบบ', [
+        _MenuItem(
+          icon: Icons.assessment,
+          title: 'รายงาน',
+          page: const ReportsPage(),
+          permissionKey: AppPermission.reports,
+        ),
+        _MenuItem(
+          icon: Icons.store,
+          title: 'จัดการสาขา',
+          page: const BranchListPage(),
+          permissionKey: AppPermission.branch,
+        ),
+        _MenuItem(
+          icon: Icons.sync_alt,
+          title: 'การเชื่อมต่อ/ซิงก์',
+          page: const SyncStatusPage(),
+          permissionKey: AppPermission.sync,
+        ),
+        _MenuItem(
+          icon: Icons.settings,
+          title: 'ตั้งค่า',
+          page: const SettingsPage(),
+          permissionKey: AppPermission.settings,
+        ),
+        _MenuItem(
+          icon: Icons.admin_panel_settings,
+          title: 'จัดการสิทธิ์',
+          page: const RolePermissionPage(),
+          permissionKey: AppPermission.rolePermissions,
+        ),
+        _MenuItem(
+          icon: Icons.manage_accounts,
+          title: 'จัดการผู้ใช้งาน',
+          page: const UserListPage(),
+          permissionKey: AppPermission.userManagement,
+        ),
+      ]),
     ];
   }
 
@@ -377,7 +388,10 @@ class _HomePageState extends ConsumerState<HomePage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _AboutRow('ชื่อโปรแกรม', AppConfig.appName),
-              _AboutRow('เวอร์ชัน', '${AppConfig.appVersion} (build ${AppConfig.buildNumber})'),
+              _AboutRow(
+                'เวอร์ชัน',
+                '${AppConfig.appVersion} (build ${AppConfig.buildNumber})',
+              ),
               const Divider(height: 20),
               _AboutRow('วันเปิดใช้งานครั้งแรก', firstLaunch),
               _AboutRow(
@@ -385,10 +399,10 @@ class _HomePageState extends ConsumerState<HomePage> {
                 licenseStatus == null
                     ? 'กำลังโหลด...'
                     : licenseStatus.isLicensed
-                        ? '✅ ลงทะเบียนแล้ว'
-                        : licenseStatus.isTrialActive
-                            ? '⏳ ทดลองใช้ (${licenseStatus.trialPhaseLabel})'
-                            : '❌ ทดลองใช้หมดอายุ',
+                    ? '✅ ลงทะเบียนแล้ว'
+                    : licenseStatus.isTrialActive
+                    ? '⏳ ทดลองใช้ (${licenseStatus.trialPhaseLabel})'
+                    : '❌ ทดลองใช้หมดอายุ',
               ),
               _AboutRow('Device ID', deviceId, mono: true),
               const Divider(height: 20),
@@ -448,9 +462,11 @@ class _HomePageState extends ConsumerState<HomePage> {
   @override
   Widget build(BuildContext context) {
     ref.watch(posContextBootstrapProvider);
+    ref.watch(takeawayPollingProvider(null));
     final user = ref.watch(authProvider).user;
     final syncAsync = ref.watch(syncStatusProvider);
     final connectionAsync = ref.watch(connectionStatusProvider);
+    final takeawayPendingCount = ref.watch(takeawayOpenOrdersCountProvider);
     final roleId = user?.roleId?.toUpperCase();
     // watch provider (ไม่ใช่ notifier) เพื่อ rebuild เมื่อ async data โหลดเสร็จ
     final permData = ref.watch(rolePermissionsProvider).value;
@@ -484,6 +500,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       allItems: _allItems,
       selectedIndex: _selectedIndex,
       visibleIndices: visibleIndices,
+      menuBadges: {'takeaway_pending': takeawayPendingCount},
       user: user,
       syncAsync: syncAsync,
       connectionAsync: connectionAsync,
@@ -565,9 +582,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                     child: sidebarWidget,
                   ),
                   const VerticalDivider(width: 1, thickness: 1),
-                  Expanded(
-                    child: LicenseNoticeBanner(child: _currentPage),
-                  ),
+                  Expanded(child: LicenseNoticeBanner(child: _currentPage)),
                 ],
               ),
             )
@@ -600,6 +615,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       data: (value) => value,
       orElse: () => null,
     );
+    final takeawayPendingCount = ref.watch(takeawayOpenOrdersCountProvider);
 
     return AppBar(
       // Hamburger menu icon สำหรับเปิด Drawer
@@ -610,6 +626,43 @@ class _HomePageState extends ConsumerState<HomePage> {
         ),
       ),
       actions: [
+        IconButton(
+          tooltip: 'บิลกลับบ้านค้าง',
+          onPressed: () => _push(context, const TakeawayOrdersPage()),
+          icon: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              const Icon(Icons.receipt_long),
+              if (takeawayPendingCount > 0)
+                Positioned(
+                  right: -6,
+                  top: -6,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 5,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryColor,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    constraints: const BoxConstraints(minWidth: 18),
+                    child: Text(
+                      takeawayPendingCount > 99
+                          ? '99+'
+                          : '$takeawayPendingCount',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
         // Sync badge
         connectionAsync.when(
           data: (connection) => IconButton(
@@ -692,6 +745,7 @@ class _SidebarContent extends StatelessWidget {
   final List<_MenuItem> allItems;
   final int selectedIndex;
   final Set<int> visibleIndices;
+  final Map<String, int> menuBadges;
   final dynamic user;
   final AsyncValue syncAsync;
   final AsyncValue connectionAsync;
@@ -708,6 +762,7 @@ class _SidebarContent extends StatelessWidget {
     required this.allItems,
     required this.selectedIndex,
     required this.visibleIndices,
+    required this.menuBadges,
     required this.user,
     required this.syncAsync,
     required this.connectionAsync,
@@ -805,6 +860,7 @@ class _SidebarContent extends StatelessWidget {
           widgets.add(
             _SidebarItem(
               item: item,
+              badgeCount: menuBadges[item.badgeId] ?? 0,
               isActive: selectedIndex == idx,
               isCollapsed: isCollapsed,
               onTap: () => onItemSelected(idx),
@@ -1085,12 +1141,14 @@ class _SidebarUser extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────
 class _SidebarItem extends StatelessWidget {
   final _MenuItem item;
+  final int badgeCount;
   final bool isActive;
   final bool isCollapsed;
   final VoidCallback onTap;
 
   const _SidebarItem({
     required this.item,
+    required this.badgeCount,
     required this.isActive,
     required this.onTap,
     this.isCollapsed = false,
@@ -1149,6 +1207,8 @@ class _SidebarItem extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
+                      if (badgeCount > 0)
+                        _SidebarBadge(count: badgeCount, isActive: isActive),
                     ],
                   )
                 : Center(child: Icon(item.icon, size: 18, color: iconColor)),
@@ -1164,6 +1224,32 @@ class _SidebarItem extends StatelessWidget {
       );
     }
     return InkWell(onTap: onTap, child: child);
+  }
+}
+
+class _SidebarBadge extends StatelessWidget {
+  const _SidebarBadge({required this.count, required this.isActive});
+
+  final int count;
+  final bool isActive;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: isActive ? Colors.white : AppTheme.primaryColor,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        count > 99 ? '99+' : '$count',
+        style: TextStyle(
+          color: isActive ? AppTheme.primaryColor : Colors.white,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
   }
 }
 
@@ -1463,10 +1549,7 @@ class _AboutRow extends StatelessWidget {
             width: 140,
             child: Text(
               label,
-              style: const TextStyle(
-                fontSize: 12,
-                color: Colors.grey,
-              ),
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
             ),
           ),
           Expanded(

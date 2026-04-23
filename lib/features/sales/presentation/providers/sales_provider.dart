@@ -1,9 +1,12 @@
 // ignore_for_file: avoid_print
 
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/client/api_client.dart';
 import '../../data/models/sales_order_model.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../settings/presentation/pages/settings_page.dart';
 
 // ── Points Config ────────────────────────────────────────────────
 // ✅ Week 5: ทุก 100 บาท ได้ 1 คะแนน (ปรับได้)
@@ -19,7 +22,55 @@ int calculateEarnedPoints(double totalAmount) {
 // ─────────────────────────────────────────────────────────────────
 final salesHistoryProvider =
     AsyncNotifierProvider<SalesHistoryNotifier, List<SalesOrderModel>>(() {
-  return SalesHistoryNotifier();
+      return SalesHistoryNotifier();
+    });
+
+final takeawayOrdersProvider = Provider<List<SalesOrderModel>>((ref) {
+  final orders = ref
+      .watch(salesHistoryProvider)
+      .maybeWhen(
+        data: (value) => value,
+        orElse: () => const <SalesOrderModel>[],
+      );
+  final takeawayOrders =
+      orders
+          .where((order) => order.serviceType?.toUpperCase() == 'TAKEAWAY')
+          .toList()
+        ..sort((a, b) => b.orderDate.compareTo(a.orderDate));
+  return takeawayOrders;
+});
+
+final takeawayOpenOrdersProvider = Provider<List<SalesOrderModel>>((ref) {
+  return ref
+      .watch(takeawayOrdersProvider)
+      .where((order) => order.status.toUpperCase() == 'OPEN')
+      .toList();
+});
+
+final takeawayOpenOrdersCountProvider = Provider<int>((ref) {
+  return ref.watch(takeawayOpenOrdersProvider).length;
+});
+
+final takeawayPollingProvider = Provider.autoDispose.family<void, Duration?>((
+  ref,
+  pollingIntervalOverride,
+) {
+  final authState = ref.watch(authProvider);
+  if (authState.isRestoring || !authState.isAuthenticated) return;
+
+  final settings = ref.watch(settingsProvider);
+  if (!settings.takeawayAutoRefreshEnabled) return;
+
+  final interval =
+      pollingIntervalOverride ??
+      Duration(seconds: settings.takeawayPollingIntervalSeconds);
+
+  if (interval <= Duration.zero) return;
+
+  final timer = Timer.periodic(interval, (_) {
+    ref.read(salesHistoryProvider.notifier).refreshSilently();
+  });
+  ref.onDispose(timer.cancel);
 });
 
 class SalesHistoryNotifier extends AsyncNotifier<List<SalesOrderModel>> {
@@ -40,8 +91,9 @@ class SalesHistoryNotifier extends AsyncNotifier<List<SalesOrderModel>> {
 
       if (response.statusCode == 200) {
         final data = response.data['data'] as List;
-        final orders =
-            data.map((json) => SalesOrderModel.fromJson(json)).toList();
+        final orders = data
+            .map((json) => SalesOrderModel.fromJson(json))
+            .toList();
         orders.sort((a, b) => b.orderDate.compareTo(a.orderDate));
         print('✅ Loaded ${orders.length} orders');
         return orders;
@@ -58,6 +110,15 @@ class SalesHistoryNotifier extends AsyncNotifier<List<SalesOrderModel>> {
   Future<void> refresh() async {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() => loadOrders());
+  }
+
+  Future<void> refreshSilently() async {
+    try {
+      final orders = await loadOrders();
+      state = AsyncValue.data(orders);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
   }
 
   /// ดึงรายละเอียดใบขาย
@@ -97,7 +158,8 @@ class SalesHistoryNotifier extends AsyncNotifier<List<SalesOrderModel>> {
         data: {
           'action': 'add',
           'points': points,
-          'remark': 'สะสมแต้มจากการซื้อสินค้า ฿${totalAmount.toStringAsFixed(2)}',
+          'remark':
+              'สะสมแต้มจากการซื้อสินค้า ฿${totalAmount.toStringAsFixed(2)}',
         },
       );
       if (response.statusCode == 200) {
@@ -138,11 +200,7 @@ class SalesHistoryNotifier extends AsyncNotifier<List<SalesOrderModel>> {
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.put(
         '/api/customers/$customerId/points',
-        data: {
-          'action': 'deduct',
-          'points': points,
-          'remark': remark,
-        },
+        data: {'action': 'deduct', 'points': points, 'remark': remark},
       );
       return response.statusCode == 200;
     } catch (e) {

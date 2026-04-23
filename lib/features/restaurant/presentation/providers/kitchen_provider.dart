@@ -1,13 +1,14 @@
 // ignore_for_file: avoid_print
 
 import 'dart:async';
-import 'dart:io';
-import 'package:flutter/services.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import '../../../../core/client/api_client.dart';
+import '../../../../shared/services/app_alert_service.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../branches/presentation/providers/branch_provider.dart';
+import '../../../settings/presentation/pages/settings_page.dart';
 import '../../data/models/kitchen_queue_model.dart';
 
 // ── Station filter ────────────────────────────────────────────────────────────
@@ -18,10 +19,10 @@ final selectedKitchenStationProvider = StateProvider<String?>((ref) => null);
 
 final kitchenQueueProvider =
     AsyncNotifierProvider<KitchenQueueNotifier, List<KitchenQueueItemModel>>(
-        KitchenQueueNotifier.new);
+      KitchenQueueNotifier.new,
+    );
 
-class KitchenQueueNotifier
-    extends AsyncNotifier<List<KitchenQueueItemModel>> {
+class KitchenQueueNotifier extends AsyncNotifier<List<KitchenQueueItemModel>> {
   Timer? _pollingTimer;
 
   @override
@@ -44,16 +45,16 @@ class KitchenQueueNotifier
     final branchId = ref.read(selectedBranchProvider)?.branchId;
     final station = ref.read(selectedKitchenStationProvider);
 
-    final buf =
-        StringBuffer('/api/kitchen/queue?status=PENDING,PREPARING,READY,HELD');
+    final buf = StringBuffer(
+      '/api/kitchen/queue?status=PENDING,PREPARING,READY,HELD',
+    );
     if (branchId != null) buf.write('&branch_id=$branchId');
     if (station != null) buf.write('&station=$station');
 
     final res = await api.get(buf.toString());
     if (res.statusCode == 200) {
       return (res.data['data'] as List)
-          .map((j) =>
-              KitchenQueueItemModel.fromJson(j as Map<String, dynamic>))
+          .map((j) => KitchenQueueItemModel.fromJson(j as Map<String, dynamic>))
           .toList();
     }
     return [];
@@ -77,27 +78,14 @@ class KitchenQueueNotifier
       final hasNewPending = items.any(
         (i) => i.kitchenStatus == 'PENDING' && !prevIds.contains(i.itemId),
       );
-      if (hasNewPending) _playAlert();
+      if (hasNewPending) {
+        final settings = ref.read(settingsProvider);
+        if (settings.restaurantAlertSoundEnabled) {
+          unawaited(ref.read(appAlertServiceProvider).playKitchenAlert());
+        }
+      }
     } catch (e) {
       print('⚠️ kitchen silent refresh error: $e');
-    }
-  }
-
-  void _playAlert() {
-    if (Platform.isMacOS) {
-      Process.run('afplay', ['/System/Library/Sounds/Ping.aiff']);
-    } else if (Platform.isLinux) {
-      Process.run('paplay', ['/usr/share/sounds/freedesktop/stereo/bell.oga'])
-          .catchError((_) => Process.run('beep', []));
-    } else if (Platform.isWindows) {
-      // PowerShell system beep — no extra package needed
-      Process.run('PowerShell', [
-        '-Command',
-        '[console]::beep(880,250); Start-Sleep -Milliseconds 80; [console]::beep(880,250)',
-      ]);
-    } else {
-      // Android / iOS — Flutter built-in alert sound
-      SystemSound.play(SystemSoundType.alert);
     }
   }
 
@@ -110,16 +98,21 @@ class KitchenQueueNotifier
       );
       if (res.statusCode == 200) {
         // optimistic update
-        state = state.whenData((items) => items
-            .map((i) => i.itemId == itemId
-                ? i.copyWith(
-                    kitchenStatus: newStatus,
-                    preparedAt: (newStatus == 'READY' || newStatus == 'SERVED')
-                        ? DateTime.now()
-                        : i.preparedAt,
-                  )
-                : i)
-            .toList());
+        state = state.whenData(
+          (items) => items
+              .map(
+                (i) => i.itemId == itemId
+                    ? i.copyWith(
+                        kitchenStatus: newStatus,
+                        preparedAt:
+                            (newStatus == 'READY' || newStatus == 'SERVED')
+                            ? DateTime.now()
+                            : i.preparedAt,
+                      )
+                    : i,
+              )
+              .toList(),
+        );
         ref.invalidate(kitchenSummaryProvider);
         return true;
       }
@@ -156,7 +149,8 @@ class KitchenQueueNotifier
 
 final kitchenSummaryProvider =
     AsyncNotifierProvider<KitchenSummaryNotifier, List<KitchenStationSummary>>(
-        KitchenSummaryNotifier.new);
+      KitchenSummaryNotifier.new,
+    );
 
 class KitchenSummaryNotifier
     extends AsyncNotifier<List<KitchenStationSummary>> {
@@ -176,8 +170,7 @@ class KitchenSummaryNotifier
     final res = await api.get(path);
     if (res.statusCode == 200) {
       return (res.data['data'] as List)
-          .map((j) =>
-              KitchenStationSummary.fromJson(j as Map<String, dynamic>))
+          .map((j) => KitchenStationSummary.fromJson(j as Map<String, dynamic>))
           .toList();
     }
     return [];

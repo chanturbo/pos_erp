@@ -41,8 +41,7 @@ class _BillingPageState extends ConsumerState<BillingPage> {
           defaultRate == defaultRate.truncateToDouble() ? 0 : 1,
         );
       }
-      ref.read(billingTableIdProvider.notifier).state =
-          widget.tableContext.tableId;
+      ref.read(billingContextProvider.notifier).state = widget.tableContext;
     });
   }
 
@@ -62,9 +61,11 @@ class _BillingPageState extends ConsumerState<BillingPage> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('ใบแจ้งราคา — ${ctx.tableName}'),
+            Text('ใบแจ้งราคา — ${ctx.displayName}'),
             Text(
-              '${ctx.guestCount} คน · ${ctx.serviceType}',
+              ctx.isTakeaway
+                  ? ctx.serviceType
+                  : '${ctx.guestCount} คน · ${ctx.serviceType}',
               style: const TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.normal,
@@ -136,6 +137,7 @@ class _BillingPageState extends ConsumerState<BillingPage> {
   }
 
   Future<void> _fireCourse(int courseNo) async {
+    if (!widget.tableContext.hasTable) return;
     final ok = await ref
         .read(billProvider.notifier)
         .fireCourse(widget.tableContext.tableId, courseNo);
@@ -254,6 +256,7 @@ class _BillingPageState extends ConsumerState<BillingPage> {
   }
 
   Future<void> _applyServiceCharge(BillModel bill) async {
+    if (!widget.tableContext.hasTable) return;
     final rate = double.tryParse(_scController.text.trim()) ?? 0;
     setState(() => _applyingSC = true);
     final ok = await ref
@@ -268,6 +271,7 @@ class _BillingPageState extends ConsumerState<BillingPage> {
   }
 
   void _openSplitBill(BillModel bill) {
+    if (!widget.tableContext.hasTable) return;
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -278,6 +282,7 @@ class _BillingPageState extends ConsumerState<BillingPage> {
   }
 
   Future<void> _showMergeDialog() async {
+    if (!widget.tableContext.hasTable) return;
     final tableListAsync = ref.read(tableListProvider);
     final tables = tableListAsync.asData?.value ?? [];
     final occupied = tables
@@ -416,10 +421,13 @@ class _BillingPageState extends ConsumerState<BillingPage> {
           address: settings.address,
           phone: settings.phone,
           taxId: settings.taxId,
-          orderNo: 'PRE-${widget.tableContext.tableName}',
+          orderNo:
+              bill.orderNo ??
+              'PRE-${widget.tableContext.displayName}',
           orderDate: DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now()),
-          customerName:
-              '${widget.tableContext.tableName} • ${widget.tableContext.guestCount} คน',
+          customerName: widget.tableContext.isTakeaway
+              ? widget.tableContext.displayName
+              : '${widget.tableContext.displayName} • ${widget.tableContext.guestCount} คน',
           items: bill.items
               .map(
                 (item) => ReceiptItem(
@@ -486,6 +494,7 @@ class _BillBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final canManageTable = tableContext.hasTable;
     return Column(
       children: [
         Expanded(
@@ -493,7 +502,7 @@ class _BillBody extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             children: [
               // ── Held Courses (fire button) ─────────────────────────
-              () {
+              if (canManageTable) () {
                 final heldByCourse = <int, List<BillItemModel>>{};
                 for (final item in bill.items) {
                   if (item.isHeld) {
@@ -559,42 +568,44 @@ class _BillBody extends StatelessWidget {
               const SizedBox(height: 12),
 
               // ── Service Charge ─────────────────────────────────────────
-              _SectionCard(
-                title: 'Service Charge',
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: scController,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        decoration: const InputDecoration(
-                          suffixText: '%',
-                          labelText: 'อัตรา',
-                          isDense: true,
-                          border: OutlineInputBorder(),
+              if (canManageTable) ...[
+                _SectionCard(
+                  title: 'Service Charge',
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: scController,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          decoration: const InputDecoration(
+                            suffixText: '%',
+                            labelText: 'อัตรา',
+                            isDense: true,
+                            border: OutlineInputBorder(),
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    FilledButton(
-                      onPressed: applyingSC ? null : onApplySC,
-                      child: applyingSC
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Text('ใช้'),
-                    ),
-                  ],
+                      const SizedBox(width: 12),
+                      FilledButton(
+                        onPressed: applyingSC ? null : onApplySC,
+                        child: applyingSC
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text('ใช้'),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
+                const SizedBox(height: 12),
+              ],
 
               // ── Summary ────────────────────────────────────────────────
               _SectionCard(
@@ -638,21 +649,23 @@ class _BillBody extends StatelessWidget {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    OutlinedButton.icon(
-                      onPressed: onMerge,
-                      icon: const Icon(Icons.merge_type, size: 18),
-                      label: const Text('รวมโต๊ะ'),
-                    ),
+                    if (canManageTable)
+                      OutlinedButton.icon(
+                        onPressed: onMerge,
+                        icon: const Icon(Icons.merge_type, size: 18),
+                        label: const Text('รวมโต๊ะ'),
+                      ),
                     OutlinedButton.icon(
                       onPressed: onPrintPreBill,
                       icon: const Icon(Icons.print_outlined, size: 18),
                       label: const Text('Pre-bill'),
                     ),
-                    OutlinedButton.icon(
-                      onPressed: onSplitBill,
-                      icon: const Icon(Icons.call_split, size: 18),
-                      label: const Text('แยกบิล'),
-                    ),
+                    if (canManageTable)
+                      OutlinedButton.icon(
+                        onPressed: onSplitBill,
+                        icon: const Icon(Icons.call_split, size: 18),
+                        label: const Text('แยกบิล'),
+                      ),
                   ],
                 ),
                 const SizedBox(height: 8),
