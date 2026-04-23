@@ -96,40 +96,7 @@ class _HomePageState extends ConsumerState<HomePage> {
           icon: Icons.dashboard,
           title: 'แดชบอร์ด',
           permissionKey: AppPermission.dashboard,
-          page: DashboardPage(
-            showBackButton: false,
-            onGoToPos: () => context.isTabletOrWider
-                ? _selectItem(1)
-                : _push(context, const PosPage()),
-            onGoToSalesHistory: () =>
-                _showOverridePage(const SalesHistoryPage(), 2),
-            onGoToProducts: () => context.hasPermanentSidebar
-                ? _selectItem(4)
-                : _push(context, const ProductListPage()),
-            onGoToCustomers: () => context.hasPermanentSidebar
-                ? _selectItem(7)
-                : _push(context, const CustomerListPage()),
-            onGoToTodaySales: () {
-              final today = DateTime.now();
-              _showOverridePage(
-                SalesHistoryPage(
-                  initialDateFrom: DateTime(today.year, today.month, today.day),
-                  initialDateTo: DateTime(today.year, today.month, today.day),
-                ),
-                2, // highlight "รายการขาย"
-              );
-            },
-            onGoToMonthSales: () {
-              final today = DateTime.now();
-              _showOverridePage(
-                SalesHistoryPage(
-                  initialDateFrom: DateTime(today.year, today.month, 1),
-                  initialDateTo: DateTime(today.year, today.month, today.day),
-                ),
-                2, // highlight "รายการขาย"
-              );
-            },
-          ),
+          page: _buildDashboardPage(),
         ),
       ]),
       if (showRestaurantSection)
@@ -312,6 +279,81 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   Widget get _currentPage => _overridePage ?? _allItems[_selectedIndex].page;
 
+  DashboardPage _buildDashboardPage() {
+    return DashboardPage(
+      showBackButton: false,
+      onGoToPos: _openPointOfSaleShortcut,
+      onGoToSalesHistory: () =>
+          _showOverridePageByTitle(const SalesHistoryPage(), 'รายการขาย'),
+      onGoToProducts: () => _openShortcutByTitle(
+        title: 'สินค้า',
+        fallbackPage: const ProductListPage(),
+      ),
+      onGoToCustomers: () => _openShortcutByTitle(
+        title: 'ลูกค้า',
+        fallbackPage: const CustomerListPage(),
+      ),
+      onGoToTodaySales: () {
+        final today = DateTime.now();
+        _showOverridePageByTitle(
+          SalesHistoryPage(
+            initialDateFrom: DateTime(today.year, today.month, today.day),
+            initialDateTo: DateTime(today.year, today.month, today.day),
+          ),
+          'รายการขาย',
+        );
+      },
+      onGoToMonthSales: () {
+        final today = DateTime.now();
+        _showOverridePageByTitle(
+          SalesHistoryPage(
+            initialDateFrom: DateTime(today.year, today.month, 1),
+            initialDateTo: DateTime(today.year, today.month, today.day),
+          ),
+          'รายการขาย',
+        );
+      },
+    );
+  }
+
+  int? _findMenuIndexByTitle(String title) {
+    final items = _allItems;
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].title == title) return i;
+    }
+    return null;
+  }
+
+  void _openShortcutByTitle({
+    required String title,
+    required Widget fallbackPage,
+  }) {
+    final index = _findMenuIndexByTitle(title);
+    if (context.hasPermanentSidebar && index != null) {
+      _selectItem(index);
+    } else {
+      _push(context, fallbackPage);
+    }
+  }
+
+  void _openFirstShortcutByTitle({
+    required List<String> titles,
+    required List<Widget> fallbackPages,
+  }) {
+    for (var i = 0; i < titles.length; i++) {
+      final index = _findMenuIndexByTitle(titles[i]);
+      if (index != null) {
+        if (context.hasPermanentSidebar) {
+          _selectItem(index);
+        } else {
+          _push(context, fallbackPages[i]);
+        }
+        return;
+      }
+    }
+    _push(context, fallbackPages.first);
+  }
+
   void _selectItem(int i) {
     // ปิด Drawer ก่อนเสมอ (tablet/mobile)
     final nav = Navigator.of(context);
@@ -323,15 +365,16 @@ class _HomePageState extends ConsumerState<HomePage> {
     });
   }
 
-  /// แสดงหน้าพิเศษ (พร้อม parameter เฉพาะ) ใน content area โดย highlight เมนู [highlightIndex]
+  /// แสดงหน้าพิเศษ (พร้อม parameter เฉพาะ) ใน content area โดย highlight เมนูจากชื่อ
   /// บน desktop (hasPermanentSidebar) → swap ใน content area (มี sidebar)
   /// บน mobile/tablet → push route ตามปกติ
-  void _showOverridePage(Widget page, int highlightIndex) {
+  void _showOverridePageByTitle(Widget page, String highlightTitle) {
     final nav = Navigator.of(context);
     if (nav.canPop()) nav.pop();
+    final highlightIndex = _findMenuIndexByTitle(highlightTitle);
     if (context.hasPermanentSidebar) {
       setState(() {
-        _selectedIndex = highlightIndex;
+        if (highlightIndex != null) _selectedIndex = highlightIndex;
         _overridePage = page;
       });
     } else {
@@ -342,12 +385,11 @@ class _HomePageState extends ConsumerState<HomePage> {
   void _push(BuildContext context, Widget page) =>
       Navigator.push(context, MaterialPageRoute(builder: (_) => page));
 
-  void _openShortcutPage({required int index, required Widget page}) {
-    if (context.hasPermanentSidebar) {
-      _selectItem(index);
-    } else {
-      _push(context, page);
-    }
+  void _openPointOfSaleShortcut() {
+    _openFirstShortcutByTitle(
+      titles: const ['หน้าขาย (POS)', 'โต๊ะอาหาร'],
+      fallbackPages: const [PosPage(), TableOverviewPage()],
+    );
   }
 
   Future<void> _handleAbout(BuildContext context) async {
@@ -520,54 +562,31 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
 
     return KeyboardShortcuts(
-      onPosShortcut: () => _openShortcutPage(index: 1, page: const PosPage()),
-      onProductShortcut: () =>
-          _openShortcutPage(index: 4, page: const ProductListPage()),
-      onCustomerShortcut: () =>
-          _openShortcutPage(index: 7, page: const CustomerListPage()),
-      onSalesHistoryShortcut: () =>
-          _openShortcutPage(index: 2, page: const SalesHistoryPage()),
-      onDashboardShortcut: () => _openShortcutPage(
-        index: 0,
-        page: DashboardPage(
-          showBackButton: false,
-          onGoToPos: () => context.isTabletOrWider
-              ? _selectItem(1)
-              : _push(context, const PosPage()),
-          onGoToSalesHistory: () =>
-              _showOverridePage(const SalesHistoryPage(), 2),
-          onGoToProducts: () => context.hasPermanentSidebar
-              ? _selectItem(4)
-              : _push(context, const ProductListPage()),
-          onGoToCustomers: () => context.hasPermanentSidebar
-              ? _selectItem(7)
-              : _push(context, const CustomerListPage()),
-          onGoToTodaySales: () {
-            final today = DateTime.now();
-            _showOverridePage(
-              SalesHistoryPage(
-                initialDateFrom: DateTime(today.year, today.month, today.day),
-                initialDateTo: DateTime(today.year, today.month, today.day),
-              ),
-              2,
-            );
-          },
-          onGoToMonthSales: () {
-            final today = DateTime.now();
-            _showOverridePage(
-              SalesHistoryPage(
-                initialDateFrom: DateTime(today.year, today.month, 1),
-                initialDateTo: DateTime(today.year, today.month, today.day),
-              ),
-              2,
-            );
-          },
-        ),
+      onPosShortcut: _openPointOfSaleShortcut,
+      onProductShortcut: () => _openShortcutByTitle(
+        title: 'สินค้า',
+        fallbackPage: const ProductListPage(),
       ),
-      onInventoryShortcut: () =>
-          _openShortcutPage(index: 5, page: const StockBalancePage()),
-      onReportsShortcut: () =>
-          _openShortcutPage(index: 16, page: const ReportsPage()),
+      onCustomerShortcut: () => _openShortcutByTitle(
+        title: 'ลูกค้า',
+        fallbackPage: const CustomerListPage(),
+      ),
+      onSalesHistoryShortcut: () => _openShortcutByTitle(
+        title: 'รายการขาย',
+        fallbackPage: const SalesHistoryPage(),
+      ),
+      onDashboardShortcut: () => _openShortcutByTitle(
+        title: 'แดชบอร์ด',
+        fallbackPage: _buildDashboardPage(),
+      ),
+      onInventoryShortcut: () => _openShortcutByTitle(
+        title: 'สต๊อกสินค้า',
+        fallbackPage: const StockBalancePage(),
+      ),
+      onReportsShortcut: () => _openShortcutByTitle(
+        title: 'รายงาน',
+        fallbackPage: const ReportsPage(),
+      ),
       child: context.hasPermanentSidebar
           // ── Desktop/Wide: Permanent sidebar ────────────────
           ? Scaffold(

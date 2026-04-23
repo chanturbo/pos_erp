@@ -7,17 +7,38 @@ class SeedData {
   /// Seed All Data
   static Future<void> seedAll(AppDatabase db) async {
     print('🌱 Starting seed data...');
+    await seedCompanies(db);
     await seedBranches(db);
     await seedWarehouses(db);
-    await seedRoles(db);   // ✅ ต้องอยู่ก่อน seedUsers (FK constraint)
+    await seedRoles(db); // ✅ ต้องอยู่ก่อน seedUsers (FK constraint)
     await seedUsers(db);
     await seedCustomerGroups(db); // ✅ ต้องอยู่ก่อน seedCustomers
     await seedCustomers(db);
     await seedSuppliers(db); // ✅ เพิ่ม
     await seedProductGroups(db);
     await seedProducts(db);
+    await seedRestaurantDemo(db);
 
     print('✅ Seed data completed');
+  }
+
+  /// Seed Companies
+  static Future<void> seedCompanies(AppDatabase db) async {
+    final companies = [
+      CompaniesCompanion.insert(
+        companyId: 'COMP001',
+        companyName: 'DEE POS Demo',
+        taxId: const Value('0105566000000'),
+        address: const Value('123 ถนนทดสอบ กรุงเทพฯ 10100'),
+        phone: const Value('02-123-4567'),
+      ),
+    ];
+
+    for (final company in companies) {
+      await db
+          .into(db.companies)
+          .insert(company, mode: InsertMode.insertOrIgnore);
+    }
   }
 
   /// Seed Branches
@@ -30,6 +51,15 @@ class SeedData {
         branchName: 'สาขาหลัก',
         address: const Value('123 ถนนทดสอบ กรุงเทพฯ 10100'),
         phone: const Value('02-123-4567'),
+      ),
+      BranchesCompanion.insert(
+        branchId: 'BR-RST-001',
+        companyId: 'COMP001',
+        branchCode: 'REST',
+        branchName: 'DEE Bistro Demo',
+        address: const Value('45 ถนนสุขุมวิท กรุงเทพฯ 10110'),
+        phone: const Value('02-555-0101'),
+        businessMode: const Value('RESTAURANT'),
       ),
     ];
 
@@ -63,6 +93,12 @@ class SeedData {
         warehouseName: 'คลังสาขาหลัก',
         branchId: 'BR001',
         // ❌ ลบ isActive ออก
+      ),
+      WarehousesCompanion.insert(
+        warehouseId: 'WH-RST-001',
+        warehouseCode: 'WH-REST',
+        warehouseName: 'คลังร้านอาหาร',
+        branchId: 'BR-RST-001',
       ),
     ];
 
@@ -461,6 +497,255 @@ class SeedData {
         // Stock exists
       }
     }
+  }
+
+  /// Seed Restaurant Demo Data
+  static Future<void> seedRestaurantDemo(AppDatabase db) async {
+    print('🌱 Seeding restaurant demo...');
+
+    final restaurantGroups = [
+      ProductGroupsCompanion.insert(
+        groupId: 'RST-GRP-FOOD',
+        groupCode: 'RST-FOOD',
+        groupName: 'อาหารจานหลัก',
+        groupType: const Value('RESTAURANT'),
+        displayOrder: const Value(10),
+      ),
+      ProductGroupsCompanion.insert(
+        groupId: 'RST-GRP-DRINK',
+        groupCode: 'RST-DRINK',
+        groupName: 'เครื่องดื่ม',
+        groupType: const Value('RESTAURANT'),
+        displayOrder: const Value(20),
+      ),
+      ProductGroupsCompanion.insert(
+        groupId: 'RST-GRP-DESSERT',
+        groupCode: 'RST-DESSERT',
+        groupName: 'ของหวาน',
+        groupType: const Value('RESTAURANT'),
+        displayOrder: const Value(30),
+      ),
+    ];
+
+    for (final group in restaurantGroups) {
+      await db.into(db.productGroups).insertOnConflictUpdate(group);
+    }
+
+    final restaurantProducts = [
+      ProductsCompanion.insert(
+        productId: 'RST-PRD-001',
+        productCode: 'RST-FOOD-001',
+        productName: 'ผัดไทยกุ้งสด',
+        barcode: const Value('8859001000011'),
+        groupId: const Value('RST-GRP-FOOD'),
+        baseUnit: 'จาน',
+        priceLevel1: const Value(129),
+        standardCost: const Value(48),
+        isStockControl: const Value(false),
+        allowNegativeStock: const Value(true),
+        reorderPoint: const Value(20),
+        serviceMode: const Value('BOTH'),
+        prepStation: const Value('kitchen'),
+        requiresPreparation: const Value(true),
+        dineInAvailable: const Value(true),
+        takeawayAvailable: const Value(true),
+      ),
+      ProductsCompanion.insert(
+        productId: 'RST-PRD-002',
+        productCode: 'RST-FOOD-002',
+        productName: 'ต้มยำกุ้งน้ำข้น',
+        barcode: const Value('8859001000028'),
+        groupId: const Value('RST-GRP-FOOD'),
+        baseUnit: 'ชาม',
+        priceLevel1: const Value(159),
+        standardCost: const Value(62),
+        isStockControl: const Value(false),
+        allowNegativeStock: const Value(true),
+        reorderPoint: const Value(15),
+        serviceMode: const Value('BOTH'),
+        prepStation: const Value('kitchen'),
+        requiresPreparation: const Value(true),
+        dineInAvailable: const Value(true),
+        takeawayAvailable: const Value(true),
+      ),
+      ProductsCompanion.insert(
+        productId: 'RST-PRD-003',
+        productCode: 'RST-FOOD-003',
+        productName: 'ข้าวกะเพราไก่ไข่ดาว',
+        barcode: const Value('8859001000035'),
+        groupId: const Value('RST-GRP-FOOD'),
+        baseUnit: 'จาน',
+        priceLevel1: const Value(89),
+        standardCost: const Value(35),
+        isStockControl: const Value(false),
+        allowNegativeStock: const Value(true),
+        reorderPoint: const Value(25),
+        serviceMode: const Value('BOTH'),
+        prepStation: const Value('kitchen'),
+        requiresPreparation: const Value(true),
+        dineInAvailable: const Value(true),
+        takeawayAvailable: const Value(true),
+      ),
+      ProductsCompanion.insert(
+        productId: 'RST-PRD-004',
+        productCode: 'RST-DRINK-001',
+        productName: 'ชาไทยเย็น',
+        barcode: const Value('8859001000042'),
+        groupId: const Value('RST-GRP-DRINK'),
+        baseUnit: 'แก้ว',
+        priceLevel1: const Value(55),
+        standardCost: const Value(18),
+        reorderPoint: const Value(30),
+        serviceMode: const Value('BOTH'),
+        prepStation: const Value('bar'),
+        requiresPreparation: const Value(true),
+        dineInAvailable: const Value(true),
+        takeawayAvailable: const Value(true),
+      ),
+      ProductsCompanion.insert(
+        productId: 'RST-PRD-005',
+        productCode: 'RST-DRINK-002',
+        productName: 'อเมริกาโน่เย็น',
+        barcode: const Value('8859001000059'),
+        groupId: const Value('RST-GRP-DRINK'),
+        baseUnit: 'แก้ว',
+        priceLevel1: const Value(65),
+        standardCost: const Value(22),
+        reorderPoint: const Value(30),
+        serviceMode: const Value('BOTH'),
+        prepStation: const Value('bar'),
+        requiresPreparation: const Value(true),
+        dineInAvailable: const Value(true),
+        takeawayAvailable: const Value(true),
+      ),
+      ProductsCompanion.insert(
+        productId: 'RST-PRD-006',
+        productCode: 'RST-DESSERT-001',
+        productName: 'บัวลอยมะพร้าวอ่อน',
+        barcode: const Value('8859001000066'),
+        groupId: const Value('RST-GRP-DESSERT'),
+        baseUnit: 'ถ้วย',
+        priceLevel1: const Value(69),
+        standardCost: const Value(24),
+        isStockControl: const Value(false),
+        allowNegativeStock: const Value(true),
+        reorderPoint: const Value(15),
+        serviceMode: const Value('BOTH'),
+        prepStation: const Value('dessert'),
+        requiresPreparation: const Value(true),
+        dineInAvailable: const Value(true),
+        takeawayAvailable: const Value(true),
+      ),
+      ProductsCompanion.insert(
+        productId: 'RST-PRD-007',
+        productCode: 'RST-DRINK-003',
+        productName: 'น้ำเปล่า',
+        barcode: const Value('8859001000073'),
+        groupId: const Value('RST-GRP-DRINK'),
+        baseUnit: 'ขวด',
+        priceLevel1: const Value(15),
+        standardCost: const Value(6),
+        reorderPoint: const Value(48),
+        serviceMode: const Value('BOTH'),
+        prepStation: const Value('cashier'),
+        requiresPreparation: const Value(false),
+        dineInAvailable: const Value(true),
+        takeawayAvailable: const Value(true),
+      ),
+    ];
+
+    for (final product in restaurantProducts) {
+      await db.into(db.products).insertOnConflictUpdate(product);
+    }
+
+    final zones = [
+      ZonesCompanion.insert(
+        zoneId: 'RST-ZONE-FRONT',
+        zoneName: 'หน้าร้าน',
+        branchId: 'BR-RST-001',
+        displayOrder: const Value(10),
+      ),
+      ZonesCompanion.insert(
+        zoneId: 'RST-ZONE-AIR',
+        zoneName: 'ห้องแอร์',
+        branchId: 'BR-RST-001',
+        displayOrder: const Value(20),
+      ),
+      ZonesCompanion.insert(
+        zoneId: 'RST-ZONE-TAKE',
+        zoneName: 'รับกลับบ้าน',
+        branchId: 'BR-RST-001',
+        displayOrder: const Value(30),
+      ),
+    ];
+
+    for (final zone in zones) {
+      await db.into(db.zones).insert(zone, mode: InsertMode.insertOrIgnore);
+    }
+
+    final tables = [
+      for (var i = 1; i <= 6; i++)
+        DiningTablesCompanion.insert(
+          tableId: 'RST-TBL-A$i',
+          tableNo: 'A$i',
+          tableDisplayName: Value('โต๊ะ A$i'),
+          zoneId: 'RST-ZONE-FRONT',
+          capacity: const Value(4),
+        ),
+      for (var i = 1; i <= 4; i++)
+        DiningTablesCompanion.insert(
+          tableId: 'RST-TBL-B$i',
+          tableNo: 'B$i',
+          tableDisplayName: Value('โต๊ะ B$i'),
+          zoneId: 'RST-ZONE-AIR',
+          capacity: const Value(6),
+        ),
+      DiningTablesCompanion.insert(
+        tableId: 'RST-TBL-TK1',
+        tableNo: 'TK1',
+        tableDisplayName: const Value('Takeaway 1'),
+        zoneId: 'RST-ZONE-TAKE',
+        capacity: const Value(1),
+      ),
+      DiningTablesCompanion.insert(
+        tableId: 'RST-TBL-TK2',
+        tableNo: 'TK2',
+        tableDisplayName: const Value('Takeaway 2'),
+        zoneId: 'RST-ZONE-TAKE',
+        capacity: const Value(1),
+      ),
+    ];
+
+    for (final table in tables) {
+      await db
+          .into(db.diningTables)
+          .insert(table, mode: InsertMode.insertOrIgnore);
+    }
+
+    final stockMovements = [
+      for (var i = 0; i < restaurantProducts.length; i++)
+        StockMovementsCompanion.insert(
+          movementId: 'RST-STK-${(i + 1).toString().padLeft(3, '0')}',
+          movementNo: 'RST-INIT-${(i + 1).toString().padLeft(3, '0')}',
+          movementDate: DateTime.now(),
+          movementType: 'INIT',
+          productId: restaurantProducts[i].productId.value,
+          warehouseId: 'WH-RST-001',
+          userId: 'USR001',
+          quantity: i >= 3 ? 120 : 80,
+          unitCost: Value(i >= 3 ? 10.0 : 30.0),
+          referenceNo: const Value('RST-DEMO'),
+          remark: const Value('สต๊อกเริ่มต้นสำหรับ demo ร้านอาหาร'),
+        ),
+    ];
+
+    for (final stock in stockMovements) {
+      await db
+          .into(db.stockMovements)
+          .insert(stock, mode: InsertMode.insertOrIgnore);
+    }
+
+    print('   ✅ Restaurant demo seeded');
   }
 
   /// Seed Suppliers

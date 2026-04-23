@@ -180,8 +180,9 @@ class _CartPanelState extends ConsumerState<CartPanel> {
       }
 
       final responseData = response.data is Map ? response.data as Map : {};
-      final dataMap =
-          responseData['data'] is Map ? responseData['data'] as Map : {};
+      final dataMap = responseData['data'] is Map
+          ? responseData['data'] as Map
+          : {};
       final orderId = dataMap['order_id'] as String? ?? '';
       final orderNo = dataMap['order_no'] as String?;
 
@@ -189,8 +190,9 @@ class _CartPanelState extends ConsumerState<CartPanel> {
         throw Exception('สร้างออเดอร์ไม่สำเร็จ');
       }
 
-      ref.read(restaurantOrderContextProvider.notifier).state =
-          restaurantContext.copyWith(
+      ref
+          .read(restaurantOrderContextProvider.notifier)
+          .state = restaurantContext.copyWith(
         currentOrderId: orderId,
         currentOrderNo: orderNo,
       );
@@ -198,7 +200,8 @@ class _CartPanelState extends ConsumerState<CartPanel> {
 
       // Auto-print kitchen ticket if enabled
       final settings = ref.read(settingsProvider);
-      if (settings.autoPrintKitchenTicket && settings.enableDirectThermalPrint) {
+      if (settings.autoPrintKitchenTicket &&
+          settings.enableDirectThermalPrint) {
         final printSettings = ThermalPrintSettings(
           enabled: settings.enableDirectThermalPrint,
           autoPrintOnSale: settings.autoPrintReceipt,
@@ -210,14 +213,18 @@ class _CartPanelState extends ConsumerState<CartPanel> {
           tableName: restaurantContext.displayName,
           orderNo: orderNo ?? orderId,
           orderTime: DateFormat('HH:mm').format(DateTime.now()),
-          items: cartState.items.map((item) => KitchenTicketItem(
-            courseNo: 1,
-            quantity: item.quantity.toDouble(),
-            unit: item.unit,
-            name: item.productName,
-            specialInstructions: null,
-            station: 'kitchen',
-          )).toList(),
+          items: cartState.items
+              .map(
+                (item) => KitchenTicketItem(
+                  courseNo: 1,
+                  quantity: item.quantity.toDouble(),
+                  unit: item.unit,
+                  name: item.productName,
+                  specialInstructions: null,
+                  station: 'kitchen',
+                ),
+              )
+              .toList(),
         );
         ThermalPrintService.instance.printKitchenTicket(
           settings: printSettings,
@@ -354,9 +361,11 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                 isRestaurantFlow:
                     ref.watch(restaurantOrderContextProvider) != null,
                 isKitchenSent:
-                    (ref.watch(restaurantOrderContextProvider)?.currentOrderId
-                            ?.isNotEmpty ??
-                        false),
+                    (ref
+                        .watch(restaurantOrderContextProvider)
+                        ?.currentOrderId
+                        ?.isNotEmpty ??
+                    false),
                 isSendingRestaurantOrder: _isSendingRestaurantOrder,
                 onSendToKitchen: _sendRestaurantOrder,
                 onOpenNewBill: () => setState(() => _scanRowSession++),
@@ -942,15 +951,19 @@ class _CartRowState extends ConsumerState<_CartRow> {
           final label = n == 1 ? 'คอร์ส 1 (เสิร์ฟทันที)' : 'คอร์ส $n';
           return SimpleDialogOption(
             onPressed: () => Navigator.pop(context, n),
-            child: Row(children: [
-              Icon(
-                n == item.courseNo ? Icons.radio_button_checked : Icons.radio_button_off,
-                size: 18,
-                color: n == item.courseNo ? _orange : Colors.grey,
-              ),
-              const SizedBox(width: 10),
-              Text(label),
-            ]),
+            child: Row(
+              children: [
+                Icon(
+                  n == item.courseNo
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_off,
+                  size: 18,
+                  color: n == item.courseNo ? _orange : Colors.grey,
+                ),
+                const SizedBox(width: 10),
+                Text(label),
+              ],
+            ),
           );
         }),
       ),
@@ -998,7 +1011,10 @@ class _CartRowState extends ConsumerState<_CartRow> {
                   GestureDetector(
                     onTap: () => _showCourseDialog(item),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: item.courseNo > 1
                             ? Colors.blue.shade50
@@ -1482,8 +1498,8 @@ class _CartSummary extends StatelessWidget {
         : Colors.grey;
     final dividerColor = isDark ? const Color(0xFF333333) : _border;
     final disabledColor = isDark ? const Color(0xFF2A2A2A) : Colors.grey[300];
-    final canCheckout = cartState.items.isNotEmpty &&
-        (!isRestaurantFlow || isKitchenSent);
+    final canCheckout =
+        cartState.items.isNotEmpty && (!isRestaurantFlow || isKitchenSent);
 
     return Container(
       decoration: BoxDecoration(
@@ -1636,7 +1652,9 @@ class _CartSummary extends StatelessWidget {
                             ? 38
                             : (context.isMobile ? 44 : 48),
                         child: ElevatedButton(
-                          onPressed: cartState.items.isEmpty || isSendingRestaurantOrder
+                          onPressed:
+                              cartState.items.isEmpty ||
+                                  isSendingRestaurantOrder
                               ? null
                               : onSendToKitchen,
                           style: ElevatedButton.styleFrom(
@@ -1651,31 +1669,37 @@ class _CartSummary extends StatelessWidget {
                               borderRadius: BorderRadius.circular(10),
                             ),
                           ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              if (isSendingRestaurantOrder)
-                                const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (isSendingRestaurantOrder)
+                                  const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                else
+                                  const Icon(Icons.kitchen_outlined, size: 18),
+                                const SizedBox(width: 8),
+                                Text(
+                                  isSendingRestaurantOrder
+                                      ? 'กำลังส่ง...'
+                                      : 'ส่งเข้าครัว',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.fade,
+                                  softWrap: false,
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
                                   ),
-                                )
-                              else
-                                const Icon(Icons.kitchen_outlined, size: 18),
-                              const SizedBox(width: 8),
-                              Text(
-                                isSendingRestaurantOrder
-                                    ? 'กำลังส่ง...'
-                                    : 'ส่งเข้าครัว',
-                                style: const TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -1734,7 +1758,9 @@ class _CartSummary extends StatelessWidget {
                             : (context.isMobile ? 44 : 48),
                         child: ElevatedButton(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: canCheckout ? _success : disabledColor,
+                            backgroundColor: canCheckout
+                                ? _success
+                                : disabledColor,
                             foregroundColor: Colors.white,
                             disabledForegroundColor: isDark
                                 ? Colors.white30
@@ -1758,25 +1784,31 @@ class _CartSummary extends StatelessWidget {
                                     onOpenNewBill?.call();
                                   }
                                 },
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(Icons.payment, size: 18),
-                              const SizedBox(width: 8),
-                              Text(
-                                !canCheckout
-                                    ? (isRestaurantFlow && !isKitchenSent
-                                        ? 'ส่งเข้าครัวก่อน'
-                                        : 'ชำระเงิน')
-                                    : (isRestaurantFlow
-                                        ? 'ปิดบิล  ฿${cartState.total.toStringAsFixed(2)}'
-                                        : 'ชำระเงิน  ฿${cartState.total.toStringAsFixed(2)}'),
-                                style: const TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.payment, size: 18),
+                                const SizedBox(width: 8),
+                                Text(
+                                  !canCheckout
+                                      ? (isRestaurantFlow && !isKitchenSent
+                                            ? 'ส่งเข้าครัวก่อน'
+                                            : 'ชำระเงิน')
+                                      : (isRestaurantFlow
+                                            ? 'ปิดบิล  ฿${cartState.total.toStringAsFixed(2)}'
+                                            : 'ชำระเงิน  ฿${cartState.total.toStringAsFixed(2)}'),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.fade,
+                                  softWrap: false,
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                       ),

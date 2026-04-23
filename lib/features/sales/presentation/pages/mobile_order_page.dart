@@ -22,8 +22,14 @@ import '../../../inventory/data/models/stock_balance_model.dart';
 import '../../../inventory/presentation/providers/stock_provider.dart';
 import '../../../products/data/models/product_model.dart';
 import '../../../products/presentation/providers/product_provider.dart';
+import '../../../restaurant/data/models/dining_table_model.dart';
+import '../../../restaurant/data/models/restaurant_order_context.dart';
+import '../../../restaurant/data/models/table_session_model.dart';
+import '../../../restaurant/presentation/providers/table_provider.dart';
+import '../../../restaurant/presentation/widgets/open_table_dialog.dart';
 import '../pages/payment_page.dart';
 import '../providers/cart_provider.dart';
+import '../providers/sales_provider.dart';
 import '../widgets/cart_panel.dart';
 import '../widgets/customer_selector_dialog.dart';
 import '../widgets/hold_orders_dialog.dart';
@@ -58,6 +64,7 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
   bool _isProductListScrolled = false;
   bool _showCart = true; // toggle ระหว่าง product list กับ cart
   int _cartPanelVersion = 0;
+  bool _restoredRestaurantOrder = false;
 
   static const _groupPalette = <Color>[
     Color(0xFF1565C0),
@@ -101,6 +108,7 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadMobilePreferences();
+      _restoreOpenRestaurantOrder();
     });
   }
 
@@ -108,12 +116,24 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
     List<ProductModel> src,
     Map<String, double> stockMap,
   ) {
+    final restaurantContext = ref.read(restaurantOrderContextProvider);
+
     final filtered = src.where((p) {
+      if (restaurantContext != null) {
+        final serviceMode = p.serviceMode.toUpperCase();
+        final supportsRestaurant =
+            serviceMode == 'RESTAURANT' || serviceMode == 'BOTH';
+        if (!supportsRestaurant || !p.dineInAvailable) return false;
+      }
+
       final matchesGroup =
           _selectedGroupId == null || p.groupId == _selectedGroupId;
       if (!matchesGroup) return false;
       if (_hideInactiveProducts && !p.isActive) return false;
-      if (_hideOutOfStockProducts && (stockMap[p.productId] ?? 0) <= 0) {
+      if (_hideOutOfStockProducts &&
+          p.isStockControl &&
+          !p.allowNegativeStock &&
+          (stockMap[p.productId] ?? 0) <= 0) {
         return false;
       }
       if (_searchQuery.trim().isEmpty) return true;
@@ -133,6 +153,90 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
     });
 
     return filtered;
+  }
+
+  Future<void> _restoreOpenRestaurantOrder() async {
+    if (_restoredRestaurantOrder) return;
+    _restoredRestaurantOrder = true;
+
+    final restaurantContext = ref.read(restaurantOrderContextProvider);
+    final currentOrderId = restaurantContext?.currentOrderId;
+    final cartState = ref.read(cartProvider);
+    if (restaurantContext == null ||
+        currentOrderId == null ||
+        currentOrderId.isEmpty ||
+        cartState.items.isNotEmpty ||
+        cartState.freeItems.isNotEmpty) {
+      return;
+    }
+
+    final order = await ref
+        .read(salesHistoryProvider.notifier)
+        .getOrderDetails(currentOrderId);
+    if (!mounted || order == null || order.items == null) return;
+
+    final regularItems = order.items!
+        .where((item) => !item.isFreeItem)
+        .map(
+          (item) => CartItem(
+            productId: item.productId,
+            productCode: item.productCode,
+            productName: item.productName,
+            unit: item.unit,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            amount: item.amount,
+            priceLevel1: item.unitPrice,
+            note: item.specialInstructions,
+            modifiers: item.modifiers
+                .map(
+                  (modifier) => CartItemModifier(
+                    modifierId: modifier.modifierId,
+                    modifierName: modifier.modifierName,
+                    priceAdjustment: modifier.priceAdjustment,
+                  ),
+                )
+                .toList(),
+          ),
+        )
+        .toList();
+
+    final freeItems = order.items!
+        .where((item) => item.isFreeItem)
+        .map(
+          (item) => CartItem(
+            productId: item.productId,
+            productCode: item.productCode,
+            productName: item.productName,
+            unit: item.unit,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            amount: item.amount,
+            promotionName: item.promotionName,
+            priceLevel1: item.unitPrice,
+          ),
+        )
+        .toList();
+
+    final totalDiscount = (order.subtotal - order.totalAmount).clamp(
+      0,
+      double.infinity,
+    );
+
+    ref
+        .read(cartProvider.notifier)
+        .replaceCart(
+          CartState(
+            items: regularItems,
+            freeItems: freeItems,
+            customerId: order.customerId ?? 'WALK_IN',
+            customerName: order.customerName ?? 'ลูกค้าทั่วไป',
+            discountAmount: totalDiscount.toDouble(),
+          ),
+        );
+
+    ref.read(restaurantOrderContextProvider.notifier).state = restaurantContext
+        .copyWith(currentOrderId: order.orderId, currentOrderNo: order.orderNo);
   }
 
   int _groupSeed(String? groupId) {
@@ -771,10 +875,8 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
     await MobileScannerService.openContinuous(
       context,
       onScanned: (result) => _handleScannedValue(result.value),
-      onScannedInSheet: (sheetContext, result) => _handleScannedValue(
-        result.value,
-        messengerContext: sheetContext,
-      ),
+      onScannedInSheet: (sheetContext, result) =>
+          _handleScannedValue(result.value, messengerContext: sheetContext),
     );
   }
 
@@ -1017,6 +1119,131 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
     );
   }
 
+  Future<void> _openRestaurantModeSheet() async {
+    await _feedbackSelection();
+    if (!mounted) return;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _RestaurantModeSheet(
+        onClear: _clearRestaurantContext,
+        onTakeaway: _startTakeawayContext,
+        onSelectTable: _selectRestaurantTable,
+      ),
+    );
+  }
+
+  Future<void> _clearRestaurantContext() async {
+    ref.read(restaurantOrderContextProvider.notifier).state = null;
+    if (!mounted) return;
+    Navigator.pop(context);
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('เปลี่ยนเป็นโหมดขายปกติแล้ว')));
+  }
+
+  Future<void> _startTakeawayContext() async {
+    final branch = ref.read(selectedBranchProvider);
+    if (branch == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('กรุณาเลือกสาขาก่อนเริ่มออเดอร์ซื้อกลับบ้าน'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    ref.read(restaurantOrderContextProvider.notifier).state =
+        RestaurantOrderContext.takeaway(branchId: branch.branchId);
+    if (!mounted) return;
+    Navigator.pop(context);
+    _showCartAndRefocus();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('เริ่มออเดอร์ซื้อกลับบ้านแล้ว')),
+    );
+  }
+
+  Future<void> _selectRestaurantTable(DiningTableModel table) async {
+    final branch = ref.read(selectedBranchProvider);
+    if (branch == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('กรุณาเลือกสาขาก่อนเปิดโต๊ะ'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    TableSessionModel? session;
+    if (table.isAvailable) {
+      final opened = await showDialog<bool>(
+        context: context,
+        builder: (_) => OpenTableDialog(
+          table: table,
+          branchId: branch.branchId,
+          onConfirm: (guestCount) async {
+            final authState = ref.read(authProvider);
+            session = await ref
+                .read(tableListProvider.notifier)
+                .openTable(
+                  tableId: table.tableId,
+                  guestCount: guestCount,
+                  branchId: branch.branchId,
+                  openedBy: authState.user?.userId,
+                );
+            return session != null;
+          },
+        ),
+      );
+      if (opened != true) return;
+      session ??= await ref
+          .read(tableListProvider.notifier)
+          .getActiveSession(table.tableId);
+    } else if (table.isOccupied) {
+      session = TableSessionModel(
+        sessionId: table.activeSessionId ?? '',
+        tableId: table.tableId,
+        branchId: branch.branchId,
+        openedAt: table.sessionOpenedAt ?? DateTime.now(),
+        guestCount: table.activeGuestCount ?? 1,
+        status: 'OPEN',
+      );
+    } else {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('โต๊ะ ${table.displayName} ยังเปิดออเดอร์ไม่ได้'),
+        ),
+      );
+      return;
+    }
+
+    final resolvedSession = session;
+    if (resolvedSession == null || !mounted) return;
+    ref
+        .read(restaurantOrderContextProvider.notifier)
+        .state = RestaurantOrderContext(
+      tableId: table.tableId,
+      tableName: table.displayName,
+      sessionId: resolvedSession.sessionId,
+      branchId: resolvedSession.branchId,
+      guestCount: resolvedSession.guestCount,
+      serviceType: 'DINE_IN',
+      currentOrderId: table.currentOrderId,
+    );
+    Navigator.pop(context);
+    _showCartAndRefocus();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('เลือกโต๊ะ ${table.displayName} แล้ว')),
+    );
+  }
+
   Future<void> _goToCheckout() async {
     await _feedbackTap();
     if (!mounted) return;
@@ -1047,6 +1274,10 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
       ref.read(customerListProvider.notifier).refresh(),
       ref.read(branchListProvider.notifier).refresh(),
       ref.read(warehouseListProvider.notifier).refresh(),
+      ref
+          .read(tableListProvider.notifier)
+          .refresh(branchId: ref.read(selectedBranchProvider)?.branchId),
+      ref.read(zoneListProvider.notifier).refresh(),
     ]);
     ref.invalidate(syncStatusProvider);
     ref.invalidate(connectionStatusProvider);
@@ -1210,11 +1441,13 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
   @override
   Widget build(BuildContext context) {
     ref.watch(posContextBootstrapProvider);
+    ref.watch(tableStatusPollingProvider);
 
     final productAsync = ref.watch(productListProvider);
     final productGroupsAsync = ref.watch(productGroupsProvider);
     final stockAsync = ref.watch(stockBalanceProvider);
     final cartState = ref.watch(cartProvider);
+    final restaurantContext = ref.watch(restaurantOrderContextProvider);
     final selectedBranch = ref.watch(selectedBranchProvider);
     final selectedWarehouse = ref.watch(selectedWarehouseProvider);
     final connectionAsync = ref.watch(connectionStatusProvider);
@@ -1230,10 +1463,14 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
       data: (stocks) => _buildStockMap(stocks, selectedWarehouse?.warehouseId),
       orElse: () => const <String, double>{},
     );
+    final isRestaurantFlow = restaurantContext != null;
+    final isKitchenSent =
+        restaurantContext?.currentOrderId?.isNotEmpty ?? false;
     final isReadyForCheckout =
         cartState.items.isNotEmpty &&
         selectedBranch != null &&
-        selectedWarehouse != null;
+        selectedWarehouse != null &&
+        (!isRestaurantFlow || isKitchenSent);
     final autoOpenCartOnTap = settings.mobilePosAutoOpenCartOnTap;
 
     final expectedFavoriteScope = _favoriteScopeKey(
@@ -1573,6 +1810,94 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                           ),
                         ),
                     ],
+                  ),
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: _openRestaurantModeSheet,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 9,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isRestaurantFlow
+                            ? AppTheme.warningColor.withValues(alpha: 0.10)
+                            : AppTheme.borderColorOf(
+                                context,
+                              ).withValues(alpha: 0.20),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isRestaurantFlow
+                              ? AppTheme.warningColor.withValues(alpha: 0.30)
+                              : AppTheme.borderColorOf(context),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            isRestaurantFlow
+                                ? (restaurantContext.isTakeaway
+                                      ? Icons.takeout_dining_rounded
+                                      : Icons.table_restaurant_rounded)
+                                : Icons.restaurant_menu_rounded,
+                            size: 17,
+                            color: isRestaurantFlow
+                                ? AppTheme.warningColor
+                                : AppTheme.subtextColorOf(context),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              isRestaurantFlow
+                                  ? restaurantContext.displayName
+                                  : 'โหมดขายปกติ',
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                color: isRestaurantFlow
+                                    ? AppTheme.warningColor
+                                    : null,
+                              ),
+                            ),
+                          ),
+                          if (isRestaurantFlow) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color:
+                                    (isKitchenSent
+                                            ? AppTheme.successColor
+                                            : AppTheme.infoColor)
+                                        .withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                isKitchenSent ? 'ส่งครัวแล้ว' : 'รอส่งครัว',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  color: isKitchenSent
+                                      ? AppTheme.successColor
+                                      : AppTheme.infoColor,
+                                ),
+                              ),
+                            ),
+                          ],
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.expand_more_rounded,
+                            size: 18,
+                            color: AppTheme.subtextColorOf(context),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                   // Favorites quick-sell strip (always visible)
                   if (_favoriteProductIds.isNotEmpty)
@@ -2874,12 +3199,16 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                           icon: Icon(
                             selectedBranch == null || selectedWarehouse == null
                                 ? Icons.settings_ethernet_rounded
+                                : isRestaurantFlow && !isKitchenSent
+                                ? Icons.kitchen_outlined
                                 : Icons.payment_rounded,
                             size: 18,
                           ),
                           label: Text(
                             cartState.items.isEmpty
                                 ? 'ชำระเงิน'
+                                : isRestaurantFlow && !isKitchenSent
+                                ? 'ส่งเข้าครัวก่อน'
                                 : 'ชำระเงิน  ฿${cartState.total.toStringAsFixed(2)}',
                             style: const TextStyle(
                               fontSize: 15,
@@ -2889,8 +3218,8 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                           style: FilledButton.styleFrom(
                             backgroundColor: AppTheme.successColor,
                             foregroundColor: Colors.white,
-                            disabledBackgroundColor:
-                                AppTheme.successColor.withValues(alpha: 0.35),
+                            disabledBackgroundColor: AppTheme.successColor
+                                .withValues(alpha: 0.35),
                             disabledForegroundColor: Colors.white70,
                             minimumSize: const Size(0, 48),
                             alignment: Alignment.center,
@@ -2922,6 +3251,272 @@ Map<String, double> _buildStockMap(
     map[stock.productId] = (map[stock.productId] ?? 0) + stock.balance;
   }
   return map;
+}
+
+class _RestaurantModeSheet extends ConsumerWidget {
+  final Future<void> Function() onClear;
+  final Future<void> Function() onTakeaway;
+  final Future<void> Function(DiningTableModel table) onSelectTable;
+
+  const _RestaurantModeSheet({
+    required this.onClear,
+    required this.onTakeaway,
+    required this.onSelectTable,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final currentContext = ref.watch(restaurantOrderContextProvider);
+    final tablesAsync = ref.watch(tableListProvider);
+
+    return SafeArea(
+      top: false,
+      child: Container(
+        height: MediaQuery.sizeOf(context).height * 0.82,
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 42,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 14),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade400,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'โหมดร้านอาหาร',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'รีเฟรชโต๊ะ',
+                  onPressed: () => ref
+                      .read(tableListProvider.notifier)
+                      .refresh(
+                        branchId: ref.read(selectedBranchProvider)?.branchId,
+                      ),
+                  icon: const Icon(Icons.refresh_rounded),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: _RestaurantModeAction(
+                    icon: Icons.point_of_sale_rounded,
+                    label: 'ขายปกติ',
+                    active: currentContext == null,
+                    color: AppTheme.primaryColor,
+                    onTap: onClear,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _RestaurantModeAction(
+                    icon: Icons.takeout_dining_rounded,
+                    label: 'ซื้อกลับบ้าน',
+                    active: currentContext?.isTakeaway ?? false,
+                    color: AppTheme.warningColor,
+                    onTap: onTakeaway,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Text(
+              'โต๊ะอาหาร',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: AppTheme.subtextColorOf(context),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: tablesAsync.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, _) => Center(child: Text('โหลดโต๊ะไม่สำเร็จ: $e')),
+                data: (tables) {
+                  final selectable =
+                      tables
+                          .where(
+                            (table) => !table.isDisabled && !table.isCleaning,
+                          )
+                          .toList()
+                        ..sort((a, b) {
+                          final zone = (a.zoneName ?? '').compareTo(
+                            b.zoneName ?? '',
+                          );
+                          return zone != 0
+                              ? zone
+                              : a.tableNo.compareTo(b.tableNo);
+                        });
+
+                  if (selectable.isEmpty) {
+                    return const Center(child: Text('ยังไม่มีโต๊ะที่เลือกได้'));
+                  }
+
+                  return GridView.builder(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    gridDelegate:
+                        const SliverGridDelegateWithMaxCrossAxisExtent(
+                          maxCrossAxisExtent: 150,
+                          mainAxisExtent: 96,
+                          crossAxisSpacing: 8,
+                          mainAxisSpacing: 8,
+                        ),
+                    itemCount: selectable.length,
+                    itemBuilder: (_, index) {
+                      final table = selectable[index];
+                      final active = currentContext?.tableId == table.tableId;
+                      final statusColor = table.isAvailable
+                          ? AppTheme.successColor
+                          : table.isOccupied
+                          ? AppTheme.warningColor
+                          : AppTheme.subtextColorOf(context);
+
+                      return InkWell(
+                        onTap: () => onSelectTable(table),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: active
+                                ? AppTheme.primaryColor.withValues(alpha: 0.10)
+                                : statusColor.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: active
+                                  ? AppTheme.primaryColor
+                                  : statusColor.withValues(alpha: 0.25),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.table_restaurant_rounded,
+                                    size: 16,
+                                    color: statusColor,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      table.displayName,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const Spacer(),
+                              Text(
+                                table.zoneName ?? 'ไม่ระบุโซน',
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: AppTheme.subtextColorOf(context),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                table.isAvailable
+                                    ? 'ว่าง'
+                                    : table.isOccupied
+                                    ? 'มีออเดอร์'
+                                    : table.status,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: statusColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RestaurantModeAction extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool active;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _RestaurantModeAction({
+    required this.icon,
+    required this.label,
+    required this.active,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        height: 48,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: active ? 0.14 : 0.07),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: color.withValues(alpha: active ? 0.45 : 0.18),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 18, color: color),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: color,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _CompactStatusChip extends StatelessWidget {
