@@ -37,6 +37,7 @@ class _TakeawayOrdersPageState extends ConsumerState<TakeawayOrdersPage> {
   Set<String> _knownOpenOrderIds = <String>{};
   Timer? _highlightClearTimer;
   bool _didPrimeOpenOrders = false;
+  DateTime? _lastUpdatedAt;
 
   Future<void> _refresh() async {
     await ref.read(salesHistoryProvider.notifier).refresh();
@@ -75,6 +76,18 @@ class _TakeawayOrdersPageState extends ConsumerState<TakeawayOrdersPage> {
       if (newIds.isNotEmpty && mounted) {
         _highlightNewOrders(newIds, next);
       }
+    });
+
+    ref.listen<AsyncValue<List<SalesOrderModel>>>(salesHistoryProvider, (
+      previous,
+      next,
+    ) {
+      next.whenOrNull(
+        data: (_) {
+          if (!mounted) return;
+          setState(() => _lastUpdatedAt = DateTime.now());
+        },
+      );
     });
 
     final ordersAsync = ref.watch(salesHistoryProvider);
@@ -127,12 +140,15 @@ class _TakeawayOrdersPageState extends ConsumerState<TakeawayOrdersPage> {
           final emptyState = filteredOrders.isEmpty
               ? _EmptyTakeawayState(statusFilter: _statusFilter)
               : null;
+          final lastUpdatedAt = _lastUpdatedAt ?? DateTime.now();
 
           return RefreshIndicator(
             onRefresh: _refresh,
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
+                _LastUpdatedBadge(lastUpdatedAt: lastUpdatedAt),
+                const SizedBox(height: 10),
                 _SearchAndFilterBar(
                   controller: _searchController,
                   searchQuery: _searchQuery,
@@ -266,6 +282,56 @@ class _TakeawayOrdersPageState extends ConsumerState<TakeawayOrdersPage> {
       this.context,
       MaterialPageRoute(builder: (_) => BillingPage(tableContext: context)),
     );
+  }
+}
+
+class _LastUpdatedBadge extends StatelessWidget {
+  const _LastUpdatedBadge({required this.lastUpdatedAt});
+
+  final DateTime lastUpdatedAt;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: 'อัปเดตล่าสุดเมื่อ ${_formatTime(lastUpdatedAt)}',
+      child: Container(
+        key: const ValueKey('takeaway-last-updated-badge'),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade200),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.sync_rounded,
+              size: 18,
+              color: AppTheme.primaryColor,
+            ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                'อัปเดตล่าสุดเมื่อ ${_formatTime(lastUpdatedAt)}',
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.black54,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static String _formatTime(DateTime value) {
+    final hh = value.hour.toString().padLeft(2, '0');
+    final mm = value.minute.toString().padLeft(2, '0');
+    return '$hh:$mm น.';
   }
 }
 

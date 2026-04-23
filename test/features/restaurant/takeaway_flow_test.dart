@@ -2,15 +2,20 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pos_erp/core/client/api_client.dart';
 import 'package:pos_erp/features/auth/data/models/user_model.dart';
 import 'package:pos_erp/features/auth/presentation/providers/auth_provider.dart';
 import 'package:pos_erp/features/branches/data/models/branch_model.dart';
 import 'package:pos_erp/features/branches/presentation/providers/branch_provider.dart';
+import 'package:pos_erp/features/dashboard/presentation/providers/dashboard_provider.dart';
+import 'package:pos_erp/features/home/presentation/pages/home_page.dart';
 import 'package:pos_erp/features/restaurant/data/models/restaurant_order_context.dart';
 import 'package:pos_erp/features/restaurant/presentation/pages/takeaway_orders_page.dart';
 import 'package:pos_erp/features/sales/presentation/pages/payment_page.dart';
 import 'package:pos_erp/features/sales/presentation/providers/cart_provider.dart';
+import 'package:pos_erp/features/sales/presentation/providers/sales_provider.dart';
+import 'package:pos_erp/features/settings/presentation/pages/settings_page.dart';
 import 'package:pos_erp/shared/services/app_alert_service.dart';
 
 class _FakeTakeawayApiClient extends ApiClient {
@@ -313,6 +318,33 @@ class _SeededCartNotifier extends CartNotifier {
   CartState build() => _state;
 }
 
+class _TestDashboardNotifier extends DashboardNotifier {
+  @override
+  Future<DashboardStats> build() async {
+    return DashboardStats(
+      totalOrders: 0,
+      totalSales: 0,
+      totalProducts: 0,
+      totalCustomers: 0,
+      todaySales: 0,
+      todayOrders: 0,
+      last7DaysSales: 0,
+      last7DaysOrders: 0,
+      last30DaysSales: 0,
+      last30DaysOrders: 0,
+      monthSales: 0,
+      monthOrders: 0,
+    );
+  }
+}
+
+class _HomeBadgeSettingsNotifier extends SettingsNotifier {
+  @override
+  SettingsState build() {
+    return SettingsState(takeawayAutoRefreshEnabled: false);
+  }
+}
+
 class _FakeAppAlertService extends AppAlertService {
   _FakeAppAlertService() : super(enableAudio: false);
 
@@ -378,6 +410,55 @@ Future<void> _pumpWithContainer(
 
 void main() {
   group('Takeaway flow tests', () {
+    testWidgets('home sidebar shows takeaway pending badge count', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({});
+      final container = ProviderContainer(
+        overrides: [
+          apiClientProvider.overrideWithValue(_FakeTakeawayApiClient.seeded()),
+          authProvider.overrideWith(_TestAuthNotifier.new),
+          selectedBranchProvider.overrideWith(_TestSelectedBranchNotifier.new),
+          selectedWarehouseProvider.overrideWith(
+            _TestSelectedWarehouseNotifier.new,
+          ),
+          posContextBootstrapProvider.overrideWith((ref) async {}),
+          dashboardProvider.overrideWith(_TestDashboardNotifier.new),
+          settingsProvider.overrideWith(_HomeBadgeSettingsNotifier.new),
+          syncStatusProvider.overrideWith(
+            (ref) => Stream.value(
+              SyncStatusModel(
+                isOnline: true,
+                appMode: 'master',
+                lastSyncAt: DateTime(2026, 4, 23, 10, 30),
+              ),
+            ),
+          ),
+          connectionStatusProvider.overrideWith(
+            (ref) => Stream.value(
+              const ConnectionStatusModel(
+                isConnected: true,
+                title: 'Master พร้อมใช้งาน',
+                detail: 'เครื่องหลักพร้อมใช้งาน',
+              ),
+            ),
+          ),
+          takeawayOpenOrdersCountProvider.overrideWith((ref) => 7),
+        ],
+      );
+
+      await _pumpWithContainer(
+        tester,
+        container: container,
+        child: const HomePage(),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('บิลกลับบ้านค้าง'), findsOneWidget);
+      expect(find.text('7'), findsOneWidget);
+    });
+
     testWidgets('takeaway orders page shows only open takeaway orders', (
       tester,
     ) async {
@@ -392,6 +473,7 @@ void main() {
 
       await tester.pumpAndSettle();
 
+      expect(find.textContaining('อัปเดตล่าสุดเมื่อ'), findsOneWidget);
       expect(find.text('TK-001'), findsOneWidget);
       expect(find.text('ลูกค้าหน้าร้าน'), findsOneWidget);
       expect(find.text('DN-001'), findsNothing);
