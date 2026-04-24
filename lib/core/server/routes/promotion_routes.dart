@@ -1,4 +1,3 @@
-// ignore_for_file: avoid_print
 // promotion_routes.dart
 // Day 41-45: Promotion & Coupon API Routes
 
@@ -7,6 +6,7 @@ import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 import 'package:drift/drift.dart' hide JsonKey;
 import '../../database/app_database.dart';
+import 'package:flutter/foundation.dart';
 
 class PromotionRoutes {
   final AppDatabase db;
@@ -251,7 +251,9 @@ class PromotionRoutes {
             createdBy: Value(data['created_by'] as String?),
           ));
 
-      print('✅ PromotionRoutes: Created $promotionId');
+      if (kDebugMode) {
+        debugPrint('✅ PromotionRoutes: Created $promotionId');
+      }
 
       return Response.ok(
         jsonEncode({
@@ -262,7 +264,9 @@ class PromotionRoutes {
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ PromotionRoutes: POST / error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ PromotionRoutes: POST / error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': '$e'}),
         headers: {'Content-Type': 'application/json'},

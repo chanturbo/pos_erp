@@ -127,6 +127,25 @@ class SalesHistoryNotifier extends AsyncNotifier<List<SalesOrderModel>> {
     }
   }
 
+  /// ยกเลิกใบขาย — คืน (success, message)
+  Future<(bool, String)> cancelOrder(String orderId) async {
+    try {
+      final apiClient = ref.read(apiClientProvider);
+      final response = await apiClient.post('/api/sales/$orderId/cancel');
+      final msg = (response.data is Map ? response.data['message'] as String? : null) ?? '';
+      if (response.statusCode == 200) {
+        await refreshSilently();
+        return (true, msg.isEmpty ? 'ยกเลิกออเดอร์สำเร็จ' : msg);
+      }
+      return (false, msg.isEmpty ? 'ยกเลิกไม่สำเร็จ' : msg);
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('❌ Error cancelling order: $e');
+      }
+      return (false, 'เกิดข้อผิดพลาด: $e');
+    }
+  }
+
   /// ดึงรายละเอียดใบขาย
   Future<SalesOrderModel?> getOrderDetails(String orderId) async {
     try {

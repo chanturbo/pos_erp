@@ -1,4 +1,3 @@
-// ignore_for_file: avoid_print
 
 import 'dart:convert';
 import 'package:shelf/shelf.dart';
@@ -8,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../../database/app_database.dart';
 import '../../utils/crypto_utils.dart';
+import 'package:flutter/foundation.dart';
 
 class KitchenRoutes {
   final AppDatabase db;
@@ -354,7 +354,9 @@ class KitchenRoutes {
         ),
       );
 
-      print('✅ Kitchen: item $itemId → $newStatus');
+      if (kDebugMode) {
+        debugPrint('✅ Kitchen: item $itemId → $newStatus');
+      }
       return _ok({
         'item_id': itemId,
         'status': newStatus,
@@ -390,7 +392,9 @@ class KitchenRoutes {
   );
 
   Response _err(dynamic e) {
-    print('❌ KitchenRoutes error: $e');
+    if (kDebugMode) {
+      debugPrint('❌ KitchenRoutes error: $e');
+    }
     return Response.internalServerError(
       body: jsonEncode({'success': false, 'message': e.toString()}),
       headers: {'content-type': 'application/json'},

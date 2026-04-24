@@ -1,20 +1,24 @@
-// ignore_for_file: avoid_print
 
 import 'dart:convert';
 import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 import 'package:drift/drift.dart' hide JsonKey;
 import '../../database/app_database.dart';
+import 'package:flutter/foundation.dart';
 
 class PurchaseRoutes {
   final AppDatabase db;
 
   PurchaseRoutes(this.db) {
-    print('🔧 PurchaseRoutes initialized');
+    if (kDebugMode) {
+      debugPrint('🔧 PurchaseRoutes initialized');
+    }
   }
 
   Router get router {
-    print('🔧 Building PurchaseRoutes router...');
+    if (kDebugMode) {
+      debugPrint('🔧 Building PurchaseRoutes router...');
+    }
     
     final router = Router();
 
@@ -29,14 +33,30 @@ class PurchaseRoutes {
     router.post('/<id>/approve', _approvePurchaseOrderHandler);
     router.post('/<id>/receive', _receivePurchaseOrderHandler);
 
-    print('🔧 PurchaseRoutes configured:');
-    print('   GET  / → /api/purchases');
-    print('   GET  /<id> → /api/purchases/:id');
-    print('   POST / → /api/purchases');
-    print('   PUT  /<id> → /api/purchases/:id');
-    print('   DELETE /<id> → /api/purchases/:id');
-    print('   POST /<id>/approve → /api/purchases/:id/approve');
-    print('   POST /<id>/receive → /api/purchases/:id/receive');
+    if (kDebugMode) {
+      debugPrint('🔧 PurchaseRoutes configured:');
+    }
+    if (kDebugMode) {
+      debugPrint('   GET  / → /api/purchases');
+    }
+    if (kDebugMode) {
+      debugPrint('   GET  /<id> → /api/purchases/:id');
+    }
+    if (kDebugMode) {
+      debugPrint('   POST / → /api/purchases');
+    }
+    if (kDebugMode) {
+      debugPrint('   PUT  /<id> → /api/purchases/:id');
+    }
+    if (kDebugMode) {
+      debugPrint('   DELETE /<id> → /api/purchases/:id');
+    }
+    if (kDebugMode) {
+      debugPrint('   POST /<id>/approve → /api/purchases/:id/approve');
+    }
+    if (kDebugMode) {
+      debugPrint('   POST /<id>/receive → /api/purchases/:id/receive');
+    }
 
     return router;
   }
@@ -44,7 +64,9 @@ class PurchaseRoutes {
   /// GET / - ดึงรายการใบสั่งซื้อทั้งหมด
   Future<Response> _getPurchaseOrdersHandler(Request request) async {
     try {
-      print('📡 PurchaseRoutes: GET /');
+      if (kDebugMode) {
+        debugPrint('📡 PurchaseRoutes: GET /');
+      }
 
       final orders = await db.select(db.purchaseOrders).get();
 
@@ -69,15 +91,21 @@ class PurchaseRoutes {
             'updated_at': po.updatedAt.toIso8601String(),
           }).toList();
 
-      print('✅ PurchaseRoutes: Found ${orders.length} purchase orders');
+      if (kDebugMode) {
+        debugPrint('✅ PurchaseRoutes: Found ${orders.length} purchase orders');
+      }
 
       return Response.ok(
         jsonEncode({'success': true, 'data': data}),
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e, stack) {
-      print('❌ PurchaseRoutes: GET / error: $e');
-      print('Stack trace: $stack');
+      if (kDebugMode) {
+        debugPrint('❌ PurchaseRoutes: GET / error: $e');
+      }
+      if (kDebugMode) {
+        debugPrint('Stack trace: $stack');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': '$e'}),
         headers: {'Content-Type': 'application/json'},
@@ -88,7 +116,9 @@ class PurchaseRoutes {
   /// GET /:id - ดึงใบสั่งซื้อพร้อมรายการสินค้า
   Future<Response> _getPurchaseOrderHandler(Request request, String id) async {
     try {
-      print('📡 PurchaseRoutes: GET /$id');
+      if (kDebugMode) {
+        debugPrint('📡 PurchaseRoutes: GET /$id');
+      }
 
       // Get purchase order
       final po = await (db.select(db.purchaseOrders)
@@ -149,7 +179,9 @@ class PurchaseRoutes {
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ PurchaseRoutes: GET /$id error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ PurchaseRoutes: GET /$id error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': '$e'}),
         headers: {'Content-Type': 'application/json'},
@@ -160,7 +192,9 @@ class PurchaseRoutes {
   /// POST / - สร้างใบสั่งซื้อใหม่
   Future<Response> _createPurchaseOrderHandler(Request request) async {
     try {
-      print('📡 PurchaseRoutes: POST /');
+      if (kDebugMode) {
+        debugPrint('📡 PurchaseRoutes: POST /');
+      }
 
       final payload = await request.readAsString();
       final data = jsonDecode(payload) as Map<String, dynamic>;
@@ -221,7 +255,9 @@ class PurchaseRoutes {
         }
       }
 
-      print('✅ PurchaseRoutes: Created purchase order: $poId');
+      if (kDebugMode) {
+        debugPrint('✅ PurchaseRoutes: Created purchase order: $poId');
+      }
 
       return Response.ok(
         jsonEncode({
@@ -232,7 +268,9 @@ class PurchaseRoutes {
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ PurchaseRoutes: POST / error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ PurchaseRoutes: POST / error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': '$e'}),
         headers: {'Content-Type': 'application/json'},
@@ -243,7 +281,9 @@ class PurchaseRoutes {
   /// PUT /:id - แก้ไขใบสั่งซื้อ
   Future<Response> _updatePurchaseOrderHandler(Request request, String id) async {
     try {
-      print('📡 PurchaseRoutes: PUT /$id');
+      if (kDebugMode) {
+        debugPrint('📡 PurchaseRoutes: PUT /$id');
+      }
 
       final payload = await request.readAsString();
       final data = jsonDecode(payload) as Map<String, dynamic>;
@@ -270,14 +310,18 @@ class PurchaseRoutes {
       await (db.update(db.purchaseOrders)..where((p) => p.poId.equals(id)))
           .write(companion);
 
-      print('✅ PurchaseRoutes: Updated purchase order: $id');
+      if (kDebugMode) {
+        debugPrint('✅ PurchaseRoutes: Updated purchase order: $id');
+      }
 
       return Response.ok(
         jsonEncode({'success': true, 'message': 'Purchase order updated'}),
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ PurchaseRoutes: PUT /$id error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ PurchaseRoutes: PUT /$id error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': '$e'}),
         headers: {'Content-Type': 'application/json'},
@@ -288,7 +332,9 @@ class PurchaseRoutes {
   /// DELETE /:id - ลบใบสั่งซื้อ
   Future<Response> _deletePurchaseOrderHandler(Request request, String id) async {
     try {
-      print('📡 PurchaseRoutes: DELETE /$id');
+      if (kDebugMode) {
+        debugPrint('📡 PurchaseRoutes: DELETE /$id');
+      }
 
       // Delete items first
       await (db.delete(db.purchaseOrderItems)..where((i) => i.poId.equals(id)))
@@ -298,14 +344,18 @@ class PurchaseRoutes {
       await (db.delete(db.purchaseOrders)..where((p) => p.poId.equals(id)))
           .go();
 
-      print('✅ PurchaseRoutes: Deleted purchase order: $id');
+      if (kDebugMode) {
+        debugPrint('✅ PurchaseRoutes: Deleted purchase order: $id');
+      }
 
       return Response.ok(
         jsonEncode({'success': true, 'message': 'Purchase order deleted'}),
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ PurchaseRoutes: DELETE /$id error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ PurchaseRoutes: DELETE /$id error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': '$e'}),
         headers: {'Content-Type': 'application/json'},
@@ -316,7 +366,9 @@ class PurchaseRoutes {
   /// POST /:id/approve - อนุมัติใบสั่งซื้อ
   Future<Response> _approvePurchaseOrderHandler(Request request, String id) async {
     try {
-      print('📡 PurchaseRoutes: POST /$id/approve');
+      if (kDebugMode) {
+        debugPrint('📡 PurchaseRoutes: POST /$id/approve');
+      }
 
       await (db.update(db.purchaseOrders)..where((p) => p.poId.equals(id)))
           .write(const PurchaseOrdersCompanion(
@@ -324,14 +376,18 @@ class PurchaseRoutes {
             updatedAt: Value.absent(),
           ));
 
-      print('✅ PurchaseRoutes: Approved purchase order: $id');
+      if (kDebugMode) {
+        debugPrint('✅ PurchaseRoutes: Approved purchase order: $id');
+      }
 
       return Response.ok(
         jsonEncode({'success': true, 'message': 'Purchase order approved'}),
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ PurchaseRoutes: POST /$id/approve error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ PurchaseRoutes: POST /$id/approve error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': '$e'}),
         headers: {'Content-Type': 'application/json'},
@@ -342,7 +398,9 @@ class PurchaseRoutes {
   /// POST /:id/receive - รับสินค้า
   Future<Response> _receivePurchaseOrderHandler(Request request, String id) async {
     try {
-      print('📡 PurchaseRoutes: POST /$id/receive');
+      if (kDebugMode) {
+        debugPrint('📡 PurchaseRoutes: POST /$id/receive');
+      }
 
       final payload = await request.readAsString();
       final data = jsonDecode(payload) as Map<String, dynamic>;
@@ -385,7 +443,9 @@ class PurchaseRoutes {
             updatedAt: Value(DateTime.now()),
           ));
 
-      print('✅ PurchaseRoutes: Received items for PO: $id');
+      if (kDebugMode) {
+        debugPrint('✅ PurchaseRoutes: Received items for PO: $id');
+      }
 
       return Response.ok(
         jsonEncode({
@@ -396,7 +456,9 @@ class PurchaseRoutes {
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ PurchaseRoutes: POST /$id/receive error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ PurchaseRoutes: POST /$id/receive error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': '$e'}),
         headers: {'Content-Type': 'application/json'},

@@ -1,8 +1,6 @@
-// ignore_for_file: avoid_print
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
-import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:cryptography/cryptography.dart';
@@ -17,6 +15,7 @@ import '../../database/app_database.dart';
 import '../license/license_local_service.dart';
 import 'models/backup_manifest.dart';
 import 'models/backup_result.dart';
+import 'package:flutter/foundation.dart';
 
 final backupServiceProvider = Provider<BackupService>((ref) {
   final db = ref.read(appDatabaseProvider);
@@ -272,21 +271,31 @@ class BackupService {
 
   static Future<bool> applyPendingRestoreIfAny() async {
     final backupDir = await AppDatabase.resolveBackupDirectory();
-    print('🔍 [Restore] backupDir: ${backupDir.path}');
+    if (kDebugMode) {
+      debugPrint('🔍 [Restore] backupDir: ${backupDir.path}');
+    }
 
     final pendingRoot = Directory(
       p.join(backupDir.path, restorePendingFolderName),
     );
-    print('🔍 [Restore] pendingRoot: ${pendingRoot.path}');
-    print('🔍 [Restore] pendingRoot exists: ${pendingRoot.existsSync()}');
+    if (kDebugMode) {
+      debugPrint('🔍 [Restore] pendingRoot: ${pendingRoot.path}');
+    }
+    if (kDebugMode) {
+      debugPrint('🔍 [Restore] pendingRoot exists: ${pendingRoot.existsSync()}');
+    }
     if (!pendingRoot.existsSync()) return false;
 
     final requestFile = File(p.join(pendingRoot.path, restoreRequestFileName));
     final payloadDir = Directory(
       p.join(pendingRoot.path, restorePayloadFolderName),
     );
-    print('🔍 [Restore] requestFile exists: ${requestFile.existsSync()}');
-    print('🔍 [Restore] payloadDir exists: ${payloadDir.existsSync()}');
+    if (kDebugMode) {
+      debugPrint('🔍 [Restore] requestFile exists: ${requestFile.existsSync()}');
+    }
+    if (kDebugMode) {
+      debugPrint('🔍 [Restore] payloadDir exists: ${payloadDir.existsSync()}');
+    }
 
     if (!requestFile.existsSync() || !payloadDir.existsSync()) {
       await pendingRoot.delete(recursive: true);
@@ -298,14 +307,20 @@ class BackupService {
     final manifest = BackupManifest.fromJson(
       requestJson['manifest'] as Map<String, dynamic>,
     );
-    print('🔍 [Restore] manifest backupId: ${manifest.backupId}');
-    print('🔍 [Restore] payload files:');
+    if (kDebugMode) {
+      debugPrint('🔍 [Restore] manifest backupId: ${manifest.backupId}');
+    }
+    if (kDebugMode) {
+      debugPrint('🔍 [Restore] payload files:');
+    }
     await for (final f in payloadDir.list(recursive: true)) {
-      if (f is File) print('   📄 ${f.path} (${await f.length()} bytes)');
+      if (f is File && kDebugMode) debugPrint('   📄 ${f.path} (${await f.length()} bytes)');
     }
 
     await _validateExtractedPayload(payloadDir, manifest);
-    print('✅ [Restore] payload validated');
+    if (kDebugMode) {
+      debugPrint('✅ [Restore] payload validated');
+    }
 
     final rollbackRoot = Directory(
       p.join(
@@ -317,13 +332,19 @@ class BackupService {
     await rollbackRoot.create(recursive: true);
 
     final currentDb = await AppDatabase.resolveDatabaseFile();
-    print('🔍 [Restore] currentDb path: ${currentDb.path}');
-    print('🔍 [Restore] currentDb exists: ${currentDb.existsSync()}');
+    if (kDebugMode) {
+      debugPrint('🔍 [Restore] currentDb path: ${currentDb.path}');
+    }
+    if (kDebugMode) {
+      debugPrint('🔍 [Restore] currentDb exists: ${currentDb.existsSync()}');
+    }
     if (currentDb.existsSync()) {
       await currentDb.copy(
         p.join(rollbackRoot.path, AppDatabase.databaseFileName),
       );
-      print('✅ [Restore] current db backed up to rollback');
+      if (kDebugMode) {
+        debugPrint('✅ [Restore] current db backed up to rollback');
+      }
     }
 
     final currentImages = await AppDatabase.resolveProductImagesDirectory();
@@ -337,15 +358,21 @@ class BackupService {
     final restoredDb = File(
       p.join(payloadDir.path, AppDatabase.databaseFileName),
     );
-    print('🔍 [Restore] restoredDb path: ${restoredDb.path}');
-    print('🔍 [Restore] restoredDb exists: ${restoredDb.existsSync()}');
+    if (kDebugMode) {
+      debugPrint('🔍 [Restore] restoredDb path: ${restoredDb.path}');
+    }
+    if (kDebugMode) {
+      debugPrint('🔍 [Restore] restoredDb exists: ${restoredDb.existsSync()}');
+    }
     if (!restoredDb.existsSync()) {
       throw const BackupException('ไม่พบฐานข้อมูลในชุด restore');
     }
 
     await currentDb.parent.create(recursive: true);
     await restoredDb.copy(currentDb.path);
-    print('✅ [Restore] db file copied to ${currentDb.path}');
+    if (kDebugMode) {
+      debugPrint('✅ [Restore] db file copied to ${currentDb.path}');
+    }
 
     // Delete stale WAL files — if left behind SQLite replays old transactions
     // on top of the restored data, making the restore appear to have no effect.
@@ -353,7 +380,9 @@ class BackupService {
       final stale = File('${currentDb.path}$suffix');
       if (stale.existsSync()) {
         await stale.delete();
-        print('🗑️ [Restore] deleted stale WAL file: ${stale.path}');
+        if (kDebugMode) {
+          debugPrint('🗑️ [Restore] deleted stale WAL file: ${stale.path}');
+        }
       }
     }
 
@@ -374,11 +403,15 @@ class BackupService {
           licensedEmail: manifest.appMeta!.licensedEmail,
         ),
       );
-      print('✅ [Restore] restored license metadata from backup manifest');
+      if (kDebugMode) {
+        debugPrint('✅ [Restore] restored license metadata from backup manifest');
+      }
     }
 
     await pendingRoot.delete(recursive: true);
-    print('✅ [Restore] pendingRoot deleted — restore complete');
+    if (kDebugMode) {
+      debugPrint('✅ [Restore] pendingRoot deleted — restore complete');
+    }
     return true;
   }
 

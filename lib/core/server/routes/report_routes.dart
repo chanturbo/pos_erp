@@ -1,4 +1,3 @@
-// ignore_for_file: avoid_print
 // report_routes.dart — Week 6: Full Reporting
 // Sales / Purchase / Inventory / Financial Reports
 

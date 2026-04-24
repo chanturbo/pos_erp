@@ -39,6 +39,8 @@ class PosPage extends ConsumerStatefulWidget {
 
 class _PosPageState extends ConsumerState<PosPage> {
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _categoryScrollController = ScrollController();
+  final Map<String?, GlobalKey> _chipKeys = {};
   String _searchQuery = '';
   List<PromotionModel> _buyXGetYPromos = [];
   bool _restoredRestaurantOrder = false;
@@ -56,6 +58,7 @@ class _PosPageState extends ConsumerState<PosPage> {
   @override
   void dispose() {
     _searchController.dispose();
+    _categoryScrollController.dispose();
     // Clear restaurant context when leaving POS (no payment completed path)
     // Safe: payment flow clears it before popping, so this is a no-op after payment
     ref.read(restaurantOrderContextProvider.notifier).state = null;
@@ -907,6 +910,19 @@ class _PosPageState extends ConsumerState<PosPage> {
     );
   }
 
+  void _scrollChipIntoView(String? groupId) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = _chipKeys[groupId]?.currentContext;
+      if (ctx != null) {
+        Scrollable.ensureVisible(
+          ctx,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
+      }
+    });
+  }
+
   // ── Restaurant category filter bar ──────────────────────────────
   Widget _buildCategoryBar(List<ProductModel> filteredProducts) {
     final groups = ref.watch(productGroupsProvider).value ?? [];
@@ -940,28 +956,41 @@ class _PosPageState extends ConsumerState<PosPage> {
         border: Border(bottom: BorderSide(color: AppTheme.border)),
       ),
       child: SingleChildScrollView(
+        controller: _categoryScrollController,
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         child: Row(
           children: [
             // "ทั้งหมด" chip
-            _groupChip(
-              label: 'ทั้งหมด',
-              count: filteredProducts.length,
-              icon: Icons.apps_rounded,
-              selected: _selectedGroupId == null,
-              onTap: () => setState(() => _selectedGroupId = null),
+            KeyedSubtree(
+              key: _chipKeys[null] ??= GlobalKey(),
+              child: _groupChip(
+                label: 'ทั้งหมด',
+                count: filteredProducts.length,
+                icon: Icons.apps_rounded,
+                selected: _selectedGroupId == null,
+                onTap: () {
+                  setState(() => _selectedGroupId = null);
+                  _scrollChipIntoView(null);
+                },
+              ),
             ),
             ...relevantGroups.map((group) {
               final count = filteredProducts
                   .where((p) => p.groupId == group.groupId)
                   .length;
-              return _groupChip(
-                label: group.groupName,
-                count: count,
-                icon: _groupIcon(group.groupName),
-                selected: _selectedGroupId == group.groupId,
-                onTap: () => setState(() => _selectedGroupId = group.groupId),
+              return KeyedSubtree(
+                key: _chipKeys[group.groupId] ??= GlobalKey(),
+                child: _groupChip(
+                  label: group.groupName,
+                  count: count,
+                  icon: _groupIcon(group.groupName),
+                  selected: _selectedGroupId == group.groupId,
+                  onTap: () {
+                    setState(() => _selectedGroupId = group.groupId);
+                    _scrollChipIntoView(group.groupId);
+                  },
+                ),
               );
             }),
           ],

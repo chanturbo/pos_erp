@@ -1,20 +1,24 @@
-// ignore_for_file: avoid_print
 
 import 'dart:convert';
 import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 import 'package:drift/drift.dart' hide JsonKey;
 import '../../database/app_database.dart';
+import 'package:flutter/foundation.dart';
 
 class SupplierRoutes {
   final AppDatabase db;
 
   SupplierRoutes(this.db) {
-    print('🔧 SupplierRoutes initialized');
+    if (kDebugMode) {
+      debugPrint('🔧 SupplierRoutes initialized');
+    }
   }
 
   Router get router {
-    print('🔧 Building SupplierRoutes router...');
+    if (kDebugMode) {
+      debugPrint('🔧 Building SupplierRoutes router...');
+    }
     
     final router = Router();
 
@@ -24,12 +28,24 @@ class SupplierRoutes {
     router.put('/<id>', _updateSupplierHandler);
     router.delete('/<id>', _deleteSupplierHandler);
 
-    print('🔧 SupplierRoutes configured:');
-    print('   GET  / → /api/suppliers');
-    print('   GET  /<id> → /api/suppliers/:id');
-    print('   POST / → /api/suppliers');
-    print('   PUT  /<id> → /api/suppliers/:id');
-    print('   DELETE /<id> → /api/suppliers/:id');
+    if (kDebugMode) {
+      debugPrint('🔧 SupplierRoutes configured:');
+    }
+    if (kDebugMode) {
+      debugPrint('   GET  / → /api/suppliers');
+    }
+    if (kDebugMode) {
+      debugPrint('   GET  /<id> → /api/suppliers/:id');
+    }
+    if (kDebugMode) {
+      debugPrint('   POST / → /api/suppliers');
+    }
+    if (kDebugMode) {
+      debugPrint('   PUT  /<id> → /api/suppliers/:id');
+    }
+    if (kDebugMode) {
+      debugPrint('   DELETE /<id> → /api/suppliers/:id');
+    }
 
     return router;
   }
@@ -37,7 +53,9 @@ class SupplierRoutes {
   /// GET /
   Future<Response> _getSuppliersHandler(Request request) async {
     try {
-      print('📡 SupplierRoutes: GET /');
+      if (kDebugMode) {
+        debugPrint('📡 SupplierRoutes: GET /');
+      }
 
       final suppliers = await db.select(db.suppliers).get();
 
@@ -59,15 +77,21 @@ class SupplierRoutes {
             'updated_at': s.updatedAt.toIso8601String(),
           }).toList();
 
-      print('✅ SupplierRoutes: Found ${suppliers.length} suppliers');
+      if (kDebugMode) {
+        debugPrint('✅ SupplierRoutes: Found ${suppliers.length} suppliers');
+      }
 
       return Response.ok(
         jsonEncode({'success': true, 'data': data}),
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e, stack) {
-      print('❌ SupplierRoutes: GET / error: $e');
-      print('Stack trace: $stack');
+      if (kDebugMode) {
+        debugPrint('❌ SupplierRoutes: GET / error: $e');
+      }
+      if (kDebugMode) {
+        debugPrint('Stack trace: $stack');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': '$e'}),
         headers: {'Content-Type': 'application/json'},
@@ -78,7 +102,9 @@ class SupplierRoutes {
   /// GET /:id
   Future<Response> _getSupplierHandler(Request request, String id) async {
     try {
-      print('📡 SupplierRoutes: GET /$id');
+      if (kDebugMode) {
+        debugPrint('📡 SupplierRoutes: GET /$id');
+      }
 
       final supplier = await (db.select(db.suppliers)
             ..where((s) => s.supplierId.equals(id)))
@@ -114,7 +140,9 @@ class SupplierRoutes {
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ SupplierRoutes: GET /$id error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ SupplierRoutes: GET /$id error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': '$e'}),
         headers: {'Content-Type': 'application/json'},
@@ -125,7 +153,9 @@ class SupplierRoutes {
   /// POST /
   Future<Response> _createSupplierHandler(Request request) async {
     try {
-      print('📡 SupplierRoutes: POST /');
+      if (kDebugMode) {
+        debugPrint('📡 SupplierRoutes: POST /');
+      }
 
       final payload = await request.readAsString();
       final data = jsonDecode(payload) as Map<String, dynamic>;
@@ -150,7 +180,9 @@ class SupplierRoutes {
 
       await db.into(db.suppliers).insert(companion);
 
-      print('✅ SupplierRoutes: Created supplier: $supplierId');
+      if (kDebugMode) {
+        debugPrint('✅ SupplierRoutes: Created supplier: $supplierId');
+      }
 
       return Response.ok(
         jsonEncode({
@@ -161,7 +193,9 @@ class SupplierRoutes {
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ SupplierRoutes: POST / error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ SupplierRoutes: POST / error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': '$e'}),
         headers: {'Content-Type': 'application/json'},
@@ -172,7 +206,9 @@ class SupplierRoutes {
   /// PUT /:id
   Future<Response> _updateSupplierHandler(Request request, String id) async {
     try {
-      print('📡 SupplierRoutes: PUT /$id');
+      if (kDebugMode) {
+        debugPrint('📡 SupplierRoutes: PUT /$id');
+      }
 
       final payload = await request.readAsString();
       final data = jsonDecode(payload) as Map<String, dynamic>;
@@ -196,14 +232,18 @@ class SupplierRoutes {
       await (db.update(db.suppliers)..where((s) => s.supplierId.equals(id)))
           .write(companion);
 
-      print('✅ SupplierRoutes: Updated supplier: $id');
+      if (kDebugMode) {
+        debugPrint('✅ SupplierRoutes: Updated supplier: $id');
+      }
 
       return Response.ok(
         jsonEncode({'success': true, 'message': 'Supplier updated'}),
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ SupplierRoutes: PUT /$id error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ SupplierRoutes: PUT /$id error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': '$e'}),
         headers: {'Content-Type': 'application/json'},
@@ -214,19 +254,25 @@ class SupplierRoutes {
   /// DELETE /:id
   Future<Response> _deleteSupplierHandler(Request request, String id) async {
     try {
-      print('📡 SupplierRoutes: DELETE /$id');
+      if (kDebugMode) {
+        debugPrint('📡 SupplierRoutes: DELETE /$id');
+      }
 
       await (db.delete(db.suppliers)..where((s) => s.supplierId.equals(id)))
           .go();
 
-      print('✅ SupplierRoutes: Deleted supplier: $id');
+      if (kDebugMode) {
+        debugPrint('✅ SupplierRoutes: Deleted supplier: $id');
+      }
 
       return Response.ok(
         jsonEncode({'success': true, 'message': 'Supplier deleted'}),
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ SupplierRoutes: DELETE /$id error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ SupplierRoutes: DELETE /$id error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': '$e'}),
         headers: {'Content-Type': 'application/json'},

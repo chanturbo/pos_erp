@@ -1,4 +1,3 @@
-// ignore_for_file: avoid_print
 
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
@@ -7,6 +6,7 @@ import 'package:shelf_router/shelf_router.dart';
 import 'package:drift/drift.dart' hide JsonKey;
 import 'package:uuid/uuid.dart';
 import '../../database/app_database.dart';
+import 'package:flutter/foundation.dart';
 
 class TableRoutes {
   final AppDatabase db;
@@ -348,7 +348,9 @@ class TableRoutes {
         payload: {'guest_count': guestCount, 'opened_by': openedBy},
       );
 
-      print('✅ Opened table $id session=$sessionId guests=$guestCount');
+      if (kDebugMode) {
+        debugPrint('✅ Opened table $id session=$sessionId guests=$guestCount');
+      }
       TableRoutes.bumpVersion();
 
       return _ok({
@@ -432,7 +434,9 @@ class TableRoutes {
         payload: {'status': 'CLOSED'},
       );
 
-      print('✅ Closed table $id session=${session.sessionId}');
+      if (kDebugMode) {
+        debugPrint('✅ Closed table $id session=${session.sessionId}');
+      }
       TableRoutes.bumpVersion();
 
       return _ok({
@@ -2271,7 +2275,9 @@ class TableRoutes {
   }
 
   Response _err(dynamic e) {
-    print('❌ TableRoutes error: $e');
+    if (kDebugMode) {
+      debugPrint('❌ TableRoutes error: $e');
+    }
     return Response.internalServerError(
       body: jsonEncode({'success': false, 'message': e.toString()}),
       headers: {'content-type': 'application/json'},

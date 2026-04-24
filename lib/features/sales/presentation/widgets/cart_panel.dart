@@ -111,6 +111,11 @@ class _CartPanelState extends ConsumerState<CartPanel> {
 
     setState(() => _isSendingRestaurantOrder = true);
 
+    final products = ref.read(productListProvider).value ?? const [];
+    final productById = {
+      for (final product in products) product.productId: product,
+    };
+
     final orderData = {
       'status': 'OPEN',
       'customer_id': cartState.customerId,
@@ -149,6 +154,18 @@ class _CartPanelState extends ConsumerState<CartPanel> {
               'discount_percent': 0.0,
               'discount_amount': 0.0,
               'amount': item.amount,
+              'special_instructions': item.note,
+              'course_no': item.courseNo,
+              if (item.modifiers.isNotEmpty)
+                'modifiers': item.modifiers
+                    .map(
+                      (modifier) => {
+                        'modifier_id': modifier.modifierId,
+                        'modifier_name': modifier.modifierName,
+                        'price_adjustment': modifier.priceAdjustment,
+                      },
+                    )
+                    .toList(),
             },
           )
           .toList(),
@@ -213,18 +230,17 @@ class _CartPanelState extends ConsumerState<CartPanel> {
           tableName: restaurantContext.displayName,
           orderNo: orderNo ?? orderId,
           orderTime: DateFormat('HH:mm').format(DateTime.now()),
-          items: cartState.items
-              .map(
-                (item) => KitchenTicketItem(
-                  courseNo: 1,
-                  quantity: item.quantity.toDouble(),
-                  unit: item.unit,
-                  name: item.productName,
-                  specialInstructions: null,
-                  station: 'kitchen',
-                ),
-              )
-              .toList(),
+          items: cartState.items.map((item) {
+            final product = productById[item.productId];
+            return KitchenTicketItem(
+              courseNo: item.courseNo,
+              quantity: item.quantity.toDouble(),
+              unit: item.unit,
+              name: item.productName,
+              specialInstructions: item.note,
+              station: product?.prepStation ?? 'kitchen',
+            );
+          }).toList(),
         );
         ThermalPrintService.instance.printKitchenTicket(
           settings: printSettings,
@@ -1789,12 +1805,19 @@ class _CartSummary extends StatelessWidget {
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(Icons.payment, size: 18),
+                                Icon(
+                                  !canCheckout &&
+                                          isRestaurantFlow &&
+                                          !isKitchenSent
+                                      ? Icons.lock_outline_rounded
+                                      : Icons.payment,
+                                  size: 18,
+                                ),
                                 const SizedBox(width: 8),
                                 Text(
                                   !canCheckout
                                       ? (isRestaurantFlow && !isKitchenSent
-                                            ? 'ส่งเข้าครัวก่อน'
+                                            ? 'กรุณาส่งเข้าครัวก่อน'
                                             : 'ชำระเงิน')
                                       : (isRestaurantFlow
                                             ? 'ปิดบิล  ฿${cartState.total.toStringAsFixed(2)}'

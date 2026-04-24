@@ -1,4 +1,3 @@
-// ignore_for_file: avoid_print
 // offline_sync_service.dart — Week 7: Offline Mode & Background Sync
 
 import 'dart:async';
@@ -8,6 +7,7 @@ import 'package:flutter_riverpod/legacy.dart';
 import '../database/app_database.dart';
 import '../config/app_mode.dart';
 import '../../../../core/client/api_client.dart';
+import 'package:flutter/foundation.dart';
 
 /// OfflineSyncService
 /// ─────────────────────────────────────────────────────────────
@@ -83,7 +83,9 @@ class OfflineSyncService {
   /// เริ่ม auto sync ทุก 30 วินาที
   void startAutoSync() {
     if (AppModeConfig.isStandalone) {
-      print('ℹ️ OfflineSyncService: Standalone mode — auto sync disabled');
+      if (kDebugMode) {
+        debugPrint('ℹ️ OfflineSyncService: Standalone mode — auto sync disabled');
+      }
       return;
     }
     _autoSyncTimer?.cancel();
@@ -91,13 +93,17 @@ class OfflineSyncService {
       const Duration(seconds: _syncIntervalSeconds),
       (_) => _autoSyncTick(),
     );
-    print('🔄 OfflineSyncService: Auto sync started (every ${_syncIntervalSeconds}s)');
+    if (kDebugMode) {
+      debugPrint('🔄 OfflineSyncService: Auto sync started (every ${_syncIntervalSeconds}s)');
+    }
   }
 
   void stopAutoSync() {
     _autoSyncTimer?.cancel();
     _autoSyncTimer = null;
-    print('⏹ OfflineSyncService: Auto sync stopped');
+    if (kDebugMode) {
+      debugPrint('⏹ OfflineSyncService: Auto sync stopped');
+    }
   }
 
   void dispose() {
@@ -110,11 +116,15 @@ class OfflineSyncService {
   /// เรียกใช้จาก UI "Sync ตอนนี้"
   Future<bool> syncNow() async {
     if (AppModeConfig.isStandalone) {
-      print('ℹ️ Standalone mode — no sync required');
+      if (kDebugMode) {
+        debugPrint('ℹ️ Standalone mode — no sync required');
+      }
       return true;
     }
     if (_isSyncing) {
-      print('⚠️ Sync already in progress, skipping');
+      if (kDebugMode) {
+        debugPrint('⚠️ Sync already in progress, skipping');
+      }
       return false;
     }
     return _doSync();
@@ -129,7 +139,9 @@ class OfflineSyncService {
       await api.post('/api/sync/retry-failed', data: {});
       await syncNow();
     } catch (e) {
-      print('❌ retryFailed error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ retryFailed error: $e');
+      }
     }
   }
 
@@ -154,9 +166,13 @@ class OfflineSyncService {
         'operation': operation,
         'data': data,
       });
-      print('📝 Enqueued $operation on $tableName:$recordId');
+      if (kDebugMode) {
+        debugPrint('📝 Enqueued $operation on $tableName:$recordId');
+      }
     } catch (e) {
-      print('❌ Enqueue error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Enqueue error: $e');
+      }
     }
   }
 
@@ -166,7 +182,9 @@ class OfflineSyncService {
     if (_isSyncing) return;
     final online = await _checkOnline();
     if (!online) {
-      print('📴 Offline — skipping auto sync');
+      if (kDebugMode) {
+        debugPrint('📴 Offline — skipping auto sync');
+      }
       return;
     }
     await _doSync();
@@ -174,7 +192,9 @@ class OfflineSyncService {
 
   Future<bool> _doSync() async {
     _isSyncing = true;
-    print('🔄 OfflineSyncService: Starting sync...');
+    if (kDebugMode) {
+      debugPrint('🔄 OfflineSyncService: Starting sync...');
+    }
 
     try {
       final api = _ref.read(apiClientProvider);
@@ -186,7 +206,9 @@ class OfflineSyncService {
       if (pushRes.statusCode == 200) {
         final pushed = pushRes.data['data']?['pushed'] as int? ?? 0;
         if (pushed > 0) {
-          print('✅ Pushed $pushed items to master');
+          if (kDebugMode) {
+            debugPrint('✅ Pushed $pushed items to master');
+          }
         }
       }
 
@@ -205,22 +227,24 @@ class OfflineSyncService {
           if (acknowledgedQueueIds.isNotEmpty) {
             await _acknowledgePulledItems(acknowledgedQueueIds);
           }
-          print(
-            '📊 Sync batch: total=${applyResult.metrics.totalItems}, '
-            'applied=${applyResult.metrics.appliedItems}, '
-            'replayed=${applyResult.metrics.replayedItems}, '
-            'passes=${applyResult.metrics.passesUsed}, '
-            'pending=${applyResult.metrics.pendingItems}',
-          );
-          print('✅ Applied ${items.length} items from master');
+          if (kDebugMode) {
+            debugPrint( '📊 Sync batch: total=${applyResult.metrics.totalItems}, ' 'applied=${applyResult.metrics.appliedItems}, ' 'replayed=${applyResult.metrics.replayedItems}, ' 'passes=${applyResult.metrics.passesUsed}, ' 'pending=${applyResult.metrics.pendingItems}', );
+          }
+          if (kDebugMode) {
+            debugPrint('✅ Applied ${items.length} items from master');
+          }
         }
       }
 
-      print('✅ Sync completed successfully');
+      if (kDebugMode) {
+        debugPrint('✅ Sync completed successfully');
+      }
       _isSyncing = false;
       return true;
     } catch (e) {
-      print('❌ Sync failed: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Sync failed: $e');
+      }
       _isSyncing = false;
       return false;
     }
@@ -244,15 +268,15 @@ class OfflineSyncService {
 
       if (pass > 1) {
         replayedItems += pendingItems.length;
-        print(
-          '🔁 Replay pass $pass for ${pendingItems.length} pending sync items',
-        );
+        if (kDebugMode) {
+          debugPrint( '🔁 Replay pass $pass for ${pendingItems.length} pending sync items', );
+        }
       }
 
       for (final map in pendingItems) {
-        print(
-          '  📥 Apply: ${map['operation']} ${map['table_name']}:${map['record_id']}',
-        );
+        if (kDebugMode) {
+          debugPrint( '  📥 Apply: ${map['operation']} ${map['table_name']}:${map['record_id']}', );
+        }
         try {
           final applied = await _dispatchPulledItem(map);
           if (applied) {
@@ -267,9 +291,9 @@ class OfflineSyncService {
             retryQueue.add(map);
           }
         } catch (e) {
-          print(
-            '❌ Failed to apply ${map['table_name']}:${map['record_id']} - $e',
-          );
+          if (kDebugMode) {
+            debugPrint( '❌ Failed to apply ${map['table_name']}:${map['record_id']} - $e', );
+          }
           retryQueue.add(map);
         }
       }
@@ -279,9 +303,9 @@ class OfflineSyncService {
       }
 
       if (appliedThisPass == 0) {
-        print(
-          '⚠️ Replay stopped with ${retryQueue.length} unapplied sync items',
-        );
+        if (kDebugMode) {
+          debugPrint( '⚠️ Replay stopped with ${retryQueue.length} unapplied sync items', );
+        }
         pendingItems = retryQueue;
         break;
       }
@@ -326,7 +350,9 @@ class OfflineSyncService {
     final data = Map<String, dynamic>.from(item['data'] as Map? ?? const {});
 
     if (tableName == null || recordId == null) {
-      print('⚠️ Skip sync item with missing table_name/record_id: $item');
+      if (kDebugMode) {
+        debugPrint('⚠️ Skip sync item with missing table_name/record_id: $item');
+      }
       return false;
     }
 
@@ -454,7 +480,9 @@ class OfflineSyncService {
         await _applyActiveSession(operation, recordId, data);
         return true;
       default:
-        print('⚠️ Unsupported sync table: $tableName');
+        if (kDebugMode) {
+          debugPrint('⚠️ Unsupported sync table: $tableName');
+        }
         return false;
     }
   }
@@ -467,10 +495,14 @@ class OfflineSyncService {
         data: {'queue_ids': queueIds},
       );
       if (response.statusCode != 200) {
-        print('⚠️ Failed to acknowledge pulled items: ${response.statusCode}');
+        if (kDebugMode) {
+          debugPrint('⚠️ Failed to acknowledge pulled items: ${response.statusCode}');
+        }
       }
     } catch (e) {
-      print('⚠️ Acknowledge error: $e');
+      if (kDebugMode) {
+        debugPrint('⚠️ Acknowledge error: $e');
+      }
     }
   }
 
@@ -500,7 +532,9 @@ class OfflineSyncService {
             ),
           );
     } catch (e) {
-      print('⚠️ Failed to persist sync batch metrics: $e');
+      if (kDebugMode) {
+        debugPrint('⚠️ Failed to persist sync batch metrics: $e');
+      }
     }
   }
 
@@ -733,7 +767,9 @@ class OfflineSyncService {
     final modifierGroupId = keys.$2;
 
     if (productId == null || modifierGroupId == null) {
-      print('⚠️ Skip product_modifiers with incomplete key: $recordId');
+      if (kDebugMode) {
+        debugPrint('⚠️ Skip product_modifiers with incomplete key: $recordId');
+      }
       return false;
     }
 

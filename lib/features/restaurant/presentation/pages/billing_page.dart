@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -29,6 +28,7 @@ class BillingPage extends ConsumerStatefulWidget {
 class _BillingPageState extends ConsumerState<BillingPage> {
   final _scController = TextEditingController(text: '0');
   bool _applyingSC = false;
+  bool _checkedDefaultServiceCharge = false;
 
   @override
   void initState() {
@@ -36,9 +36,7 @@ class _BillingPageState extends ConsumerState<BillingPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final defaultRate = ref.read(settingsProvider).defaultServiceChargeRate;
       if (defaultRate > 0) {
-        _scController.text = defaultRate.toStringAsFixed(
-          defaultRate == defaultRate.truncateToDouble() ? 0 : 1,
-        );
+        _scController.text = _formatServiceChargeRate(defaultRate);
       }
       ref.read(billingContextProvider.notifier).state = widget.tableContext;
     });
@@ -117,6 +115,7 @@ class _BillingPageState extends ConsumerState<BillingPage> {
           if (bill == null || bill.isEmpty) {
             return const _EmptyBill();
           }
+          _maybeApplyDefaultServiceCharge(bill);
           return _BillBody(
             bill: bill,
             tableContext: ctx,
@@ -133,6 +132,49 @@ class _BillingPageState extends ConsumerState<BillingPage> {
         },
       ),
     );
+  }
+
+  void _maybeApplyDefaultServiceCharge(BillModel bill) {
+    if (_checkedDefaultServiceCharge) {
+      if (!_applyingSC) {
+        _scController.text = _formatServiceChargeRate(bill.serviceChargeRate);
+      }
+      return;
+    }
+
+    _checkedDefaultServiceCharge = true;
+    _scController.text = _formatServiceChargeRate(
+      bill.serviceChargeRate > 0
+          ? bill.serviceChargeRate
+          : ref.read(settingsProvider).defaultServiceChargeRate,
+    );
+
+    final defaultRate = ref.read(settingsProvider).defaultServiceChargeRate;
+    if (!widget.tableContext.hasTable || defaultRate <= 0) return;
+    if (bill.serviceChargeRate > 0 || bill.serviceChargeAmount > 0) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      setState(() => _applyingSC = true);
+      final ok = await ref
+          .read(billProvider.notifier)
+          .setServiceCharge(widget.tableContext.tableId, defaultRate);
+      if (!mounted) return;
+      setState(() => _applyingSC = false);
+      if (!ok) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('ไม่สามารถตั้ง service charge เริ่มต้นได้'),
+            backgroundColor: AppTheme.errorColor,
+          ),
+        );
+      }
+    });
+  }
+
+  String _formatServiceChargeRate(double rate) {
+    if (rate <= 0) return '0';
+    return rate.toStringAsFixed(rate == rate.truncateToDouble() ? 0 : 1);
   }
 
   Future<void> _fireCourse(int courseNo) async {
@@ -271,6 +313,7 @@ class _BillingPageState extends ConsumerState<BillingPage> {
     final ok = await ref
         .read(billProvider.notifier)
         .setServiceCharge(widget.tableContext.tableId, rate);
+    _checkedDefaultServiceCharge = true;
     setState(() => _applyingSC = false);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -297,7 +340,7 @@ class _BillingPageState extends ConsumerState<BillingPage> {
     if (!mounted) return;
     // If payment completed (context cleared by PaymentPage), close billing page
     if (ref.read(restaurantOrderContextProvider) == null) {
-      Navigator.of(context).pop();
+      Navigator.of(context).pop(true);
     }
   }
 
@@ -356,8 +399,7 @@ class _BillingPageState extends ConsumerState<BillingPage> {
     final shouldReuseCartCustomer =
         billingCustomerId == null || billingCustomerId.isEmpty;
     final preservedPriceLevel =
-        shouldReuseCartCustomer ||
-            billingCustomerId == currentCart.customerId
+        shouldReuseCartCustomer || billingCustomerId == currentCart.customerId
         ? currentCart.customerPriceLevel
         : 1;
     final items = bill.items
@@ -392,9 +434,7 @@ class _BillingPageState extends ConsumerState<BillingPage> {
           CartState(
             items: items,
             customerId:
-                billingCustomerId ??
-                currentCart.customerId ??
-                'WALK_IN',
+                billingCustomerId ?? currentCart.customerId ?? 'WALK_IN',
             customerName:
                 billingCustomerName ??
                 currentCart.customerName ??
@@ -424,7 +464,7 @@ class _BillingPageState extends ConsumerState<BillingPage> {
     if (!mounted) return;
     // If payment completed (context cleared by PaymentPage), close billing page
     if (ref.read(restaurantOrderContextProvider) == null) {
-      Navigator.of(context).pop();
+      Navigator.of(context).pop(true);
     }
   }
 
@@ -446,9 +486,7 @@ class _BillingPageState extends ConsumerState<BillingPage> {
           address: settings.address,
           phone: settings.phone,
           taxId: settings.taxId,
-          orderNo:
-              bill.orderNo ??
-              'PRE-${widget.tableContext.displayName}',
+          orderNo: bill.orderNo ?? 'PRE-${widget.tableContext.displayName}',
           orderDate: DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now()),
           customerName: widget.tableContext.isTakeaway
               ? widget.tableContext.displayName
@@ -527,52 +565,53 @@ class _BillBody extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             children: [
               // ── Held Courses (fire button) ─────────────────────────
-              if (canManageTable) () {
-                final heldByCourse = <int, List<BillItemModel>>{};
-                for (final item in bill.items) {
-                  if (item.isHeld) {
-                    (heldByCourse[item.courseNo] ??= []).add(item);
+              if (canManageTable)
+                () {
+                  final heldByCourse = <int, List<BillItemModel>>{};
+                  for (final item in bill.items) {
+                    if (item.isHeld) {
+                      (heldByCourse[item.courseNo] ??= []).add(item);
+                    }
                   }
-                }
-                if (heldByCourse.isEmpty) return const SizedBox.shrink();
-                final courses = heldByCourse.keys.toList()..sort();
-                return Column(
-                  children: [
-                    ...courses.map(
-                      (courseNo) => _SectionCard(
-                        title: 'Course $courseNo — รอ Fire',
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            ...heldByCourse[courseNo]!.map(
-                              (item) => _ItemRow(
-                                item: item,
-                                onVoid: () => onVoidItem(item),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            SizedBox(
-                              width: double.infinity,
-                              child: FilledButton.icon(
-                                onPressed: () => onFireCourse(courseNo),
-                                icon: const Icon(
-                                  Icons.local_fire_department,
-                                  size: 18,
-                                ),
-                                label: Text('Fire Course $courseNo'),
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: Colors.deepOrange,
+                  if (heldByCourse.isEmpty) return const SizedBox.shrink();
+                  final courses = heldByCourse.keys.toList()..sort();
+                  return Column(
+                    children: [
+                      ...courses.map(
+                        (courseNo) => _SectionCard(
+                          title: 'Course $courseNo — รอ Fire',
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              ...heldByCourse[courseNo]!.map(
+                                (item) => _ItemRow(
+                                  item: item,
+                                  onVoid: () => onVoidItem(item),
                                 ),
                               ),
-                            ),
-                          ],
+                              const SizedBox(height: 8),
+                              SizedBox(
+                                width: double.infinity,
+                                child: FilledButton.icon(
+                                  onPressed: () => onFireCourse(courseNo),
+                                  icon: const Icon(
+                                    Icons.local_fire_department,
+                                    size: 18,
+                                  ),
+                                  label: Text('Fire Course $courseNo'),
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: Colors.deepOrange,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-                );
-              }(),
+                      const SizedBox(height: 12),
+                    ],
+                  );
+                }(),
 
               // ── Items ──────────────────────────────────────────────────
               _SectionCard(

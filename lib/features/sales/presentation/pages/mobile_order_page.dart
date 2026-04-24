@@ -1096,8 +1096,11 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
 
     if (holdName == null || holdName.trim().isEmpty) return;
 
-    final isTakeaway = ref.read(restaurantOrderContextProvider)?.isTakeaway ?? false;
-    ref.read(cartProvider.notifier).hold(holdName.trim(), isTakeaway: isTakeaway);
+    final isTakeaway =
+        ref.read(restaurantOrderContextProvider)?.isTakeaway ?? false;
+    ref
+        .read(cartProvider.notifier)
+        .hold(holdName.trim(), isTakeaway: isTakeaway);
     if (!mounted) return;
     ScaffoldMessenger.of(
       context,
@@ -3201,7 +3204,7 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                             selectedBranch == null || selectedWarehouse == null
                                 ? Icons.settings_ethernet_rounded
                                 : isRestaurantFlow && !isKitchenSent
-                                ? Icons.kitchen_outlined
+                                ? Icons.lock_outline_rounded
                                 : Icons.payment_rounded,
                             size: 18,
                           ),
@@ -3209,7 +3212,7 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                             cartState.items.isEmpty
                                 ? 'ชำระเงิน'
                                 : isRestaurantFlow && !isKitchenSent
-                                ? 'ส่งเข้าครัวก่อน'
+                                ? 'กรุณาส่งเข้าครัวก่อน'
                                 : 'ชำระเงิน  ฿${cartState.total.toStringAsFixed(2)}',
                             style: const TextStyle(
                               fontSize: 15,

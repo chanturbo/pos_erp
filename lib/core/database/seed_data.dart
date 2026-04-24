@@ -1,14 +1,16 @@
-// ignore_for_file: avoid_print
 
 import 'package:drift/drift.dart';
 import 'app_database.dart';
+import 'package:flutter/foundation.dart';
 
 enum DemoMode { posOnly, restaurantOnly, both, none }
 
 class SeedData {
   /// Seed essential base data (always required — no demo products)
   static Future<void> seedEssential(AppDatabase db) async {
-    print('🌱 Seeding essential data...');
+    if (kDebugMode) {
+      debugPrint('🌱 Seeding essential data...');
+    }
     await seedCompanies(db);
     await seedBranches(db);
     await seedWarehouses(db);
@@ -17,15 +19,21 @@ class SeedData {
     await seedCustomerGroups(db);
     await seedCustomers(db);
     await seedSuppliers(db);
-    print('✅ Essential data seeded');
+    if (kDebugMode) {
+      debugPrint('✅ Essential data seeded');
+    }
   }
 
   /// Seed POS demo: product groups + products + initial stock
   static Future<void> seedPosDemo(AppDatabase db) async {
-    print('🌱 Seeding POS demo data...');
+    if (kDebugMode) {
+      debugPrint('🌱 Seeding POS demo data...');
+    }
     await seedProductGroups(db);
     await seedProducts(db);
-    print('✅ POS demo seeded');
+    if (kDebugMode) {
+      debugPrint('✅ POS demo seeded');
+    }
   }
 
   /// Seed demo data by mode
@@ -42,16 +50,22 @@ class SeedData {
       case DemoMode.none:
         break;
     }
-    print('✅ Seed by mode ($mode) completed');
+    if (kDebugMode) {
+      debugPrint('✅ Seed by mode ($mode) completed');
+    }
   }
 
   /// Seed All Data (backward-compatible — seeds everything)
   static Future<void> seedAll(AppDatabase db) async {
-    print('🌱 Starting seed data...');
+    if (kDebugMode) {
+      debugPrint('🌱 Starting seed data...');
+    }
     await seedEssential(db);
     await seedPosDemo(db);
     await seedRestaurantDemo(db);
-    print('✅ Seed data completed');
+    if (kDebugMode) {
+      debugPrint('✅ Seed data completed');
+    }
   }
 
   /// Seed Companies
@@ -141,7 +155,9 @@ class SeedData {
     for (final role in roles) {
       await db.into(db.roles).insert(role, mode: InsertMode.insertOrIgnore);
     }
-    print('   ✅ Roles seeded');
+    if (kDebugMode) {
+      debugPrint('   ✅ Roles seeded');
+    }
   }
 
   static Future<void> seedUsers(AppDatabase db) async {
@@ -174,10 +190,14 @@ class SeedData {
       try {
         await db.into(db.users).insert(user, mode: InsertMode.insertOrIgnore);
       } catch (e) {
-        print('⚠️ seedUsers error: $e');
+        if (kDebugMode) {
+          debugPrint('⚠️ seedUsers error: $e');
+        }
       }
     }
-    print('   ✅ Users seeded');
+    if (kDebugMode) {
+      debugPrint('   ✅ Users seeded');
+    }
   }
 
   /// Seed Customer Groups (ระดับราคา 1-5)
@@ -224,7 +244,9 @@ class SeedData {
         // Group exists
       }
     }
-    print('✅ Seeded customer groups (price levels 1-5)');
+    if (kDebugMode) {
+      debugPrint('✅ Seeded customer groups (price levels 1-5)');
+    }
   }
 
   /// Seed Customers
@@ -539,7 +561,9 @@ class SeedData {
 
   /// Seed Restaurant Demo Data
   static Future<void> seedRestaurantDemo(AppDatabase db) async {
-    print('🌱 Seeding restaurant demo...');
+    if (kDebugMode) {
+      debugPrint('🌱 Seeding restaurant demo...');
+    }
 
     final restaurantGroups = [
       ProductGroupsCompanion.insert(
@@ -804,16 +828,22 @@ class SeedData {
           .insert(stock, mode: InsertMode.insertOrIgnore);
     }
 
-    print('   ✅ Restaurant demo seeded');
+    if (kDebugMode) {
+      debugPrint('   ✅ Restaurant demo seeded');
+    }
   }
 
   /// Seed Suppliers
   static Future<void> seedSuppliers(AppDatabase db) async {
-    print('🌱 Seeding suppliers...');
+    if (kDebugMode) {
+      debugPrint('🌱 Seeding suppliers...');
+    }
 
     final existing = await db.select(db.suppliers).get();
     if (existing.isNotEmpty) {
-      print('   ⏭️ Suppliers already exist, skipping');
+      if (kDebugMode) {
+        debugPrint('   ⏭️ Suppliers already exist, skipping');
+      }
       return;
     }
 
@@ -865,13 +895,19 @@ class SeedData {
       try {
         await db.into(db.suppliers).insert(supplier);
         inserted++;
-        print('   ✅ Inserted: ${supplier.supplierId.value}');
+        if (kDebugMode) {
+          debugPrint('   ✅ Inserted: ${supplier.supplierId.value}');
+        }
       } catch (e) {
-        print('   ❌ Failed to insert ${supplier.supplierId.value}: $e');
+        if (kDebugMode) {
+          debugPrint('   ❌ Failed to insert ${supplier.supplierId.value}: $e');
+        }
       }
     }
 
     final count = await db.select(db.suppliers).get();
-    print('✅ Seeded $inserted suppliers (total in DB: ${count.length})');
+    if (kDebugMode) {
+      debugPrint('✅ Seeded $inserted suppliers (total in DB: ${count.length})');
+    }
   }
 }

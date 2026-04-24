@@ -266,7 +266,9 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
                                 ),
                                 Expanded(
                                   child: _TakeawayHoldsRow(
-                                    onResume: _isBusy ? null : _resumeTakeawayHold,
+                                    onResume: _isBusy
+                                        ? null
+                                        : _resumeTakeawayHold,
                                   ),
                                 ),
                               ],
@@ -274,45 +276,48 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
                             const SizedBox(height: 20),
                             // ── Zone sections ─────────────────────────────
                             ...byZone.entries.map((entry) {
-                            final zoneName =
-                                entry.value.first.zoneName ?? entry.key;
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _ZoneHeader(zoneName: zoneName),
-                                const SizedBox(height: 8),
-                                GridView.builder(
-                                  shrinkWrap: true,
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  gridDelegate:
-                                      const SliverGridDelegateWithMaxCrossAxisExtent(
-                                        maxCrossAxisExtent: 160,
-                                        mainAxisExtent: 150,
-                                        crossAxisSpacing: 10,
-                                        mainAxisSpacing: 10,
-                                      ),
-                                  itemCount: entry.value.length,
-                                  itemBuilder: (ctx, i) {
-                                    final table = entry.value[i];
-                                    return TableCard(
-                                      table: table,
-                                      onTap: table.isCleaning
-                                          ? null
-                                          : () =>
-                                                _handleTableTap(context, table),
-                                      onCleaningCompleted: table.isCleaning
-                                          ? () => _markTableCleaningCompleted(
-                                              context,
-                                              table,
-                                            )
-                                          : null,
-                                    );
-                                  },
-                                ),
-                                const SizedBox(height: 20),
-                              ],
-                            );
-                          }),
+                              final zoneName =
+                                  entry.value.first.zoneName ?? entry.key;
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _ZoneHeader(zoneName: zoneName),
+                                  const SizedBox(height: 8),
+                                  GridView.builder(
+                                    shrinkWrap: true,
+                                    physics:
+                                        const NeverScrollableScrollPhysics(),
+                                    gridDelegate:
+                                        const SliverGridDelegateWithMaxCrossAxisExtent(
+                                          maxCrossAxisExtent: 160,
+                                          mainAxisExtent: 150,
+                                          crossAxisSpacing: 10,
+                                          mainAxisSpacing: 10,
+                                        ),
+                                    itemCount: entry.value.length,
+                                    itemBuilder: (ctx, i) {
+                                      final table = entry.value[i];
+                                      return TableCard(
+                                        table: table,
+                                        onTap: table.isCleaning
+                                            ? null
+                                            : () => _handleTableTap(
+                                                context,
+                                                table,
+                                              ),
+                                        onCleaningCompleted: table.isCleaning
+                                            ? () => _markTableCleaningCompleted(
+                                                context,
+                                                table,
+                                              )
+                                            : null,
+                                      );
+                                    },
+                                  ),
+                                  const SizedBox(height: 20),
+                                ],
+                              );
+                            }),
                           ],
                         ),
                       );
@@ -714,7 +719,7 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
     nameCtrl.dispose();
   }
 
-  void _openBillingPage(DiningTableModel table) {
+  Future<void> _openBillingPage(DiningTableModel table) async {
     final ctx = RestaurantOrderContext(
       tableId: table.tableId,
       tableName: table.displayName,
@@ -722,10 +727,13 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
       branchId: ref.read(selectedBranchProvider)?.branchId ?? '',
       guestCount: table.activeGuestCount ?? 1,
     );
-    Navigator.push(
+    final didCompletePayment = await Navigator.push<bool>(
       context,
       MaterialPageRoute(builder: (_) => BillingPage(tableContext: ctx)),
     );
+    if (didCompletePayment != true || !mounted) return;
+    final branchId = ref.read(selectedBranchProvider)?.branchId;
+    await ref.read(tableListProvider.notifier).refresh(branchId: branchId);
   }
 
   Future<void> _startTakeawayOrder() async {
@@ -769,7 +777,11 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
   /// คืนชื่อที่ไม่ซ้ำกับ hold orders ที่มีอยู่แล้ว
   /// ถ้า "ซื้อกลับ 14:30" มีอยู่แล้ว → คืน "ซื้อกลับ 14:30 (2)", "(3)", ...
   String _uniqueHoldName(String base) {
-    final existing = ref.read(holdOrdersProvider).orders.map((o) => o.name).toSet();
+    final existing = ref
+        .read(holdOrdersProvider)
+        .orders
+        .map((o) => o.name)
+        .toSet();
     if (!existing.contains(base)) return base;
     int counter = 2;
     while (existing.contains('$base ($counter)')) {
@@ -790,12 +802,15 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
     if (hasPendingCart) {
       // Auto-hold current cart before recalling — prevents merging two customers' orders
       // Use the existing context to determine isTakeaway, not always true
-      final existingIsTakeaway = ref.read(restaurantOrderContextProvider)?.isTakeaway ?? false;
+      final existingIsTakeaway =
+          ref.read(restaurantOrderContextProvider)?.isTakeaway ?? false;
       final now = DateTime.now();
       final holdName = _uniqueHoldName(
         'ซื้อกลับ ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}',
       );
-      ref.read(cartProvider.notifier).hold(holdName, isTakeaway: existingIsTakeaway);
+      ref
+          .read(cartProvider.notifier)
+          .hold(holdName, isTakeaway: existingIsTakeaway);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -1325,7 +1340,11 @@ class _TakeawayActionCard extends ConsumerWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.takeout_dining, size: 36, color: Colors.orange.shade700),
+                  Icon(
+                    Icons.takeout_dining,
+                    size: 36,
+                    color: Colors.orange.shade700,
+                  ),
                   const SizedBox(height: 8),
                   Text(
                     'ซื้อกลับ',
@@ -1338,7 +1357,10 @@ class _TakeawayActionCard extends ConsumerWidget {
                   const SizedBox(height: 2),
                   Text(
                     'Take Away',
-                    style: TextStyle(fontSize: 11, color: Colors.orange.shade500),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.orange.shade500,
+                    ),
                   ),
                 ],
               ),
@@ -1348,7 +1370,10 @@ class _TakeawayActionCard extends ConsumerWidget {
                 top: 6,
                 right: 6,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.red.shade500,
                     borderRadius: BorderRadius.circular(999),
@@ -1376,7 +1401,12 @@ class _TakeawayHoldsRow extends ConsumerWidget {
   final void Function(int index)? onResume;
   const _TakeawayHoldsRow({this.onResume});
 
-  Future<void> _confirmDelete(BuildContext context, WidgetRef ref, int originalIndex, String name) async {
+  Future<void> _confirmDelete(
+    BuildContext context,
+    WidgetRef ref,
+    int originalIndex,
+    String name,
+  ) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -1448,7 +1478,11 @@ class _TakeawayHoldsRow extends ConsumerWidget {
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.pause_circle_outline_rounded, size: 14, color: Colors.orange.shade700),
+                          Icon(
+                            Icons.pause_circle_outline_rounded,
+                            size: 14,
+                            color: Colors.orange.shade700,
+                          ),
                           const SizedBox(width: 4),
                           Expanded(
                             child: Text(
@@ -1467,7 +1501,10 @@ class _TakeawayHoldsRow extends ConsumerWidget {
                       const SizedBox(height: 5),
                       Text(
                         '${cart.items.length} รายการ',
-                        style: TextStyle(fontSize: 11, color: Colors.orange.shade600),
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.orange.shade600,
+                        ),
                       ),
                       const SizedBox(height: 3),
                       Text(
@@ -1481,11 +1518,17 @@ class _TakeawayHoldsRow extends ConsumerWidget {
                       const SizedBox(height: 3),
                       Text(
                         DateFormat('HH:mm').format(order.timestamp),
-                        style: TextStyle(fontSize: 10, color: Colors.orange.shade400),
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.orange.shade400,
+                        ),
                       ),
                       const SizedBox(height: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.orange.shade600,
                           borderRadius: BorderRadius.circular(999),
@@ -1507,7 +1550,8 @@ class _TakeawayHoldsRow extends ConsumerWidget {
                   top: 4,
                   right: 14,
                   child: GestureDetector(
-                    onTap: () => _confirmDelete(context, ref, entry.key, order.name),
+                    onTap: () =>
+                        _confirmDelete(context, ref, entry.key, order.name),
                     child: Container(
                       width: 18,
                       height: 18,
@@ -1515,7 +1559,11 @@ class _TakeawayHoldsRow extends ConsumerWidget {
                         color: Colors.red.shade400,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.close, size: 12, color: Colors.white),
+                      child: const Icon(
+                        Icons.close,
+                        size: 12,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 ),

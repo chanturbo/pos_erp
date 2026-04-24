@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/busy_overlay.dart';
 import '../../data/models/reservation_model.dart';
@@ -27,6 +28,7 @@ class _ReservationsPageState extends ConsumerState<ReservationsPage> {
     final statusFilter = ref.watch(reservationStatusFilterProvider);
     final searchQuery = ref.watch(reservationSearchQueryProvider);
     final fmt = DateFormat('d MMM yyyy', 'th');
+    final reservations = reservationsAsync.asData?.value ?? const [];
 
     return Scaffold(
       backgroundColor: AppTheme.surfaceColor,
@@ -46,10 +48,11 @@ class _ReservationsPageState extends ConsumerState<ReservationsPage> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.extended(
         onPressed: _isBusy ? null : () => _openForm(context, ref),
         backgroundColor: AppTheme.primaryColor,
-        child: const Icon(Icons.add, color: Colors.white),
+        icon: const Icon(Icons.add, color: Colors.white),
+        label: const Text('เพิ่มการจอง', style: TextStyle(color: Colors.white)),
       ),
       body: Stack(
         children: [
@@ -57,9 +60,23 @@ class _ReservationsPageState extends ConsumerState<ReservationsPage> {
             absorbing: _isBusy,
             child: Column(
               children: [
-                _DateBar(date: date, fmt: fmt),
-                _SearchBar(searchQuery: searchQuery),
-                _StatusFilterBar(statusFilter: statusFilter),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  child: _ReservationSummaryPanel(
+                    date: date,
+                    fmt: fmt,
+                    reservations: reservations,
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  child: _ReservationFiltersPanel(
+                    date: date,
+                    fmt: fmt,
+                    searchQuery: searchQuery,
+                    statusFilter: statusFilter,
+                  ),
+                ),
                 Expanded(
                   child: reservationsAsync.when(
                     data: (list) => list.isEmpty
@@ -68,7 +85,7 @@ class _ReservationsPageState extends ConsumerState<ReservationsPage> {
                             padding: const EdgeInsets.all(16),
                             itemCount: list.length,
                             separatorBuilder: (context, index) =>
-                                const SizedBox(height: 8),
+                                const SizedBox(height: 12),
                             itemBuilder: (_, i) => _ReservationCard(
                               reservation: list[i],
                               onAction: (action) =>
@@ -77,7 +94,11 @@ class _ReservationsPageState extends ConsumerState<ReservationsPage> {
                           ),
                     loading: () =>
                         const Center(child: CircularProgressIndicator()),
-                    error: (e, _) => Center(child: Text('เกิดข้อผิดพลาด: $e')),
+                    error: (e, _) => _ErrorState(
+                      message: '$e',
+                      onRetry: () =>
+                          ref.read(reservationsProvider.notifier).refresh(),
+                    ),
                   ),
                 ),
               ],
@@ -240,8 +261,7 @@ class _ReservationsPageState extends ConsumerState<ReservationsPage> {
         builder: (ctx, setSt) => AlertDialog(
           title: Text('นำลูกค้า ${r.customerName} เข้านั่ง'),
           content: DropdownButtonFormField<String>(
-            // ignore: deprecated_member_use
-            value: selectedId,
+            initialValue: selectedId,
             decoration: const InputDecoration(
               labelText: 'เลือกโต๊ะ',
               border: OutlineInputBorder(),
@@ -295,9 +315,202 @@ class _ReservationsPageState extends ConsumerState<ReservationsPage> {
   }
 }
 
-class _SearchBar extends ConsumerStatefulWidget {
+class _ReservationSummaryPanel extends StatelessWidget {
+  const _ReservationSummaryPanel({
+    required this.date,
+    required this.fmt,
+    required this.reservations,
+  });
+
+  final DateTime date;
+  final DateFormat fmt;
+  final List<ReservationModel> reservations;
+
+  @override
+  Widget build(BuildContext context) {
+    final pending = reservations.where((r) => r.isPending).length;
+    final confirmed = reservations.where((r) => r.isConfirmed).length;
+    final seated = reservations.where((r) => r.isSeated).length;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.cardWhite,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.event_note,
+                  color: AppTheme.primaryColor,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'ภาพรวมการจอง',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.navyColor,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'รายการจองประจำวันที่ ${fmt.format(date)}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.subtextColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              _SummaryMetric(
+                label: 'รอยืนยัน',
+                value: '$pending',
+                icon: Icons.hourglass_top_rounded,
+                color: AppTheme.warningColor,
+                background: AppTheme.warningContainer,
+              ),
+              _SummaryMetric(
+                label: 'ยืนยันแล้ว',
+                value: '$confirmed',
+                icon: Icons.check_circle_outline,
+                color: AppTheme.primaryColor,
+                background: AppTheme.primaryContainer,
+              ),
+              _SummaryMetric(
+                label: 'เข้านั่งแล้ว',
+                value: '$seated',
+                icon: Icons.event_seat,
+                color: AppTheme.successColor,
+                background: AppTheme.successContainer,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SummaryMetric extends StatelessWidget {
+  const _SummaryMetric({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+    required this.background,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color color;
+  final Color background;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 180,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.subtextColor,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: color,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReservationFiltersPanel extends StatelessWidget {
+  const _ReservationFiltersPanel({
+    required this.date,
+    required this.fmt,
+    required this.searchQuery,
+    required this.statusFilter,
+  });
+
+  final DateTime date;
+  final DateFormat fmt;
   final String searchQuery;
+  final String? statusFilter;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+      decoration: BoxDecoration(
+        color: AppTheme.cardWhite,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.borderColor),
+      ),
+      child: Column(
+        children: [
+          _DateBar(date: date, fmt: fmt),
+          const SizedBox(height: 12),
+          _SearchBar(searchQuery: searchQuery),
+          const SizedBox(height: 12),
+          _StatusFilterBar(statusFilter: statusFilter),
+        ],
+      ),
+    );
+  }
+}
+
+class _SearchBar extends ConsumerStatefulWidget {
   const _SearchBar({required this.searchQuery});
+
+  final String searchQuery;
 
   @override
   ConsumerState<_SearchBar> createState() => _SearchBarState();
@@ -330,43 +543,36 @@ class _SearchBarState extends ConsumerState<_SearchBar> {
   }
 
   @override
-  Widget build(BuildContext context) => Container(
-    color: Colors.white,
-    padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
-    child: TextField(
-      controller: _controller,
-      onChanged: (value) =>
-          ref.read(reservationSearchQueryProvider.notifier).state = value,
-      decoration: InputDecoration(
-        hintText: 'ค้นหาชื่อลูกค้า หรือเบอร์โทร',
-        prefixIcon: const Icon(Icons.search),
-        suffixIcon: widget.searchQuery.isEmpty
-            ? null
-            : IconButton(
-                tooltip: 'ล้างคำค้นหา',
-                onPressed: () =>
-                    ref.read(reservationSearchQueryProvider.notifier).state =
-                        '',
-                icon: const Icon(Icons.close),
-              ),
-        isDense: true,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-      ),
+  Widget build(BuildContext context) => TextField(
+    controller: _controller,
+    onChanged: (value) =>
+        ref.read(reservationSearchQueryProvider.notifier).state = value,
+    decoration: InputDecoration(
+      hintText: 'ค้นหาชื่อลูกค้า หรือเบอร์โทร',
+      prefixIcon: const Icon(Icons.search),
+      suffixIcon: widget.searchQuery.isEmpty
+          ? null
+          : IconButton(
+              tooltip: 'ล้างคำค้นหา',
+              onPressed: () =>
+                  ref.read(reservationSearchQueryProvider.notifier).state = '',
+              icon: const Icon(Icons.close),
+            ),
+      isDense: true,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
     ),
   );
 }
 
-// ── Date Bar ──────────────────────────────────────────────────────────────────
-
 class _DateBar extends ConsumerWidget {
+  const _DateBar({required this.date, required this.fmt});
+
   final DateTime date;
   final DateFormat fmt;
-  const _DateBar({required this.date, required this.fmt});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) => Container(
-    color: Colors.white,
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+    padding: const EdgeInsets.symmetric(horizontal: 4),
     child: Row(
       children: [
         IconButton(
@@ -375,7 +581,8 @@ class _DateBar extends ConsumerWidget {
               date.subtract(const Duration(days: 1)),
         ),
         Expanded(
-          child: GestureDetector(
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
             onTap: () async {
               final picked = await showDatePicker(
                 context: context,
@@ -387,10 +594,33 @@ class _DateBar extends ConsumerWidget {
                 ref.read(reservationDateProvider.notifier).state = picked;
               }
             },
-            child: Text(
-              fmt.format(date),
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: AppTheme.headerBg,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.borderColor),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.calendar_today_outlined,
+                    size: 16,
+                    color: AppTheme.primaryColor,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    fmt.format(date),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.navyColor,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -404,11 +634,10 @@ class _DateBar extends ConsumerWidget {
   );
 }
 
-// ── Status Filter ─────────────────────────────────────────────────────────────
-
 class _StatusFilterBar extends ConsumerWidget {
-  final String? statusFilter;
   const _StatusFilterBar({required this.statusFilter});
+
+  final String? statusFilter;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -420,12 +649,10 @@ class _StatusFilterBar extends ConsumerWidget {
       ('CANCELLED', 'ยกเลิก'),
       ('NO_SHOW', 'ไม่มา'),
     ];
-    return Container(
-      height: 40,
-      color: Colors.white,
+    return SizedBox(
+      height: 42,
       child: ListView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
         children: filters
             .map(
               (f) => _FilterChip(
@@ -443,47 +670,49 @@ class _StatusFilterBar extends ConsumerWidget {
 }
 
 class _FilterChip extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
   const _FilterChip({
     required this.label,
     required this.selected,
     required this.onTap,
   });
 
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
   @override
   Widget build(BuildContext context) => GestureDetector(
     onTap: onTap,
     child: AnimatedContainer(
       duration: const Duration(milliseconds: 150),
-      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+      margin: const EdgeInsets.only(right: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: selected ? AppTheme.primaryColor : Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(20),
+        color: selected
+            ? AppTheme.primaryColor.withValues(alpha: 0.12)
+            : AppTheme.headerBg,
+        borderRadius: BorderRadius.circular(999),
         border: Border.all(
-          color: selected ? AppTheme.primaryColor : Colors.grey.shade300,
+          color: selected ? AppTheme.primaryColor : AppTheme.borderColor,
         ),
       ),
       child: Text(
         label,
         style: TextStyle(
           fontSize: 13,
-          color: selected ? Colors.white : Colors.black87,
-          fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+          color: selected ? AppTheme.primaryColor : AppTheme.navyColor,
+          fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
         ),
       ),
     ),
   );
 }
 
-// ── Reservation Card ──────────────────────────────────────────────────────────
-
 class _ReservationCard extends StatelessWidget {
+  const _ReservationCard({required this.reservation, required this.onAction});
+
   final ReservationModel reservation;
   final void Function(String action) onAction;
-  const _ReservationCard({required this.reservation, required this.onAction});
 
   @override
   Widget build(BuildContext context) {
@@ -491,116 +720,154 @@ class _ReservationCard extends StatelessWidget {
     final timeFmt = DateFormat('HH:mm');
     final statusInfo = _statusInfo(r.status);
 
-    return Card(
-      margin: EdgeInsets.zero,
-      elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.cardWhite,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.borderColor),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: statusInfo.$1.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              statusInfo.$2,
+                              style: TextStyle(
+                                color: statusInfo.$1,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          if (r.tableName != null || r.tableId != null)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppTheme.infoContainer,
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                r.tableName ?? r.tableId!,
+                                style: const TextStyle(
+                                  color: AppTheme.infoColor,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        r.customerName,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.navyColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
+                    horizontal: 12,
+                    vertical: 8,
                   ),
                   decoration: BoxDecoration(
-                    color: statusInfo.$1.withValues(alpha: 0.12),
+                    color: AppTheme.headerBg,
                     borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppTheme.borderColor),
                   ),
                   child: Text(
-                    statusInfo.$2,
-                    style: TextStyle(
-                      color: statusInfo.$1,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
+                    timeFmt.format(r.reservationTime),
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: AppTheme.navyColor,
                     ),
                   ),
                 ),
-                const Spacer(),
-                Text(
-                  timeFmt.format(r.reservationTime),
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
               ],
             ),
-            const SizedBox(height: 10),
-            Row(
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 14,
+              runSpacing: 8,
               children: [
-                const Icon(Icons.person, size: 16, color: Colors.grey),
-                const SizedBox(width: 6),
-                Text(
-                  r.customerName,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
+                _InfoChip(
+                  icon: Icons.group_outlined,
+                  label: '${r.partySize} คน',
+                ),
+                if (r.customerPhone != null && r.customerPhone!.isNotEmpty)
+                  _InfoChip(
+                    icon: Icons.phone_outlined,
+                    label: r.customerPhone!,
                   ),
-                ),
-                const SizedBox(width: 12),
-                const Icon(Icons.group, size: 16, color: Colors.grey),
-                const SizedBox(width: 4),
-                Text(
-                  '${r.partySize} คน',
-                  style: TextStyle(color: Colors.grey.shade600),
-                ),
+                if (r.tableName != null || r.tableId != null)
+                  _InfoChip(
+                    icon: Icons.table_restaurant_outlined,
+                    label: r.tableName ?? r.tableId!,
+                  ),
               ],
             ),
-            if (r.customerPhone != null) ...[
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  const Icon(Icons.phone, size: 14, color: Colors.grey),
-                  const SizedBox(width: 6),
-                  Text(
-                    r.customerPhone!,
-                    style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
-                  ),
-                ],
-              ),
-            ],
-            if (r.tableName != null || r.tableId != null) ...[
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  const Icon(
-                    Icons.table_restaurant,
-                    size: 14,
-                    color: Colors.grey,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    r.tableName ?? r.tableId!,
-                    style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
-                  ),
-                ],
-              ),
-            ],
             if (r.notes != null && r.notes!.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(Icons.note, size: 14, color: Colors.grey),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      r.notes!,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey.shade600,
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppTheme.warningContainer,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.sticky_note_2_outlined,
+                      size: 16,
+                      color: AppTheme.warningColor,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        r.notes!,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: AppTheme.navyColor,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
             _ActionButtons(reservation: r, onAction: onAction),
           ],
         ),
@@ -609,19 +876,40 @@ class _ReservationCard extends StatelessWidget {
   }
 
   (Color, String) _statusInfo(String status) => switch (status) {
-    'PENDING' => (Colors.orange, 'รอยืนยัน'),
+    'PENDING' => (AppTheme.warningColor, 'รอยืนยัน'),
     'CONFIRMED' => (AppTheme.primaryColor, 'ยืนยันแล้ว'),
     'SEATED' => (AppTheme.successColor, 'เข้านั่งแล้ว'),
     'CANCELLED' => (AppTheme.errorColor, 'ยกเลิก'),
-    'NO_SHOW' => (Colors.grey, 'ไม่มา'),
-    _ => (Colors.grey, status),
+    'NO_SHOW' => (AppTheme.subtextColor, 'ไม่มา'),
+    _ => (AppTheme.subtextColor, status),
   };
 }
 
+class _InfoChip extends StatelessWidget {
+  const _InfoChip({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Icon(icon, size: 16, color: AppTheme.subtextColor),
+      const SizedBox(width: 6),
+      Text(
+        label,
+        style: const TextStyle(fontSize: 13, color: AppTheme.subtextColor),
+      ),
+    ],
+  );
+}
+
 class _ActionButtons extends StatelessWidget {
+  const _ActionButtons({required this.reservation, required this.onAction});
+
   final ReservationModel reservation;
   final void Function(String) onAction;
-  const _ActionButtons({required this.reservation, required this.onAction});
 
   @override
   Widget build(BuildContext context) {
@@ -633,11 +921,12 @@ class _ActionButtons extends StatelessWidget {
             : r.isCancelled
             ? 'ยกเลิกการจอง'
             : 'ไม่มาตามนัด',
-        style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+        style: const TextStyle(color: AppTheme.subtextColor, fontSize: 13),
       );
     }
     return Wrap(
       spacing: 8,
+      runSpacing: 8,
       children: [
         OutlinedButton.icon(
           onPressed: () => onAction('edit'),
@@ -672,7 +961,7 @@ class _ActionButtons extends StatelessWidget {
         TextButton(
           onPressed: () => onAction('no_show'),
           style: TextButton.styleFrom(
-            foregroundColor: Colors.grey,
+            foregroundColor: AppTheme.subtextColor,
             visualDensity: VisualDensity.compact,
           ),
           child: const Text('ไม่มา'),
@@ -690,31 +979,100 @@ class _ActionButtons extends StatelessWidget {
   }
 }
 
-// ── Empty State ───────────────────────────────────────────────────────────────
-
 class _EmptyState extends StatelessWidget {
-  final VoidCallback onAdd;
   const _EmptyState({required this.onAdd});
+
+  final VoidCallback onAdd;
 
   @override
   Widget build(BuildContext context) => Center(
-    child: Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(Icons.event_seat, size: 64, color: Colors.grey.shade300),
-        const SizedBox(height: 16),
-        Text(
-          'ไม่มีการจองในวันนี้',
-          style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
-        ),
-        const SizedBox(height: 20),
-        FilledButton.icon(
-          onPressed: onAdd,
-          icon: const Icon(Icons.add),
-          label: const Text('เพิ่มการจอง'),
-          style: FilledButton.styleFrom(backgroundColor: AppTheme.primaryColor),
-        ),
-      ],
+    child: Container(
+      constraints: const BoxConstraints(maxWidth: 420),
+      margin: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: AppTheme.cardWhite,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.borderColor),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.event_seat, size: 64, color: Colors.grey.shade300),
+          const SizedBox(height: 16),
+          Text(
+            'ไม่มีการจองในวันนี้',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: Colors.grey.shade700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'เพิ่มการจองล่วงหน้าเพื่อให้ทีมหน้าร้านเตรียมโต๊ะได้ทัน',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 13, color: AppTheme.subtextColor),
+          ),
+          const SizedBox(height: 20),
+          FilledButton.icon(
+            onPressed: onAdd,
+            icon: const Icon(Icons.add),
+            label: const Text('เพิ่มการจอง'),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _ErrorState extends StatelessWidget {
+  const _ErrorState({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Container(
+      constraints: const BoxConstraints(maxWidth: 420),
+      margin: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: AppTheme.cardWhite,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.borderColor),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.error_outline, size: 52, color: AppTheme.errorColor),
+          const SizedBox(height: 12),
+          const Text(
+            'โหลดรายการจองไม่สำเร็จ',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.navyColor,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 13, color: AppTheme.subtextColor),
+          ),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh),
+            label: const Text('ลองใหม่'),
+          ),
+        ],
+      ),
     ),
   );
 }

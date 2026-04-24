@@ -1,4 +1,3 @@
-// ignore_for_file: avoid_print
 // ar_receipt_routes.dart
 // Day 39-40: AR Receipt Routes — รับเงินจากลูกค้า
 
@@ -7,6 +6,7 @@ import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 import 'package:drift/drift.dart' hide JsonKey;
 import '../../database/app_database.dart';
+import 'package:flutter/foundation.dart';
 
 class ArReceiptRoutes {
   final AppDatabase db;
@@ -53,27 +53,35 @@ class ArReceiptRoutes {
     await (db.update(db.customers)
           ..where((c) => c.customerId.equals(customerId)))
         .write(CustomersCompanion(currentBalance: Value(newBalance)));
-    print('💰 Customer $customerId balance: ${customer.currentBalance} → $newBalance (delta: $delta)');
+    if (kDebugMode) {
+      debugPrint('💰 Customer $customerId balance: ${customer.currentBalance} → $newBalance (delta: $delta)');
+    }
   }
 
   // ─── GET / — รายการใบเสร็จรับเงินทั้งหมด ─────────────────────────────
   Future<Response> _getReceiptsHandler(Request request) async {
     try {
-      print('📡 ArReceiptRoutes: GET /');
+      if (kDebugMode) {
+        debugPrint('📡 ArReceiptRoutes: GET /');
+      }
 
       final receipts = await (db.select(db.arReceipts)
             ..orderBy([(rec) => OrderingTerm.desc(rec.receiptDate)]))
           .get();
 
       final data = receipts.map(_receiptToMap).toList();
-      print('✅ ArReceiptRoutes: Found ${receipts.length} receipts');
+      if (kDebugMode) {
+        debugPrint('✅ ArReceiptRoutes: Found ${receipts.length} receipts');
+      }
 
       return Response.ok(
         jsonEncode({'success': true, 'data': data}),
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ ArReceiptRoutes: GET / error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ ArReceiptRoutes: GET / error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': '$e'}),
         headers: {'Content-Type': 'application/json'},
@@ -84,7 +92,9 @@ class ArReceiptRoutes {
   // ─── GET /:id — รายละเอียดใบเสร็จพร้อม Allocations ──────────────────
   Future<Response> _getReceiptHandler(Request request, String id) async {
     try {
-      print('📡 ArReceiptRoutes: GET /$id');
+      if (kDebugMode) {
+        debugPrint('📡 ArReceiptRoutes: GET /$id');
+      }
 
       final receipt = await (db.select(db.arReceipts)
             ..where((rec) => rec.receiptId.equals(id)))
@@ -130,7 +140,9 @@ class ArReceiptRoutes {
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ ArReceiptRoutes: GET /$id error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ ArReceiptRoutes: GET /$id error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': '$e'}),
         headers: {'Content-Type': 'application/json'},
@@ -141,7 +153,9 @@ class ArReceiptRoutes {
   // ─── POST / — สร้างใบเสร็จรับเงิน + จัดสรรกับใบแจ้งหนี้ ─────────────
   Future<Response> _createReceiptHandler(Request request) async {
     try {
-      print('📡 ArReceiptRoutes: POST /');
+      if (kDebugMode) {
+        debugPrint('📡 ArReceiptRoutes: POST /');
+      }
 
       final payload = await request.readAsString();
       final data = jsonDecode(payload) as Map<String, dynamic>;
@@ -242,11 +256,13 @@ class ArReceiptRoutes {
                           ),
                         );
                   } catch (e) {
-                    print('⚠️ Points transaction log failed (AR EARN): $e');
+                    if (kDebugMode) {
+                      debugPrint('⚠️ Points transaction log failed (AR EARN): $e');
+                    }
                   }
-                  print(
-                    '⭐ Points earned (AR paid): ${invoice.customerId} +$earnedPts',
-                  );
+                  if (kDebugMode) {
+                    debugPrint( '⭐ Points earned (AR paid): ${invoice.customerId} +$earnedPts', );
+                  }
                 }
               }
             }
@@ -259,7 +275,9 @@ class ArReceiptRoutes {
       final totalAmount = (data['total_amount'] as num).toDouble();
       await _updateCustomerBalance(customerId, -totalAmount);
 
-      print('✅ ArReceiptRoutes: Created receipt: $receiptId');
+      if (kDebugMode) {
+        debugPrint('✅ ArReceiptRoutes: Created receipt: $receiptId');
+      }
 
       return Response.ok(
         jsonEncode({
@@ -270,7 +288,9 @@ class ArReceiptRoutes {
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ ArReceiptRoutes: POST / error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ ArReceiptRoutes: POST / error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': '$e'}),
         headers: {'Content-Type': 'application/json'},
@@ -281,7 +301,9 @@ class ArReceiptRoutes {
   // ─── DELETE /:id — ลบใบเสร็จ + คืนยอดใบแจ้งหนี้ ─────────────────────
   Future<Response> _deleteReceiptHandler(Request request, String id) async {
     try {
-      print('📡 ArReceiptRoutes: DELETE /$id');
+      if (kDebugMode) {
+        debugPrint('📡 ArReceiptRoutes: DELETE /$id');
+      }
 
       final receipt = await (db.select(db.arReceipts)
             ..where((rec) => rec.receiptId.equals(id)))
@@ -337,14 +359,18 @@ class ArReceiptRoutes {
             ..where((rec) => rec.receiptId.equals(id)))
           .go();
 
-      print('✅ ArReceiptRoutes: Deleted receipt: $id');
+      if (kDebugMode) {
+        debugPrint('✅ ArReceiptRoutes: Deleted receipt: $id');
+      }
 
       return Response.ok(
         jsonEncode({'success': true, 'message': 'Receipt deleted'}),
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ ArReceiptRoutes: DELETE /$id error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ ArReceiptRoutes: DELETE /$id error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': '$e'}),
         headers: {'Content-Type': 'application/json'},
@@ -356,7 +382,9 @@ class ArReceiptRoutes {
   Future<Response> _getReceiptsByCustomerHandler(
       Request request, String customerId) async {
     try {
-      print('📡 ArReceiptRoutes: GET /customer/$customerId');
+      if (kDebugMode) {
+        debugPrint('📡 ArReceiptRoutes: GET /customer/$customerId');
+      }
 
       final receipts = await (db.select(db.arReceipts)
             ..where((rec) => rec.customerId.equals(customerId))
@@ -364,14 +392,18 @@ class ArReceiptRoutes {
           .get();
 
       final data = receipts.map(_receiptToMap).toList();
-      print('✅ ArReceiptRoutes: Found ${receipts.length} receipts');
+      if (kDebugMode) {
+        debugPrint('✅ ArReceiptRoutes: Found ${receipts.length} receipts');
+      }
 
       return Response.ok(
         jsonEncode({'success': true, 'data': data}),
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ ArReceiptRoutes: GET /customer/$customerId error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ ArReceiptRoutes: GET /customer/$customerId error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': '$e'}),
         headers: {'Content-Type': 'application/json'},

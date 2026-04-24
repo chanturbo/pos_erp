@@ -1,9 +1,9 @@
-// ignore_for_file: avoid_print
 import 'dart:convert';
 import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 import 'package:drift/drift.dart' hide JsonKey;
 import '../../database/app_database.dart';
+import 'package:flutter/foundation.dart';
 
 class ApPaymentRoutes {
   final AppDatabase db;
@@ -24,7 +24,9 @@ class ApPaymentRoutes {
   /// GET / - รายการจ่ายเงินทั้งหมด
   Future<Response> _getPaymentsHandler(Request request) async {
     try {
-      print('📡 ApPaymentRoutes: GET /');
+      if (kDebugMode) {
+        debugPrint('📡 ApPaymentRoutes: GET /');
+      }
 
       final payments = await db.select(db.apPayments).get();
 
@@ -45,14 +47,18 @@ class ApPaymentRoutes {
             'created_at': pay.createdAt.toIso8601String(),
           }).toList();
 
-      print('✅ ApPaymentRoutes: Found ${payments.length} payments');
+      if (kDebugMode) {
+        debugPrint('✅ ApPaymentRoutes: Found ${payments.length} payments');
+      }
 
       return Response.ok(
         jsonEncode({'success': true, 'data': data}),
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ ApPaymentRoutes: GET / error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ ApPaymentRoutes: GET / error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': '$e'}),
         headers: {'Content-Type': 'application/json'},
@@ -63,7 +69,9 @@ class ApPaymentRoutes {
   /// GET /:id - รายละเอียดการจ่ายเงินพร้อม Allocations
   Future<Response> _getPaymentHandler(Request request, String id) async {
     try {
-      print('📡 ApPaymentRoutes: GET /$id');
+      if (kDebugMode) {
+        debugPrint('📡 ApPaymentRoutes: GET /$id');
+      }
 
       final payment = await (db.select(db.apPayments)
             ..where((pay) => pay.paymentId.equals(id)))
@@ -110,7 +118,9 @@ class ApPaymentRoutes {
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ ApPaymentRoutes: GET /$id error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ ApPaymentRoutes: GET /$id error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': '$e'}),
         headers: {'Content-Type': 'application/json'},
@@ -121,7 +131,9 @@ class ApPaymentRoutes {
   /// POST / - สร้างการจ่ายเงิน
   Future<Response> _createPaymentHandler(Request request) async {
     try {
-      print('📡 ApPaymentRoutes: POST /');
+      if (kDebugMode) {
+        debugPrint('📡 ApPaymentRoutes: POST /');
+      }
 
       final payload = await request.readAsString();
       final data = jsonDecode(payload) as Map<String, dynamic>;
@@ -203,7 +215,9 @@ class ApPaymentRoutes {
         ));
       }
 
-      print('✅ ApPaymentRoutes: Created payment: $paymentId');
+      if (kDebugMode) {
+        debugPrint('✅ ApPaymentRoutes: Created payment: $paymentId');
+      }
 
       return Response.ok(
         jsonEncode({
@@ -214,7 +228,9 @@ class ApPaymentRoutes {
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ ApPaymentRoutes: POST / error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ ApPaymentRoutes: POST / error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': '$e'}),
         headers: {'Content-Type': 'application/json'},
@@ -225,7 +241,9 @@ class ApPaymentRoutes {
   /// DELETE /:id - ลบการจ่ายเงิน
   Future<Response> _deletePaymentHandler(Request request, String id) async {
     try {
-      print('📡 ApPaymentRoutes: DELETE /$id');
+      if (kDebugMode) {
+        debugPrint('📡 ApPaymentRoutes: DELETE /$id');
+      }
 
       // ลบ Allocations ก่อน
       await (db.delete(db.apPaymentAllocations)
@@ -236,14 +254,18 @@ class ApPaymentRoutes {
       await (db.delete(db.apPayments)..where((pay) => pay.paymentId.equals(id)))
           .go();
 
-      print('✅ ApPaymentRoutes: Deleted payment: $id');
+      if (kDebugMode) {
+        debugPrint('✅ ApPaymentRoutes: Deleted payment: $id');
+      }
 
       return Response.ok(
         jsonEncode({'success': true, 'message': 'Payment deleted'}),
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ ApPaymentRoutes: DELETE /$id error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ ApPaymentRoutes: DELETE /$id error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': '$e'}),
         headers: {'Content-Type': 'application/json'},

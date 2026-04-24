@@ -1,9 +1,9 @@
-// ignore_for_file: avoid_print
 
 import 'package:drift/drift.dart';
 import '../database/app_database.dart';
 import '../utils/crypto_utils.dart';
 import '../utils/jwt_utils.dart';
+import 'package:flutter/foundation.dart';
 
 class AuthService {
   final AppDatabase db;
@@ -57,7 +57,9 @@ class AuthService {
       );
       
     } catch (e) {
-      print('Login error: $e');
+      if (kDebugMode) {
+        debugPrint('Login error: $e');
+      }
       return null;
     }
   }
@@ -70,7 +72,9 @@ class AuthService {
             ..where((t) => t.token.equals(token)))
           .go();
     } catch (e) {
-      print('Logout error: $e');
+      if (kDebugMode) {
+        debugPrint('Logout error: $e');
+      }
     }
   }
   
@@ -91,7 +95,9 @@ class AuthService {
       
       return user;
     } catch (e) {
-      print('Verify token error: $e');
+      if (kDebugMode) {
+        debugPrint('Verify token error: $e');
+      }
       return null;
     }
   }
@@ -107,7 +113,9 @@ class AuthService {
         ),
       );
     } catch (e) {
-      print('Create session error: $e');
+      if (kDebugMode) {
+        debugPrint('Create session error: $e');
+      }
     }
   }
 }

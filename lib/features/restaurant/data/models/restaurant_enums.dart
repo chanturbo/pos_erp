@@ -64,7 +64,7 @@ enum ServiceType {
       case ServiceType.takeaway:
         return 'ซื้อกลับบ้าน';
       case ServiceType.delivery:
-        return 'ส่งถึงบ้าน';
+        return 'อื่นๆ';
     }
   }
 }

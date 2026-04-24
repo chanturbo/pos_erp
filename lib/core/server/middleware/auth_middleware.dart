@@ -1,9 +1,9 @@
-// ignore_for_file: avoid_print
 
 import 'dart:convert';
 import 'package:shelf/shelf.dart';
 import '../../database/app_database.dart';
 import '../../services/auth_service.dart';
+import 'package:flutter/foundation.dart';
 
 // ─────────────────────────────────────────────────────────────────
 // Role constants — ตรงกับ roles ใน seed_data.dart
@@ -133,7 +133,9 @@ Middleware authMiddleware(AppDatabase db) {
         // ✅ inject User เข้า context → route handlers ใช้ getAuthUser()
         return handler(request.change(context: {'user': user}));
       } catch (e) {
-        print('❌ Auth middleware error: $e');
+        if (kDebugMode) {
+          debugPrint('❌ Auth middleware error: $e');
+        }
         return Response(
           401,
           body: jsonEncode({'success': false, 'message': 'Unauthorized — ไม่สามารถยืนยันตัวตนได้'}),

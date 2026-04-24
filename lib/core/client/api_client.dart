@@ -1,8 +1,8 @@
-// ignore_for_file: avoid_print
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../config/app_config.dart';
+import 'package:flutter/foundation.dart';
 
 class ApiClient {
   final Dio _dio;
@@ -24,24 +24,30 @@ class ApiClient {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) {
-          print('📡 ${options.method} ${options.uri.path}');
+          if (kDebugMode) {
+            debugPrint('📡 ${options.method} ${options.uri.path}');
+          }
           return handler.next(options);
         },
         onResponse: (response, handler) {
-          print(
-            '✅ Response [${response.statusCode}]: ${response.requestOptions.uri.path}',
-          );
+          if (kDebugMode) {
+            debugPrint( '✅ Response [${response.statusCode}]: ${response.requestOptions.uri.path}', );
+          }
           return handler.next(response);
         },
         onError: (error, handler) {
           final statusCode = error.response?.statusCode;
-          print('❌ Error [$statusCode]: ${error.message}');
+          if (kDebugMode) {
+            debugPrint('❌ Error [$statusCode]: ${error.message}');
+          }
           final path = error.requestOptions.path;
 
           // ✅ 401 — token หมดอายุ / ไม่มี token
           // resolve แทน throw ไม่ให้ app crash
           if (statusCode == 401 && path != '/api/auth/login') {
-            print('🔒 401 Unauthorized — token may be expired or missing');
+            if (kDebugMode) {
+              debugPrint('🔒 401 Unauthorized — token may be expired or missing');
+            }
             onUnauthorized?.call();
             return handler.resolve(
               Response(
@@ -64,7 +70,9 @@ class ApiClient {
     final resolved = AppConfig.resolveApiBaseUrl();
     if (_dio.options.baseUrl != resolved) {
       _dio.options.baseUrl = resolved;
-      print('🌐 API Base URL switched to $resolved');
+      if (kDebugMode) {
+        debugPrint('🌐 API Base URL switched to $resolved');
+      }
     }
   }
 
@@ -73,10 +81,14 @@ class ApiClient {
     _token = token;
     if (token != null) {
       _dio.options.headers['Authorization'] = 'Bearer $token';
-      print('🔑 Token set');
+      if (kDebugMode) {
+        debugPrint('🔑 Token set');
+      }
     } else {
       _dio.options.headers.remove('Authorization');
-      print('🔓 Token removed');
+      if (kDebugMode) {
+        debugPrint('🔓 Token removed');
+      }
     }
   }
 
@@ -93,7 +105,9 @@ class ApiClient {
       final response = await _dio.get(path, queryParameters: queryParameters);
       return response;
     } on DioException catch (e) {
-      print('❌ GET Error: ${e.message}');
+      if (kDebugMode) {
+        debugPrint('❌ GET Error: ${e.message}');
+      }
       rethrow;
     }
   }
@@ -105,7 +119,9 @@ class ApiClient {
       final response = await _dio.post(path, data: data);
       return response;
     } on DioException catch (e) {
-      print('❌ POST Error: ${e.message}');
+      if (kDebugMode) {
+        debugPrint('❌ POST Error: ${e.message}');
+      }
       rethrow;
     }
   }
@@ -117,7 +133,9 @@ class ApiClient {
       final response = await _dio.put(path, data: data);
       return response;
     } on DioException catch (e) {
-      print('❌ PUT Error: ${e.message}');
+      if (kDebugMode) {
+        debugPrint('❌ PUT Error: ${e.message}');
+      }
       rethrow;
     }
   }
@@ -135,7 +153,9 @@ class ApiClient {
       );
       return response;
     } on DioException catch (e) {
-      print('❌ DELETE Error: ${e.message}');
+      if (kDebugMode) {
+        debugPrint('❌ DELETE Error: ${e.message}');
+      }
       rethrow;
     }
   }
@@ -148,6 +168,8 @@ class ApiClient {
 /// API Client Provider - ใช้ที่เดียวทั้งโปรเจค
 final apiClientProvider = Provider<ApiClient>((ref) {
   final client = ApiClient();
-  print('🌐 API Base URL: ${client.baseUrl}');
+  if (kDebugMode) {
+    debugPrint('🌐 API Base URL: ${client.baseUrl}');
+  }
   return client;
 });

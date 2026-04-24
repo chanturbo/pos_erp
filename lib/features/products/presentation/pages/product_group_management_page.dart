@@ -724,6 +724,7 @@ class _ProductGroupFormSheetState
   late String _selectedColor;
   late String _selectedIcon;
   bool _showInPos = true;
+  int _displayOrder = 0;
   bool _isSaving = false;
 
   @override
@@ -738,6 +739,7 @@ class _ProductGroupFormSheetState
     _selectedColor = widget.group?.mobileColor ?? widget.colorOptions.first.hex;
     _selectedIcon = widget.group?.mobileIcon ?? widget.iconOptions.first.key;
     _showInPos = widget.group?.showInPos ?? true;
+    _displayOrder = widget.group?.displayOrder ?? 0;
   }
 
   @override
@@ -757,6 +759,7 @@ class _ProductGroupFormSheetState
       'mobile_color': _selectedColor,
       'mobile_icon': _selectedIcon,
       'show_in_pos': _showInPos,
+      'display_order': _displayOrder,
     };
 
     final repo = ref.read(productGroupRepositoryProvider);
@@ -921,6 +924,56 @@ class _ProductGroupFormSheetState
                   ],
                 ),
                 const SizedBox(height: 18),
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'ลำดับการแสดง (POS)',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: _displayOrder > 0
+                          ? () => setState(() => _displayOrder--)
+                          : null,
+                      icon: const Icon(Icons.remove_circle_outline),
+                      tooltip: 'ลดลำดับ',
+                    ),
+                    Container(
+                      width: 44,
+                      alignment: Alignment.center,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade300),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '$_displayOrder',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => setState(() => _displayOrder++),
+                      icon: const Icon(Icons.add_circle_outline),
+                      tooltip: 'เพิ่มลำดับ',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'ตัวเลขน้อยกว่า = แสดงก่อน (0 = ลำดับแรก)',
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                ),
+                const SizedBox(height: 12),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   title: const Text(

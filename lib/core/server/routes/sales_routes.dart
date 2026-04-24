@@ -1,4 +1,3 @@
-// ignore_for_file: avoid_print
 
 import 'dart:convert';
 import 'package:shelf/shelf.dart';
@@ -8,6 +7,7 @@ import 'package:uuid/uuid.dart';
 import '../../database/app_database.dart';
 import '../middleware/auth_middleware.dart';
 import '../../utils/input_validators.dart';
+import 'package:flutter/foundation.dart';
 
 class SalesRoutes {
   final AppDatabase db;
@@ -31,11 +31,15 @@ class SalesRoutes {
   /// GET /api/sales - รายการขายทั้งหมด
   Future<Response> _getSalesOrdersHandler(Request request) async {
     try {
-      print('📡 GET /api/sales');
+      if (kDebugMode) {
+        debugPrint('📡 GET /api/sales');
+      }
 
       final orders = await db.select(db.salesOrders).get();
 
-      print('✅ Found ${orders.length} orders');
+      if (kDebugMode) {
+        debugPrint('✅ Found ${orders.length} orders');
+      }
 
       return Response.ok(
         jsonEncode({
@@ -64,7 +68,9 @@ class SalesRoutes {
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ GET /api/sales error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ GET /api/sales error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': 'เกิดข้อผิดพลาด: $e'}),
       );
@@ -74,7 +80,9 @@ class SalesRoutes {
   /// GET /api/sales/:id - ดึงใบขาย 1 รายการ
   Future<Response> _getSalesOrderHandler(Request request, String id) async {
     try {
-      print('📡 GET /api/sales/$id');
+      if (kDebugMode) {
+        debugPrint('📡 GET /api/sales/$id');
+      }
 
       final order = await (db.select(
         db.salesOrders,
@@ -207,7 +215,9 @@ class SalesRoutes {
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ GET /api/sales/$id error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ GET /api/sales/$id error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': 'เกิดข้อผิดพลาด: $e'}),
       );
@@ -288,7 +298,9 @@ class SalesRoutes {
       final branchId =
           authUser.branchId ?? data['branch_id'] as String? ?? 'BR001';
 
-      print('🆔 Generated order: $orderNo (user: $userId)');
+      if (kDebugMode) {
+        debugPrint('🆔 Generated order: $orderNo (user: $userId)');
+      }
 
       // ─────────────────────────────────────────────────────────────
       // CRITICAL FIX: stock check อยู่ภายใน transaction เดียวกับ insert
@@ -299,7 +311,9 @@ class SalesRoutes {
       // ใหม่: BEGIN → check → insert → COMMIT (atomic)
       //   → ถ้า stock ไม่พอ throw → transaction rollback ทันที
       // ─────────────────────────────────────────────────────────────
-      print('💾 Starting transaction...');
+      if (kDebugMode) {
+        debugPrint('💾 Starting transaction...');
+      }
 
       // กำหนดสถานะ order: 'OPEN' = จองสต๊อก, 'COMPLETED' = ตัดสต๊อกทันที (POS)
       final orderStatus = data['status'] as String? ?? 'COMPLETED';
@@ -340,9 +354,9 @@ class SalesRoutes {
               productId,
               warehouseId,
             );
-            print(
-              '📊 Available stock $productId: $availableStock (need: $quantity)',
-            );
+            if (kDebugMode) {
+              debugPrint( '📊 Available stock $productId: $availableStock (need: $quantity)', );
+            }
 
             if (availableStock < quantity) {
               throw _ValidationException(
@@ -406,7 +420,9 @@ class SalesRoutes {
                 status: Value(orderStatus),
               ),
             );
-        print('✅ Order inserted: $orderNo (status: $orderStatus)');
+        if (kDebugMode) {
+          debugPrint('✅ Order inserted: $orderNo (status: $orderStatus)');
+        }
 
         // --- Insert Items ---
         for (var i = 0; i < items.length; i++) {
@@ -486,7 +502,9 @@ class SalesRoutes {
             if (isOpenOrder) {
               // OPEN: จองสต๊อก (ยังไม่ตัด)
               await _reserveStock(warehouseId, productId, quantity);
-              print('🔒 Reserved: $productId +$quantity');
+              if (kDebugMode) {
+                debugPrint('🔒 Reserved: $productId +$quantity');
+              }
             } else {
               // COMPLETED: ตัดสต๊อกทันที (POS flow เดิม)
               final movementNo = 'SM-$datePart-$ts-$lineNo';
@@ -508,9 +526,9 @@ class SalesRoutes {
                     ),
                   );
               await _upsertStockBalance(warehouseId, productId, -quantity, 0);
-              print(
-                '✅ Stock movement: $movementNo (-$quantity @ cost $avgCost)',
-              );
+              if (kDebugMode) {
+                debugPrint( '✅ Stock movement: $movementNo (-$quantity @ cost $avgCost)', );
+              }
             }
           }
         }
@@ -578,15 +596,17 @@ class SalesRoutes {
                     ),
                   );
               await _upsertStockBalance(warehouseId, productId, -quantity, 0);
-              print(
-                '✅ Free item stock movement: $movementNo (-$quantity @ cost $freeAvgCost)',
-              );
+              if (kDebugMode) {
+                debugPrint( '✅ Free item stock movement: $movementNo (-$quantity @ cost $freeAvgCost)', );
+              }
             }
           }
         }
       });
 
-      print('✅ Transaction committed: $orderNo');
+      if (kDebugMode) {
+        debugPrint('✅ Transaction committed: $orderNo');
+      }
 
       if (isOpenOrder && tableId != null && tableId.trim().isNotEmpty) {
         await (db.update(
@@ -629,7 +649,9 @@ class SalesRoutes {
                   ), // BUY_X_GET_Y ไม่มีตัวเลขส่วนลด
                 ),
               );
-          print('✅ Promotion $promoId usage incremented');
+          if (kDebugMode) {
+            debugPrint('✅ Promotion $promoId usage incremented');
+          }
         }
       }
 
@@ -667,9 +689,13 @@ class SalesRoutes {
                     ),
                   );
             } catch (e) {
-              print('⚠️ Points transaction log failed (REDEEM): $e');
+              if (kDebugMode) {
+                debugPrint('⚠️ Points transaction log failed (REDEEM): $e');
+              }
             }
-            print('🔻 Points redeemed: $customerId -$pointsUsed');
+            if (kDebugMode) {
+              debugPrint('🔻 Points redeemed: $customerId -$pointsUsed');
+            }
           }
 
           // ── บวกแต้มที่ได้รับ (เฉพาะลูกค้าที่มี memberNo และไม่ใช่การขายเชื่อ) ──
@@ -696,9 +722,13 @@ class SalesRoutes {
                       ),
                     );
               } catch (e) {
-                print('⚠️ Points transaction log failed (EARN): $e');
+                if (kDebugMode) {
+                  debugPrint('⚠️ Points transaction log failed (EARN): $e');
+                }
               }
-              print('⭐ Points earned: $customerId +$earnedPoints');
+              if (kDebugMode) {
+                debugPrint('⭐ Points earned: $customerId +$earnedPoints');
+              }
             }
           }
 
@@ -712,7 +742,9 @@ class SalesRoutes {
                 updatedAt: Value(DateTime.now()),
               ),
             );
-            print('✅ Points balance: $customerId → $currentPoints pts');
+            if (kDebugMode) {
+              debugPrint('✅ Points balance: $customerId → $currentPoints pts');
+            }
           }
         }
       }
@@ -738,8 +770,12 @@ class SalesRoutes {
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e, stack) {
-      print('❌ POST /api/sales error: $e');
-      print('Stack trace: $stack');
+      if (kDebugMode) {
+        debugPrint('❌ POST /api/sales error: $e');
+      }
+      if (kDebugMode) {
+        debugPrint('Stack trace: $stack');
+      }
       return Response.internalServerError(
         body: jsonEncode({
           'success': false,
@@ -865,9 +901,9 @@ class SalesRoutes {
                 -item.quantity,
                 0,
               );
-              print(
-                '✅ Complete: ${item.productId} -${item.quantity} @ cost $avgCost, released reserve',
-              );
+              if (kDebugMode) {
+                debugPrint( '✅ Complete: ${item.productId} -${item.quantity} @ cost $avgCost, released reserve', );
+              }
             }
           }
 
@@ -930,7 +966,9 @@ class SalesRoutes {
         }
       });
 
-      print('✅ SalesRoutes: Orders ${targetOrderIds.join(",")} completed');
+      if (kDebugMode) {
+        debugPrint('✅ SalesRoutes: Orders ${targetOrderIds.join(",")} completed');
+      }
 
       return Response.ok(
         jsonEncode({
@@ -952,7 +990,9 @@ class SalesRoutes {
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ POST /api/sales/$id/complete error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ POST /api/sales/$id/complete error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': 'เกิดข้อผิดพลาดภายใน'}),
       );
@@ -973,12 +1013,12 @@ class SalesRoutes {
         );
       }
 
-      if (order.status != 'OPEN') {
+      if (order.status != 'OPEN' && order.status != 'COMPLETED') {
         return Response(
           400,
           body: jsonEncode({
             'success': false,
-            'message': 'ยกเลิกได้เฉพาะ order ที่อยู่ในสถานะ OPEN เท่านั้น',
+            'message': 'ยกเลิกได้เฉพาะ order ที่อยู่ในสถานะ OPEN หรือ COMPLETED เท่านั้น',
           }),
           headers: {'Content-Type': 'application/json'},
         );
@@ -988,8 +1028,10 @@ class SalesRoutes {
         db.salesOrderItems,
       )..where((t) => t.orderId.equals(id))).get();
 
+      final now = DateTime.now();
+      final ts = now.millisecondsSinceEpoch;
+
       await db.transaction(() async {
-        // คืนการจองสต๊อกทุกรายการ
         for (final item in items) {
           final product =
               await (db.select(db.products)
@@ -997,12 +1039,37 @@ class SalesRoutes {
                   .getSingleOrNull();
 
           if (product != null && product.isStockControl) {
-            await _releaseReservation(
-              order.warehouseId,
-              item.productId,
-              item.quantity,
-            );
-            print('🔓 Released reserve: ${item.productId} -${item.quantity}');
+            if (order.status == 'OPEN') {
+              // คืนการจองสต๊อก (reserved_qty)
+              await _releaseReservation(
+                order.warehouseId,
+                item.productId,
+                item.quantity,
+              );
+            } else {
+              // COMPLETED: คืนสต๊อกที่ตัดออกไปแล้ว
+              await _upsertStockBalance(
+                order.warehouseId,
+                item.productId,
+                item.quantity, // บวกกลับ
+                0,
+              );
+              // บันทึก movement ย้อนกลับ
+              await db.into(db.stockMovements).insert(
+                StockMovementsCompanion(
+                  movementId: Value('CANCEL_${item.itemId}_$ts'),
+                  movementNo: Value('CANCEL-${order.orderNo}'),
+                  movementDate: Value(now),
+                  movementType: const Value('SALE_CANCEL'),
+                  productId: Value(item.productId),
+                  warehouseId: Value(order.warehouseId),
+                  quantity: Value(item.quantity),
+                  unitCost: const Value(0),
+                  referenceNo: Value(order.orderNo),
+                  remark: const Value('ยกเลิกการขาย'),
+                ),
+              );
+            }
           }
         }
 
@@ -1023,8 +1090,6 @@ class SalesRoutes {
         }
       });
 
-      print('✅ SalesRoutes: Order $id cancelled, reservations released');
-
       return Response.ok(
         jsonEncode({
           'success': true,
@@ -1033,7 +1098,9 @@ class SalesRoutes {
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ POST /api/sales/$id/cancel error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ POST /api/sales/$id/cancel error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': 'เกิดข้อผิดพลาดภายใน'}),
       );
@@ -1229,7 +1296,9 @@ class SalesRoutes {
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ PUT /api/sales/$id error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ PUT /api/sales/$id error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({
           'success': false,
@@ -1257,7 +1326,9 @@ class SalesRoutes {
         );
       });
     } catch (e) {
-      print('❌ DELETE /api/sales/$id error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ DELETE /api/sales/$id error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({
           'success': false,

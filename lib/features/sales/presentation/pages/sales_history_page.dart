@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -9,6 +8,7 @@ import 'sales_history_pdf_report.dart';
 import 'package:pos_erp/shared/theme/app_theme.dart';
 import 'package:pos_erp/shared/pdf/pdf_report_button.dart';
 import 'package:pos_erp/shared/utils/responsive_utils.dart';
+import 'package:pos_erp/shared/widgets/app_dialogs.dart';
 import 'package:pos_erp/shared/widgets/pagination_bar.dart';
 import 'package:pos_erp/shared/widgets/mobile_home_button.dart';
 import 'package:pos_erp/features/settings/presentation/pages/settings_page.dart';
@@ -45,9 +45,9 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
   int _currentPage = 1;
 
   // ── Column widths [วันที่, เลขที่, ลูกค้า, ชำระ, ยอด, สถานะ, จัดการ]
-  final List<double> _colWidths = [140, 130, 180, 100, 118, 96, 70];
-  static const List<double> _colMinW = [110, 100, 120, 80, 100, 88, 70];
-  static const List<double> _colMaxW = [200, 200, 320, 140, 170, 120, 70];
+  final List<double> _colWidths = [140, 130, 180, 100, 118, 96, 110];
+  static const List<double> _colMinW = [110, 100, 120, 80, 100, 88, 110];
+  static const List<double> _colMaxW = [200, 200, 320, 140, 170, 120, 110];
   final _hScroll = ScrollController();
   final _fmt = NumberFormat('#,##0.00');
   final _dateFmt = DateFormat('dd/MM/yyyy HH:mm');
@@ -419,7 +419,7 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                                             100,
                                             110,
                                             100,
-                                            70,
+                                            110,
                                           ]);
                                         }),
                                       ),
@@ -447,6 +447,9 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                                                       ),
                                                 ),
                                               ),
+                                              onCancel: pageItems[i].status != 'CANCELLED'
+                                                  ? () => _confirmCancelOrder(pageItems[i])
+                                                  : null,
                                             );
                                           },
                                         ),
@@ -492,6 +495,47 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Future<void> _confirmCancelOrder(SalesOrderModel order) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AppDialog(
+        title: buildAppDialogTitle(
+          context,
+          title: 'ยืนยันยกเลิกออเดอร์',
+          icon: Icons.cancel_outlined,
+          iconColor: AppTheme.errorColor,
+        ),
+        content: Text(
+          'ต้องการยกเลิกออเดอร์ ${order.orderNo} ใช่หรือไม่?\n'
+          'ระบบจะคืนสต๊อกสินค้าทั้งหมดในออเดอร์นี้',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('ปิด'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(backgroundColor: AppTheme.errorColor),
+            child: const Text('ยกเลิกออเดอร์'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final (ok, msg) = await ref
+        .read(salesHistoryProvider.notifier)
+        .cancelOrder(order.orderId);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: ok ? AppTheme.successColor : AppTheme.errorColor,
       ),
     );
   }
@@ -1156,6 +1200,7 @@ class _SalesOrderRow extends StatefulWidget {
   final DateFormat dateFmt;
   final NumberFormat fmt;
   final VoidCallback onTap;
+  final VoidCallback? onCancel;
 
   const _SalesOrderRow({
     required this.order,
@@ -1163,6 +1208,7 @@ class _SalesOrderRow extends StatefulWidget {
     required this.dateFmt,
     required this.fmt,
     required this.onTap,
+    this.onCancel,
   });
 
   @override
@@ -1273,7 +1319,9 @@ class _SalesOrderRowState extends State<_SalesOrderRow> {
                         : Text(
                             o.tableId != null ? 'Walk-in (โต๊ะ)' : 'Walk-in',
                             style: const TextStyle(
-                                fontSize: 12, color: AppTheme.textSub),
+                              fontSize: 12,
+                              color: AppTheme.textSub,
+                            ),
                           ),
                     if (o.serviceType != null) ...[
                       const SizedBox(height: 3),
@@ -1321,33 +1369,62 @@ class _SalesOrderRowState extends State<_SalesOrderRow> {
                 child: Center(child: _StatusBadge(status: o.status)),
               ),
 
-              // ── ดูรายละเอียด ───────────────────────────────────
+              // ── จัดการ (ดูรายละเอียด / ยกเลิก) ────────────────
               SizedBox(
                 width: w[6],
-                child: Center(
-                  child: Tooltip(
-                    message: 'ดูรายละเอียด',
-                    waitDuration: const Duration(milliseconds: 600),
-                    child: InkWell(
-                      onTap: widget.onTap,
-                      borderRadius: BorderRadius.circular(6),
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: AppTheme.primary.withValues(alpha: 0.08),
-                          border: Border.all(
-                            color: AppTheme.primary.withValues(alpha: 0.18),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Tooltip(
+                      message: 'ดูรายละเอียด',
+                      waitDuration: const Duration(milliseconds: 600),
+                      child: InkWell(
+                        onTap: widget.onTap,
+                        borderRadius: BorderRadius.circular(6),
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primary.withValues(alpha: 0.08),
+                            border: Border.all(
+                              color: AppTheme.primary.withValues(alpha: 0.18),
+                            ),
+                            borderRadius: BorderRadius.circular(6),
                           ),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: const Icon(
-                          Icons.open_in_new,
-                          size: 15,
-                          color: AppTheme.primary,
+                          child: const Icon(
+                            Icons.open_in_new,
+                            size: 15,
+                            color: AppTheme.primary,
+                          ),
                         ),
                       ),
                     ),
-                  ),
+                    if (!isCancelled && widget.onCancel != null) ...[
+                      const SizedBox(width: 6),
+                      Tooltip(
+                        message: 'ยกเลิกออเดอร์',
+                        waitDuration: const Duration(milliseconds: 600),
+                        child: InkWell(
+                          onTap: widget.onCancel,
+                          borderRadius: BorderRadius.circular(6),
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: AppTheme.error.withValues(alpha: 0.08),
+                              border: Border.all(
+                                color: AppTheme.error.withValues(alpha: 0.18),
+                              ),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Icon(
+                              Icons.cancel_outlined,
+                              size: 15,
+                              color: AppTheme.error,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ],
@@ -1444,9 +1521,13 @@ class _ServiceTypeBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (label, color, icon) = switch (serviceType.toUpperCase()) {
-      'DINE_IN' => ('ทานที่ร้าน', const Color(0xFF6A1B9A), Icons.table_restaurant),
+      'DINE_IN' => (
+        'ทานที่ร้าน',
+        const Color(0xFF6A1B9A),
+        Icons.table_restaurant,
+      ),
       'TAKEAWAY' => ('ซื้อกลับ', AppTheme.warning, Icons.takeout_dining),
-      'DELIVERY' => ('ส่งถึงบ้าน', AppTheme.info, Icons.delivery_dining),
+      'DELIVERY' => ('อื่นๆ', AppTheme.textSub, Icons.storefront_outlined),
       _ => (serviceType, AppTheme.textSub, Icons.storefront_outlined),
     };
     return Container(

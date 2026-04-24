@@ -1,4 +1,3 @@
-// ignore_for_file: avoid_print
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -64,14 +63,18 @@ iQIDAQAB
           message: Uint8List.fromList(payloadBytes),
           signature: Uint8List.fromList(signatureBytes),
         )) {
-          print('[License] RSA signature invalid');
+          if (kDebugMode) {
+            debugPrint('[License] RSA signature invalid');
+          }
           return null;
         }
       }
 
       return _parseAndValidate(payloadBytes, deviceId);
     } catch (e) {
-      print('[License] verify error: $e');
+      if (kDebugMode) {
+        debugPrint('[License] verify error: $e');
+      }
       return null;
     }
   }
@@ -86,7 +89,9 @@ iQIDAQAB
         ..init(false, PublicKeyParameter<RSAPublicKey>(publicKey));
       return signer.verifySignature(message, RSASignature(signature));
     } catch (e) {
-      print('[License] RSA verify error: $e');
+      if (kDebugMode) {
+        debugPrint('[License] RSA verify error: $e');
+      }
       return false;
     }
   }
@@ -129,7 +134,9 @@ iQIDAQAB
     // ตรวจ device_id — "ANY" ใช้ได้ใน debug mode เท่านั้น
     if (payload.deviceId != deviceId) {
       if (kDebugMode && payload.deviceId == 'ANY') return payload;
-      print('[License] device_id mismatch: ${payload.deviceId} vs $deviceId');
+      if (kDebugMode) {
+        debugPrint('[License] device_id mismatch: ${payload.deviceId} vs $deviceId');
+      }
       return null;
     }
 

@@ -1,4 +1,3 @@
-// ignore_for_file: avoid_print
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -6,6 +5,7 @@ import 'license_key_verifier.dart';
 import 'license_local_service.dart';
 import 'license_models.dart';
 import 'time_guard_service.dart';
+import 'package:flutter/foundation.dart';
 
 final licenseServiceProvider =
     AsyncNotifierProvider<LicenseService, LicenseStatus>(LicenseService.new);
@@ -37,7 +37,9 @@ class LicenseService extends AsyncNotifier<LicenseStatus> {
     }
 
     await prefs.setString(keyLicenseSavedKey, key.trim());
-    print('[License] Activated for ${payload.email}, expires ${payload.expireDate}');
+    if (kDebugMode) {
+      debugPrint('[License] Activated for ${payload.email}, expires ${payload.expireDate}');
+    }
     ref.invalidateSelf();
     return null;
   }

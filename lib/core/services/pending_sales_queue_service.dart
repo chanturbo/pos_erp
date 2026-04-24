@@ -1,4 +1,3 @@
-// ignore_for_file: avoid_print
 
 import 'dart:async';
 import 'dart:convert';
@@ -8,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../client/api_client.dart';
+import 'package:flutter/foundation.dart';
 
 class PendingSalesQueueService {
   static const _prefsKey = 'pending_sales_orders';
@@ -42,7 +42,9 @@ class PendingSalesQueueService {
       'payload': payload,
     });
     await _saveItems(items);
-    print('🧾 Queued offline sale (${items.length} pending)');
+    if (kDebugMode) {
+      debugPrint('🧾 Queued offline sale (${items.length} pending)');
+    }
   }
 
   Future<int> replayPendingOrders(ApiClient apiClient) async {
@@ -93,7 +95,9 @@ class PendingSalesQueueService {
 
       await _saveItems(remaining);
       if (replayed > 0) {
-        print('✅ Replayed $replayed queued sale(s)');
+        if (kDebugMode) {
+          debugPrint('✅ Replayed $replayed queued sale(s)');
+        }
       }
       return replayed;
     } finally {
@@ -129,7 +133,9 @@ class PendingSalesQueueService {
           },
         );
       } catch (e) {
-        print('⚠️ Could not mark queued coupon $coupon as used: $e');
+        if (kDebugMode) {
+          debugPrint('⚠️ Could not mark queued coupon $coupon as used: $e');
+        }
       }
     }
   }
@@ -145,7 +151,9 @@ class PendingSalesQueueService {
           .map((item) => Map<String, dynamic>.from(item as Map))
           .toList();
     } catch (e) {
-      print('❌ Pending queue decode error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Pending queue decode error: $e');
+      }
       return [];
     }
   }

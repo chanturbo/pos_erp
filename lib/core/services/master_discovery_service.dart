@@ -1,4 +1,3 @@
-// ignore_for_file: avoid_print
 
 import 'dart:async';
 import 'dart:convert';
@@ -6,6 +5,7 @@ import 'dart:io';
 
 import '../config/app_config.dart';
 import '../config/app_mode.dart';
+import 'package:flutter/foundation.dart';
 
 class DiscoveredMaster {
   final String name;
@@ -115,7 +115,9 @@ class MasterDiscoveryService {
         (_) => _pruneStale(),
       );
     } catch (e) {
-      print('❌ MasterDiscovery listener error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ MasterDiscovery listener error: $e');
+      }
     }
   }
 
@@ -148,7 +150,9 @@ class MasterDiscoveryService {
       );
       _broadcaster!.broadcastEnabled = true;
     } catch (e) {
-      print('❌ MasterDiscovery broadcaster error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ MasterDiscovery broadcaster error: $e');
+      }
     }
   }
 
@@ -172,7 +176,9 @@ class MasterDiscoveryService {
         discoveryPort,
       );
     } catch (e) {
-      print('❌ MasterDiscovery broadcast error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ MasterDiscovery broadcast error: $e');
+      }
     }
   }
 

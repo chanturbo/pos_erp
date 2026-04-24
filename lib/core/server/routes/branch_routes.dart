@@ -1,4 +1,3 @@
-// ignore_for_file: avoid_print
 // branch_routes.dart — Week 7: Branch & Warehouse API
 
 import 'dart:convert';
@@ -6,6 +5,7 @@ import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 import 'package:drift/drift.dart' hide JsonKey;
 import '../../database/app_database.dart';
+import 'package:flutter/foundation.dart';
 
 class BranchRoutes {
   final AppDatabase db;
@@ -143,7 +143,9 @@ class BranchRoutes {
             branchId: Value(branchId),
           ));
 
-      print('✅ BranchRoutes: Created branch $branchId');
+      if (kDebugMode) {
+        debugPrint('✅ BranchRoutes: Created branch $branchId');
+      }
       return _okMsg({'branch_id': branchId}, 'Branch created');
     } catch (e) {
       return _err(e);

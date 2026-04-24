@@ -1,9 +1,9 @@
-// ignore_for_file: avoid_print
 import 'dart:convert';
 import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 import 'package:drift/drift.dart' hide JsonKey;
 import '../../database/app_database.dart';
+import 'package:flutter/foundation.dart';
 
 class ApInvoiceRoutes {
   final AppDatabase db;
@@ -26,7 +26,9 @@ class ApInvoiceRoutes {
   /// GET / - รายการใบแจ้งหนี้ทั้งหมด
   Future<Response> _getInvoicesHandler(Request request) async {
     try {
-      print('📡 ApInvoiceRoutes: GET /');
+      if (kDebugMode) {
+        debugPrint('📡 ApInvoiceRoutes: GET /');
+      }
 
       final invoices = await db.select(db.apInvoices).get();
 
@@ -47,14 +49,18 @@ class ApInvoiceRoutes {
             'updated_at': inv.updatedAt.toIso8601String(),
           }).toList();
 
-      print('✅ ApInvoiceRoutes: Found ${invoices.length} invoices');
+      if (kDebugMode) {
+        debugPrint('✅ ApInvoiceRoutes: Found ${invoices.length} invoices');
+      }
 
       return Response.ok(
         jsonEncode({'success': true, 'data': data}),
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ ApInvoiceRoutes: GET / error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ ApInvoiceRoutes: GET / error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': '$e'}),
         headers: {'Content-Type': 'application/json'},
@@ -65,7 +71,9 @@ class ApInvoiceRoutes {
   /// GET /:id - รายละเอียดใบแจ้งหนี้พร้อมรายการสินค้า
   Future<Response> _getInvoiceHandler(Request request, String id) async {
     try {
-      print('📡 ApInvoiceRoutes: GET /$id');
+      if (kDebugMode) {
+        debugPrint('📡 ApInvoiceRoutes: GET /$id');
+      }
 
       final invoice = await (db.select(db.apInvoices)
             ..where((inv) => inv.invoiceId.equals(id)))
@@ -119,7 +127,9 @@ class ApInvoiceRoutes {
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ ApInvoiceRoutes: GET /$id error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ ApInvoiceRoutes: GET /$id error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': '$e'}),
         headers: {'Content-Type': 'application/json'},
@@ -130,7 +140,9 @@ class ApInvoiceRoutes {
   /// POST / - สร้างใบแจ้งหนี้
   Future<Response> _createInvoiceHandler(Request request) async {
     try {
-      print('📡 ApInvoiceRoutes: POST /');
+      if (kDebugMode) {
+        debugPrint('📡 ApInvoiceRoutes: POST /');
+      }
 
       final payload = await request.readAsString();
       final data = jsonDecode(payload) as Map<String, dynamic>;
@@ -194,7 +206,9 @@ class ApInvoiceRoutes {
         ));
       }
 
-      print('✅ ApInvoiceRoutes: Created invoice: $invoiceId');
+      if (kDebugMode) {
+        debugPrint('✅ ApInvoiceRoutes: Created invoice: $invoiceId');
+      }
 
       return Response.ok(
         jsonEncode({
@@ -205,7 +219,9 @@ class ApInvoiceRoutes {
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ ApInvoiceRoutes: POST / error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ ApInvoiceRoutes: POST / error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': '$e'}),
         headers: {'Content-Type': 'application/json'},
@@ -216,7 +232,9 @@ class ApInvoiceRoutes {
   /// PUT /:id - แก้ไขใบแจ้งหนี้
   Future<Response> _updateInvoiceHandler(Request request, String id) async {
     try {
-      print('📡 ApInvoiceRoutes: PUT /$id');
+      if (kDebugMode) {
+        debugPrint('📡 ApInvoiceRoutes: PUT /$id');
+      }
 
       final payload = await request.readAsString();
       final data = jsonDecode(payload) as Map<String, dynamic>;
@@ -238,14 +256,18 @@ class ApInvoiceRoutes {
       await (db.update(db.apInvoices)..where((inv) => inv.invoiceId.equals(id)))
           .write(companion);
 
-      print('✅ ApInvoiceRoutes: Updated invoice: $id');
+      if (kDebugMode) {
+        debugPrint('✅ ApInvoiceRoutes: Updated invoice: $id');
+      }
 
       return Response.ok(
         jsonEncode({'success': true, 'message': 'Invoice updated'}),
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ ApInvoiceRoutes: PUT /$id error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ ApInvoiceRoutes: PUT /$id error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': '$e'}),
         headers: {'Content-Type': 'application/json'},
@@ -256,7 +278,9 @@ class ApInvoiceRoutes {
   /// DELETE /:id - ลบใบแจ้งหนี้
   Future<Response> _deleteInvoiceHandler(Request request, String id) async {
     try {
-      print('📡 ApInvoiceRoutes: DELETE /$id');
+      if (kDebugMode) {
+        debugPrint('📡 ApInvoiceRoutes: DELETE /$id');
+      }
 
       // ลบรายการสินค้าก่อน
       await (db.delete(db.apInvoiceItems)
@@ -267,14 +291,18 @@ class ApInvoiceRoutes {
       await (db.delete(db.apInvoices)..where((inv) => inv.invoiceId.equals(id)))
           .go();
 
-      print('✅ ApInvoiceRoutes: Deleted invoice: $id');
+      if (kDebugMode) {
+        debugPrint('✅ ApInvoiceRoutes: Deleted invoice: $id');
+      }
 
       return Response.ok(
         jsonEncode({'success': true, 'message': 'Invoice deleted'}),
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ ApInvoiceRoutes: DELETE /$id error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ ApInvoiceRoutes: DELETE /$id error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': '$e'}),
         headers: {'Content-Type': 'application/json'},
@@ -286,7 +314,9 @@ class ApInvoiceRoutes {
   Future<Response> _getInvoicesBySupplierHandler(
       Request request, String supplierId) async {
     try {
-      print('📡 ApInvoiceRoutes: GET /supplier/$supplierId');
+      if (kDebugMode) {
+        debugPrint('📡 ApInvoiceRoutes: GET /supplier/$supplierId');
+      }
 
       final invoices = await (db.select(db.apInvoices)
             ..where((inv) => inv.supplierId.equals(supplierId))
@@ -310,14 +340,18 @@ class ApInvoiceRoutes {
             'updated_at': inv.updatedAt.toIso8601String(),
           }).toList();
 
-      print('✅ ApInvoiceRoutes: Found ${invoices.length} invoices');
+      if (kDebugMode) {
+        debugPrint('✅ ApInvoiceRoutes: Found ${invoices.length} invoices');
+      }
 
       return Response.ok(
         jsonEncode({'success': true, 'data': data}),
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ ApInvoiceRoutes: GET /supplier/$supplierId error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ ApInvoiceRoutes: GET /supplier/$supplierId error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': '$e'}),
         headers: {'Content-Type': 'application/json'},

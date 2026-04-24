@@ -1,20 +1,24 @@
-// ignore_for_file: avoid_print
 
 import 'dart:convert';
 import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 import 'package:drift/drift.dart' hide JsonKey;
 import '../../database/app_database.dart';
+import 'package:flutter/foundation.dart';
 
 class GoodsReceiptRoutes {
   final AppDatabase db;
 
   GoodsReceiptRoutes(this.db) {
-    print('🔧 GoodsReceiptRoutes initialized');
+    if (kDebugMode) {
+      debugPrint('🔧 GoodsReceiptRoutes initialized');
+    }
   }
 
   Router get router {
-    print('🔧 Building GoodsReceiptRoutes router...');
+    if (kDebugMode) {
+      debugPrint('🔧 Building GoodsReceiptRoutes router...');
+    }
 
     final router = Router();
 
@@ -25,13 +29,27 @@ class GoodsReceiptRoutes {
     router.delete('/<id>', _deleteGoodsReceiptHandler);
     router.post('/<id>/confirm', _confirmGoodsReceiptHandler);
 
-    print('🔧 GoodsReceiptRoutes configured:');
-    print('   GET  / → /api/goods-receipts');
-    print('   GET  /<id> → /api/goods-receipts/:id');
-    print('   POST / → /api/goods-receipts');
-    print('   PUT  /<id> → /api/goods-receipts/:id');
-    print('   DELETE /<id> → /api/goods-receipts/:id');
-    print('   POST /<id>/confirm → /api/goods-receipts/:id/confirm');
+    if (kDebugMode) {
+      debugPrint('🔧 GoodsReceiptRoutes configured:');
+    }
+    if (kDebugMode) {
+      debugPrint('   GET  / → /api/goods-receipts');
+    }
+    if (kDebugMode) {
+      debugPrint('   GET  /<id> → /api/goods-receipts/:id');
+    }
+    if (kDebugMode) {
+      debugPrint('   POST / → /api/goods-receipts');
+    }
+    if (kDebugMode) {
+      debugPrint('   PUT  /<id> → /api/goods-receipts/:id');
+    }
+    if (kDebugMode) {
+      debugPrint('   DELETE /<id> → /api/goods-receipts/:id');
+    }
+    if (kDebugMode) {
+      debugPrint('   POST /<id>/confirm → /api/goods-receipts/:id/confirm');
+    }
 
     return router;
   }
@@ -39,7 +57,9 @@ class GoodsReceiptRoutes {
   /// GET / - ดึงรายการใบรับสินค้าทั้งหมด
   Future<Response> _getGoodsReceiptsHandler(Request request) async {
     try {
-      print('📡 GoodsReceiptRoutes: GET /');
+      if (kDebugMode) {
+        debugPrint('📡 GoodsReceiptRoutes: GET /');
+      }
 
       // JOIN กับ COUNT items เพื่อไม่ต้องโหลด items ทั้งหมด
       final rows = await db.customSelect('''
@@ -74,15 +94,21 @@ class GoodsReceiptRoutes {
           )
           .toList();
 
-      print('✅ GoodsReceiptRoutes: Found ${rows.length} goods receipts');
+      if (kDebugMode) {
+        debugPrint('✅ GoodsReceiptRoutes: Found ${rows.length} goods receipts');
+      }
 
       return Response.ok(
         jsonEncode({'success': true, 'data': data}),
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e, stack) {
-      print('❌ GoodsReceiptRoutes: GET / error: $e');
-      print('Stack trace: $stack');
+      if (kDebugMode) {
+        debugPrint('❌ GoodsReceiptRoutes: GET / error: $e');
+      }
+      if (kDebugMode) {
+        debugPrint('Stack trace: $stack');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': '$e'}),
         headers: {'Content-Type': 'application/json'},
@@ -93,7 +119,9 @@ class GoodsReceiptRoutes {
   /// GET /:id - ดึงใบรับสินค้าพร้อมรายการสินค้า
   Future<Response> _getGoodsReceiptHandler(Request request, String id) async {
     try {
-      print('📡 GoodsReceiptRoutes: GET /$id');
+      if (kDebugMode) {
+        debugPrint('📡 GoodsReceiptRoutes: GET /$id');
+      }
 
       final gr = await (db.select(
         db.goodsReceipts,
@@ -153,7 +181,9 @@ class GoodsReceiptRoutes {
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ GoodsReceiptRoutes: GET /$id error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ GoodsReceiptRoutes: GET /$id error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': '$e'}),
         headers: {'Content-Type': 'application/json'},
@@ -164,7 +194,9 @@ class GoodsReceiptRoutes {
   /// POST / - สร้างใบรับสินค้าใหม่ (DRAFT)
   Future<Response> _createGoodsReceiptHandler(Request request) async {
     try {
-      print('📡 GoodsReceiptRoutes: POST /');
+      if (kDebugMode) {
+        debugPrint('📡 GoodsReceiptRoutes: POST /');
+      }
 
       final payload = await request.readAsString();
       final data = jsonDecode(payload) as Map<String, dynamic>;
@@ -234,7 +266,9 @@ class GoodsReceiptRoutes {
         }
       });
 
-      print('✅ GoodsReceiptRoutes: Created goods receipt: $grId');
+      if (kDebugMode) {
+        debugPrint('✅ GoodsReceiptRoutes: Created goods receipt: $grId');
+      }
 
       return Response.ok(
         jsonEncode({
@@ -245,7 +279,9 @@ class GoodsReceiptRoutes {
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ GoodsReceiptRoutes: POST / error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ GoodsReceiptRoutes: POST / error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': '$e'}),
         headers: {'Content-Type': 'application/json'},
@@ -259,7 +295,9 @@ class GoodsReceiptRoutes {
     String id,
   ) async {
     try {
-      print('📡 GoodsReceiptRoutes: PUT /$id');
+      if (kDebugMode) {
+        debugPrint('📡 GoodsReceiptRoutes: PUT /$id');
+      }
 
       // ✅ ป้องกันแก้ไขหลัง confirm แล้ว
       final gr = await (db.select(
@@ -297,14 +335,18 @@ class GoodsReceiptRoutes {
         ),
       );
 
-      print('✅ GoodsReceiptRoutes: Updated goods receipt: $id');
+      if (kDebugMode) {
+        debugPrint('✅ GoodsReceiptRoutes: Updated goods receipt: $id');
+      }
 
       return Response.ok(
         jsonEncode({'success': true, 'message': 'Goods receipt updated'}),
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ GoodsReceiptRoutes: PUT /$id error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ GoodsReceiptRoutes: PUT /$id error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': '$e'}),
         headers: {'Content-Type': 'application/json'},
@@ -318,7 +360,9 @@ class GoodsReceiptRoutes {
     String id,
   ) async {
     try {
-      print('📡 GoodsReceiptRoutes: DELETE /$id');
+      if (kDebugMode) {
+        debugPrint('📡 GoodsReceiptRoutes: DELETE /$id');
+      }
 
       final gr = await (db.select(
         db.goodsReceipts,
@@ -351,14 +395,18 @@ class GoodsReceiptRoutes {
         db.goodsReceipts,
       )..where((g) => g.grId.equals(id))).go();
 
-      print('✅ GoodsReceiptRoutes: Deleted goods receipt: $id');
+      if (kDebugMode) {
+        debugPrint('✅ GoodsReceiptRoutes: Deleted goods receipt: $id');
+      }
 
       return Response.ok(
         jsonEncode({'success': true, 'message': 'Goods receipt deleted'}),
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ GoodsReceiptRoutes: DELETE /$id error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ GoodsReceiptRoutes: DELETE /$id error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': '$e'}),
         headers: {'Content-Type': 'application/json'},
@@ -372,7 +420,9 @@ class GoodsReceiptRoutes {
     String id,
   ) async {
     try {
-      print('📡 GoodsReceiptRoutes: POST /$id/confirm');
+      if (kDebugMode) {
+        debugPrint('📡 GoodsReceiptRoutes: POST /$id/confirm');
+      }
 
       final gr = await (db.select(
         db.goodsReceipts,
@@ -454,9 +504,9 @@ class GoodsReceiptRoutes {
             item.unitPrice,
           );
 
-          print(
-            '✅ Stock movement: $movementNo (+${item.receivedQuantity} ${item.productId} @${item.unitPrice})',
-          );
+          if (kDebugMode) {
+            debugPrint( '✅ Stock movement: $movementNo (+${item.receivedQuantity} ${item.productId} @${item.unitPrice})', );
+          }
         }
 
         // --- 2) อัพเดทสถานะ GR → CONFIRMED ---
@@ -516,7 +566,9 @@ class GoodsReceiptRoutes {
         }
       });
 
-      print('✅ GoodsReceiptRoutes: Confirmed goods receipt: $id');
+      if (kDebugMode) {
+        debugPrint('✅ GoodsReceiptRoutes: Confirmed goods receipt: $id');
+      }
 
       return Response.ok(
         jsonEncode({
@@ -526,8 +578,12 @@ class GoodsReceiptRoutes {
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e, stack) {
-      print('❌ GoodsReceiptRoutes: POST /$id/confirm error: $e');
-      print('Stack trace: $stack');
+      if (kDebugMode) {
+        debugPrint('❌ GoodsReceiptRoutes: POST /$id/confirm error: $e');
+      }
+      if (kDebugMode) {
+        debugPrint('Stack trace: $stack');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': '$e'}),
         headers: {'Content-Type': 'application/json'},

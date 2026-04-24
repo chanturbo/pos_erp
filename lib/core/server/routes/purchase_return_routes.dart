@@ -1,10 +1,10 @@
-// ignore_for_file: avoid_print
 import 'dart:convert';
 import 'dart:async';
 import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 import 'package:drift/drift.dart' hide JsonKey;
 import '../../database/app_database.dart';
+import 'package:flutter/foundation.dart';
 
 class PurchaseReturnRoutes {
   final AppDatabase db;
@@ -28,7 +28,9 @@ class PurchaseReturnRoutes {
   /// GET / - รายการคืนสินค้าทั้งหมด
   Future<Response> _getReturnsHandler(Request request) async {
     try {
-      print('📡 PurchaseReturnRoutes: GET /');
+      if (kDebugMode) {
+        debugPrint('📡 PurchaseReturnRoutes: GET /');
+      }
 
       final returns = await db.select(db.purchaseReturns).get();
 
@@ -53,14 +55,18 @@ class PurchaseReturnRoutes {
           )
           .toList();
 
-      print('✅ PurchaseReturnRoutes: Found ${returns.length} returns');
+      if (kDebugMode) {
+        debugPrint('✅ PurchaseReturnRoutes: Found ${returns.length} returns');
+      }
 
       return Response.ok(
         jsonEncode({'success': true, 'data': data}),
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ PurchaseReturnRoutes: GET / error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ PurchaseReturnRoutes: GET / error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': '$e'}),
         headers: {'Content-Type': 'application/json'},
@@ -71,7 +77,9 @@ class PurchaseReturnRoutes {
   /// GET /:id - รายละเอียดใบคืนสินค้าพร้อมรายการ
   Future<Response> _getReturnHandler(Request request, String id) async {
     try {
-      print('📡 PurchaseReturnRoutes: GET /$id');
+      if (kDebugMode) {
+        debugPrint('📡 PurchaseReturnRoutes: GET /$id');
+      }
 
       final returnDoc = await (db.select(db.purchaseReturns)
             ..where((ret) => ret.returnId.equals(id)))
@@ -131,7 +139,9 @@ class PurchaseReturnRoutes {
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ PurchaseReturnRoutes: GET /$id error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ PurchaseReturnRoutes: GET /$id error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': '$e'}),
         headers: {'Content-Type': 'application/json'},
@@ -142,7 +152,9 @@ class PurchaseReturnRoutes {
   /// POST / - สร้างใบคืนสินค้า (DRAFT)
   Future<Response> _createReturnHandler(Request request) async {
     try {
-      print('📡 PurchaseReturnRoutes: POST /');
+      if (kDebugMode) {
+        debugPrint('📡 PurchaseReturnRoutes: POST /');
+      }
 
       final payload = await request.readAsString();
       final data = jsonDecode(payload) as Map<String, dynamic>;
@@ -155,7 +167,9 @@ class PurchaseReturnRoutes {
         await _insertDraftReturn(returnId, data, validated, ts);
       });
 
-      print('✅ PurchaseReturnRoutes: Created return: $returnId');
+      if (kDebugMode) {
+        debugPrint('✅ PurchaseReturnRoutes: Created return: $returnId');
+      }
 
       return Response.ok(
         jsonEncode({
@@ -172,7 +186,9 @@ class PurchaseReturnRoutes {
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ PurchaseReturnRoutes: POST / error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ PurchaseReturnRoutes: POST / error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': '$e'}),
         headers: {'Content-Type': 'application/json'},
@@ -183,7 +199,9 @@ class PurchaseReturnRoutes {
   /// PUT /:id - แก้ไขใบคืนสินค้า (DRAFT เท่านั้น)
   Future<Response> _updateReturnHandler(Request request, String id) async {
     try {
-      print('📡 PurchaseReturnRoutes: PUT /$id');
+      if (kDebugMode) {
+        debugPrint('📡 PurchaseReturnRoutes: PUT /$id');
+      }
 
       final existing = await (db.select(db.purchaseReturns)
             ..where((ret) => ret.returnId.equals(id)))
@@ -241,7 +259,9 @@ class PurchaseReturnRoutes {
         );
       });
 
-      print('✅ PurchaseReturnRoutes: Updated return: $id');
+      if (kDebugMode) {
+        debugPrint('✅ PurchaseReturnRoutes: Updated return: $id');
+      }
 
       return Response.ok(
         jsonEncode({'success': true, 'message': 'Return updated'}),
@@ -254,7 +274,9 @@ class PurchaseReturnRoutes {
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ PurchaseReturnRoutes: PUT /$id error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ PurchaseReturnRoutes: PUT /$id error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': '$e'}),
         headers: {'Content-Type': 'application/json'},
@@ -264,7 +286,9 @@ class PurchaseReturnRoutes {
 
   /// PUT /:id/confirm - ยืนยันใบคืนสินค้า (ลดสต๊อก)
   Future<Response> _confirmReturnHandler(Request request, String id) async {
-    print('📡 PurchaseReturnRoutes: PUT /$id/confirm');
+    if (kDebugMode) {
+      debugPrint('📡 PurchaseReturnRoutes: PUT /$id/confirm');
+    }
 
     final returnDoc = await (db.select(db.purchaseReturns)
           ..where((ret) => ret.returnId.equals(id)))
@@ -389,9 +413,9 @@ class PurchaseReturnRoutes {
               0,
             );
 
-            print(
-              '✅ Stock movement: $movementNo (-${item.quantity} ${item.productId})',
-            );
+            if (kDebugMode) {
+              debugPrint( '✅ Stock movement: $movementNo (-${item.quantity} ${item.productId})', );
+            }
           }
 
           final affectedRows = await (db.update(db.purchaseReturns)
@@ -413,7 +437,9 @@ class PurchaseReturnRoutes {
           }
         });
 
-        print('✅ PurchaseReturnRoutes: Confirmed return: $id');
+        if (kDebugMode) {
+          debugPrint('✅ PurchaseReturnRoutes: Confirmed return: $id');
+        }
 
         return Response.ok(
           jsonEncode({
@@ -430,7 +456,9 @@ class PurchaseReturnRoutes {
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ PurchaseReturnRoutes: PUT /$id/confirm error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ PurchaseReturnRoutes: PUT /$id/confirm error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({
           'success': false,
@@ -444,7 +472,9 @@ class PurchaseReturnRoutes {
   /// DELETE /:id - ลบใบคืนสินค้า (DRAFT เท่านั้น)
   Future<Response> _deleteReturnHandler(Request request, String id) async {
     try {
-      print('📡 PurchaseReturnRoutes: DELETE /$id');
+      if (kDebugMode) {
+        debugPrint('📡 PurchaseReturnRoutes: DELETE /$id');
+      }
 
       final returnDoc = await (db.select(db.purchaseReturns)
             ..where((ret) => ret.returnId.equals(id)))
@@ -476,14 +506,18 @@ class PurchaseReturnRoutes {
             ..where((ret) => ret.returnId.equals(id)))
           .go();
 
-      print('✅ PurchaseReturnRoutes: Deleted return: $id');
+      if (kDebugMode) {
+        debugPrint('✅ PurchaseReturnRoutes: Deleted return: $id');
+      }
 
       return Response.ok(
         jsonEncode({'success': true, 'message': 'Return deleted'}),
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ PurchaseReturnRoutes: DELETE /$id error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ PurchaseReturnRoutes: DELETE /$id error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': '$e'}),
         headers: {'Content-Type': 'application/json'},

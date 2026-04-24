@@ -1,4 +1,3 @@
-// ignore_for_file: avoid_print
 import 'dart:convert';
 import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
@@ -6,6 +5,7 @@ import 'package:drift/drift.dart' hide JsonKey;
 import '../../database/app_database.dart';
 import '../../utils/crypto_utils.dart';
 import '../middleware/auth_middleware.dart';
+import 'package:flutter/foundation.dart';
 
 class UserRoutes {
   final AppDatabase db;
@@ -259,7 +259,9 @@ class UserRoutes {
       headers: {'Content-Type': 'application/json'});
 
   Response _serverError(Object e) {
-    print('❌ UserRoutes error: $e');
+    if (kDebugMode) {
+      debugPrint('❌ UserRoutes error: $e');
+    }
     return Response.internalServerError(
       body: jsonEncode({'success': false, 'message': 'เกิดข้อผิดพลาด: $e'}),
       headers: {'Content-Type': 'application/json'},

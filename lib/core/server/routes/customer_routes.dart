@@ -1,10 +1,10 @@
-// ignore_for_file: avoid_print
 import 'dart:convert';
 import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 import 'package:drift/drift.dart' hide JsonKey;
 import '../../database/app_database.dart';
 import '../../utils/input_validators.dart';
+import 'package:flutter/foundation.dart';
 
 class CustomerRoutes {
   final AppDatabase db;
@@ -282,7 +282,9 @@ class CustomerRoutes {
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ POST /api/customers error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ POST /api/customers error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': 'เกิดข้อผิดพลาดภายใน กรุณาลองใหม่'}),
       );
@@ -363,7 +365,9 @@ class CustomerRoutes {
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ PUT /api/customers/$id error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ PUT /api/customers/$id error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': 'เกิดข้อผิดพลาดภายใน กรุณาลองใหม่'}),
       );

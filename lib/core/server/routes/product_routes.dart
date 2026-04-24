@@ -1,10 +1,10 @@
-// ignore_for_file: avoid_print
 import 'dart:convert';
 import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 import 'package:drift/drift.dart' hide JsonKey;
 import '../../database/app_database.dart';
 import '../../utils/input_validators.dart';
+import 'package:flutter/foundation.dart';
 
 class ProductRoutes {
   final AppDatabase db;
@@ -381,6 +381,9 @@ class ProductRoutes {
           showInPos: data.containsKey('show_in_pos')
               ? Value(data['show_in_pos'] as bool? ?? true)
               : const Value.absent(),
+          displayOrder: data.containsKey('display_order')
+              ? Value((data['display_order'] as num?)?.toInt() ?? 0)
+              : const Value.absent(),
           groupType: Value(
             _encodeGroupType(
               iconKey: _normalizeIconKey(
@@ -683,7 +686,9 @@ class ProductRoutes {
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ POST /api/products error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ POST /api/products error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({
           'success': false,
@@ -776,7 +781,9 @@ class ProductRoutes {
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ PUT /api/products/$id error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ PUT /api/products/$id error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({
           'success': false,

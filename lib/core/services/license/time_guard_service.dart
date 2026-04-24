@@ -1,6 +1,6 @@
-// ignore_for_file: avoid_print
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart';
 
 /// ป้องกันการย้อนนาฬิกาเพื่อโกงช่วงทดลองใช้
 ///
@@ -33,9 +33,13 @@ class TimeGuardService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_keyLastNtpTime, ntpTime.toIso8601String());
       await prefs.setString(_keyLastDeviceTime, deviceTime.toIso8601String());
-      print('[TimeGuard] NTP synced: $ntpTime (device: $deviceTime)');
+      if (kDebugMode) {
+        debugPrint('[TimeGuard] NTP synced: $ntpTime (device: $deviceTime)');
+      }
     } catch (e) {
-      print('[TimeGuard] NTP sync skipped (offline?): $e');
+      if (kDebugMode) {
+        debugPrint('[TimeGuard] NTP sync skipped (offline?): $e');
+      }
     }
   }
 
@@ -55,7 +59,9 @@ class TimeGuardService {
 
     // ถ้า device_now < last_device → ย้อนนาฬิกา → ใช้เวลา NTP ที่เก็บไว้
     if (deviceNow.isBefore(lastDevice.subtract(const Duration(minutes: 2)))) {
-      print('[TimeGuard] Clock rollback detected! Using last NTP time.');
+      if (kDebugMode) {
+        debugPrint('[TimeGuard] Clock rollback detected! Using last NTP time.');
+      }
       return lastNtp;
     }
 

@@ -1,10 +1,10 @@
-// ignore_for_file: avoid_print
 
 import 'dart:convert';
 import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 import '../../database/app_database.dart';
 import '../../database/seed_data.dart';
+import 'package:flutter/foundation.dart';
 
 class SetupRoutes {
   final AppDatabase db;
@@ -44,9 +44,13 @@ class SetupRoutes {
         );
       }
 
-      print('🌱 [SetupRoutes] Seeding demo data: $modeStr');
+      if (kDebugMode) {
+        debugPrint('🌱 [SetupRoutes] Seeding demo data: $modeStr');
+      }
       await SeedData.seedByMode(db, mode);
-      print('✅ [SetupRoutes] Demo seeding complete: $modeStr');
+      if (kDebugMode) {
+        debugPrint('✅ [SetupRoutes] Demo seeding complete: $modeStr');
+      }
 
       return Response.ok(
         jsonEncode({
@@ -57,7 +61,9 @@ class SetupRoutes {
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ [SetupRoutes] seed-demo error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ [SetupRoutes] seed-demo error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': 'เกิดข้อผิดพลาด: $e'}),
         headers: {'Content-Type': 'application/json'},

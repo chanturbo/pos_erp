@@ -1,4 +1,3 @@
-// ignore_for_file: avoid_print
 // ar_invoice_routes.dart
 // Day 36-38: AR Invoice Routes — ใบแจ้งหนี้ลูกหนี้
 
@@ -7,6 +6,7 @@ import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 import 'package:drift/drift.dart' hide JsonKey;
 import '../../database/app_database.dart';
+import 'package:flutter/foundation.dart';
 
 class ArInvoiceRoutes {
   final AppDatabase db;
@@ -62,21 +62,27 @@ class ArInvoiceRoutes {
   // ─── GET / — รายการใบแจ้งหนี้ทั้งหมด ──────────────────────────────────
   Future<Response> _getInvoicesHandler(Request request) async {
     try {
-      print('📡 ArInvoiceRoutes: GET /');
+      if (kDebugMode) {
+        debugPrint('📡 ArInvoiceRoutes: GET /');
+      }
 
       final invoices = await (db.select(db.arInvoices)
             ..orderBy([(inv) => OrderingTerm.desc(inv.invoiceDate)]))
           .get();
 
       final data = invoices.map(_invoiceToMap).toList();
-      print('✅ ArInvoiceRoutes: Found ${invoices.length} invoices');
+      if (kDebugMode) {
+        debugPrint('✅ ArInvoiceRoutes: Found ${invoices.length} invoices');
+      }
 
       return Response.ok(
         jsonEncode({'success': true, 'data': data}),
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ ArInvoiceRoutes: GET / error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ ArInvoiceRoutes: GET / error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': '$e'}),
         headers: {'Content-Type': 'application/json'},
@@ -87,7 +93,9 @@ class ArInvoiceRoutes {
   // ─── GET /:id — รายละเอียดใบแจ้งหนี้พร้อมรายการสินค้า ────────────────
   Future<Response> _getInvoiceHandler(Request request, String id) async {
     try {
-      print('📡 ArInvoiceRoutes: GET /$id');
+      if (kDebugMode) {
+        debugPrint('📡 ArInvoiceRoutes: GET /$id');
+      }
 
       final invoice = await (db.select(db.arInvoices)
             ..where((inv) => inv.invoiceId.equals(id)))
@@ -135,7 +143,9 @@ class ArInvoiceRoutes {
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ ArInvoiceRoutes: GET /$id error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ ArInvoiceRoutes: GET /$id error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': '$e'}),
         headers: {'Content-Type': 'application/json'},
@@ -153,13 +163,17 @@ class ArInvoiceRoutes {
     await (db.update(db.customers)
           ..where((c) => c.customerId.equals(customerId)))
         .write(CustomersCompanion(currentBalance: Value(newBalance)));
-    print('💰 Customer $customerId balance: ${customer.currentBalance} → $newBalance (delta: $delta)');
+    if (kDebugMode) {
+      debugPrint('💰 Customer $customerId balance: ${customer.currentBalance} → $newBalance (delta: $delta)');
+    }
   }
 
   // ─── POST / — สร้างใบแจ้งหนี้ ─────────────────────────────────────────
   Future<Response> _createInvoiceHandler(Request request) async {
     try {
-      print('📡 ArInvoiceRoutes: POST /');
+      if (kDebugMode) {
+        debugPrint('📡 ArInvoiceRoutes: POST /');
+      }
 
       final payload = await request.readAsString();
       final data = jsonDecode(payload) as Map<String, dynamic>;
@@ -219,7 +233,9 @@ class ArInvoiceRoutes {
       final totalAmount = (data['total_amount'] as num).toDouble();
       await _updateCustomerBalance(customerId, totalAmount);
 
-      print('✅ ArInvoiceRoutes: Created invoice: $invoiceId');
+      if (kDebugMode) {
+        debugPrint('✅ ArInvoiceRoutes: Created invoice: $invoiceId');
+      }
 
       return Response.ok(
         jsonEncode({
@@ -230,7 +246,9 @@ class ArInvoiceRoutes {
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ ArInvoiceRoutes: POST / error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ ArInvoiceRoutes: POST / error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': '$e'}),
         headers: {'Content-Type': 'application/json'},
@@ -241,7 +259,9 @@ class ArInvoiceRoutes {
   // ─── PUT /:id — แก้ไขใบแจ้งหนี้ + items ────────────────────────────
   Future<Response> _updateInvoiceHandler(Request request, String id) async {
     try {
-      print('📡 ArInvoiceRoutes: PUT /$id');
+      if (kDebugMode) {
+        debugPrint('📡 ArInvoiceRoutes: PUT /$id');
+      }
 
       final payload = await request.readAsString();
       final data = jsonDecode(payload) as Map<String, dynamic>;
@@ -292,17 +312,23 @@ class ArInvoiceRoutes {
                 remark: Value(item['remark'] as String?),
               ));
         }
-        print('✅ ArInvoiceRoutes: Updated ${items.length} items for $id');
+        if (kDebugMode) {
+          debugPrint('✅ ArInvoiceRoutes: Updated ${items.length} items for $id');
+        }
       }
 
-      print('✅ ArInvoiceRoutes: Updated invoice: $id');
+      if (kDebugMode) {
+        debugPrint('✅ ArInvoiceRoutes: Updated invoice: $id');
+      }
 
       return Response.ok(
         jsonEncode({'success': true, 'message': 'Invoice updated'}),
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ ArInvoiceRoutes: PUT /$id error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ ArInvoiceRoutes: PUT /$id error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': '$e'}),
         headers: {'Content-Type': 'application/json'},
@@ -313,7 +339,9 @@ class ArInvoiceRoutes {
   // ─── DELETE /:id — ลบใบแจ้งหนี้ (UNPAID เท่านั้น) ───────────────────
   Future<Response> _deleteInvoiceHandler(Request request, String id) async {
     try {
-      print('📡 ArInvoiceRoutes: DELETE /$id');
+      if (kDebugMode) {
+        debugPrint('📡 ArInvoiceRoutes: DELETE /$id');
+      }
 
       final invoice = await (db.select(db.arInvoices)
             ..where((inv) => inv.invoiceId.equals(id)))
@@ -350,14 +378,18 @@ class ArInvoiceRoutes {
             ..where((inv) => inv.invoiceId.equals(id)))
           .go();
 
-      print('✅ ArInvoiceRoutes: Deleted invoice: $id');
+      if (kDebugMode) {
+        debugPrint('✅ ArInvoiceRoutes: Deleted invoice: $id');
+      }
 
       return Response.ok(
         jsonEncode({'success': true, 'message': 'Invoice deleted'}),
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ ArInvoiceRoutes: DELETE /$id error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ ArInvoiceRoutes: DELETE /$id error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': '$e'}),
         headers: {'Content-Type': 'application/json'},
@@ -369,7 +401,9 @@ class ArInvoiceRoutes {
   Future<Response> _getInvoicesByCustomerHandler(
       Request request, String customerId) async {
     try {
-      print('📡 ArInvoiceRoutes: GET /customer/$customerId');
+      if (kDebugMode) {
+        debugPrint('📡 ArInvoiceRoutes: GET /customer/$customerId');
+      }
 
       final invoices = await (db.select(db.arInvoices)
             ..where((inv) => inv.customerId.equals(customerId))
@@ -377,14 +411,18 @@ class ArInvoiceRoutes {
           .get();
 
       final data = invoices.map(_invoiceToMap).toList();
-      print('✅ ArInvoiceRoutes: Found ${invoices.length} invoices');
+      if (kDebugMode) {
+        debugPrint('✅ ArInvoiceRoutes: Found ${invoices.length} invoices');
+      }
 
       return Response.ok(
         jsonEncode({'success': true, 'data': data}),
         headers: {'Content-Type': 'application/json'},
       );
     } catch (e) {
-      print('❌ ArInvoiceRoutes: GET /customer/$customerId error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ ArInvoiceRoutes: GET /customer/$customerId error: $e');
+      }
       return Response.internalServerError(
         body: jsonEncode({'success': false, 'message': '$e'}),
         headers: {'Content-Type': 'application/json'},

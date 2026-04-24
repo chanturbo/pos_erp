@@ -1,4 +1,3 @@
-// ignore_for_file: avoid_print
 
 import 'dart:convert';
 import 'dart:io';
@@ -31,6 +30,7 @@ import 'routes/kitchen_routes.dart'; // Restaurant Phase R2
 import 'routes/setup_routes.dart';
 import 'middleware/auth_middleware.dart';
 import 'middleware/license_middleware.dart';
+import 'package:flutter/foundation.dart';
 
 class ApiServer {
   final AppDatabase db;
@@ -43,115 +43,167 @@ class ApiServer {
   /// เริ่ม Server
   Future<void> start({int port = 8080}) async {
     if (_server != null) {
-      print('ℹ️ API Server already running');
+      if (kDebugMode) {
+        debugPrint('ℹ️ API Server already running');
+      }
       return;
     }
     try {
       final router = Router();
 
-      print('🔧 Configuring routes...');
+      if (kDebugMode) {
+        debugPrint('🔧 Configuring routes...');
+      }
 
       // ==================== PUBLIC ROUTES ====================
 
       // Health check
       router.get('/api/health', (Request request) {
-        print('📡 Health check');
+        if (kDebugMode) {
+          debugPrint('📡 Health check');
+        }
         return Response.ok('OK');
       });
 
       // Auth routes
       router.mount('/api/auth', AuthRoutes(db).router.call);
-      print('   ✅ /api/auth');
+      if (kDebugMode) {
+        debugPrint('   ✅ /api/auth');
+      }
 
       // ==================== PROTECTED ROUTES ====================
 
       // Product routes
       router.mount('/api/products', ProductRoutes(db).router.call);
-      print('   ✅ /api/products');
+      if (kDebugMode) {
+        debugPrint('   ✅ /api/products');
+      }
 
       // Customer routes
       router.mount('/api/customers', CustomerRoutes(db).router.call);
-      print('   ✅ /api/customers');
+      if (kDebugMode) {
+        debugPrint('   ✅ /api/customers');
+      }
 
       // Customer dividend routes
       router.mount('/api/customer-dividend-runs', CustomerDividendRoutes(db).router.call);
-      print('   ✅ /api/customer-dividend-runs');
+      if (kDebugMode) {
+        debugPrint('   ✅ /api/customer-dividend-runs');
+      }
 
       // Supplier routes
       router.mount('/api/suppliers', SupplierRoutes(db).router.call);
-      print('   ✅ /api/suppliers');
+      if (kDebugMode) {
+        debugPrint('   ✅ /api/suppliers');
+      }
 
       // Stock routes
       router.mount('/api/stock', StockRoutes(db).router.call);
-      print('   ✅ /api/stock');
+      if (kDebugMode) {
+        debugPrint('   ✅ /api/stock');
+      }
 
       // Sales routes
       router.mount('/api/sales', SalesRoutes(db).router.call);
-      print('   ✅ /api/sales');
+      if (kDebugMode) {
+        debugPrint('   ✅ /api/sales');
+      }
 
       // Report routes
       router.mount('/api/reports', ReportRoutes(db).router.call);
-      print('   ✅ /api/reports');
+      if (kDebugMode) {
+        debugPrint('   ✅ /api/reports');
+      }
 
       // Purchase routes
       router.mount('/api/purchases', PurchaseRoutes(db).router.call);
-      print('   ✅ /api/purchases');
+      if (kDebugMode) {
+        debugPrint('   ✅ /api/purchases');
+      }
 
       // Goods Receipt routes
       router.mount('/api/goods-receipts', GoodsReceiptRoutes(db).router.call);
-      print('   ✅ /api/goods-receipts');
+      if (kDebugMode) {
+        debugPrint('   ✅ /api/goods-receipts');
+      }
 
       // AP Invoice routes
       router.mount('/api/ap-invoices', ApInvoiceRoutes(db).router.call);
-      print('   ✅ /api/ap-invoices');
+      if (kDebugMode) {
+        debugPrint('   ✅ /api/ap-invoices');
+      }
 
       // AP Payment routes
       router.mount('/api/ap-payments', ApPaymentRoutes(db).router.call);
-      print('   ✅ /api/ap-payments');
+      if (kDebugMode) {
+        debugPrint('   ✅ /api/ap-payments');
+      }
 
       // Purchase Return routes
       router.mount('/api/purchase-returns', PurchaseReturnRoutes(db).router.call);
-      print('   ✅ /api/purchase-returns');
+      if (kDebugMode) {
+        debugPrint('   ✅ /api/purchase-returns');
+      }
 
       // AR Invoice routes ✅ Day 36-38
       router.mount('/api/ar-invoices', ArInvoiceRoutes(db).router.call);
-      print('   ✅ /api/ar-invoices');
+      if (kDebugMode) {
+        debugPrint('   ✅ /api/ar-invoices');
+      }
 
       // AR Receipt routes ✅ Day 39-40
       router.mount('/api/ar-receipts', ArReceiptRoutes(db).router.call);
-      print('   ✅ /api/ar-receipts');
+      if (kDebugMode) {
+        debugPrint('   ✅ /api/ar-receipts');
+      }
 
       // Promotion & Coupon routes ✅ Day 41-45
       router.mount('/api/promotions', PromotionRoutes(db).router.call);
-      print('   ✅ /api/promotions');
+      if (kDebugMode) {
+        debugPrint('   ✅ /api/promotions');
+      }
 
       // User Management routes
       router.mount('/api/users', UserRoutes(db).router.call);
-      print('   ✅ /api/users');
+      if (kDebugMode) {
+        debugPrint('   ✅ /api/users');
+      }
 
       // Branch, Warehouse & Sync routes ✅ Week 7
       router.mount('/api/branches', BranchRoutes(db).router.call);
-      print('   ✅ /api/branches');
+      if (kDebugMode) {
+        debugPrint('   ✅ /api/branches');
+      }
 
       // Restaurant Table routes ✅ Phase R1
       router.mount('/api/tables', TableRoutes(db).router.call);
-      print('   ✅ /api/tables');
+      if (kDebugMode) {
+        debugPrint('   ✅ /api/tables');
+      }
 
       // Kitchen Display routes ✅ Phase R2
       router.mount('/api/kitchen', KitchenRoutes(db).router.call);
-      print('   ✅ /api/kitchen');
+      if (kDebugMode) {
+        debugPrint('   ✅ /api/kitchen');
+      }
 
       // Setup / Demo seeding (no auth required — first-time setup)
       router.mount('/api/setup', SetupRoutes(db).router.call);
-      print('   ✅ /api/setup');
+      if (kDebugMode) {
+        debugPrint('   ✅ /api/setup');
+      }
 
       // 🆕 Sync helper endpoints (เรียกจาก OfflineSyncService)
       router.post('/api/sync/push-pending', _pushPendingHandler);
       router.post('/api/sync/enqueue', _enqueueHandler);
       router.post('/api/sync/retry-failed', _retryFailedHandler);
-      print('   ✅ /api/sync/*');
+      if (kDebugMode) {
+        debugPrint('   ✅ /api/sync/*');
+      }
 
-      print('🔧 Routes configured successfully');
+      if (kDebugMode) {
+        debugPrint('🔧 Routes configured successfully');
+      }
 
       // ==================== PIPELINE ====================
       final handler = Pipeline()
@@ -163,10 +215,16 @@ class ApiServer {
 
       // ==================== START SERVER ====================
       _server = await io.serve(handler, InternetAddress.anyIPv4, port);
-      print('✅ API Server started at http://0.0.0.0:$port');
+      if (kDebugMode) {
+        debugPrint('✅ API Server started at http://0.0.0.0:$port');
+      }
     } catch (e, stack) {
-      print('❌ Failed to start server: $e');
-      print('Stack trace: $stack');
+      if (kDebugMode) {
+        debugPrint('❌ Failed to start server: $e');
+      }
+      if (kDebugMode) {
+        debugPrint('Stack trace: $stack');
+      }
       rethrow;
     }
   }
@@ -175,7 +233,9 @@ class ApiServer {
   Future<void> stop() async {
     await _server?.close();
     _server = null;
-    print('⏹️  API Server stopped');
+    if (kDebugMode) {
+      debugPrint('⏹️  API Server stopped');
+    }
   }
 
   // ── Sync helper handlers ───────────────────────────────────────────────────
