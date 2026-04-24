@@ -371,7 +371,24 @@ Future<void> _normalizeLegacyRoleIds(AppDatabase db) async {
 
 Future<void> _seedInitialData(AppDatabase db) async {
   try {
-    await SeedData.seedAll(db);
+    final prefs = await SharedPreferences.getInstance();
+    final demoMode = prefs.getString('demo_seed_mode');
+
+    if (demoMode != null) {
+      // Demo mode already chosen — only ensure essential base data is current
+      await SeedData.seedEssential(db);
+    } else {
+      // First run: check if products already exist (upgrade from pre-dialog version)
+      final existing = await (db.select(db.products)..limit(1)).get();
+      if (existing.isNotEmpty) {
+        // Existing install — mark as 'both' and re-run all seed (idempotent)
+        await prefs.setString('demo_seed_mode', 'both');
+        await SeedData.seedAll(db);
+      } else {
+        // Fresh install — seed essential only; UI will prompt for demo choice
+        await SeedData.seedEssential(db);
+      }
+    }
     print('✅ Initial data seeded');
   } catch (e) {
     print('⚠️ Seed data error: $e');

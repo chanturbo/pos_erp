@@ -1,7 +1,7 @@
-// ignore_for_file: avoid_print
 // promotion_provider.dart
 // Day 41-45: Promotion Provider
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/promotion_model.dart';
 import '../../../../core/client/api_client.dart';
@@ -35,7 +35,9 @@ class PromotionNotifier extends AsyncNotifier<List<PromotionModel>> {
       }
       return [];
     } catch (e) {
-      print('❌ Error loading promotions: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error loading promotions: $e');
+      }
       return [];
     }
   }
@@ -56,7 +58,9 @@ class PromotionNotifier extends AsyncNotifier<List<PromotionModel>> {
       }
       return false;
     } catch (e) {
-      print('❌ Error creating promotion: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error creating promotion: $e');
+      }
       return false;
     }
   }
@@ -75,7 +79,9 @@ class PromotionNotifier extends AsyncNotifier<List<PromotionModel>> {
       }
       return false;
     } catch (e) {
-      print('❌ Error updating promotion: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error updating promotion: $e');
+      }
       return false;
     }
   }
@@ -103,7 +109,9 @@ class PromotionNotifier extends AsyncNotifier<List<PromotionModel>> {
       }
       return {'success': false, 'code': 'UNKNOWN'};
     } catch (e) {
-      print('❌ Error deleting promotion: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error deleting promotion: $e');
+      }
       return {'success': false, 'code': 'ERROR', 'message': '$e'};
     }
   }
@@ -123,7 +131,9 @@ final activePromotionsProvider =
     }
     return [];
   } catch (e) {
-    print('❌ Error loading active promotions: $e');
+    if (kDebugMode) {
+      debugPrint('❌ Error loading active promotions: $e');
+    }
     return [];
   }
 });
@@ -218,7 +228,9 @@ class CouponNotifier extends AsyncNotifier<CouponPageState> {
       }
       return CouponPageState.empty();
     } catch (e) {
-      print('❌ Error loading coupons: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error loading coupons: $e');
+      }
       rethrow;
     }
   }
@@ -285,7 +297,9 @@ class CouponNotifier extends AsyncNotifier<CouponPageState> {
       }
       return false;
     } catch (e) {
-      print('❌ Error creating coupons: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error creating coupons: $e');
+      }
       return false;
     }
   }
@@ -301,7 +315,9 @@ class CouponNotifier extends AsyncNotifier<CouponPageState> {
       }
       return null;
     } catch (e) {
-      print('❌ Error validating coupon: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error validating coupon: $e');
+      }
       return null;
     }
   }
@@ -320,7 +336,9 @@ final applyPromotionProvider = FutureProvider.family<
     }
     return {'total_discount': 0.0, 'applied_promotions': []};
   } catch (e) {
-    print('❌ Error applying promotions: $e');
+    if (kDebugMode) {
+      debugPrint('❌ Error applying promotions: $e');
+    }
     return {'total_discount': 0.0, 'applied_promotions': []};
   }
 });

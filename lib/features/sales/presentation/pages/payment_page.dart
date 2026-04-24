@@ -1,5 +1,5 @@
-// ignore_for_file: avoid_print
 
+import 'package:flutter/foundation.dart';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -1116,7 +1116,9 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
         },
       };
 
-      print('📦 Sending order: total=${orderData['total_amount']}');
+      if (kDebugMode) {
+        debugPrint('📦 Sending order: total=${orderData['total_amount']}');
+      }
 
       final response = targetOrderIds.isNotEmpty
           ? await apiClient.post(
@@ -1132,7 +1134,9 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
             )
           : await apiClient.post('/api/sales', data: orderData);
 
-      print('✅ Response: ${response.statusCode}');
+      if (kDebugMode) {
+        debugPrint('✅ Response: ${response.statusCode}');
+      }
 
       if (response.statusCode == 200) {
         // ✅ อ่านค่าจาก response ก่อน — ต้องใช้ orderNo ใน coupon use call
@@ -1153,7 +1157,9 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                 data: {'customer_id': cartState.customerId, 'order_no': orderNo},
               );
             } catch (e) {
-              print('⚠️ Could not mark coupon ${coupon.code} as used: $e');
+              if (kDebugMode) {
+                debugPrint('⚠️ Could not mark coupon ${coupon.code} as used: $e');
+              }
             }
           }
         }
@@ -1197,9 +1203,13 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                   .toList(),
             };
             await apiClient.post('/api/ar-invoices', data: arData);
-            print('✅ AR Invoice created for CREDIT sale $orderNo');
+            if (kDebugMode) {
+              debugPrint('✅ AR Invoice created for CREDIT sale $orderNo');
+            }
           } catch (e) {
-            print('⚠️ Could not create AR invoice: $e');
+            if (kDebugMode) {
+              debugPrint('⚠️ Could not create AR invoice: $e');
+            }
           }
         }
 
@@ -1228,7 +1238,9 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
             }
             ref.invalidate(tableListProvider);
           } catch (e) {
-            print('⚠️ Could not close restaurant table after payment: $e');
+            if (kDebugMode) {
+              debugPrint('⚠️ Could not close restaurant table after payment: $e');
+            }
             restaurantPostPaymentWarning =
                 'ชำระเงินสำเร็จแล้ว แต่ระบบปิดโต๊ะให้อัตโนมัติไม่สำเร็จ';
           }
@@ -1302,7 +1314,9 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
         throw Exception(serverMsg);
       }
     } on DioException catch (e) {
-      print('❌ Payment error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Payment error: $e');
+      }
 
       final currentOrderId =
           ref.read(restaurantOrderContextProvider)?.currentOrderId;
@@ -1434,7 +1448,9 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
         );
       }
     } catch (e) {
-      print('❌ Payment error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Payment error: $e');
+      }
 
       if (mounted) {
         final userMessage = _toUserMessage(e);

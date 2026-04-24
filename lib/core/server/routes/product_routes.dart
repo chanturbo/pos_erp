@@ -85,14 +85,16 @@ class ProductRoutes {
                   'group_name': g.groupName,
                   'group_type': g.groupType,
                   'image_url': g.imageUrl,
+                  'show_in_pos': g.showInPos,
+                  'display_order': g.displayOrder,
                   'mobile_color': _extractGroupColor(g),
                   'mobile_icon': _extractGroupIcon(g),
                 },
               )
               .toList()
             ..sort(
-              (a, b) => (a['group_name'] as String).compareTo(
-                b['group_name'] as String,
+              (a, b) => ((a['display_order'] as int?) ?? 0).compareTo(
+                (b['display_order'] as int?) ?? 0,
               ),
             );
       return Response.ok(
@@ -376,6 +378,9 @@ class ProductRoutes {
         ProductGroupsCompanion(
           groupCode: Value(nextCode),
           groupName: Value(nextName),
+          showInPos: data.containsKey('show_in_pos')
+              ? Value(data['show_in_pos'] as bool? ?? true)
+              : const Value.absent(),
           groupType: Value(
             _encodeGroupType(
               iconKey: _normalizeIconKey(
@@ -511,7 +516,8 @@ class ProductRoutes {
               base_unit, price_level1, price_level2, price_level3,
               price_level4, price_level5, standard_cost,
               is_stock_control, allow_negative_stock, is_active,
-              image_path
+              image_path, service_mode, dine_in_available, takeaway_available,
+              requires_preparation, prep_station
             FROM products
             $where
             ORDER BY product_code ASC
@@ -537,6 +543,11 @@ class ProductRoutes {
               'allow_negative_stock': row.read<bool>('allow_negative_stock'),
               'is_active': row.read<bool>('is_active'),
               'image_path': row.readNullable<String>('image_path'),
+              'service_mode': row.read<String>('service_mode'),
+              'dine_in_available': row.read<bool>('dine_in_available'),
+              'takeaway_available': row.read<bool>('takeaway_available'),
+              'requires_preparation': row.read<bool>('requires_preparation'),
+              'prep_station': row.readNullable<String>('prep_station'),
             },
           )
           .toList();

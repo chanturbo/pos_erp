@@ -1,4 +1,3 @@
-// ignore_for_file: avoid_print
 // lib/features/settings/presentation/pages/settings_page.dart
 
 import 'dart:io';

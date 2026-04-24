@@ -1,5 +1,5 @@
-// ignore_for_file: avoid_print
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/client/api_client.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -68,7 +68,9 @@ class DashboardNotifier extends AsyncNotifier<DashboardStats> {
   /// โหลดสถิติ Dashboard
   Future<DashboardStats> loadStats() async {
     try {
-      print('📡 Loading dashboard stats...');
+      if (kDebugMode) {
+        debugPrint('📡 Loading dashboard stats...');
+      }
 
       final apiClient = ref.read(apiClientProvider);
 
@@ -145,11 +147,15 @@ class DashboardNotifier extends AsyncNotifier<DashboardStats> {
         monthOrders: monthOrders,
       );
 
-      print('✅ Dashboard stats loaded');
+      if (kDebugMode) {
+        debugPrint('✅ Dashboard stats loaded');
+      }
 
       return stats;
     } catch (e) {
-      print('❌ Error loading dashboard stats: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error loading dashboard stats: $e');
+      }
 
       // Return default stats if error
       return DashboardStats(

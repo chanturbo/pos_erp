@@ -1,4 +1,4 @@
-// ignore_for_file: avoid_print
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/ap_payment_model.dart';
 import '../../../../core/client/api_client.dart';
@@ -21,7 +21,9 @@ class ApPaymentNotifier extends AsyncNotifier<List<ApPaymentModel>> {
   /// โหลดรายการจ่ายเงิน
   Future<List<ApPaymentModel>> loadPayments() async {
     try {
-      print('📡 Loading AP payments...');
+      if (kDebugMode) {
+        debugPrint('📡 Loading AP payments...');
+      }
 
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.get('/api/ap-payments');
@@ -32,14 +34,20 @@ class ApPaymentNotifier extends AsyncNotifier<List<ApPaymentModel>> {
             .map((json) => ApPaymentModel.fromJson(json as Map<String, dynamic>))
             .toList();
 
-        print('✅ Loaded ${payments.length} payments');
+        if (kDebugMode) {
+          debugPrint('✅ Loaded ${payments.length} payments');
+        }
         return payments;
       }
 
-      print('⚠️ No payments data');
+      if (kDebugMode) {
+        debugPrint('⚠️ No payments data');
+      }
       return [];
     } catch (e) {
-      print('❌ Error loading payments: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error loading payments: $e');
+      }
       return [];
     }
   }
@@ -53,7 +61,9 @@ class ApPaymentNotifier extends AsyncNotifier<List<ApPaymentModel>> {
   /// สร้างการจ่ายเงินใหม่
   Future<bool> createPayment(ApPaymentModel payment) async {
     try {
-      print('📝 Creating AP payment: ${payment.paymentNo}');
+      if (kDebugMode) {
+        debugPrint('📝 Creating AP payment: ${payment.paymentNo}');
+      }
 
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.post(
@@ -62,13 +72,17 @@ class ApPaymentNotifier extends AsyncNotifier<List<ApPaymentModel>> {
       );
 
       if (response.statusCode == 200) {
-        print('✅ Payment created successfully');
+        if (kDebugMode) {
+          debugPrint('✅ Payment created successfully');
+        }
         await refresh();
         return true;
       }
       return false;
     } catch (e) {
-      print('❌ Error creating payment: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error creating payment: $e');
+      }
       return false;
     }
   }
@@ -76,19 +90,25 @@ class ApPaymentNotifier extends AsyncNotifier<List<ApPaymentModel>> {
   /// ลบการจ่ายเงิน
   Future<bool> deletePayment(String paymentId) async {
     try {
-      print('🗑️ Deleting payment: $paymentId');
+      if (kDebugMode) {
+        debugPrint('🗑️ Deleting payment: $paymentId');
+      }
 
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.delete('/api/ap-payments/$paymentId');
 
       if (response.statusCode == 200) {
-        print('✅ Payment deleted successfully');
+        if (kDebugMode) {
+          debugPrint('✅ Payment deleted successfully');
+        }
         await refresh();
         return true;
       }
       return false;
     } catch (e) {
-      print('❌ Error deleting payment: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error deleting payment: $e');
+      }
       return false;
     }
   }
@@ -96,7 +116,9 @@ class ApPaymentNotifier extends AsyncNotifier<List<ApPaymentModel>> {
   /// ดึงรายละเอียดการจ่ายเงินพร้อม Allocations
   Future<ApPaymentModel?> getPaymentDetails(String paymentId) async {
     try {
-      print('📡 Loading payment details: $paymentId');
+      if (kDebugMode) {
+        debugPrint('📡 Loading payment details: $paymentId');
+      }
 
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.get('/api/ap-payments/$paymentId');
@@ -108,7 +130,9 @@ class ApPaymentNotifier extends AsyncNotifier<List<ApPaymentModel>> {
 
       return null;
     } catch (e) {
-      print('❌ Error loading payment details: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error loading payment details: $e');
+      }
       return null;
     }
   }

@@ -1,5 +1,5 @@
-// ignore_for_file: avoid_print
 
+import 'package:flutter/foundation.dart';
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -85,7 +85,9 @@ class SalesHistoryNotifier extends AsyncNotifier<List<SalesOrderModel>> {
   /// โหลดรายการขาย
   Future<List<SalesOrderModel>> loadOrders() async {
     try {
-      print('📡 Loading sales orders...');
+      if (kDebugMode) {
+        debugPrint('📡 Loading sales orders...');
+      }
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.get('/api/sales');
 
@@ -95,13 +97,17 @@ class SalesHistoryNotifier extends AsyncNotifier<List<SalesOrderModel>> {
             .map((json) => SalesOrderModel.fromJson(json))
             .toList();
         orders.sort((a, b) => b.orderDate.compareTo(a.orderDate));
-        print('✅ Loaded ${orders.length} orders');
+        if (kDebugMode) {
+          debugPrint('✅ Loaded ${orders.length} orders');
+        }
         return orders;
       } else {
         throw Exception('Failed to load orders: ${response.statusCode}');
       }
     } catch (e) {
-      print('❌ Error loading orders: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error loading orders: $e');
+      }
       throw Exception('เกิดข้อผิดพลาด: $e');
     }
   }
@@ -131,7 +137,9 @@ class SalesHistoryNotifier extends AsyncNotifier<List<SalesOrderModel>> {
       }
       return null;
     } catch (e) {
-      print('❌ Error getting order details: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error getting order details: $e');
+      }
       return null;
     }
   }
@@ -163,12 +171,16 @@ class SalesHistoryNotifier extends AsyncNotifier<List<SalesOrderModel>> {
         },
       );
       if (response.statusCode == 200) {
-        print('✅ Added $points points to customer $customerId');
+        if (kDebugMode) {
+          debugPrint('✅ Added $points points to customer $customerId');
+        }
         return true;
       }
       return false;
     } catch (e) {
-      print('❌ Error adding points: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error adding points: $e');
+      }
       return false;
     }
   }
@@ -184,7 +196,9 @@ class SalesHistoryNotifier extends AsyncNotifier<List<SalesOrderModel>> {
       }
       return 0;
     } catch (e) {
-      print('❌ Error getting points: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error getting points: $e');
+      }
       return 0;
     }
   }
@@ -204,7 +218,9 @@ class SalesHistoryNotifier extends AsyncNotifier<List<SalesOrderModel>> {
       );
       return response.statusCode == 200;
     } catch (e) {
-      print('❌ Error redeeming points: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error redeeming points: $e');
+      }
       return false;
     }
   }

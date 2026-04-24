@@ -1,5 +1,5 @@
-// ignore_for_file: avoid_print
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import '../../../../core/client/api_client.dart';
@@ -92,7 +92,9 @@ class ReservationsNotifier extends AsyncNotifier<List<ReservationModel>> {
       }
       return null;
     } catch (e) {
-      print('❌ createReservation error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ createReservation error: $e');
+      }
       return null;
     }
   }
@@ -103,7 +105,9 @@ class ReservationsNotifier extends AsyncNotifier<List<ReservationModel>> {
       await api.put('/api/tables/reservations/$id', data: body);
       await refresh();
     } catch (e) {
-      print('❌ editReservation error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ editReservation error: $e');
+      }
     }
   }
 
@@ -118,7 +122,9 @@ class ReservationsNotifier extends AsyncNotifier<List<ReservationModel>> {
       await refresh();
       return true;
     } catch (e) {
-      print('❌ confirmReservation error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ confirmReservation error: $e');
+      }
       return false;
     }
   }
@@ -134,7 +140,9 @@ class ReservationsNotifier extends AsyncNotifier<List<ReservationModel>> {
       await refresh();
       return true;
     } catch (e) {
-      print('❌ cancelReservation error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ cancelReservation error: $e');
+      }
       return false;
     }
   }
@@ -150,7 +158,9 @@ class ReservationsNotifier extends AsyncNotifier<List<ReservationModel>> {
       await refresh();
       return true;
     } catch (e) {
-      print('❌ noShowReservation error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ noShowReservation error: $e');
+      }
       return false;
     }
   }
@@ -173,7 +183,9 @@ class ReservationsNotifier extends AsyncNotifier<List<ReservationModel>> {
       }
       return null;
     } catch (e) {
-      print('❌ seatReservation error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ seatReservation error: $e');
+      }
       return null;
     }
   }

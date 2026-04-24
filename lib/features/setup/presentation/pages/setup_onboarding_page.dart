@@ -22,6 +22,7 @@ import 'package:pos_erp/features/branches/data/models/branch_model.dart';
 import 'package:pos_erp/core/services/backup/backup_service.dart';
 import 'package:pos_erp/core/services/backup/models/backup_result.dart';
 import 'package:pos_erp/core/services/backup/google_drive_backup_service.dart';
+import 'package:pos_erp/core/client/api_client.dart';
 import '../../shared/setup_storage.dart';
 
 class _SetupReadiness {
@@ -331,6 +332,10 @@ class _SetupOnboardingPageState extends ConsumerState<SetupOnboardingPage> {
   bool _autoCompleting = false;
   String? _persistedSelectedBranchId;
   String? _persistedSelectedWarehouseId;
+
+  // Demo data selection state
+  bool _demoChoicePending = false;
+  bool _demoSeeding = false;
   SetupRestoreSnapshot _restoreSnapshot = const SetupRestoreSnapshot(
     status: SetupRestoreStatus.undecided,
   );
@@ -363,6 +368,7 @@ class _SetupOnboardingPageState extends ConsumerState<SetupOnboardingPage> {
     _addressController.text = settings.address;
     Future.microtask(_loadRestoreSnapshot);
     Future.microtask(_loadPersistedPosContext);
+    Future.microtask(_checkDemoChoice);
   }
 
   @override
@@ -423,6 +429,186 @@ class _SetupOnboardingPageState extends ConsumerState<SetupOnboardingPage> {
       _persistedSelectedBranchId = snapshot.branchId;
       _persistedSelectedWarehouseId = snapshot.warehouseId;
     });
+  }
+
+  Future<void> _checkDemoChoice() async {
+    final mode = await SetupStorage.getDemoMode();
+    if (!mounted) return;
+    setState(() => _demoChoicePending = mode == null);
+  }
+
+  Future<void> _applyDemoMode(String mode) async {
+    if (_demoSeeding) return;
+    setState(() => _demoSeeding = true);
+    try {
+      final api = ref.read(apiClientProvider);
+      await api.post('/api/setup/seed-demo', data: {'mode': mode});
+      await SetupStorage.setDemoMode(mode);
+      // Refresh providers so the seeded data appears immediately
+      ref.invalidate(productListProvider);
+      ref.invalidate(branchListProvider);
+      ref.invalidate(warehouseListProvider);
+      if (!mounted) return;
+      setState(() {
+        _demoChoicePending = false;
+        _demoSeeding = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _demoSeeding = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('เกิดข้อผิดพลาด: $e'),
+          backgroundColor: AppTheme.errorColor,
+        ),
+      );
+    }
+  }
+
+  Widget _demoDataCard() {
+    if (!_demoChoicePending) return const SizedBox.shrink();
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.blue.shade200, width: 1.5),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.dataset_outlined, color: Colors.blue.shade700, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  'ข้อมูลตัวอย่าง',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    color: Colors.blue.shade800,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade100,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    'ระบบใหม่',
+                    style: TextStyle(fontSize: 11, color: Colors.orange.shade800),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'เลือกประเภทข้อมูลตัวอย่างที่ต้องการสร้างสำหรับการใช้งานครั้งแรก',
+              style: TextStyle(fontSize: 13, color: AppTheme.subtextColorOf(context)),
+            ),
+            const SizedBox(height: 14),
+            if (_demoSeeding)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                      SizedBox(width: 12),
+                      Text('กำลังสร้างข้อมูลตัวอย่าง...'),
+                    ],
+                  ),
+                ),
+              )
+            else
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  _demoOptionButton(
+                    icon: Icons.point_of_sale,
+                    label: 'POS ร้านค้า',
+                    description: 'สินค้าขายปลีก + สต๊อก',
+                    color: Colors.green,
+                    onTap: () => _applyDemoMode('pos'),
+                  ),
+                  _demoOptionButton(
+                    icon: Icons.restaurant,
+                    label: 'ร้านอาหาร',
+                    description: 'เมนูอาหาร + โต๊ะ + KDS',
+                    color: Colors.orange,
+                    onTap: () => _applyDemoMode('restaurant'),
+                  ),
+                  _demoOptionButton(
+                    icon: Icons.store,
+                    label: 'ทั้งสองระบบ',
+                    description: 'POS + ร้านอาหาร',
+                    color: Colors.purple,
+                    onTap: () => _applyDemoMode('both'),
+                  ),
+                  _demoOptionButton(
+                    icon: Icons.close,
+                    label: 'ไม่ต้องการ',
+                    description: 'เริ่มจากข้อมูลเปล่า',
+                    color: Colors.grey,
+                    onTap: () => _applyDemoMode('none'),
+                  ),
+                ],
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _demoOptionButton({
+    required IconData icon,
+    required String label,
+    required String description,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        width: 150,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withValues(alpha: 0.35), width: 1.5),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: color, size: 22),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                color: color.withValues(alpha: 0.9),
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              description,
+              style: TextStyle(fontSize: 11, color: AppTheme.subtextColorOf(context)),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<String?> _promptRestorePassphrase() async {
@@ -862,6 +1048,7 @@ class _SetupOnboardingPageState extends ConsumerState<SetupOnboardingPage> {
                   const SizedBox(height: 16),
                   _restoreChoiceCard(),
                   const SizedBox(height: 16),
+                  _demoDataCard(),
                   if (_currentStep == 0) _storeInfoStep(),
                   if (_currentStep == 1)
                     _branchWarehouseStep(

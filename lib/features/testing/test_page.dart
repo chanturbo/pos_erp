@@ -1,5 +1,5 @@
-// ignore_for_file: avoid_print
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/database/app_database.dart';
@@ -379,38 +379,58 @@ class TestPage extends ConsumerWidget {
         LoadingOverlay.show(context, message: 'กำลังลบข้อมูล...');
       }
 
-      print('🗑️ Deleting stock movements...');
+      if (kDebugMode) {
+        debugPrint('🗑️ Deleting stock movements...');
+      }
       await db.delete(db.stockMovements).go();
 
-      print('🗑️ Deleting sales order items...');
+      if (kDebugMode) {
+        debugPrint('🗑️ Deleting sales order items...');
+      }
       await db.delete(db.salesOrderItems).go();
 
-      print('🗑️ Deleting sales orders...');
+      if (kDebugMode) {
+        debugPrint('🗑️ Deleting sales orders...');
+      }
       await db.delete(db.salesOrders).go();
 
-      print('🗑️ Deleting products...');
+      if (kDebugMode) {
+        debugPrint('🗑️ Deleting products...');
+      }
       await db.delete(db.products).go();
 
-      print('🗑️ Deleting product groups...');
+      if (kDebugMode) {
+        debugPrint('🗑️ Deleting product groups...');
+      }
       await db.delete(db.productGroups).go();
 
-      print('🗑️ Deleting customers...');
+      if (kDebugMode) {
+        debugPrint('🗑️ Deleting customers...');
+      }
       await db.delete(db.customers).go();
 
-      print('🗑️ Deleting warehouses...');
+      if (kDebugMode) {
+        debugPrint('🗑️ Deleting warehouses...');
+      }
       await db.delete(db.warehouses).go();
 
-      print('🗑️ Deleting branches...');
+      if (kDebugMode) {
+        debugPrint('🗑️ Deleting branches...');
+      }
       await db.delete(db.branches).go();
 
-      print('✅ Data cleared (kept users & roles)');
+      if (kDebugMode) {
+        debugPrint('✅ Data cleared (kept users & roles)');
+      }
 
       if (context.mounted) {
         LoadingOverlay.hide(context);
         context.showWarning('ลบข้อมูลสำเร็จ (เก็บ Users ไว้)');
       }
     } catch (e) {
-      print('❌ Clear data error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Clear data error: $e');
+      }
       if (context.mounted) {
         LoadingOverlay.hide(context);
         context.showError('เกิดข้อผิดพลาด: $e');

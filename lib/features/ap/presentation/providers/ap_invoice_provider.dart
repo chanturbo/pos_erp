@@ -1,4 +1,4 @@
-// ignore_for_file: avoid_print
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/ap_invoice_model.dart';
 import '../../../../core/client/api_client.dart';
@@ -21,7 +21,9 @@ class ApInvoiceNotifier extends AsyncNotifier<List<ApInvoiceModel>> {
   /// โหลดรายการใบแจ้งหนี้
   Future<List<ApInvoiceModel>> loadInvoices() async {
     try {
-      print('📡 Loading AP invoices...');
+      if (kDebugMode) {
+        debugPrint('📡 Loading AP invoices...');
+      }
 
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.get('/api/ap-invoices');
@@ -32,14 +34,20 @@ class ApInvoiceNotifier extends AsyncNotifier<List<ApInvoiceModel>> {
             .map((json) => ApInvoiceModel.fromJson(json as Map<String, dynamic>))
             .toList();
 
-        print('✅ Loaded ${invoices.length} invoices');
+        if (kDebugMode) {
+          debugPrint('✅ Loaded ${invoices.length} invoices');
+        }
         return invoices;
       }
 
-      print('⚠️ No invoices data');
+      if (kDebugMode) {
+        debugPrint('⚠️ No invoices data');
+      }
       return [];
     } catch (e) {
-      print('❌ Error loading invoices: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error loading invoices: $e');
+      }
       return [];
     }
   }
@@ -53,7 +61,9 @@ class ApInvoiceNotifier extends AsyncNotifier<List<ApInvoiceModel>> {
   /// สร้างใบแจ้งหนี้ใหม่
   Future<bool> createInvoice(ApInvoiceModel invoice) async {
     try {
-      print('📝 Creating AP invoice: ${invoice.invoiceNo}');
+      if (kDebugMode) {
+        debugPrint('📝 Creating AP invoice: ${invoice.invoiceNo}');
+      }
 
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.post(
@@ -62,13 +72,17 @@ class ApInvoiceNotifier extends AsyncNotifier<List<ApInvoiceModel>> {
       );
 
       if (response.statusCode == 200) {
-        print('✅ Invoice created successfully');
+        if (kDebugMode) {
+          debugPrint('✅ Invoice created successfully');
+        }
         await refresh();
         return true;
       }
       return false;
     } catch (e) {
-      print('❌ Error creating invoice: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error creating invoice: $e');
+      }
       return false;
     }
   }
@@ -76,7 +90,9 @@ class ApInvoiceNotifier extends AsyncNotifier<List<ApInvoiceModel>> {
   /// แก้ไขใบแจ้งหนี้
   Future<bool> updateInvoice(ApInvoiceModel invoice) async {
     try {
-      print('📝 Updating AP invoice: ${invoice.invoiceNo}');
+      if (kDebugMode) {
+        debugPrint('📝 Updating AP invoice: ${invoice.invoiceNo}');
+      }
 
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.put(
@@ -85,13 +101,17 @@ class ApInvoiceNotifier extends AsyncNotifier<List<ApInvoiceModel>> {
       );
 
       if (response.statusCode == 200) {
-        print('✅ Invoice updated successfully');
+        if (kDebugMode) {
+          debugPrint('✅ Invoice updated successfully');
+        }
         await refresh();
         return true;
       }
       return false;
     } catch (e) {
-      print('❌ Error updating invoice: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error updating invoice: $e');
+      }
       return false;
     }
   }
@@ -99,19 +119,25 @@ class ApInvoiceNotifier extends AsyncNotifier<List<ApInvoiceModel>> {
   /// ลบใบแจ้งหนี้
   Future<bool> deleteInvoice(String invoiceId) async {
     try {
-      print('🗑️ Deleting invoice: $invoiceId');
+      if (kDebugMode) {
+        debugPrint('🗑️ Deleting invoice: $invoiceId');
+      }
 
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.delete('/api/ap-invoices/$invoiceId');
 
       if (response.statusCode == 200) {
-        print('✅ Invoice deleted successfully');
+        if (kDebugMode) {
+          debugPrint('✅ Invoice deleted successfully');
+        }
         await refresh();
         return true;
       }
       return false;
     } catch (e) {
-      print('❌ Error deleting invoice: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error deleting invoice: $e');
+      }
       return false;
     }
   }
@@ -119,7 +145,9 @@ class ApInvoiceNotifier extends AsyncNotifier<List<ApInvoiceModel>> {
   /// ดึงรายละเอียดใบแจ้งหนี้พร้อมรายการสินค้า
   Future<ApInvoiceModel?> getInvoiceDetails(String invoiceId) async {
     try {
-      print('📡 Loading invoice details: $invoiceId');
+      if (kDebugMode) {
+        debugPrint('📡 Loading invoice details: $invoiceId');
+      }
 
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.get('/api/ap-invoices/$invoiceId');
@@ -131,7 +159,9 @@ class ApInvoiceNotifier extends AsyncNotifier<List<ApInvoiceModel>> {
 
       return null;
     } catch (e) {
-      print('❌ Error loading invoice details: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error loading invoice details: $e');
+      }
       return null;
     }
   }
@@ -139,7 +169,9 @@ class ApInvoiceNotifier extends AsyncNotifier<List<ApInvoiceModel>> {
   /// ดึงรายการใบแจ้งหนี้ของซัพพลายเออร์
   Future<List<ApInvoiceModel>> getInvoicesBySupplier(String supplierId) async {
     try {
-      print('📡 Loading invoices for supplier: $supplierId');
+      if (kDebugMode) {
+        debugPrint('📡 Loading invoices for supplier: $supplierId');
+      }
 
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.get('/api/ap-invoices/supplier/$supplierId');
@@ -150,13 +182,17 @@ class ApInvoiceNotifier extends AsyncNotifier<List<ApInvoiceModel>> {
             .map((json) => ApInvoiceModel.fromJson(json as Map<String, dynamic>))
             .toList();
 
-        print('✅ Loaded ${invoices.length} invoices for supplier');
+        if (kDebugMode) {
+          debugPrint('✅ Loaded ${invoices.length} invoices for supplier');
+        }
         return invoices;
       }
 
       return [];
     } catch (e) {
-      print('❌ Error loading invoices by supplier: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error loading invoices by supplier: $e');
+      }
       return [];
     }
   }
@@ -167,7 +203,9 @@ class ApInvoiceNotifier extends AsyncNotifier<List<ApInvoiceModel>> {
       final invoices = await getInvoicesBySupplier(supplierId);
       return invoices.where((inv) => !inv.isFullyPaid).toList();
     } catch (e) {
-      print('❌ Error loading unpaid invoices: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error loading unpaid invoices: $e');
+      }
       return [];
     }
   }

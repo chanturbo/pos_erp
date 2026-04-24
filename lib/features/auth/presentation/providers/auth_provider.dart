@@ -1,5 +1,5 @@
-// ignore_for_file: avoid_print
 
+import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -70,7 +70,9 @@ class AuthNotifier extends Notifier<AuthState> {
       final token = state.token;
       if (token != null) {
         client.setToken(token);
-        print('🔄 Token re-synced to new ApiClient instance');
+        if (kDebugMode) {
+          debugPrint('🔄 Token re-synced to new ApiClient instance');
+        }
       }
       _wireOnUnauthorized(client);
     });
@@ -87,9 +89,9 @@ class AuthNotifier extends Notifier<AuthState> {
       // ป้องกัน call ซ้ำ ถ้า logout ไปแล้ว
       if (!state.isAuthenticated) return;
 
-      print(
-        '🔒 onUnauthorized fired — clearing session & redirecting to login',
-      );
+      if (kDebugMode) {
+        debugPrint('🔒 onUnauthorized fired — clearing session & redirecting to login');
+      }
 
       // ล้าง token ทั้งใน state, Dio header, และ SharedPreferences
       client.setToken(null);
@@ -111,7 +113,9 @@ class AuthNotifier extends Notifier<AuthState> {
   /// โหลด Auth จาก SharedPreferences
   Future<void> _loadSavedAuth() async {
     try {
-      print('🔐 Loading saved auth...');
+      if (kDebugMode) {
+        debugPrint('🔐 Loading saved auth...');
+      }
 
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
@@ -121,14 +125,18 @@ class AuthNotifier extends Notifier<AuthState> {
         // ✅ ตรวจ token ก่อนว่ายังไม่หมดอายุ
         final payload = JwtUtils.verifyToken(token);
         if (payload == null) {
-          print('⚠️ Saved token expired — clearing auth');
+          if (kDebugMode) {
+            debugPrint('⚠️ Saved token expired — clearing auth');
+          }
           await prefs.remove('auth_token');
           await prefs.remove('user_data');
           state = state.copyWith(isRestoring: false);
           return;
         }
 
-        print('✅ Found saved auth');
+        if (kDebugMode) {
+          debugPrint('✅ Found saved auth');
+        }
 
         // Decode user
         final userMap = Map<String, dynamic>.from(jsonDecode(userJson) as Map);
@@ -149,15 +157,21 @@ class AuthNotifier extends Notifier<AuthState> {
           token: token,
         );
 
-        print('✅ Auth restored: ${user.fullName}');
+        if (kDebugMode) {
+          debugPrint('✅ Auth restored: ${user.fullName}');
+        }
       } else {
-        print('ℹ️ No saved auth found');
+        if (kDebugMode) {
+          debugPrint('ℹ️ No saved auth found');
+        }
         state = state.copyWith(
           isRestoring: false,
         ); // ✅ ไม่มี token → redirect login
       }
     } catch (e) {
-      print('❌ Load saved auth error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Load saved auth error: $e');
+      }
       state = state.copyWith(
         isRestoring: false,
       ); // ✅ error → ก็ต้อง redirect login
@@ -172,7 +186,9 @@ class AuthNotifier extends Notifier<AuthState> {
     state = state.copyWith(isLoading: true, clearError: true);
 
     try {
-      print('🔐 Logging in as $username...');
+      if (kDebugMode) {
+        debugPrint('🔐 Logging in as $username...');
+      }
 
       final apiClient = ref.read(apiClientProvider);
 
@@ -194,7 +210,10 @@ class AuthNotifier extends Notifier<AuthState> {
           branchId: data['branch_id'] as String?,
         );
 
-        final token = data['token'] as String? ?? 'dummy_token';
+        final token = data['token'] as String?;
+        if (token == null || token.isEmpty) {
+          throw Exception('Server did not return an auth token');
+        }
 
         // Save to SharedPreferences
         final prefs = await SharedPreferences.getInstance();
@@ -212,11 +231,15 @@ class AuthNotifier extends Notifier<AuthState> {
           token: token,
         );
 
-        print('✅ Login successful: ${user.fullName}');
+        if (kDebugMode) {
+          debugPrint('✅ Login successful: ${user.fullName}');
+        }
 
         return true;
       } else {
-        print('❌ Login failed: ${response.statusCode}');
+        if (kDebugMode) {
+          debugPrint('❌ Login failed: ${response.statusCode}');
+        }
         final message = response.data is Map<String, dynamic>
             ? response.data['message'] as String?
             : null;
@@ -228,7 +251,9 @@ class AuthNotifier extends Notifier<AuthState> {
         return false;
       }
     } on DioException catch (e) {
-      print('❌ Login Dio error: ${e.message}');
+      if (kDebugMode) {
+        debugPrint('❌ Login Dio error: ${e.message}');
+      }
       final responseData = e.response?.data;
       final message = responseData is Map<String, dynamic>
           ? responseData['message'] as String?
@@ -239,7 +264,9 @@ class AuthNotifier extends Notifier<AuthState> {
       );
       return false;
     } catch (e) {
-      print('❌ Login error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Login error: $e');
+      }
 
       state = state.copyWith(isLoading: false, error: 'เกิดข้อผิดพลาด: $e');
       return false;
@@ -249,7 +276,9 @@ class AuthNotifier extends Notifier<AuthState> {
   /// Logout
   Future<void> logout() async {
     try {
-      print('👋 Logging out...');
+      if (kDebugMode) {
+        debugPrint('👋 Logging out...');
+      }
 
       final apiClient = ref.read(apiClientProvider);
 
@@ -257,7 +286,9 @@ class AuthNotifier extends Notifier<AuthState> {
       try {
         await apiClient.post('/api/auth/logout');
       } catch (e) {
-        print('⚠️ Logout API error: $e');
+        if (kDebugMode) {
+          debugPrint('⚠️ Logout API error: $e');
+        }
       }
 
       // Clear SharedPreferences
@@ -271,9 +302,13 @@ class AuthNotifier extends Notifier<AuthState> {
       // Reset state
       state = AuthState.initial();
 
-      print('✅ Logged out');
+      if (kDebugMode) {
+        debugPrint('✅ Logged out');
+      }
     } catch (e) {
-      print('❌ Logout error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Logout error: $e');
+      }
     }
   }
 

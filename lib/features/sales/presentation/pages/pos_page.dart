@@ -42,6 +42,7 @@ class _PosPageState extends ConsumerState<PosPage> {
   String _searchQuery = '';
   List<PromotionModel> _buyXGetYPromos = [];
   bool _restoredRestaurantOrder = false;
+  String? _selectedGroupId; // restaurant category filter
 
   @override
   void initState() {
@@ -55,6 +56,9 @@ class _PosPageState extends ConsumerState<PosPage> {
   @override
   void dispose() {
     _searchController.dispose();
+    // Clear restaurant context when leaving POS (no payment completed path)
+    // Safe: payment flow clears it before popping, so this is a no-op after payment
+    ref.read(restaurantOrderContextProvider.notifier).state = null;
     super.dispose();
   }
 
@@ -208,7 +212,8 @@ class _PosPageState extends ConsumerState<PosPage> {
     );
     if (result == null || result.isEmpty) return;
 
-    ref.read(cartProvider.notifier).hold(result);
+    final isTakeaway = ref.read(restaurantOrderContextProvider)?.isTakeaway ?? false;
+    ref.read(cartProvider.notifier).hold(result, isTakeaway: isTakeaway);
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -323,10 +328,13 @@ class _PosPageState extends ConsumerState<PosPage> {
     var result = src.where((p) {
       if (restaurantContext != null) {
         final serviceMode = p.serviceMode.toUpperCase();
-        final supportsDineIn =
+        final supportsRestaurant =
             serviceMode == 'RESTAURANT' || serviceMode == 'BOTH';
-        if (!supportsDineIn || !p.dineInAvailable) {
-          return false;
+        if (!supportsRestaurant) return false;
+        if (restaurantContext.isTakeaway) {
+          if (!p.takeawayAvailable) return false;
+        } else {
+          if (!p.dineInAvailable) return false;
         }
       }
       if (p.isStockControl && !p.allowNegativeStock) {
@@ -356,6 +364,13 @@ class _PosPageState extends ConsumerState<PosPage> {
     // ฟัง cart changes → คำนวณของแถมใหม่เมื่อ regular items เปลี่ยน
     ref.listen<CartState>(cartProvider, (prev, next) {
       if (prev?.items != next.items) _syncFreeItems();
+    });
+
+    // Clear category filter when restaurant context changes (new table / back to retail)
+    ref.listen<RestaurantOrderContext?>(restaurantOrderContextProvider, (prev, next) {
+      if (prev?.tableId != next?.tableId || (prev != null) != (next != null)) {
+        if (mounted) setState(() => _selectedGroupId = null);
+      }
     });
 
     // ฟัง activePromotionsProvider → sync ทันทีเมื่อโปรโมชั่นถูก pause/resume
@@ -719,8 +734,19 @@ class _PosPageState extends ConsumerState<PosPage> {
                 child: productAsync.when(
                   data: (products) {
                     final filtered = _filterProducts(products, stockMap: stockMap);
-                    if (filtered.isEmpty) return _buildEmptyProducts();
-                    return ProductGrid(products: filtered);
+                    final displayed = _selectedGroupId != null
+                        ? filtered.where((p) => p.groupId == _selectedGroupId).toList()
+                        : filtered;
+                    return Column(
+                      children: [
+                        _buildCategoryBar(filtered),
+                        Expanded(
+                          child: displayed.isEmpty
+                              ? _buildEmptyProducts()
+                              : ProductGrid(products: displayed),
+                        ),
+                      ],
+                    );
                   },
                   loading: () => const Center(
                     child: Column(
@@ -879,6 +905,149 @@ class _PosPageState extends ConsumerState<PosPage> {
         },
       ),
     );
+  }
+
+  // ── Restaurant category filter bar ──────────────────────────────
+  Widget _buildCategoryBar(List<ProductModel> filteredProducts) {
+    final groups = ref.watch(productGroupsProvider).value ?? [];
+
+    // แสดงเฉพาะ group ที่ showInPos=true และมีสินค้าอยู่จริง
+    final presentGroupIds = filteredProducts
+        .map((p) => p.groupId)
+        .whereType<String>()
+        .toSet();
+    final relevantGroups = groups
+        .where((g) => g.showInPos && presentGroupIds.contains(g.groupId))
+        .toList();
+
+    // Reset stale selection if the selected group is no longer visible
+    if (_selectedGroupId != null &&
+        !relevantGroups.any((g) => g.groupId == _selectedGroupId)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _selectedGroupId = null);
+      });
+    }
+
+    if (relevantGroups.isEmpty) return const SizedBox.shrink();
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? AppTheme.darkTopBar : Colors.white;
+
+    return Container(
+      height: 48,
+      decoration: BoxDecoration(
+        color: bg,
+        border: Border(bottom: BorderSide(color: AppTheme.border)),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Row(
+          children: [
+            // "ทั้งหมด" chip
+            _groupChip(
+              label: 'ทั้งหมด',
+              count: filteredProducts.length,
+              icon: Icons.apps_rounded,
+              selected: _selectedGroupId == null,
+              onTap: () => setState(() => _selectedGroupId = null),
+            ),
+            ...relevantGroups.map((group) {
+              final count = filteredProducts
+                  .where((p) => p.groupId == group.groupId)
+                  .length;
+              return _groupChip(
+                label: group.groupName,
+                count: count,
+                icon: _groupIcon(group.groupName),
+                selected: _selectedGroupId == group.groupId,
+                onTap: () => setState(() => _selectedGroupId = group.groupId),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _groupChip({
+    required String label,
+    required int count,
+    required IconData icon,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    final color = selected ? AppTheme.primary : AppTheme.navy.withValues(alpha: 0.55);
+    final bgColor = selected
+        ? AppTheme.primary.withValues(alpha: 0.12)
+        : Colors.transparent;
+    final borderColor = selected
+        ? AppTheme.primary.withValues(alpha: 0.6)
+        : AppTheme.border;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        margin: const EdgeInsets.only(right: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: borderColor),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: color),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                color: color,
+              ),
+            ),
+            const SizedBox(width: 5),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              decoration: BoxDecoration(
+                color: selected
+                    ? AppTheme.primary.withValues(alpha: 0.2)
+                    : AppTheme.border.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '$count',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: color,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  IconData _groupIcon(String groupName) {
+    final name = groupName.toLowerCase();
+    if (name.contains('อาหาร') || name.contains('ข้าว') || name.contains('จาน')) {
+      return Icons.lunch_dining_rounded;
+    }
+    if (name.contains('เครื่องดื่ม') || name.contains('ชา') || name.contains('กาแฟ') || name.contains('น้ำ')) {
+      return Icons.local_cafe_rounded;
+    }
+    if (name.contains('ของหวาน') || name.contains('เค้ก') || name.contains('ไอศ')) {
+      return Icons.icecream_rounded;
+    }
+    if (name.contains('ของว่าง') || name.contains('ขนม') || name.contains('สแน็ค')) {
+      return Icons.cookie_rounded;
+    }
+    return Icons.category_rounded;
   }
 
   // ── Empty state ────────────────────────────────────────────────

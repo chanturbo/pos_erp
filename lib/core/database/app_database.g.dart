@@ -2277,6 +2277,21 @@ class $ProductGroupsTable extends ProductGroups
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _showInPosMeta = const VerificationMeta(
+    'showInPos',
+  );
+  @override
+  late final GeneratedColumn<bool> showInPos = GeneratedColumn<bool>(
+    'show_in_pos',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("show_in_pos" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -2298,6 +2313,7 @@ class $ProductGroupsTable extends ProductGroups
     groupType,
     imageUrl,
     displayOrder,
+    showInPos,
     createdAt,
   ];
   @override
@@ -2366,6 +2382,12 @@ class $ProductGroupsTable extends ProductGroups
         ),
       );
     }
+    if (data.containsKey('show_in_pos')) {
+      context.handle(
+        _showInPosMeta,
+        showInPos.isAcceptableOrUnknown(data['show_in_pos']!, _showInPosMeta),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -2413,6 +2435,10 @@ class $ProductGroupsTable extends ProductGroups
         DriftSqlType.int,
         data['${effectivePrefix}display_order'],
       )!,
+      showInPos: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}show_in_pos'],
+      )!,
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -2434,6 +2460,7 @@ class ProductGroup extends DataClass implements Insertable<ProductGroup> {
   final String groupType;
   final String? imageUrl;
   final int displayOrder;
+  final bool showInPos;
   final DateTime createdAt;
   const ProductGroup({
     required this.groupId,
@@ -2443,6 +2470,7 @@ class ProductGroup extends DataClass implements Insertable<ProductGroup> {
     required this.groupType,
     this.imageUrl,
     required this.displayOrder,
+    required this.showInPos,
     required this.createdAt,
   });
   @override
@@ -2459,6 +2487,7 @@ class ProductGroup extends DataClass implements Insertable<ProductGroup> {
       map['image_url'] = Variable<String>(imageUrl);
     }
     map['display_order'] = Variable<int>(displayOrder);
+    map['show_in_pos'] = Variable<bool>(showInPos);
     map['created_at'] = Variable<DateTime>(createdAt);
     return map;
   }
@@ -2476,6 +2505,7 @@ class ProductGroup extends DataClass implements Insertable<ProductGroup> {
           ? const Value.absent()
           : Value(imageUrl),
       displayOrder: Value(displayOrder),
+      showInPos: Value(showInPos),
       createdAt: Value(createdAt),
     );
   }
@@ -2493,6 +2523,7 @@ class ProductGroup extends DataClass implements Insertable<ProductGroup> {
       groupType: serializer.fromJson<String>(json['groupType']),
       imageUrl: serializer.fromJson<String?>(json['imageUrl']),
       displayOrder: serializer.fromJson<int>(json['displayOrder']),
+      showInPos: serializer.fromJson<bool>(json['showInPos']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
@@ -2507,6 +2538,7 @@ class ProductGroup extends DataClass implements Insertable<ProductGroup> {
       'groupType': serializer.toJson<String>(groupType),
       'imageUrl': serializer.toJson<String?>(imageUrl),
       'displayOrder': serializer.toJson<int>(displayOrder),
+      'showInPos': serializer.toJson<bool>(showInPos),
       'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
@@ -2519,6 +2551,7 @@ class ProductGroup extends DataClass implements Insertable<ProductGroup> {
     String? groupType,
     Value<String?> imageUrl = const Value.absent(),
     int? displayOrder,
+    bool? showInPos,
     DateTime? createdAt,
   }) => ProductGroup(
     groupId: groupId ?? this.groupId,
@@ -2530,6 +2563,7 @@ class ProductGroup extends DataClass implements Insertable<ProductGroup> {
     groupType: groupType ?? this.groupType,
     imageUrl: imageUrl.present ? imageUrl.value : this.imageUrl,
     displayOrder: displayOrder ?? this.displayOrder,
+    showInPos: showInPos ?? this.showInPos,
     createdAt: createdAt ?? this.createdAt,
   );
   ProductGroup copyWithCompanion(ProductGroupsCompanion data) {
@@ -2545,6 +2579,7 @@ class ProductGroup extends DataClass implements Insertable<ProductGroup> {
       displayOrder: data.displayOrder.present
           ? data.displayOrder.value
           : this.displayOrder,
+      showInPos: data.showInPos.present ? data.showInPos.value : this.showInPos,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
@@ -2559,6 +2594,7 @@ class ProductGroup extends DataClass implements Insertable<ProductGroup> {
           ..write('groupType: $groupType, ')
           ..write('imageUrl: $imageUrl, ')
           ..write('displayOrder: $displayOrder, ')
+          ..write('showInPos: $showInPos, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
@@ -2573,6 +2609,7 @@ class ProductGroup extends DataClass implements Insertable<ProductGroup> {
     groupType,
     imageUrl,
     displayOrder,
+    showInPos,
     createdAt,
   );
   @override
@@ -2586,6 +2623,7 @@ class ProductGroup extends DataClass implements Insertable<ProductGroup> {
           other.groupType == this.groupType &&
           other.imageUrl == this.imageUrl &&
           other.displayOrder == this.displayOrder &&
+          other.showInPos == this.showInPos &&
           other.createdAt == this.createdAt);
 }
 
@@ -2597,6 +2635,7 @@ class ProductGroupsCompanion extends UpdateCompanion<ProductGroup> {
   final Value<String> groupType;
   final Value<String?> imageUrl;
   final Value<int> displayOrder;
+  final Value<bool> showInPos;
   final Value<DateTime> createdAt;
   final Value<int> rowid;
   const ProductGroupsCompanion({
@@ -2607,6 +2646,7 @@ class ProductGroupsCompanion extends UpdateCompanion<ProductGroup> {
     this.groupType = const Value.absent(),
     this.imageUrl = const Value.absent(),
     this.displayOrder = const Value.absent(),
+    this.showInPos = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -2618,6 +2658,7 @@ class ProductGroupsCompanion extends UpdateCompanion<ProductGroup> {
     this.groupType = const Value.absent(),
     this.imageUrl = const Value.absent(),
     this.displayOrder = const Value.absent(),
+    this.showInPos = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : groupId = Value(groupId),
@@ -2631,6 +2672,7 @@ class ProductGroupsCompanion extends UpdateCompanion<ProductGroup> {
     Expression<String>? groupType,
     Expression<String>? imageUrl,
     Expression<int>? displayOrder,
+    Expression<bool>? showInPos,
     Expression<DateTime>? createdAt,
     Expression<int>? rowid,
   }) {
@@ -2642,6 +2684,7 @@ class ProductGroupsCompanion extends UpdateCompanion<ProductGroup> {
       if (groupType != null) 'group_type': groupType,
       if (imageUrl != null) 'image_url': imageUrl,
       if (displayOrder != null) 'display_order': displayOrder,
+      if (showInPos != null) 'show_in_pos': showInPos,
       if (createdAt != null) 'created_at': createdAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -2655,6 +2698,7 @@ class ProductGroupsCompanion extends UpdateCompanion<ProductGroup> {
     Value<String>? groupType,
     Value<String?>? imageUrl,
     Value<int>? displayOrder,
+    Value<bool>? showInPos,
     Value<DateTime>? createdAt,
     Value<int>? rowid,
   }) {
@@ -2666,6 +2710,7 @@ class ProductGroupsCompanion extends UpdateCompanion<ProductGroup> {
       groupType: groupType ?? this.groupType,
       imageUrl: imageUrl ?? this.imageUrl,
       displayOrder: displayOrder ?? this.displayOrder,
+      showInPos: showInPos ?? this.showInPos,
       createdAt: createdAt ?? this.createdAt,
       rowid: rowid ?? this.rowid,
     );
@@ -2695,6 +2740,9 @@ class ProductGroupsCompanion extends UpdateCompanion<ProductGroup> {
     if (displayOrder.present) {
       map['display_order'] = Variable<int>(displayOrder.value);
     }
+    if (showInPos.present) {
+      map['show_in_pos'] = Variable<bool>(showInPos.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -2714,6 +2762,7 @@ class ProductGroupsCompanion extends UpdateCompanion<ProductGroup> {
           ..write('groupType: $groupType, ')
           ..write('imageUrl: $imageUrl, ')
           ..write('displayOrder: $displayOrder, ')
+          ..write('showInPos: $showInPos, ')
           ..write('createdAt: $createdAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -35171,6 +35220,7 @@ typedef $$ProductGroupsTableCreateCompanionBuilder =
       Value<String> groupType,
       Value<String?> imageUrl,
       Value<int> displayOrder,
+      Value<bool> showInPos,
       Value<DateTime> createdAt,
       Value<int> rowid,
     });
@@ -35183,6 +35233,7 @@ typedef $$ProductGroupsTableUpdateCompanionBuilder =
       Value<String> groupType,
       Value<String?> imageUrl,
       Value<int> displayOrder,
+      Value<bool> showInPos,
       Value<DateTime> createdAt,
       Value<int> rowid,
     });
@@ -35261,6 +35312,11 @@ class $$ProductGroupsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<bool> get showInPos => $composableBuilder(
+    column: $table.showInPos,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnFilters(column),
@@ -35336,6 +35392,11 @@ class $$ProductGroupsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get showInPos => $composableBuilder(
+    column: $table.showInPos,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -35375,6 +35436,9 @@ class $$ProductGroupsTableAnnotationComposer
     column: $table.displayOrder,
     builder: (column) => column,
   );
+
+  GeneratedColumn<bool> get showInPos =>
+      $composableBuilder(column: $table.showInPos, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -35440,6 +35504,7 @@ class $$ProductGroupsTableTableManager
                 Value<String> groupType = const Value.absent(),
                 Value<String?> imageUrl = const Value.absent(),
                 Value<int> displayOrder = const Value.absent(),
+                Value<bool> showInPos = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ProductGroupsCompanion(
@@ -35450,6 +35515,7 @@ class $$ProductGroupsTableTableManager
                 groupType: groupType,
                 imageUrl: imageUrl,
                 displayOrder: displayOrder,
+                showInPos: showInPos,
                 createdAt: createdAt,
                 rowid: rowid,
               ),
@@ -35462,6 +35528,7 @@ class $$ProductGroupsTableTableManager
                 Value<String> groupType = const Value.absent(),
                 Value<String?> imageUrl = const Value.absent(),
                 Value<int> displayOrder = const Value.absent(),
+                Value<bool> showInPos = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ProductGroupsCompanion.insert(
@@ -35472,6 +35539,7 @@ class $$ProductGroupsTableTableManager
                 groupType: groupType,
                 imageUrl: imageUrl,
                 displayOrder: displayOrder,
+                showInPos: showInPos,
                 createdAt: createdAt,
                 rowid: rowid,
               ),

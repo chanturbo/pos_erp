@@ -3,22 +3,54 @@
 import 'package:drift/drift.dart';
 import 'app_database.dart';
 
+enum DemoMode { posOnly, restaurantOnly, both, none }
+
 class SeedData {
-  /// Seed All Data
-  static Future<void> seedAll(AppDatabase db) async {
-    print('🌱 Starting seed data...');
+  /// Seed essential base data (always required — no demo products)
+  static Future<void> seedEssential(AppDatabase db) async {
+    print('🌱 Seeding essential data...');
     await seedCompanies(db);
     await seedBranches(db);
     await seedWarehouses(db);
-    await seedRoles(db); // ✅ ต้องอยู่ก่อน seedUsers (FK constraint)
+    await seedRoles(db);
     await seedUsers(db);
-    await seedCustomerGroups(db); // ✅ ต้องอยู่ก่อน seedCustomers
+    await seedCustomerGroups(db);
     await seedCustomers(db);
-    await seedSuppliers(db); // ✅ เพิ่ม
+    await seedSuppliers(db);
+    print('✅ Essential data seeded');
+  }
+
+  /// Seed POS demo: product groups + products + initial stock
+  static Future<void> seedPosDemo(AppDatabase db) async {
+    print('🌱 Seeding POS demo data...');
     await seedProductGroups(db);
     await seedProducts(db);
-    await seedRestaurantDemo(db);
+    print('✅ POS demo seeded');
+  }
 
+  /// Seed demo data by mode
+  static Future<void> seedByMode(AppDatabase db, DemoMode mode) async {
+    await seedEssential(db);
+    switch (mode) {
+      case DemoMode.posOnly:
+        await seedPosDemo(db);
+      case DemoMode.restaurantOnly:
+        await seedRestaurantDemo(db);
+      case DemoMode.both:
+        await seedPosDemo(db);
+        await seedRestaurantDemo(db);
+      case DemoMode.none:
+        break;
+    }
+    print('✅ Seed by mode ($mode) completed');
+  }
+
+  /// Seed All Data (backward-compatible — seeds everything)
+  static Future<void> seedAll(AppDatabase db) async {
+    print('🌱 Starting seed data...');
+    await seedEssential(db);
+    await seedPosDemo(db);
+    await seedRestaurantDemo(db);
     print('✅ Seed data completed');
   }
 
@@ -46,41 +78,17 @@ class SeedData {
     final branches = [
       BranchesCompanion.insert(
         branchId: 'BR001',
-        companyId: 'COMP001', // ✅ เพิ่ม required field
+        companyId: 'COMP001',
         branchCode: 'HQ',
         branchName: 'สาขาหลัก',
         address: const Value('123 ถนนทดสอบ กรุงเทพฯ 10100'),
         phone: const Value('02-123-4567'),
-      ),
-      BranchesCompanion.insert(
-        branchId: 'BR-RST-001',
-        companyId: 'COMP001',
-        branchCode: 'REST',
-        branchName: 'DEE Bistro Demo',
-        address: const Value('45 ถนนสุขุมวิท กรุงเทพฯ 10110'),
-        phone: const Value('02-555-0101'),
         businessMode: const Value('RESTAURANT'),
       ),
     ];
 
     for (var branch in branches) {
-      try {
-        await db
-            .into(db.branches)
-            .insert(branch, mode: InsertMode.insertOrIgnore);
-      } catch (e) {
-        // Branch exists
-      }
-    }
-
-    for (var branch in branches) {
-      try {
-        await db
-            .into(db.branches)
-            .insert(branch, mode: InsertMode.insertOrIgnore);
-      } catch (e) {
-        // Branch exists
-      }
+      await db.into(db.branches).insertOnConflictUpdate(branch);
     }
   }
 
@@ -92,24 +100,11 @@ class SeedData {
         warehouseCode: 'WH-HQ',
         warehouseName: 'คลังสาขาหลัก',
         branchId: 'BR001',
-        // ❌ ลบ isActive ออก
-      ),
-      WarehousesCompanion.insert(
-        warehouseId: 'WH-RST-001',
-        warehouseCode: 'WH-REST',
-        warehouseName: 'คลังร้านอาหาร',
-        branchId: 'BR-RST-001',
       ),
     ];
 
     for (var warehouse in warehouses) {
-      try {
-        await db
-            .into(db.warehouses)
-            .insert(warehouse, mode: InsertMode.insertOrIgnore);
-      } catch (e) {
-        // Warehouse exists
-      }
+      await db.into(db.warehouses).insertOnConflictUpdate(warehouse);
     }
   }
 
@@ -286,29 +281,55 @@ class SeedData {
       ProductGroupsCompanion.insert(
         groupId: 'GRP001',
         groupCode: 'FOOD',
-        groupName: 'อาหารและเครื่องดื่ม',
-        // ❌ ลบ isActive ออก
+        groupName: 'อาหาร',
+        displayOrder: const Value(10),
       ),
       ProductGroupsCompanion.insert(
         groupId: 'GRP002',
-        groupCode: 'SNACK',
-        groupName: 'ขนมและของว่าง',
+        groupCode: 'DESSERT',
+        groupName: 'ของหวาน',
+        displayOrder: const Value(20),
       ),
       ProductGroupsCompanion.insert(
         groupId: 'GRP003',
-        groupCode: 'DAILY',
-        groupName: 'ของใช้ประจำวัน',
+        groupCode: 'DRINK',
+        groupName: 'เครื่องดื่ม',
+        displayOrder: const Value(30),
+      ),
+      ProductGroupsCompanion.insert(
+        groupId: 'GRP004',
+        groupCode: 'SNACK',
+        groupName: 'ของทานเล่น',
+        displayOrder: const Value(40),
+      ),
+      ProductGroupsCompanion.insert(
+        groupId: 'GRP005',
+        groupCode: 'BAKERY',
+        groupName: 'เบเกอรี่',
+        displayOrder: const Value(50),
+      ),
+      ProductGroupsCompanion.insert(
+        groupId: 'GRP006',
+        groupCode: 'BUFFET',
+        groupName: 'บุฟเฟต์',
+        displayOrder: const Value(60),
+      ),
+      ProductGroupsCompanion.insert(
+        groupId: 'GRP007',
+        groupCode: 'HEALTHY',
+        groupName: 'อาหารสุขภาพ',
+        displayOrder: const Value(70),
+      ),
+      ProductGroupsCompanion.insert(
+        groupId: 'GRP008',
+        groupCode: 'OTHER',
+        groupName: 'อื่นๆ',
+        displayOrder: const Value(80),
       ),
     ];
 
     for (var group in groups) {
-      try {
-        await db
-            .into(db.productGroups)
-            .insert(group, mode: InsertMode.insertOrIgnore);
-      } catch (e) {
-        // Group exists
-      }
+      await db.into(db.productGroups).insertOnConflictUpdate(group);
     }
   }
 
@@ -320,8 +341,10 @@ class SeedData {
         productCode: 'FOOD-001',
         productName: 'น้ำดื่ม 600ml',
         barcode: const Value('8850123456789'),
-        // ❌ ลบ productGroupId, cost, price1, isStockControl, allowNegativeStock, isActive
         baseUnit: 'ขวด',
+        serviceMode: const Value('BOTH'),
+        dineInAvailable: const Value(true),
+        takeawayAvailable: const Value(true),
       ),
       ProductsCompanion.insert(
         productId: 'PRD002',
@@ -329,6 +352,9 @@ class SeedData {
         productName: 'กาแฟกระป๋อง',
         barcode: const Value('8850123456790'),
         baseUnit: 'กระป๋อง',
+        serviceMode: const Value('BOTH'),
+        dineInAvailable: const Value(true),
+        takeawayAvailable: const Value(true),
       ),
       ProductsCompanion.insert(
         productId: 'PRD003',
@@ -336,6 +362,9 @@ class SeedData {
         productName: 'ชาเขียวญี่ปุ่น',
         barcode: const Value('8850123456791'),
         baseUnit: 'ขวด',
+        serviceMode: const Value('BOTH'),
+        dineInAvailable: const Value(true),
+        takeawayAvailable: const Value(true),
       ),
       ProductsCompanion.insert(
         productId: 'PRD004',
@@ -343,6 +372,9 @@ class SeedData {
         productName: 'มันฝรั่งทอด รสออริจินัล',
         barcode: const Value('8850123456792'),
         baseUnit: 'ถุง',
+        serviceMode: const Value('BOTH'),
+        dineInAvailable: const Value(true),
+        takeawayAvailable: const Value(true),
       ),
       ProductsCompanion.insert(
         productId: 'PRD005',
@@ -350,6 +382,9 @@ class SeedData {
         productName: 'คุกกี้ช็อกโกแลต',
         barcode: const Value('8850123456793'),
         baseUnit: 'กล่อง',
+        serviceMode: const Value('BOTH'),
+        dineInAvailable: const Value(true),
+        takeawayAvailable: const Value(true),
       ),
       ProductsCompanion.insert(
         productId: 'PRD006',
@@ -357,6 +392,9 @@ class SeedData {
         productName: 'ยาสีฟัน',
         barcode: const Value('8850123456794'),
         baseUnit: 'หลอด',
+        serviceMode: const Value('BOTH'),
+        dineInAvailable: const Value(true),
+        takeawayAvailable: const Value(true),
       ),
       ProductsCompanion.insert(
         productId: 'PRD007',
@@ -364,6 +402,9 @@ class SeedData {
         productName: 'แชมพู',
         barcode: const Value('8850123456795'),
         baseUnit: 'ขวด',
+        serviceMode: const Value('BOTH'),
+        dineInAvailable: const Value(true),
+        takeawayAvailable: const Value(true),
       ),
       ProductsCompanion.insert(
         productId: 'PRD008',
@@ -371,17 +412,14 @@ class SeedData {
         productName: 'สบู่ก้อน',
         barcode: const Value('8850123456796'),
         baseUnit: 'ก้อน',
+        serviceMode: const Value('BOTH'),
+        dineInAvailable: const Value(true),
+        takeawayAvailable: const Value(true),
       ),
     ];
 
     for (var product in products) {
-      try {
-        await db
-            .into(db.products)
-            .insert(product, mode: InsertMode.insertOrIgnore);
-      } catch (e) {
-        // Product exists
-      }
+      await db.into(db.products).insertOnConflictUpdate(product);
     }
 
     await seedInitialStock(db);
@@ -507,23 +545,58 @@ class SeedData {
       ProductGroupsCompanion.insert(
         groupId: 'RST-GRP-FOOD',
         groupCode: 'RST-FOOD',
-        groupName: 'อาหารจานหลัก',
+        groupName: 'อาหาร',
         groupType: const Value('RESTAURANT'),
         displayOrder: const Value(10),
-      ),
-      ProductGroupsCompanion.insert(
-        groupId: 'RST-GRP-DRINK',
-        groupCode: 'RST-DRINK',
-        groupName: 'เครื่องดื่ม',
-        groupType: const Value('RESTAURANT'),
-        displayOrder: const Value(20),
       ),
       ProductGroupsCompanion.insert(
         groupId: 'RST-GRP-DESSERT',
         groupCode: 'RST-DESSERT',
         groupName: 'ของหวาน',
         groupType: const Value('RESTAURANT'),
+        displayOrder: const Value(20),
+      ),
+      ProductGroupsCompanion.insert(
+        groupId: 'RST-GRP-DRINK',
+        groupCode: 'RST-DRINK',
+        groupName: 'เครื่องดื่ม',
+        groupType: const Value('RESTAURANT'),
         displayOrder: const Value(30),
+      ),
+      ProductGroupsCompanion.insert(
+        groupId: 'RST-GRP-SNACK',
+        groupCode: 'RST-SNACK',
+        groupName: 'ของทานเล่น',
+        groupType: const Value('RESTAURANT'),
+        displayOrder: const Value(40),
+      ),
+      ProductGroupsCompanion.insert(
+        groupId: 'RST-GRP-BAKERY',
+        groupCode: 'RST-BAKERY',
+        groupName: 'เบเกอรี่',
+        groupType: const Value('RESTAURANT'),
+        displayOrder: const Value(50),
+      ),
+      ProductGroupsCompanion.insert(
+        groupId: 'RST-GRP-BUFFET',
+        groupCode: 'RST-BUFFET',
+        groupName: 'บุฟเฟต์',
+        groupType: const Value('RESTAURANT'),
+        displayOrder: const Value(60),
+      ),
+      ProductGroupsCompanion.insert(
+        groupId: 'RST-GRP-HEALTHY',
+        groupCode: 'RST-HEALTHY',
+        groupName: 'อาหารสุขภาพ',
+        groupType: const Value('RESTAURANT'),
+        displayOrder: const Value(70),
+      ),
+      ProductGroupsCompanion.insert(
+        groupId: 'RST-GRP-OTHER',
+        groupCode: 'RST-OTHER',
+        groupName: 'อื่นๆ',
+        groupType: const Value('RESTAURANT'),
+        displayOrder: const Value(80),
       ),
     ];
 
@@ -595,6 +668,8 @@ class SeedData {
         baseUnit: 'แก้ว',
         priceLevel1: const Value(55),
         standardCost: const Value(18),
+        isStockControl: const Value(false),
+        allowNegativeStock: const Value(true),
         reorderPoint: const Value(30),
         serviceMode: const Value('BOTH'),
         prepStation: const Value('bar'),
@@ -611,6 +686,8 @@ class SeedData {
         baseUnit: 'แก้ว',
         priceLevel1: const Value(65),
         standardCost: const Value(22),
+        isStockControl: const Value(false),
+        allowNegativeStock: const Value(true),
         reorderPoint: const Value(30),
         serviceMode: const Value('BOTH'),
         prepStation: const Value('bar'),
@@ -645,6 +722,8 @@ class SeedData {
         baseUnit: 'ขวด',
         priceLevel1: const Value(15),
         standardCost: const Value(6),
+        isStockControl: const Value(true),
+        allowNegativeStock: const Value(true),
         reorderPoint: const Value(48),
         serviceMode: const Value('BOTH'),
         prepStation: const Value('cashier'),
@@ -662,25 +741,19 @@ class SeedData {
       ZonesCompanion.insert(
         zoneId: 'RST-ZONE-FRONT',
         zoneName: 'หน้าร้าน',
-        branchId: 'BR-RST-001',
+        branchId: 'BR001',
         displayOrder: const Value(10),
       ),
       ZonesCompanion.insert(
         zoneId: 'RST-ZONE-AIR',
         zoneName: 'ห้องแอร์',
-        branchId: 'BR-RST-001',
+        branchId: 'BR001',
         displayOrder: const Value(20),
-      ),
-      ZonesCompanion.insert(
-        zoneId: 'RST-ZONE-TAKE',
-        zoneName: 'รับกลับบ้าน',
-        branchId: 'BR-RST-001',
-        displayOrder: const Value(30),
       ),
     ];
 
     for (final zone in zones) {
-      await db.into(db.zones).insert(zone, mode: InsertMode.insertOrIgnore);
+      await db.into(db.zones).insertOnConflictUpdate(zone);
     }
 
     final tables = [
@@ -700,20 +773,6 @@ class SeedData {
           zoneId: 'RST-ZONE-AIR',
           capacity: const Value(6),
         ),
-      DiningTablesCompanion.insert(
-        tableId: 'RST-TBL-TK1',
-        tableNo: 'TK1',
-        tableDisplayName: const Value('Takeaway 1'),
-        zoneId: 'RST-ZONE-TAKE',
-        capacity: const Value(1),
-      ),
-      DiningTablesCompanion.insert(
-        tableId: 'RST-TBL-TK2',
-        tableNo: 'TK2',
-        tableDisplayName: const Value('Takeaway 2'),
-        zoneId: 'RST-ZONE-TAKE',
-        capacity: const Value(1),
-      ),
     ];
 
     for (final table in tables) {
@@ -730,7 +789,7 @@ class SeedData {
           movementDate: DateTime.now(),
           movementType: 'INIT',
           productId: restaurantProducts[i].productId.value,
-          warehouseId: 'WH-RST-001',
+          warehouseId: 'WH001',
           userId: 'USR001',
           quantity: i >= 3 ? 120 : 80,
           unitCost: Value(i >= 3 ? 10.0 : 30.0),

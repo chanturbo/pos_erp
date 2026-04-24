@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 enum BusinessMode {
   retail,
   restaurant,
@@ -100,6 +102,20 @@ enum PrepStation {
         return 'ของหวาน';
       case PrepStation.cashier:
         return 'แคชเชียร์';
+    }
+  }
+
+  /// ไอคอนสำหรับแสดงใน KitchenDisplayPage
+  IconData get icon {
+    switch (this) {
+      case PrepStation.kitchen:
+        return Icons.restaurant;
+      case PrepStation.bar:
+        return Icons.local_bar;
+      case PrepStation.dessert:
+        return Icons.cake;
+      case PrepStation.cashier:
+        return Icons.point_of_sale;
     }
   }
 }

@@ -1407,6 +1407,7 @@ class _PToggleBtn extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Tooltip(
     message: tooltip,
+    waitDuration: const Duration(milliseconds: 400),
     child: InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
@@ -1476,6 +1477,7 @@ class _PRefreshBtn extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Tooltip(
     message: 'รีเฟรช',
+    waitDuration: const Duration(milliseconds: 400),
     child: InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
@@ -1910,6 +1912,7 @@ class _ProductResizableHeader extends StatelessWidget {
           // ปุ่ม reset
           Tooltip(
             message: 'รีเซตความกว้างคอลัมน์',
+            waitDuration: const Duration(milliseconds: 400),
             child: InkWell(
               onTap: onReset,
               borderRadius: BorderRadius.circular(4),
@@ -2107,6 +2110,7 @@ class _ActionIconBtn extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Tooltip(
     message: tooltip,
+    waitDuration: const Duration(milliseconds: 400),
     child: InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),

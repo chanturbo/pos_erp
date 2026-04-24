@@ -1,5 +1,5 @@
-// ignore_for_file: avoid_print
 
+import 'package:flutter/foundation.dart';
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -85,7 +85,9 @@ class KitchenQueueNotifier extends AsyncNotifier<List<KitchenQueueItemModel>> {
         }
       }
     } catch (e) {
-      print('⚠️ kitchen silent refresh error: $e');
+      if (kDebugMode) {
+        debugPrint('⚠️ kitchen silent refresh error: $e');
+      }
     }
   }
 
@@ -118,7 +120,9 @@ class KitchenQueueNotifier extends AsyncNotifier<List<KitchenQueueItemModel>> {
       }
       return false;
     } catch (e) {
-      print('❌ updateStatus error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ updateStatus error: $e');
+      }
       return false;
     }
   }
@@ -139,7 +143,9 @@ class KitchenQueueNotifier extends AsyncNotifier<List<KitchenQueueItemModel>> {
       }
       return false;
     } catch (e) {
-      print('❌ fireCourse error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ fireCourse error: $e');
+      }
       return false;
     }
   }

@@ -605,8 +605,8 @@ class CartNotifier extends Notifier<CartState> {
   }
 
   /// พักบิล
-  void hold(String name) {
-    ref.read(holdOrdersProvider.notifier).addOrder(name, state);
+  void hold(String name, {bool isTakeaway = false}) {
+    ref.read(holdOrdersProvider.notifier).addOrder(name, state, isTakeaway: isTakeaway);
     clear();
   }
 }
@@ -647,17 +647,20 @@ class HoldOrder {
   final String name;
   final CartState cartState;
   final DateTime timestamp;
+  final bool isTakeaway;
 
   HoldOrder({
     required this.name,
     required this.cartState,
     required this.timestamp,
+    this.isTakeaway = false,
   });
 
   Map<String, dynamic> toJson() => {
     'name': name,
     'cart_state': cartState.toJson(),
     'timestamp': timestamp.toIso8601String(),
+    'is_takeaway': isTakeaway,
   };
 
   factory HoldOrder.fromJson(Map<String, dynamic> json) => HoldOrder(
@@ -667,6 +670,7 @@ class HoldOrder {
     ),
     timestamp:
         DateTime.tryParse(json['timestamp'] as String? ?? '') ?? DateTime.now(),
+    isTakeaway: json['is_takeaway'] as bool? ?? false,
   );
 }
 
@@ -703,10 +707,10 @@ class HoldOrdersNotifier extends Notifier<HoldOrdersState> {
     return HoldOrdersState();
   }
 
-  void addOrder(String name, CartState cartState) {
+  void addOrder(String name, CartState cartState, {bool isTakeaway = false}) {
     final orders = List<HoldOrder>.from(state.orders);
     orders.add(
-      HoldOrder(name: name, cartState: cartState, timestamp: DateTime.now()),
+      HoldOrder(name: name, cartState: cartState, timestamp: DateTime.now(), isTakeaway: isTakeaway),
     );
     state = state.copyWith(orders: orders);
     _persist();
@@ -723,6 +727,7 @@ class HoldOrdersNotifier extends Notifier<HoldOrdersState> {
       name: trimmed,
       cartState: current.cartState,
       timestamp: current.timestamp,
+      isTakeaway: current.isTakeaway,
     );
     state = state.copyWith(orders: orders);
     _persist();

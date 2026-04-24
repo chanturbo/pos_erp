@@ -12,6 +12,7 @@ class ProductGroups extends Table {
   TextColumn get groupType => text().withDefault(const Constant('GENERAL'))();
   TextColumn get imageUrl => text().nullable()();
   IntColumn get displayOrder => integer().withDefault(const Constant(0))();
+  BoolColumn get showInPos => boolean().withDefault(const Constant(true))();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
   
   @override

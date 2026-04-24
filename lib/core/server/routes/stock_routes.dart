@@ -61,9 +61,9 @@ class StockRoutes {
           AND sm.warehouse_id = w.warehouse_id
         LEFT JOIN stock_balances sb ON sb.product_id = p.product_id
           AND sb.warehouse_id = w.warehouse_id
-        WHERE p.is_stock_control = 1
+        WHERE p.is_active = 1
         GROUP BY p.product_id, w.warehouse_id
-        HAVING balance > 0 OR p.is_active = 1
+        HAVING p.is_stock_control = 1 OR COALESCE(SUM(sm.quantity), 0) > 0
         ORDER BY p.product_code, w.warehouse_code
       ''';
 

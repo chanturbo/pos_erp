@@ -25,10 +25,10 @@ class _ViewModeNotifier extends Notifier<ProductViewMode> {
   ProductViewMode build() {
     Future.microtask(() async {
       final prefs = await SharedPreferences.getInstance();
-      final saved = prefs.getString('pos_product_view_mode') ?? 'list';
-      state = saved == 'grid' ? ProductViewMode.grid : ProductViewMode.list;
+      final saved = prefs.getString('pos_product_view_mode') ?? 'grid';
+      state = saved == 'list' ? ProductViewMode.list : ProductViewMode.grid;
     });
-    return ProductViewMode.list;
+    return ProductViewMode.grid;
   }
 
   void set(ProductViewMode mode) => state = mode;

@@ -1,5 +1,5 @@
-// ignore_for_file: avoid_print
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/client/api_client.dart';
 import '../../data/models/stock_balance_model.dart';
@@ -18,7 +18,9 @@ class StockBalanceNotifier extends AsyncNotifier<List<StockBalanceModel>> {
   /// โหลดสต๊อกคงเหลือ
   Future<List<StockBalanceModel>> loadStockBalance() async {
     try {
-      print('📡 Loading stock balance...');
+      if (kDebugMode) {
+        debugPrint('📡 Loading stock balance...');
+      }
       
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.get('/api/stock/balance');
@@ -27,14 +29,18 @@ class StockBalanceNotifier extends AsyncNotifier<List<StockBalanceModel>> {
         final data = response.data['data'] as List;
         final stocks = data.map((json) => StockBalanceModel.fromJson(json)).toList();
         
-        print('✅ Loaded ${stocks.length} stock items');
+        if (kDebugMode) {
+          debugPrint('✅ Loaded ${stocks.length} stock items');
+        }
         
         return stocks;
       } else {
         throw Exception('Failed to load stock balance: ${response.statusCode}');
       }
     } catch (e) {
-      print('❌ Error loading stock balance: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error loading stock balance: $e');
+      }
       throw Exception('เกิดข้อผิดพลาด: $e');
     }
   }
@@ -55,7 +61,9 @@ class StockBalanceNotifier extends AsyncNotifier<List<StockBalanceModel>> {
     String? remark,
   }) async {
     try {
-      print('📦 Stock in: $quantity @ cost $unitCost');
+      if (kDebugMode) {
+        debugPrint('📦 Stock in: $quantity @ cost $unitCost');
+      }
 
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.post('/api/stock/in', data: {
@@ -68,13 +76,17 @@ class StockBalanceNotifier extends AsyncNotifier<List<StockBalanceModel>> {
       });
       
       if (response.statusCode == 200) {
-        print('✅ Stock in success');
+        if (kDebugMode) {
+          debugPrint('✅ Stock in success');
+        }
         await refresh();
         return true;
       }
       return false;
     } catch (e) {
-      print('❌ Error stock in: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error stock in: $e');
+      }
       return false;
     }
   }
@@ -88,7 +100,9 @@ class StockBalanceNotifier extends AsyncNotifier<List<StockBalanceModel>> {
     String? remark,
   }) async {
     try {
-      print('📤 Stock out: $quantity');
+      if (kDebugMode) {
+        debugPrint('📤 Stock out: $quantity');
+      }
       
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.post('/api/stock/out', data: {
@@ -100,13 +114,17 @@ class StockBalanceNotifier extends AsyncNotifier<List<StockBalanceModel>> {
       });
       
       if (response.statusCode == 200) {
-        print('✅ Stock out success');
+        if (kDebugMode) {
+          debugPrint('✅ Stock out success');
+        }
         await refresh();
         return true;
       }
       return false;
     } catch (e) {
-      print('❌ Error stock out: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error stock out: $e');
+      }
       return false;
     }
   }
@@ -120,7 +138,9 @@ class StockBalanceNotifier extends AsyncNotifier<List<StockBalanceModel>> {
     required String remark,
   }) async {
     try {
-      print('📝 Adjust stock to: $newBalance');
+      if (kDebugMode) {
+        debugPrint('📝 Adjust stock to: $newBalance');
+      }
       
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.post('/api/stock/adjust', data: {
@@ -132,13 +152,17 @@ class StockBalanceNotifier extends AsyncNotifier<List<StockBalanceModel>> {
       });
       
       if (response.statusCode == 200) {
-        print('✅ Adjust stock success');
+        if (kDebugMode) {
+          debugPrint('✅ Adjust stock success');
+        }
         await refresh();
         return true;
       }
       return false;
     } catch (e) {
-      print('❌ Error adjust stock: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error adjust stock: $e');
+      }
       return false;
     }
   }
@@ -152,7 +176,9 @@ class StockBalanceNotifier extends AsyncNotifier<List<StockBalanceModel>> {
     String? remark,
   }) async {
     try {
-      print('🔄 Transfer stock: $quantity');
+      if (kDebugMode) {
+        debugPrint('🔄 Transfer stock: $quantity');
+      }
       
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.post('/api/stock/transfer', data: {
@@ -164,13 +190,17 @@ class StockBalanceNotifier extends AsyncNotifier<List<StockBalanceModel>> {
       });
       
       if (response.statusCode == 200) {
-        print('✅ Transfer stock success');
+        if (kDebugMode) {
+          debugPrint('✅ Transfer stock success');
+        }
         await refresh();
         return true;
       }
       return false;
     } catch (e) {
-      print('❌ Error transfer stock: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error transfer stock: $e');
+      }
       return false;
     }
   }

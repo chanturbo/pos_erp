@@ -166,7 +166,7 @@ class AppDatabase extends _$AppDatabase {
   ''';
 
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 13;
 
   @override
   MigrationStrategy get migration {
@@ -266,6 +266,26 @@ class AppDatabase extends _$AppDatabase {
         }
         if (from < 11) {
           await customStatement(_createTableSessionEventsTable);
+        }
+        if (from < 12) {
+          // Fix seed products (PRD001-PRD008) ที่ถูก insert ก่อน migration v8
+          // ให้ serviceMode=BOTH และ dineInAvailable/takeawayAvailable=true
+          // เพื่อให้ปรากฏในหน้า POS โหมดร้านอาหารได้
+          await customStatement('''
+            UPDATE products
+            SET service_mode = 'BOTH',
+                dine_in_available = 1,
+                takeaway_available = 1
+            WHERE product_id IN (
+              'PRD001','PRD002','PRD003','PRD004',
+              'PRD005','PRD006','PRD007','PRD008'
+            )
+          ''').catchError((_) {});
+        }
+        if (from < 13) {
+          await customStatement('''
+            ALTER TABLE product_groups ADD COLUMN show_in_pos INTEGER NOT NULL DEFAULT 1
+          ''').catchError((_) {});
         }
       },
     );

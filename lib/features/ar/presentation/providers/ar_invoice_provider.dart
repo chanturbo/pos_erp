@@ -1,7 +1,7 @@
-// ignore_for_file: avoid_print
 // ar_invoice_provider.dart
 // Day 36-38: AR Invoice Provider
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/ar_invoice_model.dart';
 import '../../../../core/client/api_client.dart';
@@ -24,7 +24,9 @@ class ArInvoiceNotifier extends AsyncNotifier<List<ArInvoiceModel>> {
 
   Future<List<ArInvoiceModel>> loadInvoices() async {
     try {
-      print('📡 Loading AR invoices...');
+      if (kDebugMode) {
+        debugPrint('📡 Loading AR invoices...');
+      }
 
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.get('/api/ar-invoices');
@@ -36,14 +38,20 @@ class ArInvoiceNotifier extends AsyncNotifier<List<ArInvoiceModel>> {
                 ArInvoiceModel.fromJson(json as Map<String, dynamic>))
             .toList();
 
-        print('✅ Loaded ${invoices.length} AR invoices');
+        if (kDebugMode) {
+          debugPrint('✅ Loaded ${invoices.length} AR invoices');
+        }
         return invoices;
       }
 
-      print('⚠️ No AR invoices data');
+      if (kDebugMode) {
+        debugPrint('⚠️ No AR invoices data');
+      }
       return [];
     } catch (e) {
-      print('❌ Error loading AR invoices: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error loading AR invoices: $e');
+      }
       return [];
     }
   }
@@ -56,7 +64,9 @@ class ArInvoiceNotifier extends AsyncNotifier<List<ArInvoiceModel>> {
   /// สร้างใบแจ้งหนี้ใหม่
   Future<bool> createInvoice(ArInvoiceModel invoice) async {
     try {
-      print('📝 Creating AR invoice: ${invoice.invoiceNo}');
+      if (kDebugMode) {
+        debugPrint('📝 Creating AR invoice: ${invoice.invoiceNo}');
+      }
 
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.post(
@@ -65,13 +75,17 @@ class ArInvoiceNotifier extends AsyncNotifier<List<ArInvoiceModel>> {
       );
 
       if (response.statusCode == 200) {
-        print('✅ AR Invoice created');
+        if (kDebugMode) {
+          debugPrint('✅ AR Invoice created');
+        }
         await refresh();
         return true;
       }
       return false;
     } catch (e) {
-      print('❌ Error creating AR invoice: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error creating AR invoice: $e');
+      }
       return false;
     }
   }
@@ -79,7 +93,9 @@ class ArInvoiceNotifier extends AsyncNotifier<List<ArInvoiceModel>> {
   /// แก้ไขใบแจ้งหนี้
   Future<bool> updateInvoice(ArInvoiceModel invoice) async {
     try {
-      print('📝 Updating AR invoice: ${invoice.invoiceNo}');
+      if (kDebugMode) {
+        debugPrint('📝 Updating AR invoice: ${invoice.invoiceNo}');
+      }
 
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.put(
@@ -88,13 +104,17 @@ class ArInvoiceNotifier extends AsyncNotifier<List<ArInvoiceModel>> {
       );
 
       if (response.statusCode == 200) {
-        print('✅ AR Invoice updated');
+        if (kDebugMode) {
+          debugPrint('✅ AR Invoice updated');
+        }
         await refresh();
         return true;
       }
       return false;
     } catch (e) {
-      print('❌ Error updating AR invoice: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error updating AR invoice: $e');
+      }
       return false;
     }
   }
@@ -102,7 +122,9 @@ class ArInvoiceNotifier extends AsyncNotifier<List<ArInvoiceModel>> {
   /// ลบใบแจ้งหนี้
   Future<bool> deleteInvoice(String invoiceId) async {
     try {
-      print('🗑 Deleting AR invoice: $invoiceId');
+      if (kDebugMode) {
+        debugPrint('🗑 Deleting AR invoice: $invoiceId');
+      }
 
       final apiClient = ref.read(apiClientProvider);
       final response =
@@ -110,13 +132,17 @@ class ArInvoiceNotifier extends AsyncNotifier<List<ArInvoiceModel>> {
 
       if (response.statusCode == 200 &&
           response.data['success'] == true) {
-        print('✅ AR Invoice deleted');
+        if (kDebugMode) {
+          debugPrint('✅ AR Invoice deleted');
+        }
         await refresh();
         return true;
       }
       return false;
     } catch (e) {
-      print('❌ Error deleting AR invoice: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error deleting AR invoice: $e');
+      }
       return false;
     }
   }
@@ -139,7 +165,9 @@ final arInvoicesByCustomerProvider = FutureProvider.family<
     }
     return [];
   } catch (e) {
-    print('❌ Error loading AR invoices for customer $customerId: $e');
+    if (kDebugMode) {
+      debugPrint('❌ Error loading AR invoices for customer $customerId: $e');
+    }
     return [];
   }
 });
@@ -157,7 +185,9 @@ final arInvoiceDetailProvider =
     }
     return null;
   } catch (e) {
-    print('❌ Error loading AR invoice $invoiceId: $e');
+    if (kDebugMode) {
+      debugPrint('❌ Error loading AR invoice $invoiceId: $e');
+    }
     return null;
   }
 });

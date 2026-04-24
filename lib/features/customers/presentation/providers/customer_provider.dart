@@ -1,5 +1,5 @@
-// ignore_for_file: avoid_print
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/client/api_client.dart';
 import '../../data/models/customer_model.dart';
@@ -41,7 +41,9 @@ class CustomerListNotifier extends AsyncNotifier<List<CustomerModel>> {
     bool membersOnly = false,
   }) async {
     try {
-      print('📡 Loading customers (limit=$limit offset=$offset search="$search")...');
+      if (kDebugMode) {
+        debugPrint('📡 Loading customers (limit=$limit offset=$offset search="$search")...');
+      }
 
       final apiClient = ref.read(apiClientProvider);
 
@@ -83,13 +85,17 @@ class CustomerListNotifier extends AsyncNotifier<List<CustomerModel>> {
         _offset = offset;
         _hasMore = pagination['has_more'] as bool? ?? false;
 
-        print('✅ Loaded ${customers.length} / $_total customers');
+        if (kDebugMode) {
+          debugPrint('✅ Loaded ${customers.length} / $_total customers');
+        }
         return customers;
       } else {
         throw Exception('Failed to load customers: ${response.statusCode}');
       }
     } catch (e) {
-      print('❌ Error loading customers: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error loading customers: $e');
+      }
       rethrow;
     }
   }
@@ -143,7 +149,9 @@ class CustomerListNotifier extends AsyncNotifier<List<CustomerModel>> {
       }
       return false;
     } catch (e) {
-      print('❌ Error creating customer: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error creating customer: $e');
+      }
       return false;
     }
   }
@@ -164,7 +172,9 @@ class CustomerListNotifier extends AsyncNotifier<List<CustomerModel>> {
       }
       return false;
     } catch (e) {
-      print('❌ Error updating customer: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error updating customer: $e');
+      }
       return false;
     }
   }
@@ -179,7 +189,9 @@ class CustomerListNotifier extends AsyncNotifier<List<CustomerModel>> {
       }
       return {'success': false};
     } catch (e) {
-      print('❌ Error checking customer delete: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error checking customer delete: $e');
+      }
       return {'success': false, 'message': '$e'};
     }
   }
@@ -197,7 +209,9 @@ class CustomerListNotifier extends AsyncNotifier<List<CustomerModel>> {
       }
       return null;
     } catch (e) {
-      print('❌ Error deleting customer: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error deleting customer: $e');
+      }
       return null;
     }
   }

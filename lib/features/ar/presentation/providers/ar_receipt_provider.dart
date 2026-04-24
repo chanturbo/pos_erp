@@ -1,7 +1,7 @@
-// ignore_for_file: avoid_print
 // ar_receipt_provider.dart
 // Day 39-40: AR Receipt Provider
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/ar_receipt_model.dart';
 import '../../../../core/client/api_client.dart';
@@ -24,7 +24,9 @@ class ArReceiptNotifier extends AsyncNotifier<List<ArReceiptModel>> {
 
   Future<List<ArReceiptModel>> loadReceipts() async {
     try {
-      print('📡 Loading AR receipts...');
+      if (kDebugMode) {
+        debugPrint('📡 Loading AR receipts...');
+      }
 
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.get('/api/ar-receipts');
@@ -36,14 +38,20 @@ class ArReceiptNotifier extends AsyncNotifier<List<ArReceiptModel>> {
                 ArReceiptModel.fromJson(json as Map<String, dynamic>))
             .toList();
 
-        print('✅ Loaded ${receipts.length} AR receipts');
+        if (kDebugMode) {
+          debugPrint('✅ Loaded ${receipts.length} AR receipts');
+        }
         return receipts;
       }
 
-      print('⚠️ No AR receipts data');
+      if (kDebugMode) {
+        debugPrint('⚠️ No AR receipts data');
+      }
       return [];
     } catch (e) {
-      print('❌ Error loading AR receipts: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error loading AR receipts: $e');
+      }
       return [];
     }
   }
@@ -56,7 +64,9 @@ class ArReceiptNotifier extends AsyncNotifier<List<ArReceiptModel>> {
   /// สร้างใบเสร็จรับเงินใหม่
   Future<bool> createReceipt(ArReceiptModel receipt) async {
     try {
-      print('📝 Creating AR receipt: ${receipt.receiptNo}');
+      if (kDebugMode) {
+        debugPrint('📝 Creating AR receipt: ${receipt.receiptNo}');
+      }
 
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.post(
@@ -65,13 +75,17 @@ class ArReceiptNotifier extends AsyncNotifier<List<ArReceiptModel>> {
       );
 
       if (response.statusCode == 200) {
-        print('✅ AR Receipt created');
+        if (kDebugMode) {
+          debugPrint('✅ AR Receipt created');
+        }
         await refresh();
         return true;
       }
       return false;
     } catch (e) {
-      print('❌ Error creating AR receipt: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error creating AR receipt: $e');
+      }
       return false;
     }
   }
@@ -79,7 +93,9 @@ class ArReceiptNotifier extends AsyncNotifier<List<ArReceiptModel>> {
   /// ลบใบเสร็จ
   Future<bool> deleteReceipt(String receiptId) async {
     try {
-      print('🗑 Deleting AR receipt: $receiptId');
+      if (kDebugMode) {
+        debugPrint('🗑 Deleting AR receipt: $receiptId');
+      }
 
       final apiClient = ref.read(apiClientProvider);
       final response =
@@ -87,13 +103,17 @@ class ArReceiptNotifier extends AsyncNotifier<List<ArReceiptModel>> {
 
       if (response.statusCode == 200 &&
           response.data['success'] == true) {
-        print('✅ AR Receipt deleted');
+        if (kDebugMode) {
+          debugPrint('✅ AR Receipt deleted');
+        }
         await refresh();
         return true;
       }
       return false;
     } catch (e) {
-      print('❌ Error deleting AR receipt: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error deleting AR receipt: $e');
+      }
       return false;
     }
   }
@@ -117,7 +137,9 @@ final arReceiptsByCustomerProvider =
     }
     return [];
   } catch (e) {
-    print('❌ Error loading AR receipts for customer $customerId: $e');
+    if (kDebugMode) {
+      debugPrint('❌ Error loading AR receipts for customer $customerId: $e');
+    }
     return [];
   }
 });
@@ -135,7 +157,9 @@ final arReceiptDetailProvider =
     }
     return null;
   } catch (e) {
-    print('❌ Error loading AR receipt $receiptId: $e');
+    if (kDebugMode) {
+      debugPrint('❌ Error loading AR receipt $receiptId: $e');
+    }
     return null;
   }
 });

@@ -1,4 +1,3 @@
-// ignore_for_file: avoid_print
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -258,27 +257,48 @@ class _BillingPageState extends ConsumerState<BillingPage> {
   Future<void> _applyServiceCharge(BillModel bill) async {
     if (!widget.tableContext.hasTable) return;
     final rate = double.tryParse(_scController.text.trim()) ?? 0;
+    if (rate < 0 || rate > 30) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('อัตรา service charge ต้องอยู่ระหว่าง 0–30%'),
+          backgroundColor: AppTheme.errorColor,
+        ),
+      );
+      return;
+    }
     setState(() => _applyingSC = true);
     final ok = await ref
         .read(billProvider.notifier)
         .setServiceCharge(widget.tableContext.tableId, rate);
     setState(() => _applyingSC = false);
-    if (!ok && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('ไม่สามารถตั้ง service charge ได้')),
-      );
-    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          ok
+              ? 'ตั้ง service charge ${rate.toStringAsFixed(0)}% แล้ว'
+              : 'ไม่สามารถตั้ง service charge ได้',
+        ),
+        backgroundColor: ok ? AppTheme.successColor : AppTheme.errorColor,
+      ),
+    );
   }
 
-  void _openSplitBill(BillModel bill) {
+  Future<void> _openSplitBill(BillModel bill) async {
     if (!widget.tableContext.hasTable) return;
-    Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) =>
             SplitBillPage(bill: bill, tableContext: widget.tableContext),
       ),
     );
+    if (!mounted) return;
+    // If payment completed (context cleared by PaymentPage), close billing page
+    if (ref.read(restaurantOrderContextProvider) == null) {
+      Navigator.of(context).pop();
+    }
   }
 
   Future<void> _showMergeDialog() async {
@@ -329,7 +349,7 @@ class _BillingPageState extends ConsumerState<BillingPage> {
     }
   }
 
-  void _proceedToPayment(BillModel bill) {
+  Future<void> _proceedToPayment(BillModel bill) async {
     final currentCart = ref.read(cartProvider);
     final billingCustomerId = bill.customerId;
     final billingCustomerName = bill.customerName;
@@ -397,10 +417,15 @@ class _BillingPageState extends ConsumerState<BillingPage> {
           splitLabel: null,
         );
 
-    Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const PaymentPage()),
     );
+    if (!mounted) return;
+    // If payment completed (context cleared by PaymentPage), close billing page
+    if (ref.read(restaurantOrderContextProvider) == null) {
+      Navigator.of(context).pop();
+    }
   }
 
   Future<void> _printPreBill(BillModel bill) async {

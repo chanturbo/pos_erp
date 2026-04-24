@@ -1,4 +1,3 @@
-// ignore_for_file: avoid_print
 // reports_page.dart — Week 6: Full Reports Hub
 
 import 'package:flutter/material.dart';

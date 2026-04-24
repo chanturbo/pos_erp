@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/busy_overlay.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -255,7 +256,24 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
                             ),
                         child: ListView(
                           padding: const EdgeInsets.all(16),
-                          children: byZone.entries.map((entry) {
+                          children: [
+                            // ── ซื้อกลับ action card + held orders ────────
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _TakeawayActionCard(
+                                  onTap: _isBusy ? null : _startTakeawayOrder,
+                                ),
+                                Expanded(
+                                  child: _TakeawayHoldsRow(
+                                    onResume: _isBusy ? null : _resumeTakeawayHold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 20),
+                            // ── Zone sections ─────────────────────────────
+                            ...byZone.entries.map((entry) {
                             final zoneName =
                                 entry.value.first.zoneName ?? entry.key;
                             return Column(
@@ -294,7 +312,8 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
                                 const SizedBox(height: 20),
                               ],
                             );
-                          }).toList(),
+                          }),
+                          ],
                         ),
                       );
                     },
@@ -718,39 +737,81 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
         cartState.discountAmount > 0 ||
         cartState.discountPercent > 0;
 
+    String? autoHoldName;
     if (hasPendingCart) {
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('เริ่มออเดอร์ซื้อกลับบ้านใหม่'),
-          content: const Text(
-            'มีรายการค้างอยู่ในตะกร้า การเริ่มออเดอร์ซื้อกลับบ้านใหม่จะล้างตะกร้าปัจจุบัน ต้องการดำเนินการต่อหรือไม่?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('ยกเลิก'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              style: FilledButton.styleFrom(
-                backgroundColor: AppTheme.primaryColor,
-              ),
-              child: const Text('เริ่มใหม่'),
-            ),
-          ],
-        ),
-      );
-      if (confirmed != true || !mounted) return;
+      // Auto-hold the current order instead of asking to clear
+      final now = DateTime.now();
+      final baseName =
+          'ซื้อกลับ ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+      autoHoldName = _uniqueHoldName(baseName);
+      ref.read(cartProvider.notifier).hold(autoHoldName, isTakeaway: true);
+      // hold() clears the cart internally
     }
 
-    ref.read(cartProvider.notifier).clear();
     ref
         .read(restaurantOrderContextProvider.notifier)
         .state = RestaurantOrderContext.takeaway(
       branchId: ref.read(selectedBranchProvider)?.branchId ?? '',
     );
 
+    if (!mounted) return;
+    if (autoHoldName != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('พักบิล "$autoHoldName" ไว้แล้ว'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const PosPage()));
+  }
+
+  /// คืนชื่อที่ไม่ซ้ำกับ hold orders ที่มีอยู่แล้ว
+  /// ถ้า "ซื้อกลับ 14:30" มีอยู่แล้ว → คืน "ซื้อกลับ 14:30 (2)", "(3)", ...
+  String _uniqueHoldName(String base) {
+    final existing = ref.read(holdOrdersProvider).orders.map((o) => o.name).toSet();
+    if (!existing.contains(base)) return base;
+    int counter = 2;
+    while (existing.contains('$base ($counter)')) {
+      counter++;
+    }
+    return '$base ($counter)';
+  }
+
+  Future<void> _resumeTakeawayHold(int index) async {
+    final cartState = ref.read(cartProvider);
+    final hasPendingCart =
+        cartState.items.isNotEmpty ||
+        cartState.freeItems.isNotEmpty ||
+        cartState.appliedCoupons.isNotEmpty ||
+        cartState.discountAmount > 0 ||
+        cartState.discountPercent > 0;
+
+    if (hasPendingCart) {
+      // Auto-hold current cart before recalling — prevents merging two customers' orders
+      // Use the existing context to determine isTakeaway, not always true
+      final existingIsTakeaway = ref.read(restaurantOrderContextProvider)?.isTakeaway ?? false;
+      final now = DateTime.now();
+      final holdName = _uniqueHoldName(
+        'ซื้อกลับ ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}',
+      );
+      ref.read(cartProvider.notifier).hold(holdName, isTakeaway: existingIsTakeaway);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('พักบิล "$holdName" ไว้แล้ว'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+
+    ref.read(holdOrdersProvider.notifier).recallOrder(index);
+    ref
+        .read(restaurantOrderContextProvider.notifier)
+        .state = RestaurantOrderContext.takeaway(
+      branchId: ref.read(selectedBranchProvider)?.branchId ?? '',
+    );
     if (!mounted) return;
     Navigator.push(context, MaterialPageRoute(builder: (_) => const PosPage()));
   }
@@ -1225,6 +1286,246 @@ class _ZoneHeader extends StatelessWidget {
       ),
     ],
   );
+}
+
+class _TakeawayActionCard extends ConsumerWidget {
+  final VoidCallback? onTap;
+  const _TakeawayActionCard({this.onTap});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final holdCount = ref
+        .watch(holdOrdersProvider)
+        .orders
+        .where((o) => o.isTakeaway)
+        .length;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: SizedBox(
+        width: 150,
+        height: 150,
+        child: Stack(
+          children: [
+            Container(
+              width: 150,
+              height: 150,
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.orange.shade400, width: 2),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.orange.withValues(alpha: 0.15),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.takeout_dining, size: 36, color: Colors.orange.shade700),
+                  const SizedBox(height: 8),
+                  Text(
+                    'ซื้อกลับ',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                      color: Colors.orange.shade800,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Take Away',
+                    style: TextStyle(fontSize: 11, color: Colors.orange.shade500),
+                  ),
+                ],
+              ),
+            ),
+            if (holdCount > 0)
+              Positioned(
+                top: 6,
+                right: 6,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade500,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  constraints: const BoxConstraints(minWidth: 20),
+                  child: Text(
+                    holdCount > 99 ? '99+' : '$holdCount',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TakeawayHoldsRow extends ConsumerWidget {
+  final void Function(int index)? onResume;
+  const _TakeawayHoldsRow({this.onResume});
+
+  Future<void> _confirmDelete(BuildContext context, WidgetRef ref, int originalIndex, String name) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('ยกเลิกบิล'),
+        content: Text('ต้องการยกเลิกบิล "$name" ใช่หรือไม่?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('ไม่ใช่'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('ยกเลิกบิล'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      ref.read(holdOrdersProvider.notifier).removeOrder(originalIndex);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final holdOrders = ref.watch(holdOrdersProvider);
+    final takeawayEntries = holdOrders.orders
+        .asMap()
+        .entries
+        .where((e) => e.value.isTakeaway)
+        .toList();
+
+    if (takeawayEntries.isEmpty) return const SizedBox.shrink();
+
+    return SizedBox(
+      height: 150,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.only(left: 12),
+        itemCount: takeawayEntries.length,
+        itemBuilder: (context, i) {
+          final entry = takeawayEntries[i];
+          final order = entry.value;
+          final cart = order.cartState;
+
+          return GestureDetector(
+            onTap: onResume != null ? () => onResume!(entry.key) : null,
+            child: Stack(
+              children: [
+                Container(
+                  width: 140,
+                  margin: const EdgeInsets.only(right: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.orange.shade300),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.orange.withValues(alpha: 0.10),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.pause_circle_outline_rounded, size: 14, color: Colors.orange.shade700),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              order.name,
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                                color: Colors.orange.shade800,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 16), // space for × button
+                        ],
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        '${cart.items.length} รายการ',
+                        style: TextStyle(fontSize: 11, color: Colors.orange.shade600),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        '฿${cart.total.toStringAsFixed(2)}',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.orange.shade800,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        DateFormat('HH:mm').format(order.timestamp),
+                        style: TextStyle(fontSize: 10, color: Colors.orange.shade400),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.shade600,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: const Text(
+                          'ดำเนินการต่อ',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Delete button ×
+                Positioned(
+                  top: 4,
+                  right: 14,
+                  child: GestureDetector(
+                    onTap: () => _confirmDelete(context, ref, entry.key, order.name),
+                    child: Container(
+                      width: 18,
+                      height: 18,
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade400,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.close, size: 12, color: Colors.white),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
 }
 
 class _EmptyState extends StatelessWidget {

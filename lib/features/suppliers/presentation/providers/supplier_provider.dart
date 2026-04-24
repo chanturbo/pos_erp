@@ -1,5 +1,5 @@
-// ignore_for_file: avoid_print
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/supplier_model.dart';
 import '../../../../core/client/api_client.dart';
@@ -22,7 +22,9 @@ class SupplierNotifier extends AsyncNotifier<List<SupplierModel>> {
   /// โหลดรายการ Suppliers
   Future<List<SupplierModel>> loadSuppliers() async {
     try {
-      print('📡 Loading suppliers...');
+      if (kDebugMode) {
+        debugPrint('📡 Loading suppliers...');
+      }
 
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.get('/api/suppliers');
@@ -33,14 +35,20 @@ class SupplierNotifier extends AsyncNotifier<List<SupplierModel>> {
             .map((json) => SupplierModel.fromJson(json as Map<String, dynamic>))
             .toList();
 
-        print('✅ Loaded ${suppliers.length} suppliers');
+        if (kDebugMode) {
+          debugPrint('✅ Loaded ${suppliers.length} suppliers');
+        }
         return suppliers;
       }
 
-      print('⚠️ No suppliers data');
+      if (kDebugMode) {
+        debugPrint('⚠️ No suppliers data');
+      }
       return [];
     } catch (e) {
-      print('❌ Error loading suppliers: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error loading suppliers: $e');
+      }
       return [];
     }
   }
@@ -54,7 +62,9 @@ class SupplierNotifier extends AsyncNotifier<List<SupplierModel>> {
   /// สร้างซัพพลายเออร์ใหม่
   Future<bool> createSupplier(SupplierModel supplier) async {
     try {
-      print('📝 Creating supplier: ${supplier.supplierName}');
+      if (kDebugMode) {
+        debugPrint('📝 Creating supplier: ${supplier.supplierName}');
+      }
 
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.post(
@@ -63,13 +73,17 @@ class SupplierNotifier extends AsyncNotifier<List<SupplierModel>> {
       );
 
       if (response.statusCode == 200) {
-        print('✅ Supplier created successfully');
+        if (kDebugMode) {
+          debugPrint('✅ Supplier created successfully');
+        }
         await refresh();
         return true;
       }
       return false;
     } catch (e) {
-      print('❌ Error creating supplier: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error creating supplier: $e');
+      }
       return false;
     }
   }
@@ -77,7 +91,9 @@ class SupplierNotifier extends AsyncNotifier<List<SupplierModel>> {
   /// แก้ไขซัพพลายเออร์
   Future<bool> updateSupplier(SupplierModel supplier) async {
     try {
-      print('📝 Updating supplier: ${supplier.supplierName}');
+      if (kDebugMode) {
+        debugPrint('📝 Updating supplier: ${supplier.supplierName}');
+      }
 
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.put(
@@ -86,13 +102,17 @@ class SupplierNotifier extends AsyncNotifier<List<SupplierModel>> {
       );
 
       if (response.statusCode == 200) {
-        print('✅ Supplier updated successfully');
+        if (kDebugMode) {
+          debugPrint('✅ Supplier updated successfully');
+        }
         await refresh();
         return true;
       }
       return false;
     } catch (e) {
-      print('❌ Error updating supplier: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error updating supplier: $e');
+      }
       return false;
     }
   }
@@ -107,7 +127,9 @@ class SupplierNotifier extends AsyncNotifier<List<SupplierModel>> {
       }
       return {'success': false};
     } catch (e) {
-      print('❌ Error checking supplier delete: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error checking supplier delete: $e');
+      }
       return {'success': false, 'message': '$e'};
     }
   }
@@ -115,20 +137,26 @@ class SupplierNotifier extends AsyncNotifier<List<SupplierModel>> {
   /// ลบซัพพลายเออร์ — server จัดการ soft-delete ถ้ามีประวัติ
   Future<String?> deleteSupplier(String supplierId) async {
     try {
-      print('🗑️ Deleting supplier: $supplierId');
+      if (kDebugMode) {
+        debugPrint('🗑️ Deleting supplier: $supplierId');
+      }
 
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.delete('/api/suppliers/$supplierId');
 
       if (response.statusCode == 200) {
-        print('✅ Supplier deleted successfully');
+        if (kDebugMode) {
+          debugPrint('✅ Supplier deleted successfully');
+        }
         await refresh();
         final msg = response.data?['message'];
         return (msg is String && msg.isNotEmpty) ? msg : 'ดำเนินการสำเร็จ';
       }
       return null;
     } catch (e) {
-      print('❌ Error deleting supplier: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error deleting supplier: $e');
+      }
       return null;
     }
   }

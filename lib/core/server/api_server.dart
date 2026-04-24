@@ -28,6 +28,7 @@ import 'routes/branch_routes.dart'; // 🆕 Week 7
 import 'routes/user_routes.dart';
 import 'routes/table_routes.dart'; // Restaurant Phase R1
 import 'routes/kitchen_routes.dart'; // Restaurant Phase R2
+import 'routes/setup_routes.dart';
 import 'middleware/auth_middleware.dart';
 import 'middleware/license_middleware.dart';
 
@@ -139,6 +140,10 @@ class ApiServer {
       // Kitchen Display routes ✅ Phase R2
       router.mount('/api/kitchen', KitchenRoutes(db).router.call);
       print('   ✅ /api/kitchen');
+
+      // Setup / Demo seeding (no auth required — first-time setup)
+      router.mount('/api/setup', SetupRoutes(db).router.call);
+      print('   ✅ /api/setup');
 
       // 🆕 Sync helper endpoints (เรียกจาก OfflineSyncService)
       router.post('/api/sync/push-pending', _pushPendingHandler);

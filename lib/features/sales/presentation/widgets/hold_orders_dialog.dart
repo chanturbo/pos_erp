@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:pos_erp/shared/widgets/app_dialogs.dart';
 import 'package:pos_erp/shared/widgets/mobile_home_button.dart';
+import '../../../branches/presentation/providers/branch_provider.dart';
+import '../../../restaurant/data/models/restaurant_order_context.dart';
 import '../providers/cart_provider.dart';
 
 class HoldOrdersDialog extends ConsumerStatefulWidget {
@@ -67,10 +69,12 @@ class _HoldOrdersDialogState extends ConsumerState<HoldOrdersDialog> {
   @override
   Widget build(BuildContext context) {
     final holdOrdersState = ref.watch(holdOrdersProvider);
-    final filteredEntries = holdOrdersState.orders.asMap().entries.where((
-      entry,
-    ) {
+    final allEntries = holdOrdersState.orders.asMap().entries.toList();
+    final takeawayCount = allEntries.where((e) => e.value.isTakeaway).length;
+
+    final filteredEntries = allEntries.where((entry) {
       final order = entry.value;
+      if (order.isTakeaway) return false; // takeaway holds managed from TableOverview
       if (_searchQuery.trim().isEmpty) return true;
       final query = _searchQuery.trim().toLowerCase();
       return order.name.toLowerCase().contains(query) ||
@@ -122,6 +126,30 @@ class _HoldOrdersDialogState extends ConsumerState<HoldOrdersDialog> {
               ),
             ),
 
+            // Takeaway holds info banner
+            if (takeawayCount > 0)
+              Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.orange.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.takeout_dining, size: 18, color: Colors.orange.shade700),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'มี $takeawayCount บิลซื้อกลับบ้าน — จัดการได้จากหน้าภาพรวมโต๊ะ',
+                        style: TextStyle(fontSize: 12, color: Colors.orange.shade800),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
             // Hold Orders List
             Expanded(
               child: orders.isEmpty
@@ -147,14 +175,48 @@ class _HoldOrdersDialogState extends ConsumerState<HoldOrdersDialog> {
                           margin: const EdgeInsets.only(bottom: 12),
                           child: ListTile(
                             leading: CircleAvatar(
-                              backgroundColor: Colors.orange,
-                              child: Text('${index + 1}'),
-                            ),
-                            title: Text(
-                              order.name,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
+                              backgroundColor: order.isTakeaway
+                                  ? Colors.orange
+                                  : Colors.blueGrey,
+                              child: Icon(
+                                order.isTakeaway
+                                    ? Icons.takeout_dining
+                                    : Icons.receipt_long,
+                                color: Colors.white,
+                                size: 20,
                               ),
+                            ),
+                            title: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    order.name,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                if (order.isTakeaway)
+                                  Container(
+                                    margin: const EdgeInsets.only(left: 6),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 7, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.orange.shade100,
+                                      borderRadius: BorderRadius.circular(999),
+                                      border: Border.all(
+                                          color: Colors.orange.shade300),
+                                    ),
+                                    child: Text(
+                                      'ซื้อกลับ',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.orange.shade800,
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -265,6 +327,12 @@ class _HoldOrdersDialogState extends ConsumerState<HoldOrdersDialog> {
                               ref
                                   .read(holdOrdersProvider.notifier)
                                   .recallOrder(originalIndex);
+                              // Restore restaurant context for takeaway orders
+                              if (order.isTakeaway) {
+                                final branchId = ref.read(selectedBranchProvider)?.branchId ?? '';
+                                ref.read(restaurantOrderContextProvider.notifier).state =
+                                    RestaurantOrderContext.takeaway(branchId: branchId);
+                              }
                               Navigator.pop(context);
 
                               ScaffoldMessenger.of(context).showSnackBar(

@@ -1,4 +1,3 @@
-// ignore_for_file: avoid_print
 // customer_purchase_summary_page.dart
 // รายงานสรุปยอดซื้อลูกค้า — รายบุคคล + รวมทั้งหมด พร้อม date filter และ PDF export
 

@@ -1,6 +1,6 @@
-// ignore_for_file: avoid_print
 // branch_provider.dart — Week 7
 
+import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
@@ -42,7 +42,9 @@ class BranchNotifier extends AsyncNotifier<List<BranchModel>> {
       }
       return [];
     } catch (e) {
-      print('❌ Error loading branches: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error loading branches: $e');
+      }
       return [];
     }
   }
@@ -63,7 +65,9 @@ class BranchNotifier extends AsyncNotifier<List<BranchModel>> {
       }
       return false;
     } catch (e) {
-      print('❌ Error creating branch: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error creating branch: $e');
+      }
       return false;
     }
   }
@@ -80,7 +84,9 @@ class BranchNotifier extends AsyncNotifier<List<BranchModel>> {
       }
       return false;
     } catch (e) {
-      print('❌ Error updating branch: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error updating branch: $e');
+      }
       return false;
     }
   }
@@ -95,7 +101,9 @@ class BranchNotifier extends AsyncNotifier<List<BranchModel>> {
       }
       return false;
     } catch (e) {
-      print('❌ Error deleting branch: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error deleting branch: $e');
+      }
       return false;
     }
   }
@@ -128,7 +136,9 @@ class WarehouseNotifier extends AsyncNotifier<List<WarehouseModel>> {
       }
       return [];
     } catch (e) {
-      print('❌ Error loading warehouses: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error loading warehouses: $e');
+      }
       return [];
     }
   }
@@ -149,7 +159,9 @@ class WarehouseNotifier extends AsyncNotifier<List<WarehouseModel>> {
       }
       return false;
     } catch (e) {
-      print('❌ Error creating warehouse: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error creating warehouse: $e');
+      }
       return false;
     }
   }
@@ -166,7 +178,9 @@ class WarehouseNotifier extends AsyncNotifier<List<WarehouseModel>> {
       }
       return false;
     } catch (e) {
-      print('❌ Error updating warehouse: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error updating warehouse: $e');
+      }
       return false;
     }
   }
@@ -366,7 +380,9 @@ Future<List<SyncBatchHistoryModel>> _loadSyncBatchHistory(Ref ref) async {
         .loadRecentBatchMetrics(limit: 20);
     return rows.map(SyncBatchHistoryModel.fromMap).toList();
   } catch (e) {
-    print('❌ Error loading sync batch history: $e');
+    if (kDebugMode) {
+      debugPrint('❌ Error loading sync batch history: $e');
+    }
     return const [];
   }
 }

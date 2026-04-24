@@ -1096,7 +1096,8 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
 
     if (holdName == null || holdName.trim().isEmpty) return;
 
-    ref.read(cartProvider.notifier).hold(holdName.trim());
+    final isTakeaway = ref.read(restaurantOrderContextProvider)?.isTakeaway ?? false;
+    ref.read(cartProvider.notifier).hold(holdName.trim(), isTakeaway: isTakeaway);
     if (!mounted) return;
     ScaffoldMessenger.of(
       context,

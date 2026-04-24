@@ -1,4 +1,4 @@
-// ignore_for_file: avoid_print
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/purchase_return_model.dart';
 import '../../../../core/client/api_client.dart';
@@ -21,7 +21,9 @@ class PurchaseReturnNotifier extends AsyncNotifier<List<PurchaseReturnModel>> {
   /// โหลดรายการคืนสินค้า
   Future<List<PurchaseReturnModel>> loadReturns() async {
     try {
-      print('📡 Loading purchase returns...');
+      if (kDebugMode) {
+        debugPrint('📡 Loading purchase returns...');
+      }
 
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.get('/api/purchase-returns');
@@ -32,14 +34,20 @@ class PurchaseReturnNotifier extends AsyncNotifier<List<PurchaseReturnModel>> {
             .map((json) => PurchaseReturnModel.fromJson(json as Map<String, dynamic>))
             .toList();
 
-        print('✅ Loaded ${returns.length} returns');
+        if (kDebugMode) {
+          debugPrint('✅ Loaded ${returns.length} returns');
+        }
         return returns;
       }
 
-      print('⚠️ No returns data');
+      if (kDebugMode) {
+        debugPrint('⚠️ No returns data');
+      }
       return [];
     } catch (e) {
-      print('❌ Error loading returns: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error loading returns: $e');
+      }
       return [];
     }
   }
@@ -53,7 +61,9 @@ class PurchaseReturnNotifier extends AsyncNotifier<List<PurchaseReturnModel>> {
   /// สร้างใบคืนสินค้าใหม่
   Future<bool> createReturn(PurchaseReturnModel returnDoc) async {
     try {
-      print('📝 Creating purchase return: ${returnDoc.returnNo}');
+      if (kDebugMode) {
+        debugPrint('📝 Creating purchase return: ${returnDoc.returnNo}');
+      }
 
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.post(
@@ -62,13 +72,17 @@ class PurchaseReturnNotifier extends AsyncNotifier<List<PurchaseReturnModel>> {
       );
 
       if (response.statusCode == 200) {
-        print('✅ Return created successfully');
+        if (kDebugMode) {
+          debugPrint('✅ Return created successfully');
+        }
         await refresh();
         return true;
       }
       return false;
     } catch (e) {
-      print('❌ Error creating return: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error creating return: $e');
+      }
       return false;
     }
   }
@@ -76,7 +90,9 @@ class PurchaseReturnNotifier extends AsyncNotifier<List<PurchaseReturnModel>> {
   /// แก้ไขใบคืนสินค้า (DRAFT เท่านั้น)
   Future<bool> updateReturn(PurchaseReturnModel returnDoc) async {
     try {
-      print('📝 Updating purchase return: ${returnDoc.returnNo}');
+      if (kDebugMode) {
+        debugPrint('📝 Updating purchase return: ${returnDoc.returnNo}');
+      }
 
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.put(
@@ -85,13 +101,17 @@ class PurchaseReturnNotifier extends AsyncNotifier<List<PurchaseReturnModel>> {
       );
 
       if (response.statusCode == 200) {
-        print('✅ Return updated successfully');
+        if (kDebugMode) {
+          debugPrint('✅ Return updated successfully');
+        }
         await refresh();
         return true;
       }
       return false;
     } catch (e) {
-      print('❌ Error updating return: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error updating return: $e');
+      }
       return false;
     }
   }
@@ -99,19 +119,25 @@ class PurchaseReturnNotifier extends AsyncNotifier<List<PurchaseReturnModel>> {
   /// ยืนยันใบคืนสินค้า (ลดสต๊อก)
   Future<bool> confirmReturn(String returnId) async {
     try {
-      print('📝 Confirming return: $returnId');
+      if (kDebugMode) {
+        debugPrint('📝 Confirming return: $returnId');
+      }
 
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.put('/api/purchase-returns/$returnId/confirm');
 
       if (response.statusCode == 200) {
-        print('✅ Return confirmed successfully');
+        if (kDebugMode) {
+          debugPrint('✅ Return confirmed successfully');
+        }
         await refresh();
         return true;
       }
       return false;
     } catch (e) {
-      print('❌ Error confirming return: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error confirming return: $e');
+      }
       return false;
     }
   }
@@ -119,19 +145,25 @@ class PurchaseReturnNotifier extends AsyncNotifier<List<PurchaseReturnModel>> {
   /// ลบใบคืนสินค้า
   Future<bool> deleteReturn(String returnId) async {
     try {
-      print('🗑️ Deleting return: $returnId');
+      if (kDebugMode) {
+        debugPrint('🗑️ Deleting return: $returnId');
+      }
 
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.delete('/api/purchase-returns/$returnId');
 
       if (response.statusCode == 200) {
-        print('✅ Return deleted successfully');
+        if (kDebugMode) {
+          debugPrint('✅ Return deleted successfully');
+        }
         await refresh();
         return true;
       }
       return false;
     } catch (e) {
-      print('❌ Error deleting return: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error deleting return: $e');
+      }
       return false;
     }
   }
@@ -139,7 +171,9 @@ class PurchaseReturnNotifier extends AsyncNotifier<List<PurchaseReturnModel>> {
   /// ดึงรายละเอียดใบคืนสินค้าพร้อมรายการ
   Future<PurchaseReturnModel?> getReturnDetails(String returnId) async {
     try {
-      print('📡 Loading return details: $returnId');
+      if (kDebugMode) {
+        debugPrint('📡 Loading return details: $returnId');
+      }
 
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.get('/api/purchase-returns/$returnId');
@@ -151,7 +185,9 @@ class PurchaseReturnNotifier extends AsyncNotifier<List<PurchaseReturnModel>> {
 
       return null;
     } catch (e) {
-      print('❌ Error loading return details: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error loading return details: $e');
+      }
       return null;
     }
   }

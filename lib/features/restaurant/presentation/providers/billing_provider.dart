@@ -1,5 +1,5 @@
-// ignore_for_file: avoid_print
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import '../../../../core/client/api_client.dart';
@@ -71,7 +71,9 @@ class BillNotifier extends AsyncNotifier<BillModel?> {
       }
       return false;
     } catch (e) {
-      print('❌ setServiceCharge error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ setServiceCharge error: $e');
+      }
       return false;
     }
   }
@@ -89,7 +91,9 @@ class BillNotifier extends AsyncNotifier<BillModel?> {
       }
       return null;
     } catch (e) {
-      print('❌ splitEqual error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ splitEqual error: $e');
+      }
       return null;
     }
   }
@@ -110,7 +114,9 @@ class BillNotifier extends AsyncNotifier<BillModel?> {
       }
       return null;
     } catch (e) {
-      print('❌ splitByItems error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ splitByItems error: $e');
+      }
       return null;
     }
   }
@@ -129,7 +135,9 @@ class BillNotifier extends AsyncNotifier<BillModel?> {
       }
       return false;
     } catch (e) {
-      print('❌ fireCourse error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ fireCourse error: $e');
+      }
       return false;
     }
   }
@@ -157,7 +165,9 @@ class BillNotifier extends AsyncNotifier<BillModel?> {
       }
       return false;
     } catch (e) {
-      print('❌ voidItem error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ voidItem error: $e');
+      }
       return false;
     }
   }
@@ -179,7 +189,9 @@ class BillNotifier extends AsyncNotifier<BillModel?> {
       }
       return null;
     } catch (e) {
-      print('❌ applySplit error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ applySplit error: $e');
+      }
       return null;
     }
   }
@@ -210,7 +222,9 @@ class MergeTablesNotifier extends AsyncNotifier<void> {
       );
       return res.statusCode == 200;
     } catch (e) {
-      print('❌ merge error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ merge error: $e');
+      }
       return false;
     }
   }

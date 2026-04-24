@@ -1,5 +1,5 @@
-// ignore_for_file: avoid_print
 
+import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
@@ -74,7 +74,9 @@ class ZoneNotifier extends AsyncNotifier<List<ZoneModel>> {
       }
       return false;
     } catch (e) {
-      print('❌ createZone error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ createZone error: $e');
+      }
       return false;
     }
   }
@@ -95,7 +97,9 @@ class ZoneNotifier extends AsyncNotifier<List<ZoneModel>> {
       await refresh();
       return true;
     } catch (e) {
-      print('❌ updateZone error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ updateZone error: $e');
+      }
       return false;
     }
   }
@@ -107,7 +111,9 @@ class ZoneNotifier extends AsyncNotifier<List<ZoneModel>> {
       await refresh();
       return true;
     } catch (e) {
-      print('❌ deleteZone error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ deleteZone error: $e');
+      }
       return false;
     }
   }
@@ -170,7 +176,9 @@ class TableNotifier extends AsyncNotifier<List<DiningTableModel>> {
       }
       return false;
     } catch (e) {
-      print('❌ createTable error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ createTable error: $e');
+      }
       return false;
     }
   }
@@ -198,7 +206,9 @@ class TableNotifier extends AsyncNotifier<List<DiningTableModel>> {
       await refresh(branchId: selectedBranch?.branchId);
       return true;
     } catch (e) {
-      print('❌ updateTable error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ updateTable error: $e');
+      }
       return false;
     }
   }
@@ -211,7 +221,9 @@ class TableNotifier extends AsyncNotifier<List<DiningTableModel>> {
       await refresh(branchId: selectedBranch?.branchId);
       return true;
     } catch (e) {
-      print('❌ deleteTable error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ deleteTable error: $e');
+      }
       return false;
     }
   }
@@ -242,7 +254,9 @@ class TableNotifier extends AsyncNotifier<List<DiningTableModel>> {
       }
       return null;
     } catch (e) {
-      print('❌ openTable error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ openTable error: $e');
+      }
       return null;
     }
   }
@@ -263,7 +277,9 @@ class TableNotifier extends AsyncNotifier<List<DiningTableModel>> {
             : null,
       );
     } catch (e) {
-      print('❌ closeTable error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ closeTable error: $e');
+      }
       return TableActionResult(success: false, message: '$e');
     }
   }
@@ -302,7 +318,9 @@ class TableNotifier extends AsyncNotifier<List<DiningTableModel>> {
       }
       return null;
     } catch (e) {
-      print('❌ transferTable error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ transferTable error: $e');
+      }
       return null;
     }
   }
@@ -315,7 +333,9 @@ class TableNotifier extends AsyncNotifier<List<DiningTableModel>> {
         data: {'waiter_name': waiterName},
       );
     } catch (e) {
-      print('❌ assignWaiter error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ assignWaiter error: $e');
+      }
       rethrow;
     }
   }
@@ -334,7 +354,9 @@ class TableNotifier extends AsyncNotifier<List<DiningTableModel>> {
       }
       return false;
     } catch (e) {
-      print('❌ updateGuestCount error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ updateGuestCount error: $e');
+      }
       return false;
     }
   }

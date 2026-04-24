@@ -45,6 +45,25 @@ class _ProductGroupManagementPageState
     ),
   ];
 
+  Future<void> _toggleShowInPos(ProductGroupModel group) async {
+    final repo = ref.read(productGroupRepositoryProvider);
+    final newValue = !group.showInPos;
+    final ok = await repo.updateGroup(group.groupId, {'show_in_pos': newValue});
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          ok
+              ? (newValue
+                  ? 'แสดงหมวด "${group.groupName}" ในหน้าขายสินค้าแล้ว'
+                  : 'ซ่อนหมวด "${group.groupName}" จากหน้าขายสินค้าแล้ว')
+              : 'อัปเดตไม่สำเร็จ',
+        ),
+        backgroundColor: ok ? AppTheme.successColor : AppTheme.errorColor,
+      ),
+    );
+  }
+
   Future<void> _openGroupForm([ProductGroupModel? group]) async {
     await showModalBottomSheet<void>(
       context: context,
@@ -135,6 +154,7 @@ class _ProductGroupManagementPageState
             colorCount: groups
                 .where((g) => (g.mobileColor ?? '').trim().isNotEmpty)
                 .length,
+            posCount: groups.where((g) => g.showInPos).length,
           ),
           Expanded(
             child: Padding(
@@ -179,6 +199,7 @@ class _ProductGroupManagementPageState
                         colors: colors,
                         onEdit: () => _openGroupForm(groups[index]),
                         onDelete: () => _confirmDelete(groups[index]),
+                        onToggleShowInPos: () => _toggleShowInPos(groups[index]),
                       ),
                     );
                   },
@@ -426,12 +447,14 @@ class _GroupSummaryBar extends StatelessWidget {
   final int totalGroups;
   final int iconCount;
   final int colorCount;
+  final int posCount;
 
   const _GroupSummaryBar({
     required this.colors,
     required this.totalGroups,
     required this.iconCount,
     required this.colorCount,
+    required this.posCount,
   });
 
   @override
@@ -453,6 +476,11 @@ class _GroupSummaryBar extends StatelessWidget {
             color: AppTheme.info,
           ),
           _GroupSummaryChip(
+            label: 'แสดงใน POS',
+            value: '$posCount',
+            color: AppTheme.success,
+          ),
+          _GroupSummaryChip(
             label: 'มีไอคอน',
             value: '$iconCount',
             color: AppTheme.primary,
@@ -460,7 +488,7 @@ class _GroupSummaryBar extends StatelessWidget {
           _GroupSummaryChip(
             label: 'มีสี',
             value: '$colorCount',
-            color: AppTheme.success,
+            color: AppTheme.warning,
           ),
         ],
       ),
@@ -573,12 +601,14 @@ class _GroupListTile extends StatelessWidget {
   final _GroupPageColors colors;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final VoidCallback onToggleShowInPos;
 
   const _GroupListTile({
     required this.group,
     required this.colors,
     required this.onEdit,
     required this.onDelete,
+    required this.onToggleShowInPos,
   });
 
   @override
@@ -636,6 +666,20 @@ class _GroupListTile extends StatelessWidget {
                 ],
               ),
             ),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'แสดงใน POS',
+                  style: TextStyle(fontSize: 10, color: colors.subtext),
+                ),
+                Switch(
+                  value: group.showInPos,
+                  onChanged: (_) => onToggleShowInPos(),
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ],
+            ),
             PopupMenuButton<String>(
               onSelected: (value) {
                 if (value == 'edit') {
@@ -679,6 +723,7 @@ class _ProductGroupFormSheetState
   late final TextEditingController _nameController;
   late String _selectedColor;
   late String _selectedIcon;
+  bool _showInPos = true;
   bool _isSaving = false;
 
   @override
@@ -692,6 +737,7 @@ class _ProductGroupFormSheetState
     );
     _selectedColor = widget.group?.mobileColor ?? widget.colorOptions.first.hex;
     _selectedIcon = widget.group?.mobileIcon ?? widget.iconOptions.first.key;
+    _showInPos = widget.group?.showInPos ?? true;
   }
 
   @override
@@ -710,6 +756,7 @@ class _ProductGroupFormSheetState
       'group_name': _nameController.text.trim(),
       'mobile_color': _selectedColor,
       'mobile_icon': _selectedIcon,
+      'show_in_pos': _showInPos,
     };
 
     final repo = ref.read(productGroupRepositoryProvider);
@@ -873,7 +920,23 @@ class _ProductGroupFormSheetState
                       ),
                   ],
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 18),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text(
+                    'แสดงในหน้าขายสินค้า (POS)',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                  ),
+                  subtitle: Text(
+                    _showInPos
+                        ? 'หมวดนี้จะแสดงในแถบหมวดหมู่ของหน้าขาย'
+                        : 'หมวดนี้จะถูกซ่อนจากหน้าขายสินค้า',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  value: _showInPos,
+                  onChanged: (v) => setState(() => _showInPos = v),
+                ),
+                const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton.icon(

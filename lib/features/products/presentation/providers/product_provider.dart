@@ -1,5 +1,5 @@
-// ignore_for_file: avoid_print
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/client/api_client.dart';
 import '../../data/models/product_model.dart';
@@ -87,9 +87,9 @@ class ProductListNotifier extends AsyncNotifier<List<ProductModel>> {
     bool activeOnly = false,
   }) async {
     try {
-      print(
-        '📡 Loading products (limit=$limit offset=$offset search="$search")...',
-      );
+      if (kDebugMode) {
+        debugPrint('📡 Loading products (limit=$limit offset=$offset search="$search")...');
+      }
 
       final apiClient = ref.read(apiClientProvider);
 
@@ -125,13 +125,17 @@ class ProductListNotifier extends AsyncNotifier<List<ProductModel>> {
         _offset = offset;
         _hasMore = pagination['has_more'] as bool? ?? false;
 
-        print('✅ Loaded ${products.length} / $_total products');
+        if (kDebugMode) {
+          debugPrint('✅ Loaded ${products.length} / $_total products');
+        }
         return products;
       } else {
         throw Exception('Failed to load products: ${response.statusCode}');
       }
     } catch (e) {
-      print('❌ Error loading products: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error loading products: $e');
+      }
       rethrow;
     }
   }
@@ -175,7 +179,9 @@ class ProductListNotifier extends AsyncNotifier<List<ProductModel>> {
       }
       return false;
     } catch (e) {
-      print('❌ Error adding product: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error adding product: $e');
+      }
       return false;
     }
   }
@@ -199,7 +205,9 @@ class ProductListNotifier extends AsyncNotifier<List<ProductModel>> {
       }
       return false;
     } catch (e) {
-      print('❌ Error updating product: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error updating product: $e');
+      }
       return false;
     }
   }
@@ -214,7 +222,9 @@ class ProductListNotifier extends AsyncNotifier<List<ProductModel>> {
       }
       return {'success': false};
     } catch (e) {
-      print('❌ Error checking product delete: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error checking product delete: $e');
+      }
       return {'success': false, 'message': '$e'};
     }
   }
@@ -232,7 +242,9 @@ class ProductListNotifier extends AsyncNotifier<List<ProductModel>> {
       }
       return null;
     } catch (e) {
-      print('❌ Error deleting product: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error deleting product: $e');
+      }
       return null;
     }
   }
@@ -249,6 +261,8 @@ class ProductGroupModel {
   final String? imageUrl;
   final String? mobileColor;
   final String? mobileIcon;
+  final bool showInPos;
+  final int displayOrder;
 
   const ProductGroupModel({
     required this.groupId,
@@ -258,6 +272,8 @@ class ProductGroupModel {
     this.imageUrl,
     this.mobileColor,
     this.mobileIcon,
+    this.showInPos = true,
+    this.displayOrder = 0,
   });
 
   factory ProductGroupModel.fromJson(Map<String, dynamic> json) =>
@@ -269,6 +285,8 @@ class ProductGroupModel {
         imageUrl: json['image_url'] as String?,
         mobileColor: json['mobile_color'] as String?,
         mobileIcon: json['mobile_icon'] as String?,
+        showInPos: json['show_in_pos'] as bool? ?? true,
+        displayOrder: json['display_order'] as int? ?? 0,
       );
 }
 
@@ -291,7 +309,9 @@ final productGroupsProvider = FutureProvider<List<ProductGroupModel>>((
     }
     return [];
   } catch (e) {
-    print('❌ Error loading product groups: $e');
+    if (kDebugMode) {
+      debugPrint('❌ Error loading product groups: $e');
+    }
     return [];
   }
 });
@@ -315,7 +335,9 @@ class ProductGroupRepository {
       }
       return false;
     } catch (e) {
-      print('❌ Error creating product group: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error creating product group: $e');
+      }
       return false;
     }
   }
@@ -330,7 +352,9 @@ class ProductGroupRepository {
       }
       return false;
     } catch (e) {
-      print('❌ Error updating product group: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error updating product group: $e');
+      }
       return false;
     }
   }
@@ -344,7 +368,9 @@ class ProductGroupRepository {
       }
       return {'success': false};
     } catch (e) {
-      print('❌ Error checking product group delete: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error checking product group delete: $e');
+      }
       return {'success': false, 'message': '$e'};
     }
   }
@@ -360,7 +386,9 @@ class ProductGroupRepository {
       }
       return null;
     } catch (e) {
-      print('❌ Error deleting product group: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error deleting product group: $e');
+      }
       return null;
     }
   }

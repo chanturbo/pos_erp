@@ -21,6 +21,17 @@ class SetupStorage {
   static const String restoreUpdatedAtKey = 'setup_restore_updated_at';
   static const String selectedBranchKey = 'selected_pos_branch_id';
   static const String selectedWarehouseKey = 'selected_pos_warehouse_id';
+  static const String demoModeKey = 'demo_seed_mode'; // 'pos' | 'restaurant' | 'both' | 'none'
+
+  static Future<String?> getDemoMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(demoModeKey);
+  }
+
+  static Future<void> setDemoMode(String mode) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(demoModeKey, mode);
+  }
 
   static Future<bool> isCompleted() async {
     final prefs = await SharedPreferences.getInstance();

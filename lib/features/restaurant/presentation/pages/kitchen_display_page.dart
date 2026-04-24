@@ -1,10 +1,10 @@
-// ignore_for_file: avoid_print
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../data/models/kitchen_queue_model.dart';
+import '../../data/models/restaurant_enums.dart';
 import '../providers/kitchen_provider.dart';
 import '../widgets/kitchen_order_card.dart'
     show KitchenOrderCard, kHeldOverdueMinutes;
@@ -22,11 +22,12 @@ class _KitchenDisplayPageState extends ConsumerState<KitchenDisplayPage>
   bool _isFullScreen = false;
   int _lastStationIndex = 0;
 
-  static const _stations = [
-    _StationTab(key: null, label: 'ทั้งหมด', icon: Icons.grid_view),
-    _StationTab(key: 'kitchen', label: 'ครัว', icon: Icons.restaurant),
-    _StationTab(key: 'bar', label: 'บาร์', icon: Icons.local_bar),
-    _StationTab(key: 'dessert', label: 'ของหวาน', icon: Icons.cake),
+  // Derived from PrepStation enum — เพิ่ม station ใหม่ใน PrepStation enum แล้ว tab จะอัปเดตอัตโนมัติ
+  static List<_StationTab> get _stations => [
+    const _StationTab(key: null, label: 'ทั้งหมด', icon: Icons.grid_view),
+    ...PrepStation.values
+        .where((s) => s != PrepStation.cashier) // cashier ไม่ใช่ kitchen station
+        .map((s) => _StationTab(key: s.name, label: s.label, icon: s.icon)),
   ];
 
   @override

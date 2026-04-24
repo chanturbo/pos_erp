@@ -1,4 +1,3 @@
-// ignore_for_file: avoid_print
 // customer_dividend_summary_page.dart
 // รายงานสรุปยอดปันผลคืนลูกค้า — คิดจากยอดรับชำระแล้วตาม % ที่กำหนด
 

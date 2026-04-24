@@ -1,5 +1,5 @@
-// ignore_for_file: avoid_print
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/client/api_client.dart';
 import '../../data/models/goods_receipt_model.dart';
@@ -25,7 +25,9 @@ class GoodsReceiptListNotifier extends AsyncNotifier<List<GoodsReceiptModel>> {
   /// โหลดรายการใบรับสินค้า
   Future<List<GoodsReceiptModel>> loadGoodsReceipts() async {
     try {
-      print('📡 Loading goods receipts...');
+      if (kDebugMode) {
+        debugPrint('📡 Loading goods receipts...');
+      }
 
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.get('/api/goods-receipts');
@@ -36,7 +38,9 @@ class GoodsReceiptListNotifier extends AsyncNotifier<List<GoodsReceiptModel>> {
             .map((json) => GoodsReceiptModel.fromJson(json))
             .toList();
 
-        print('✅ Loaded ${receipts.length} goods receipts');
+        if (kDebugMode) {
+          debugPrint('✅ Loaded ${receipts.length} goods receipts');
+        }
 
         return receipts;
       } else {
@@ -45,7 +49,9 @@ class GoodsReceiptListNotifier extends AsyncNotifier<List<GoodsReceiptModel>> {
         );
       }
     } catch (e) {
-      print('❌ Error loading goods receipts: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error loading goods receipts: $e');
+      }
       throw Exception('เกิดข้อผิดพลาด: $e');
     }
   }
@@ -59,7 +65,9 @@ class GoodsReceiptListNotifier extends AsyncNotifier<List<GoodsReceiptModel>> {
   /// สร้างใบรับสินค้าใหม่
   Future<bool> createGoodsReceipt(GoodsReceiptModel receipt) async {
     try {
-      print('📝 Creating goods receipt...');
+      if (kDebugMode) {
+        debugPrint('📝 Creating goods receipt...');
+      }
 
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.post(
@@ -68,13 +76,17 @@ class GoodsReceiptListNotifier extends AsyncNotifier<List<GoodsReceiptModel>> {
       );
 
       if (response.statusCode == 200) {
-        print('✅ Goods receipt created');
+        if (kDebugMode) {
+          debugPrint('✅ Goods receipt created');
+        }
         await refresh();
         return true;
       }
       return false;
     } catch (e) {
-      print('❌ Error creating goods receipt: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error creating goods receipt: $e');
+      }
       return false;
     }
   }
@@ -82,7 +94,9 @@ class GoodsReceiptListNotifier extends AsyncNotifier<List<GoodsReceiptModel>> {
   /// แก้ไขใบรับสินค้า
   Future<bool> updateGoodsReceipt(GoodsReceiptModel receipt) async {
     try {
-      print('📝 Updating goods receipt: ${receipt.grNo}');
+      if (kDebugMode) {
+        debugPrint('📝 Updating goods receipt: ${receipt.grNo}');
+      }
 
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.put(
@@ -91,13 +105,17 @@ class GoodsReceiptListNotifier extends AsyncNotifier<List<GoodsReceiptModel>> {
       );
 
       if (response.statusCode == 200) {
-        print('✅ Goods receipt updated');
+        if (kDebugMode) {
+          debugPrint('✅ Goods receipt updated');
+        }
         await refresh();
         return true;
       }
       return false;
     } catch (e) {
-      print('❌ Error updating goods receipt: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error updating goods receipt: $e');
+      }
       return false;
     }
   }
@@ -105,19 +123,25 @@ class GoodsReceiptListNotifier extends AsyncNotifier<List<GoodsReceiptModel>> {
   /// ลบใบรับสินค้า
   Future<bool> deleteGoodsReceipt(String grId) async {
     try {
-      print('🗑️ Deleting goods receipt: $grId');
+      if (kDebugMode) {
+        debugPrint('🗑️ Deleting goods receipt: $grId');
+      }
 
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.delete('/api/goods-receipts/$grId');
 
       if (response.statusCode == 200) {
-        print('✅ Goods receipt deleted');
+        if (kDebugMode) {
+          debugPrint('✅ Goods receipt deleted');
+        }
         await refresh();
         return true;
       }
       return false;
     } catch (e) {
-      print('❌ Error deleting goods receipt: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error deleting goods receipt: $e');
+      }
       return false;
     }
   }
@@ -125,7 +149,9 @@ class GoodsReceiptListNotifier extends AsyncNotifier<List<GoodsReceiptModel>> {
   /// ยืนยันใบรับสินค้า (บันทึกเข้าสต๊อก)
   Future<bool> confirmGoodsReceipt(String grId) async {
     try {
-      print('✅ Confirming goods receipt: $grId');
+      if (kDebugMode) {
+        debugPrint('✅ Confirming goods receipt: $grId');
+      }
 
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.post(
@@ -133,13 +159,17 @@ class GoodsReceiptListNotifier extends AsyncNotifier<List<GoodsReceiptModel>> {
       );
 
       if (response.statusCode == 200) {
-        print('✅ Goods receipt confirmed and stock updated');
+        if (kDebugMode) {
+          debugPrint('✅ Goods receipt confirmed and stock updated');
+        }
         await refresh();
         return true;
       }
       return false;
     } catch (e) {
-      print('❌ Error confirming goods receipt: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error confirming goods receipt: $e');
+      }
       return false;
     }
   }
@@ -147,7 +177,9 @@ class GoodsReceiptListNotifier extends AsyncNotifier<List<GoodsReceiptModel>> {
   /// ดึงรายละเอียดใบรับสินค้า
   Future<GoodsReceiptModel?> getGoodsReceiptDetails(String grId) async {
     try {
-      print('📡 Loading goods receipt details: $grId');
+      if (kDebugMode) {
+        debugPrint('📡 Loading goods receipt details: $grId');
+      }
 
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.get('/api/goods-receipts/$grId');
@@ -156,13 +188,17 @@ class GoodsReceiptListNotifier extends AsyncNotifier<List<GoodsReceiptModel>> {
         final data = response.data['data'];
         final receipt = GoodsReceiptModel.fromJson(data);
 
-        print('✅ Loaded goods receipt details');
+        if (kDebugMode) {
+          debugPrint('✅ Loaded goods receipt details');
+        }
 
         return receipt;
       }
       return null;
     } catch (e) {
-      print('❌ Error loading goods receipt details: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error loading goods receipt details: $e');
+      }
       return null;
     }
   }
@@ -170,7 +206,9 @@ class GoodsReceiptListNotifier extends AsyncNotifier<List<GoodsReceiptModel>> {
   /// ดึงรายการ PO ที่รอรับสินค้า
   Future<List<Map<String, dynamic>>> getPendingPurchaseOrders() async {
     try {
-      print('📡 Loading pending purchase orders...');
+      if (kDebugMode) {
+        debugPrint('📡 Loading pending purchase orders...');
+      }
 
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.get('/api/purchases');
@@ -187,13 +225,17 @@ class GoodsReceiptListNotifier extends AsyncNotifier<List<GoodsReceiptModel>> {
             .map((e) => e as Map<String, dynamic>)
             .toList(); // ✅ แก้ไข
 
-        print('✅ Found ${pendingPOs.length} pending purchase orders');
+        if (kDebugMode) {
+          debugPrint('✅ Found ${pendingPOs.length} pending purchase orders');
+        }
 
         return pendingPOs;
       }
       return [];
     } catch (e) {
-      print('❌ Error loading pending purchase orders: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error loading pending purchase orders: $e');
+      }
       return [];
     }
   }
