@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../shared/theme/app_theme.dart';
@@ -24,7 +23,6 @@ const _kAutoRefreshSeconds = 15;
 class _KitchenDisplayPageState extends ConsumerState<KitchenDisplayPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  bool _isFullScreen = false;
   int _lastStationIndex = 0;
 
   int _countdown = _kAutoRefreshSeconds;
@@ -68,15 +66,6 @@ class _KitchenDisplayPageState extends ConsumerState<KitchenDisplayPage>
     _doRefresh();
   }
 
-  void _toggleFullScreen() {
-    setState(() => _isFullScreen = !_isFullScreen);
-    if (_isFullScreen) {
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    } else {
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    }
-  }
-
   Future<void> _doRefresh() async {
     await ref.read(kitchenQueueProvider.notifier).silentRefresh();
     ref.read(kitchenSummaryProvider.notifier).refresh();
@@ -92,7 +81,6 @@ class _KitchenDisplayPageState extends ConsumerState<KitchenDisplayPage>
   @override
   void dispose() {
     _countdownTimer?.cancel();
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _tabController
       ..removeListener(_onTabChanged)
       ..dispose();
@@ -117,13 +105,6 @@ class _KitchenDisplayPageState extends ConsumerState<KitchenDisplayPage>
             total: _kAutoRefreshSeconds,
             onTap: _refreshAll,
           ),
-          IconButton(
-            icon: Icon(
-              _isFullScreen ? Icons.fullscreen_exit : Icons.fullscreen,
-            ),
-            tooltip: _isFullScreen ? 'ออกจาก Full Screen' : 'Full Screen',
-            onPressed: _toggleFullScreen,
-          ),
           const SizedBox(width: 8),
         ],
       ),
@@ -141,20 +122,20 @@ class _KitchenDisplayPageState extends ConsumerState<KitchenDisplayPage>
             child: Container(
               decoration: BoxDecoration(
                 color: AppTheme.cardWhite,
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: AppRadius.md,
                 border: Border.all(color: AppTheme.borderColor),
               ),
               child: TabBar(
                 controller: _tabController,
                 indicator: BoxDecoration(
                   color: AppTheme.primaryColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: AppRadius.md,
                 ),
                 dividerColor: Colors.transparent,
                 indicatorPadding: const EdgeInsets.all(6),
                 labelColor: AppTheme.navyColor,
                 unselectedLabelColor: AppTheme.subtextColor,
-                splashBorderRadius: BorderRadius.circular(10),
+                splashBorderRadius: AppRadius.md,
                 tabs: _stations.map((s) {
                   final sm = s.key != null ? summaryMap[s.key] : null;
                   final active = sm?.totalActive ?? 0;
@@ -220,7 +201,7 @@ class _KitchenSummaryPanel extends StatelessWidget {
       padding: EdgeInsets.all(isMobile ? 10 : 12),
       decoration: BoxDecoration(
         color: AppTheme.cardWhite,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: AppRadius.lg,
         border: Border.all(color: AppTheme.borderColor),
       ),
       child: Column(
@@ -232,7 +213,7 @@ class _KitchenSummaryPanel extends StatelessWidget {
                 padding: EdgeInsets.all(isMobile ? 7 : 8),
                 decoration: BoxDecoration(
                   color: AppTheme.primaryColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: AppRadius.md,
                 ),
                 child: Icon(
                   Icons.kitchen,
@@ -370,7 +351,7 @@ class _SummaryCard extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         color: background,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: AppRadius.md,
       ),
       child: Row(
         children: [
@@ -637,7 +618,7 @@ class _MobileQueueFilterBar extends StatelessWidget {
                 color: selected
                     ? spec.color.withValues(alpha: 0.14)
                     : AppTheme.cardWhite,
-                borderRadius: BorderRadius.circular(999),
+                borderRadius: AppRadius.pill,
                 border: Border.all(
                   color: selected ? spec.color : AppTheme.borderColor,
                 ),
@@ -672,7 +653,7 @@ class _MobileQueueFilterBar extends StatelessWidget {
                       color: selected
                           ? spec.color.withValues(alpha: 0.18)
                           : AppTheme.headerBg,
-                      borderRadius: BorderRadius.circular(999),
+                      borderRadius: AppRadius.pill,
                     ),
                     child: Text(
                       '${spec.count}',
@@ -711,7 +692,7 @@ class _QueueColumn extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: AppTheme.cardWhite,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: AppRadius.lg,
         border: Border.all(color: AppTheme.borderColor),
       ),
       child: Column(
@@ -759,7 +740,7 @@ class _QueueColumn extends StatelessWidget {
                             color: AppTheme.warningColor.withValues(
                               alpha: 0.14,
                             ),
-                            borderRadius: BorderRadius.circular(999),
+                            borderRadius: AppRadius.pill,
                             border: Border.all(
                               color: AppTheme.warningColor.withValues(
                                 alpha: 0.35,
@@ -785,7 +766,7 @@ class _QueueColumn extends StatelessWidget {
                   ),
                   decoration: BoxDecoration(
                     color: spec.color.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(999),
+                    borderRadius: AppRadius.pill,
                   ),
                   child: Text(
                     '${spec.count}',
@@ -858,7 +839,7 @@ class _KdsMessageState extends StatelessWidget {
                 padding: EdgeInsets.all(padding),
                 decoration: BoxDecoration(
                   color: AppTheme.cardWhite,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: AppRadius.lg,
                   border: Border.all(color: AppTheme.borderColor),
                 ),
                 child: Column(
@@ -944,7 +925,7 @@ class _CountdownRefreshButtonState extends State<_CountdownRefreshButton>
       message: 'อัพเดทใน ${widget.countdown} วิ  (กดเพื่อรีเฟรชทันที)',
       child: InkWell(
         onTap: _tap,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: AppRadius.sm,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           child: Row(
@@ -996,7 +977,7 @@ class _Badge extends StatelessWidget {
     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
     decoration: BoxDecoration(
       color: AppTheme.primaryColor,
-      borderRadius: BorderRadius.circular(999),
+      borderRadius: AppRadius.pill,
     ),
     child: Text(
       '$count',

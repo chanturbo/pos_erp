@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -9,6 +11,10 @@ import '../providers/reservation_provider.dart';
 import '../providers/table_provider.dart';
 import 'reservation_form_page.dart';
 
+const _kReservationsRefreshSeconds = 30;
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 class ReservationsPage extends ConsumerStatefulWidget {
   const ReservationsPage({super.key});
 
@@ -18,17 +24,68 @@ class ReservationsPage extends ConsumerStatefulWidget {
 
 class _ReservationsPageState extends ConsumerState<ReservationsPage> {
   String? _busyMessage;
+  Timer? _countdownTimer;
+  int _countdown = _kReservationsRefreshSeconds;
+  bool _showDailyList = false;
 
   bool get _isBusy => _busyMessage != null;
 
   @override
+  void initState() {
+    super.initState();
+    _startCountdown();
+  }
+
+  void _startCountdown() {
+    _countdownTimer?.cancel();
+    _countdown = _kReservationsRefreshSeconds;
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      setState(() {
+        _countdown--;
+        if (_countdown <= 0) {
+          _countdown = _kReservationsRefreshSeconds;
+          unawaited(ref.read(reservationsProvider.notifier).refresh());
+          unawaited(ref.read(reservationCalendarProvider.notifier).refresh());
+        }
+      });
+    });
+  }
+
+  void _refreshAll() {
+    _startCountdown();
+    unawaited(
+      _runBusy('กำลังรีเฟรชรายการจอง...', () async {
+        await Future.wait([
+          ref.read(reservationsProvider.notifier).refresh(),
+          ref.read(reservationCalendarProvider.notifier).refresh(),
+        ]);
+      }),
+    );
+  }
+
+  Future<void> _pullRefresh() =>
+      ref.read(reservationsProvider.notifier).refresh();
+
+  @override
+  void dispose() {
+    _countdownTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final reservationsAsync = ref.watch(reservationsProvider);
+    final calendarAsync = ref.watch(reservationCalendarProvider);
     final date = ref.watch(reservationDateProvider);
+    final calendarMonth = ref.watch(reservationCalendarMonthProvider);
     final statusFilter = ref.watch(reservationStatusFilterProvider);
     final searchQuery = ref.watch(reservationSearchQueryProvider);
     final fmt = DateFormat('d MMM yyyy', 'th');
-    final reservations = reservationsAsync.asData?.value ?? const [];
+    final monthFmt = DateFormat('MMMM yyyy', 'th');
+    final reservations = _showDailyList
+        ? reservationsAsync.asData?.value ?? const []
+        : calendarAsync.asData?.value ?? const [];
 
     return Scaffold(
       backgroundColor: AppTheme.surfaceColor,
@@ -37,15 +94,12 @@ class _ReservationsPageState extends ConsumerState<ReservationsPage> {
         backgroundColor: AppTheme.navyColor,
         foregroundColor: Colors.white,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _isBusy
-                ? null
-                : () => _runBusy(
-                    'กำลังรีเฟรชรายการจอง...',
-                    () => ref.read(reservationsProvider.notifier).refresh(),
-                  ),
+          _CountdownRefreshButton(
+            countdown: _countdown,
+            total: _kReservationsRefreshSeconds,
+            onTap: _isBusy ? null : _refreshAll,
           ),
+          const SizedBox(width: 8),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -64,41 +118,81 @@ class _ReservationsPageState extends ConsumerState<ReservationsPage> {
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                   child: _ReservationSummaryPanel(
                     date: date,
+                    month: calendarMonth,
                     fmt: fmt,
+                    monthFmt: monthFmt,
+                    isMonthView: !_showDailyList,
                     reservations: reservations,
+                    searchQuery: searchQuery,
                   ),
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                  child: _ReservationFiltersPanel(
-                    date: date,
-                    fmt: fmt,
-                    searchQuery: searchQuery,
-                    statusFilter: statusFilter,
-                  ),
+                  child: const _ReservationStatusFilterBar(),
                 ),
                 Expanded(
-                  child: reservationsAsync.when(
-                    data: (list) => list.isEmpty
-                        ? _EmptyState(onAdd: () => _openForm(context, ref))
-                        : ListView.separated(
-                            padding: const EdgeInsets.all(16),
-                            itemCount: list.length,
-                            separatorBuilder: (context, index) =>
-                                const SizedBox(height: 12),
-                            itemBuilder: (_, i) => _ReservationCard(
-                              reservation: list[i],
-                              onAction: (action) =>
-                                  _handleAction(context, ref, list[i], action),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: _showDailyList
+                        ? reservationsAsync.when(
+                            loading: () => const Center(
+                              child: CircularProgressIndicator(),
+                            ),
+                            error: (e, _) => _ReservationMessageState(
+                              icon: Icons.event_busy,
+                              title: 'โหลดรายการจองไม่สำเร็จ',
+                              message: '$e',
+                              iconColor: AppTheme.errorColor,
+                              action: TextButton.icon(
+                                onPressed: () => ref
+                                    .read(reservationsProvider.notifier)
+                                    .refresh(),
+                                icon: const Icon(Icons.refresh),
+                                label: const Text('ลองใหม่'),
+                              ),
+                            ),
+                            data: (list) => _ReservationListColumn(
+                              reservations: list,
+                              statusFilter: statusFilter,
+                              dateLabel: fmt.format(date),
+                              onBackToMonth: () =>
+                                  setState(() => _showDailyList = false),
+                              onAction: (r, action) =>
+                                  _handleAction(context, ref, r, action),
+                              onAdd: () => _openForm(context, ref),
+                              onRefresh: _pullRefresh,
+                            ),
+                          )
+                        : calendarAsync.when(
+                            loading: () => const Center(
+                              child: CircularProgressIndicator(),
+                            ),
+                            error: (e, _) => _ReservationMessageState(
+                              icon: Icons.calendar_month,
+                              title: 'โหลดปฏิทินการจองไม่สำเร็จ',
+                              message: '$e',
+                              iconColor: AppTheme.errorColor,
+                              action: TextButton.icon(
+                                onPressed: () => ref
+                                    .read(reservationCalendarProvider.notifier)
+                                    .refresh(),
+                                icon: const Icon(Icons.refresh),
+                                label: const Text('ลองใหม่'),
+                              ),
+                            ),
+                            data: (list) => _ReservationMonthCalendar(
+                              month: calendarMonth,
+                              reservations: list,
+                              monthFmt: monthFmt,
+                              onSelectDay: (picked) {
+                                ref
+                                        .read(reservationDateProvider.notifier)
+                                        .state =
+                                    picked;
+                                setState(() => _showDailyList = true);
+                              },
                             ),
                           ),
-                    loading: () =>
-                        const Center(child: CircularProgressIndicator()),
-                    error: (e, _) => _ErrorState(
-                      message: '$e',
-                      onRetry: () =>
-                          ref.read(reservationsProvider.notifier).refresh(),
-                    ),
                   ),
                 ),
               ],
@@ -123,6 +217,7 @@ class _ReservationsPageState extends ConsumerState<ReservationsPage> {
     );
     if (!mounted) return;
     await ref.read(reservationsProvider.notifier).refresh();
+    await ref.read(reservationCalendarProvider.notifier).refresh();
   }
 
   Future<void> _handleAction(
@@ -146,6 +241,7 @@ class _ReservationsPageState extends ConsumerState<ReservationsPage> {
         ok ? 'ยืนยันการจอง ${r.customerName} แล้ว' : 'ยืนยันการจองไม่สำเร็จ',
         success: ok,
       );
+      if (ok) await ref.read(reservationCalendarProvider.notifier).refresh();
       return;
     }
     if (action == 'cancel') {
@@ -164,6 +260,7 @@ class _ReservationsPageState extends ConsumerState<ReservationsPage> {
         ok ? 'ยกเลิกการจอง ${r.customerName} แล้ว' : 'ยกเลิกการจองไม่สำเร็จ',
         success: ok,
       );
+      if (ok) await ref.read(reservationCalendarProvider.notifier).refresh();
       return;
     }
     if (action == 'no_show') {
@@ -176,6 +273,7 @@ class _ReservationsPageState extends ConsumerState<ReservationsPage> {
         ok ? 'บันทึกสถานะไม่มาตามนัดแล้ว' : 'บันทึกสถานะไม่มาตามนัดไม่สำเร็จ',
         success: ok,
       );
+      if (ok) await ref.read(reservationCalendarProvider.notifier).refresh();
       return;
     }
     if (action == 'seat') {
@@ -188,9 +286,7 @@ class _ReservationsPageState extends ConsumerState<ReservationsPage> {
     try {
       return await action();
     } finally {
-      if (mounted) {
-        setState(() => _busyMessage = null);
-      }
+      if (mounted) setState(() => _busyMessage = null);
     }
   }
 
@@ -302,6 +398,11 @@ class _ReservationsPageState extends ConsumerState<ReservationsPage> {
                             : 'เกิดข้อผิดพลาดระหว่างนำลูกค้าเข้านั่ง',
                         success: result != null,
                       );
+                      if (result != null) {
+                        await ref
+                            .read(reservationCalendarProvider.notifier)
+                            .refresh();
+                      }
                     },
               style: FilledButton.styleFrom(
                 backgroundColor: AppTheme.primaryColor,
@@ -315,16 +416,26 @@ class _ReservationsPageState extends ConsumerState<ReservationsPage> {
   }
 }
 
+// ─── Summary Panel ────────────────────────────────────────────────────────────
+
 class _ReservationSummaryPanel extends StatelessWidget {
   const _ReservationSummaryPanel({
     required this.date,
+    required this.month,
     required this.fmt,
+    required this.monthFmt,
+    required this.isMonthView,
     required this.reservations,
+    required this.searchQuery,
   });
 
   final DateTime date;
+  final DateTime month;
   final DateFormat fmt;
+  final DateFormat monthFmt;
+  final bool isMonthView;
   final List<ReservationModel> reservations;
+  final String searchQuery;
 
   @override
   Widget build(BuildContext context) {
@@ -333,11 +444,11 @@ class _ReservationSummaryPanel extends StatelessWidget {
     final seated = reservations.where((r) => r.isSeated).length;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppTheme.cardWhite,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.borderColor),
+        color: AppTheme.cardColor(context),
+        borderRadius: AppRadius.lg,
+        border: Border.all(color: AppTheme.borderColorOf(context)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -345,83 +456,87 @@ class _ReservationSummaryPanel extends StatelessWidget {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: AppTheme.primaryColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: AppRadius.md,
                 ),
                 child: const Icon(
                   Icons.event_note,
                   color: AppTheme.primaryColor,
+                  size: 18,
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'ภาพรวมการจอง',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.navyColor,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'รายการจองประจำวันที่ ${fmt.format(date)}',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppTheme.subtextColor,
-                      ),
-                    ),
-                  ],
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'ภาพรวมการจอง',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.navyColor,
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              _SummaryMetric(
-                label: 'รอยืนยัน',
-                value: '$pending',
-                icon: Icons.hourglass_top_rounded,
-                color: AppTheme.warningColor,
-                background: AppTheme.warningContainer,
-              ),
-              _SummaryMetric(
-                label: 'ยืนยันแล้ว',
-                value: '$confirmed',
-                icon: Icons.check_circle_outline,
-                color: AppTheme.primaryColor,
-                background: AppTheme.primaryContainer,
-              ),
-              _SummaryMetric(
-                label: 'เข้านั่งแล้ว',
-                value: '$seated',
-                icon: Icons.event_seat,
-                color: AppTheme.successColor,
-                background: AppTheme.successContainer,
-              ),
-            ],
+          const SizedBox(height: 10),
+          if (isMonthView)
+            _MonthBar(month: month, fmt: monthFmt)
+          else
+            _DateBar(date: date, fmt: fmt),
+          const SizedBox(height: 10),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _SummaryCard(
+                  label: 'รอยืนยัน',
+                  value: '$pending',
+                  icon: Icons.hourglass_top_rounded,
+                  color: AppTheme.warningColor,
+                  background: AppTheme.warningContainer,
+                  compact: true,
+                ),
+                const SizedBox(width: 8),
+                _SummaryCard(
+                  label: 'ยืนยันแล้ว',
+                  value: '$confirmed',
+                  icon: Icons.check_circle_outline,
+                  color: AppTheme.primaryColor,
+                  background: AppTheme.primaryContainer,
+                  compact: true,
+                ),
+                const SizedBox(width: 8),
+                _SummaryCard(
+                  label: 'เข้านั่งแล้ว',
+                  value: '$seated',
+                  icon: Icons.event_seat,
+                  color: AppTheme.successColor,
+                  background: AppTheme.successContainer,
+                  compact: true,
+                ),
+              ],
+            ),
           ),
+          const SizedBox(height: 10),
+          _SearchBar(searchQuery: searchQuery),
         ],
       ),
     );
   }
 }
 
-class _SummaryMetric extends StatelessWidget {
-  const _SummaryMetric({
+// ─── Summary Card (mirrors _SummaryCard from KDS) ─────────────────────────────
+
+class _SummaryCard extends StatelessWidget {
+  const _SummaryCard({
     required this.label,
     required this.value,
     required this.icon,
     required this.color,
     required this.background,
+    this.compact = false,
   });
 
   final String label;
@@ -429,36 +544,37 @@ class _SummaryMetric extends StatelessWidget {
   final IconData icon;
   final Color color;
   final Color background;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 180,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(14),
+      width: compact ? 132 : 160,
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 10 : 12,
+        vertical: compact ? 8 : 10,
       ),
+      decoration: BoxDecoration(color: background, borderRadius: AppRadius.md),
       child: Row(
         children: [
-          Icon(icon, color: color),
-          const SizedBox(width: 10),
+          Icon(icon, color: color, size: compact ? 16 : 18),
+          SizedBox(width: compact ? 6 : 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   label,
-                  style: const TextStyle(
-                    fontSize: 12,
+                  style: TextStyle(
+                    fontSize: compact ? 10 : 11,
                     color: AppTheme.subtextColor,
                   ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 1),
                 Text(
                   value,
                   style: TextStyle(
-                    fontSize: 20,
+                    fontSize: compact ? 15 : 17,
                     fontWeight: FontWeight.w800,
                     color: color,
                   ),
@@ -472,40 +588,815 @@ class _SummaryMetric extends StatelessWidget {
   }
 }
 
-class _ReservationFiltersPanel extends StatelessWidget {
-  const _ReservationFiltersPanel({
-    required this.date,
-    required this.fmt,
-    required this.searchQuery,
+// ─── Status Filter Bar (mirrors _MobileQueueFilterBar from KDS) ───────────────
+
+class _ReservationStatusFilterBar extends ConsumerWidget {
+  const _ReservationStatusFilterBar();
+
+  static const _tabs = [
+    (value: null, label: 'ทั้งหมด'),
+    (value: 'PENDING', label: 'รอยืนยัน'),
+    (value: 'CONFIRMED', label: 'ยืนยันแล้ว'),
+    (value: 'SEATED', label: 'เข้านั่งแล้ว'),
+    (value: 'CANCELLED', label: 'ยกเลิก'),
+    (value: 'NO_SHOW', label: 'ไม่มา'),
+  ];
+
+  Color _colorOf(String? status) => switch (status) {
+    'PENDING' => AppTheme.warningColor,
+    'CONFIRMED' => AppTheme.primaryColor,
+    'SEATED' => AppTheme.successColor,
+    'CANCELLED' => AppTheme.errorColor,
+    'NO_SHOW' => AppTheme.subtextColor,
+    _ => AppTheme.navyColor,
+  };
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final statusFilter = ref.watch(reservationStatusFilterProvider);
+
+    return SizedBox(
+      height: 38,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: _tabs.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final tab = _tabs[index];
+          final selected = statusFilter == tab.value;
+          final color = _colorOf(tab.value);
+
+          return GestureDetector(
+            onTap: () =>
+                ref.read(reservationStatusFilterProvider.notifier).state =
+                    tab.value,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: selected
+                    ? color.withValues(alpha: 0.14)
+                    : AppTheme.cardColor(context),
+                borderRadius: AppRadius.pill,
+                border: Border.all(
+                  color: selected ? color : AppTheme.borderColorOf(context),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: color,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    tab.label,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: selected ? color : AppTheme.textColorOf(context),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ─── Reservation List Column (mirrors _TakeawayOrderColumn / _QueueColumn) ────
+
+class _ReservationListColumn extends StatelessWidget {
+  const _ReservationListColumn({
+    required this.reservations,
     required this.statusFilter,
+    required this.onAction,
+    required this.onAdd,
+    required this.onRefresh,
+    this.dateLabel,
+    this.onBackToMonth,
   });
 
-  final DateTime date;
-  final DateFormat fmt;
-  final String searchQuery;
+  final List<ReservationModel> reservations;
   final String? statusFilter;
+  final void Function(ReservationModel r, String action) onAction;
+  final VoidCallback onAdd;
+  final Future<void> Function() onRefresh;
+  final String? dateLabel;
+  final VoidCallback? onBackToMonth;
+
+  (Color, Color, String) get _headerStyle => switch (statusFilter) {
+    'PENDING' => (AppTheme.warningContainer, AppTheme.warningColor, 'รอยืนยัน'),
+    'CONFIRMED' => (
+      AppTheme.primaryContainer,
+      AppTheme.primaryColor,
+      'ยืนยันแล้ว',
+    ),
+    'SEATED' => (
+      AppTheme.successContainer,
+      AppTheme.successColor,
+      'เข้านั่งแล้ว',
+    ),
+    'CANCELLED' => (
+      AppTheme.errorColor.withValues(alpha: 0.10),
+      AppTheme.errorColor,
+      'ยกเลิก',
+    ),
+    'NO_SHOW' => (
+      AppTheme.subtextColor.withValues(alpha: 0.10),
+      AppTheme.subtextColor,
+      'ไม่มา',
+    ),
+    _ => (AppTheme.headerBg, AppTheme.navyColor, 'ทั้งหมด'),
+  };
 
   @override
   Widget build(BuildContext context) {
+    final (headerBg, headerColor, headerTitle) = _headerStyle;
+
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
       decoration: BoxDecoration(
-        color: AppTheme.cardWhite,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.borderColor),
+        color: AppTheme.cardColor(context),
+        borderRadius: AppRadius.lg,
+        border: Border.all(color: AppTheme.borderColorOf(context)),
       ),
       child: Column(
         children: [
-          _DateBar(date: date, fmt: fmt),
-          const SizedBox(height: 12),
-          _SearchBar(searchQuery: searchQuery),
-          const SizedBox(height: 12),
-          _StatusFilterBar(statusFilter: statusFilter),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: headerBg,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(15),
+              ),
+            ),
+            child: Row(
+              children: [
+                if (onBackToMonth != null) ...[
+                  IconButton(
+                    tooltip: 'กลับไปมุมมองเดือน',
+                    onPressed: onBackToMonth,
+                    icon: const Icon(Icons.arrow_back),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  const SizedBox(width: 4),
+                ],
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: headerColor,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        headerTitle,
+                        style: const TextStyle(
+                          color: AppTheme.navyColor,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                        ),
+                      ),
+                      if (dateLabel != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          dateLabel!,
+                          style: const TextStyle(
+                            color: AppTheme.subtextColor,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: headerColor.withValues(alpha: 0.12),
+                    borderRadius: AppRadius.pill,
+                  ),
+                  child: Text(
+                    '${reservations.length}',
+                    style: TextStyle(
+                      color: headerColor,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: reservations.isEmpty
+                ? _ReservationMessageState(
+                    icon: Icons.event_seat,
+                    title: 'ไม่มีการจองในช่วงนี้',
+                    message:
+                        'เพิ่มการจองล่วงหน้าเพื่อให้ทีมหน้าร้านเตรียมโต๊ะได้ทัน',
+                    iconColor: AppTheme.iconSubtleOf(context),
+                    action: FilledButton.icon(
+                      onPressed: onAdd,
+                      icon: const Icon(Icons.add),
+                      label: const Text('เพิ่มการจอง'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppTheme.primaryColor,
+                      ),
+                    ),
+                  )
+                : RefreshIndicator(
+                    onRefresh: onRefresh,
+                    child: ListView.separated(
+                      padding: const EdgeInsets.all(10),
+                      itemCount: reservations.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 10),
+                      itemBuilder: (_, i) => _ReservationCard(
+                        reservation: reservations[i],
+                        onAction: (action) => onAction(reservations[i], action),
+                      ),
+                    ),
+                  ),
+          ),
         ],
       ),
     );
   }
 }
+
+// ─── Message State (mirrors _KdsMessageState) ─────────────────────────────────
+
+class _ReservationMessageState extends StatelessWidget {
+  const _ReservationMessageState({
+    required this.icon,
+    required this.title,
+    required this.message,
+    required this.iconColor,
+    this.action,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+  final Color iconColor;
+  final Widget? action;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compactHeight = constraints.maxHeight < 200;
+        final iconSize = compactHeight ? 40.0 : 56.0;
+        final padding = compactHeight ? 16.0 : 24.0;
+        final gapLarge = compactHeight ? 10.0 : 14.0;
+        final gapSmall = compactHeight ? 6.0 : 8.0;
+
+        return Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(8),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Container(
+                padding: EdgeInsets.all(padding),
+                decoration: BoxDecoration(
+                  color: AppTheme.cardColor(context),
+                  borderRadius: AppRadius.lg,
+                  border: Border.all(color: AppTheme.borderColorOf(context)),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(icon, size: iconSize, color: iconColor),
+                    SizedBox(height: gapLarge),
+                    Text(
+                      title,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: compactHeight ? 16 : 18,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.textColorOf(context),
+                      ),
+                    ),
+                    SizedBox(height: gapSmall),
+                    Text(
+                      message,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: compactHeight ? 12 : 13,
+                        color: AppTheme.mutedTextOf(context),
+                      ),
+                    ),
+                    if (action != null) ...[
+                      const SizedBox(height: 20),
+                      action!,
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ─── Date Bar ─────────────────────────────────────────────────────────────────
+
+class _DateBar extends ConsumerWidget {
+  const _DateBar({required this.date, required this.fmt});
+
+  final DateTime date;
+  final DateFormat fmt;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Row(
+      children: [
+        IconButton(
+          icon: const Icon(Icons.chevron_left),
+          onPressed: () => ref.read(reservationDateProvider.notifier).state =
+              date.subtract(const Duration(days: 1)),
+          visualDensity: VisualDensity.compact,
+        ),
+        Expanded(
+          child: InkWell(
+            borderRadius: AppRadius.md,
+            onTap: () async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: date,
+                firstDate: DateTime.now().subtract(const Duration(days: 30)),
+                lastDate: DateTime.now().add(const Duration(days: 90)),
+              );
+              if (picked != null) {
+                ref.read(reservationDateProvider.notifier).state = picked;
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppTheme.surface3Of(context),
+                borderRadius: AppRadius.md,
+                border: Border.all(color: AppTheme.borderColorOf(context)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.calendar_today_outlined,
+                    size: 16,
+                    color: AppTheme.primaryColor,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    fmt.format(date),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textColorOf(context),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        IconButton(
+          icon: const Icon(Icons.chevron_right),
+          onPressed: () => ref.read(reservationDateProvider.notifier).state =
+              date.add(const Duration(days: 1)),
+          visualDensity: VisualDensity.compact,
+        ),
+      ],
+    );
+  }
+}
+
+class _MonthBar extends ConsumerWidget {
+  const _MonthBar({required this.month, required this.fmt});
+
+  final DateTime month;
+  final DateFormat fmt;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final normalizedMonth = DateTime(month.year, month.month);
+
+    return Row(
+      children: [
+        IconButton(
+          tooltip: 'เดือนก่อนหน้า',
+          icon: const Icon(Icons.chevron_left),
+          onPressed: () =>
+              ref.read(reservationCalendarMonthProvider.notifier).state =
+                  DateTime(normalizedMonth.year, normalizedMonth.month - 1),
+          visualDensity: VisualDensity.compact,
+        ),
+        Expanded(
+          child: InkWell(
+            borderRadius: AppRadius.md,
+            onTap: () async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: normalizedMonth,
+                firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                lastDate: DateTime.now().add(const Duration(days: 365)),
+              );
+              if (picked != null) {
+                ref.read(reservationCalendarMonthProvider.notifier).state =
+                    DateTime(picked.year, picked.month);
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppTheme.surface3Of(context),
+                borderRadius: AppRadius.md,
+                border: Border.all(color: AppTheme.borderColorOf(context)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.calendar_month,
+                    size: 16,
+                    color: AppTheme.primaryColor,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    fmt.format(normalizedMonth),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textColorOf(context),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        IconButton(
+          tooltip: 'เดือนถัดไป',
+          icon: const Icon(Icons.chevron_right),
+          onPressed: () =>
+              ref.read(reservationCalendarMonthProvider.notifier).state =
+                  DateTime(normalizedMonth.year, normalizedMonth.month + 1),
+          visualDensity: VisualDensity.compact,
+        ),
+      ],
+    );
+  }
+}
+
+class _ReservationMonthCalendar extends StatelessWidget {
+  const _ReservationMonthCalendar({
+    required this.month,
+    required this.reservations,
+    required this.monthFmt,
+    required this.onSelectDay,
+  });
+
+  final DateTime month;
+  final List<ReservationModel> reservations;
+  final DateFormat monthFmt;
+  final ValueChanged<DateTime> onSelectDay;
+
+  static const _weekdayLabels = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
+
+  Color _statusColor(ReservationModel reservation) {
+    if (reservation.isPending) return AppTheme.warningColor;
+    if (reservation.isConfirmed) return AppTheme.primaryColor;
+    if (reservation.isSeated) return AppTheme.successColor;
+    if (reservation.isCancelled) return AppTheme.errorColor;
+    return AppTheme.subtextColor;
+  }
+
+  String _timeText(DateTime value) =>
+      '${value.hour.toString().padLeft(2, '0')}:'
+      '${value.minute.toString().padLeft(2, '0')}';
+
+  Map<DateTime, List<ReservationModel>> _groupByDay() {
+    final grouped = <DateTime, List<ReservationModel>>{};
+    for (final reservation in reservations) {
+      final time = reservation.reservationTime;
+      final day = DateTime(time.year, time.month, time.day);
+      grouped.putIfAbsent(day, () => []).add(reservation);
+    }
+    for (final dayReservations in grouped.values) {
+      dayReservations.sort(
+        (a, b) => a.reservationTime.compareTo(b.reservationTime),
+      );
+    }
+    return grouped;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final normalizedMonth = DateTime(month.year, month.month);
+    final firstDay = DateTime(normalizedMonth.year, normalizedMonth.month);
+    final daysInMonth = DateTime(
+      normalizedMonth.year,
+      normalizedMonth.month + 1,
+      0,
+    ).day;
+    final leadingEmptyDays = firstDay.weekday % 7;
+    final totalCells = leadingEmptyDays + daysInMonth;
+    final rowCount = totalCells <= 35 ? 5 : 6;
+    final grouped = _groupByDay();
+    final today = DateTime.now();
+    final todayDate = DateTime(today.year, today.month, today.day);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.cardColor(context),
+        borderRadius: AppRadius.lg,
+        border: Border.all(color: AppTheme.borderColorOf(context)),
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: const BoxDecoration(
+              color: AppTheme.headerBg,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(15)),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.calendar_month,
+                  color: AppTheme.primaryColor,
+                  size: 18,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    monthFmt.format(normalizedMonth),
+                    style: const TextStyle(
+                      color: AppTheme.navyColor,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor.withValues(alpha: 0.12),
+                    borderRadius: AppRadius.pill,
+                  ),
+                  child: Text(
+                    '${reservations.length} จอง',
+                    style: const TextStyle(
+                      color: AppTheme.primaryColor,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            height: 34,
+            decoration: BoxDecoration(
+              color: AppTheme.surface3Of(context),
+              border: Border(
+                bottom: BorderSide(color: AppTheme.borderColorOf(context)),
+              ),
+            ),
+            child: Row(
+              children: _weekdayLabels
+                  .map(
+                    (label) => Expanded(
+                      child: Center(
+                        child: Text(
+                          label,
+                          style: const TextStyle(
+                            color: AppTheme.subtextColor,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ),
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final cellWidth = constraints.maxWidth / 7;
+                final cellHeight = constraints.maxHeight / rowCount;
+                final ratio = cellWidth / cellHeight;
+
+                return GridView.builder(
+                  physics: const NeverScrollableScrollPhysics(),
+                  padding: EdgeInsets.zero,
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 7,
+                    childAspectRatio: ratio,
+                  ),
+                  itemCount: rowCount * 7,
+                  itemBuilder: (context, index) {
+                    final dayNumber = index - leadingEmptyDays + 1;
+                    if (dayNumber < 1 || dayNumber > daysInMonth) {
+                      return DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: AppTheme.surfaceColor,
+                          border: Border(
+                            right: BorderSide(
+                              color: AppTheme.borderColorOf(context),
+                            ),
+                            bottom: BorderSide(
+                              color: AppTheme.borderColorOf(context),
+                            ),
+                          ),
+                        ),
+                      );
+                    }
+
+                    final day = DateTime(
+                      normalizedMonth.year,
+                      normalizedMonth.month,
+                      dayNumber,
+                    );
+                    final dayReservations = grouped[day] ?? const [];
+                    final isToday = day == todayDate;
+
+                    return InkWell(
+                      onTap: () => onSelectDay(day),
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: isToday
+                              ? AppTheme.primaryColor.withValues(alpha: 0.05)
+                              : AppTheme.cardColor(context),
+                          border: Border(
+                            right: BorderSide(
+                              color: AppTheme.borderColorOf(context),
+                            ),
+                            bottom: BorderSide(
+                              color: AppTheme.borderColorOf(context),
+                            ),
+                          ),
+                        ),
+                        child: LayoutBuilder(
+                          builder: (context, cellConstraints) {
+                            final compact = cellConstraints.maxHeight < 48;
+                            final dayLabel = Container(
+                              width: compact ? 18 : 24,
+                              height: compact ? 18 : 24,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: isToday
+                                    ? AppTheme.primaryColor
+                                    : Colors.transparent,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Text(
+                                '$dayNumber',
+                                style: TextStyle(
+                                  color: isToday
+                                      ? Colors.white
+                                      : AppTheme.textColorOf(context),
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: compact ? 10 : 12,
+                                ),
+                              ),
+                            );
+
+                            if (compact) {
+                              return Row(
+                                children: [
+                                  dayLabel,
+                                  if (dayReservations.isNotEmpty) ...[
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      '${dayReservations.length}',
+                                      style: TextStyle(
+                                        color: AppTheme.primaryColor,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              );
+                            }
+
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                dayLabel,
+                                const SizedBox(height: 4),
+                                Expanded(
+                                  child: Column(
+                                    children: [
+                                      ...dayReservations
+                                          .take(3)
+                                          .map(
+                                            (
+                                              reservation,
+                                            ) => _CalendarReservationChip(
+                                              text:
+                                                  '${_timeText(reservation.reservationTime)} '
+                                                  '${reservation.customerName}',
+                                              color: _statusColor(reservation),
+                                            ),
+                                          ),
+                                      if (dayReservations.length > 3)
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                            top: 2,
+                                          ),
+                                          child: Text(
+                                            '+${dayReservations.length - 3} เพิ่มเติม',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              color: AppTheme.subtextColor,
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CalendarReservationChip extends StatelessWidget {
+  const _CalendarReservationChip({required this.text, required this.color});
+
+  final String text;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: AppRadius.xs,
+        border: Border(left: BorderSide(color: color, width: 2)),
+      ),
+      child: Text(
+        text,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+          height: 1.1,
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Search Bar ───────────────────────────────────────────────────────────────
 
 class _SearchBar extends ConsumerStatefulWidget {
   const _SearchBar({required this.searchQuery});
@@ -543,170 +1434,150 @@ class _SearchBarState extends ConsumerState<_SearchBar> {
   }
 
   @override
-  Widget build(BuildContext context) => TextField(
-    controller: _controller,
-    onChanged: (value) =>
-        ref.read(reservationSearchQueryProvider.notifier).state = value,
-    decoration: InputDecoration(
-      hintText: 'ค้นหาชื่อลูกค้า หรือเบอร์โทร',
-      prefixIcon: const Icon(Icons.search),
-      suffixIcon: widget.searchQuery.isEmpty
-          ? null
-          : IconButton(
-              tooltip: 'ล้างคำค้นหา',
-              onPressed: () =>
-                  ref.read(reservationSearchQueryProvider.notifier).state = '',
-              icon: const Icon(Icons.close),
-            ),
-      isDense: true,
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-    ),
-  );
-}
-
-class _DateBar extends ConsumerWidget {
-  const _DateBar({required this.date, required this.fmt});
-
-  final DateTime date;
-  final DateFormat fmt;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 4),
-    child: Row(
-      children: [
-        IconButton(
-          icon: const Icon(Icons.chevron_left),
-          onPressed: () => ref.read(reservationDateProvider.notifier).state =
-              date.subtract(const Duration(days: 1)),
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: _controller,
+      onChanged: (value) =>
+          ref.read(reservationSearchQueryProvider.notifier).state = value,
+      decoration: InputDecoration(
+        hintText: 'ค้นหาชื่อลูกค้า หรือเบอร์โทร',
+        hintStyle: TextStyle(
+          fontSize: 13,
+          color: AppTheme.mutedTextOf(context),
         ),
-        Expanded(
-          child: InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: () async {
-              final picked = await showDatePicker(
-                context: context,
-                initialDate: date,
-                firstDate: DateTime.now().subtract(const Duration(days: 30)),
-                lastDate: DateTime.now().add(const Duration(days: 90)),
-              );
-              if (picked != null) {
-                ref.read(reservationDateProvider.notifier).state = picked;
-              }
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                color: AppTheme.headerBg,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppTheme.borderColor),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.calendar_today_outlined,
-                    size: 16,
-                    color: AppTheme.primaryColor,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    fmt.format(date),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: AppTheme.navyColor,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+        prefixIcon: Icon(
+          Icons.search,
+          size: 20,
+          color: AppTheme.iconOf(context),
         ),
-        IconButton(
-          icon: const Icon(Icons.chevron_right),
-          onPressed: () => ref.read(reservationDateProvider.notifier).state =
-              date.add(const Duration(days: 1)),
-        ),
-      ],
-    ),
-  );
-}
-
-class _StatusFilterBar extends ConsumerWidget {
-  const _StatusFilterBar({required this.statusFilter});
-
-  final String? statusFilter;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    const filters = [
-      (null, 'ทั้งหมด'),
-      ('PENDING', 'รอยืนยัน'),
-      ('CONFIRMED', 'ยืนยันแล้ว'),
-      ('SEATED', 'เข้านั่งแล้ว'),
-      ('CANCELLED', 'ยกเลิก'),
-      ('NO_SHOW', 'ไม่มา'),
-    ];
-    return SizedBox(
-      height: 42,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        children: filters
-            .map(
-              (f) => _FilterChip(
-                label: f.$2,
-                selected: statusFilter == f.$1,
-                onTap: () =>
-                    ref.read(reservationStatusFilterProvider.notifier).state =
-                        f.$1,
+        suffixIcon: widget.searchQuery.isEmpty
+            ? null
+            : IconButton(
+                tooltip: 'ล้างคำค้นหา',
+                onPressed: () =>
+                    ref.read(reservationSearchQueryProvider.notifier).state =
+                        '',
+                icon: const Icon(Icons.close, size: 18),
               ),
-            )
-            .toList(),
+        filled: true,
+        fillColor: AppTheme.surface3Of(context),
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 10,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: AppRadius.md,
+          borderSide: BorderSide(color: AppTheme.inputBorderOf(context)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: AppRadius.md,
+          borderSide: BorderSide(color: AppTheme.inputBorderOf(context)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: AppRadius.md,
+          borderSide: const BorderSide(color: AppTheme.primaryColor),
+        ),
       ),
     );
   }
 }
 
-class _FilterChip extends StatelessWidget {
-  const _FilterChip({
-    required this.label,
-    required this.selected,
+// ─── Countdown Refresh Button (mirrors KDS) ───────────────────────────────────
+
+class _CountdownRefreshButton extends StatefulWidget {
+  const _CountdownRefreshButton({
+    required this.countdown,
+    required this.total,
     required this.onTap,
   });
 
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
+  final int countdown;
+  final int total;
+  final VoidCallback? onTap;
 
   @override
-  Widget build(BuildContext context) => GestureDetector(
-    onTap: onTap,
-    child: AnimatedContainer(
-      duration: const Duration(milliseconds: 150),
-      margin: const EdgeInsets.only(right: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: selected
-            ? AppTheme.primaryColor.withValues(alpha: 0.12)
-            : AppTheme.headerBg,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: selected ? AppTheme.primaryColor : AppTheme.borderColor,
-        ),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 13,
-          color: selected ? AppTheme.primaryColor : AppTheme.navyColor,
-          fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-        ),
-      ),
-    ),
-  );
+  State<_CountdownRefreshButton> createState() =>
+      _CountdownRefreshButtonState();
 }
+
+class _CountdownRefreshButtonState extends State<_CountdownRefreshButton>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _spinCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _spinCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+  }
+
+  @override
+  void dispose() {
+    _spinCtrl.dispose();
+    super.dispose();
+  }
+
+  void _tap() {
+    if (widget.onTap == null) return;
+    _spinCtrl.forward(from: 0);
+    widget.onTap!();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = widget.countdown / widget.total;
+    final isUrgent = widget.countdown <= 5;
+
+    return Tooltip(
+      message: 'อัพเดทใน ${widget.countdown} วิ  (กดเพื่อรีเฟรชทันที)',
+      child: InkWell(
+        onTap: widget.onTap != null ? _tap : null,
+        borderRadius: AppRadius.sm,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 22,
+                height: 22,
+                child: RotationTransition(
+                  turns: _spinCtrl,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      CircularProgressIndicator(
+                        value: progress,
+                        strokeWidth: 2.5,
+                        backgroundColor: Colors.white24,
+                        color: isUrgent ? Colors.orangeAccent : Colors.white,
+                      ),
+                      const Icon(Icons.refresh, size: 12, color: Colors.white),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                '${widget.countdown}s',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: isUrgent ? Colors.orangeAccent : Colors.white70,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Reservation Card ─────────────────────────────────────────────────────────
 
 class _ReservationCard extends StatelessWidget {
   const _ReservationCard({required this.reservation, required this.onAction});
@@ -722,9 +1593,9 @@ class _ReservationCard extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: AppTheme.cardWhite,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.borderColor),
+        color: AppTheme.cardColor(context),
+        borderRadius: AppRadius.lg,
+        border: Border.all(color: AppTheme.borderColorOf(context)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -750,7 +1621,7 @@ class _ReservationCard extends StatelessWidget {
                             ),
                             decoration: BoxDecoration(
                               color: statusInfo.$1.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(999),
+                              borderRadius: AppRadius.pill,
                             ),
                             child: Text(
                               statusInfo.$2,
@@ -769,7 +1640,7 @@ class _ReservationCard extends StatelessWidget {
                               ),
                               decoration: BoxDecoration(
                                 color: AppTheme.infoContainer,
-                                borderRadius: BorderRadius.circular(999),
+                                borderRadius: AppRadius.pill,
                               ),
                               child: Text(
                                 r.tableName ?? r.tableId!,
@@ -785,10 +1656,10 @@ class _ReservationCard extends StatelessWidget {
                       const SizedBox(height: 12),
                       Text(
                         r.customerName,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
-                          color: AppTheme.navyColor,
+                          color: AppTheme.textColorOf(context),
                         ),
                       ),
                     ],
@@ -800,16 +1671,16 @@ class _ReservationCard extends StatelessWidget {
                     vertical: 8,
                   ),
                   decoration: BoxDecoration(
-                    color: AppTheme.headerBg,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppTheme.borderColor),
+                    color: AppTheme.surface3Of(context),
+                    borderRadius: AppRadius.md,
+                    border: Border.all(color: AppTheme.borderColorOf(context)),
                   ),
                   child: Text(
                     timeFmt.format(r.reservationTime),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w800,
-                      color: AppTheme.navyColor,
+                      color: AppTheme.textColorOf(context),
                     ),
                   ),
                 ),
@@ -843,7 +1714,7 @@ class _ReservationCard extends StatelessWidget {
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: AppTheme.warningContainer,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: AppRadius.md,
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -885,6 +1756,8 @@ class _ReservationCard extends StatelessWidget {
   };
 }
 
+// ─── Info Chip ────────────────────────────────────────────────────────────────
+
 class _InfoChip extends StatelessWidget {
   const _InfoChip({required this.icon, required this.label});
 
@@ -895,15 +1768,17 @@ class _InfoChip extends StatelessWidget {
   Widget build(BuildContext context) => Row(
     mainAxisSize: MainAxisSize.min,
     children: [
-      Icon(icon, size: 16, color: AppTheme.subtextColor),
+      Icon(icon, size: 16, color: AppTheme.mutedTextOf(context)),
       const SizedBox(width: 6),
       Text(
         label,
-        style: const TextStyle(fontSize: 13, color: AppTheme.subtextColor),
+        style: TextStyle(fontSize: 13, color: AppTheme.mutedTextOf(context)),
       ),
     ],
   );
 }
+
+// ─── Action Buttons ───────────────────────────────────────────────────────────
 
 class _ActionButtons extends StatelessWidget {
   const _ActionButtons({required this.reservation, required this.onAction});
@@ -921,7 +1796,7 @@ class _ActionButtons extends StatelessWidget {
             : r.isCancelled
             ? 'ยกเลิกการจอง'
             : 'ไม่มาตามนัด',
-        style: const TextStyle(color: AppTheme.subtextColor, fontSize: 13),
+        style: TextStyle(color: AppTheme.mutedTextOf(context), fontSize: 13),
       );
     }
     return Wrap(
@@ -977,102 +1852,4 @@ class _ActionButtons extends StatelessWidget {
       ],
     );
   }
-}
-
-class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.onAdd});
-
-  final VoidCallback onAdd;
-
-  @override
-  Widget build(BuildContext context) => Center(
-    child: Container(
-      constraints: const BoxConstraints(maxWidth: 420),
-      margin: const EdgeInsets.all(24),
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: AppTheme.cardWhite,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.borderColor),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.event_seat, size: 64, color: Colors.grey.shade300),
-          const SizedBox(height: 16),
-          Text(
-            'ไม่มีการจองในวันนี้',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: Colors.grey.shade700,
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'เพิ่มการจองล่วงหน้าเพื่อให้ทีมหน้าร้านเตรียมโต๊ะได้ทัน',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 13, color: AppTheme.subtextColor),
-          ),
-          const SizedBox(height: 20),
-          FilledButton.icon(
-            onPressed: onAdd,
-            icon: const Icon(Icons.add),
-            label: const Text('เพิ่มการจอง'),
-            style: FilledButton.styleFrom(
-              backgroundColor: AppTheme.primaryColor,
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) => Center(
-    child: Container(
-      constraints: const BoxConstraints(maxWidth: 420),
-      margin: const EdgeInsets.all(24),
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: AppTheme.cardWhite,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.borderColor),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.error_outline, size: 52, color: AppTheme.errorColor),
-          const SizedBox(height: 12),
-          const Text(
-            'โหลดรายการจองไม่สำเร็จ',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: AppTheme.navyColor,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            message,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 13, color: AppTheme.subtextColor),
-          ),
-          const SizedBox(height: 16),
-          FilledButton.icon(
-            onPressed: onRetry,
-            icon: const Icon(Icons.refresh),
-            label: const Text('ลองใหม่'),
-          ),
-        ],
-      ),
-    ),
-  );
 }

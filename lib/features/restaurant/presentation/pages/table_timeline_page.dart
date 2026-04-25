@@ -291,7 +291,7 @@ class _OrderDetail extends StatelessWidget {
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
         color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: AppRadius.sm,
         border: Border.all(color: Colors.grey.shade200),
       ),
       child: Column(
@@ -322,7 +322,7 @@ class _OrderDetail extends StatelessWidget {
                           horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
                         color: Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(4),
+                        borderRadius: AppRadius.xs,
                       ),
                       child: Text('คอร์ส $course',
                           style: TextStyle(

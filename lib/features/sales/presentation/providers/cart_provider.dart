@@ -44,6 +44,7 @@ class AppliedCoupon {
 
 // Cart Item Model
 class CartItem {
+  final String lineId; // unique per cart row — allows same productId with different notes
   final String productId;
   final String productCode;
   final String productName;
@@ -65,7 +66,12 @@ class CartItem {
   final double priceLevel4;
   final double priceLevel5;
 
+  static int _lineCounter = 0;
+  static String _nextLineId(String productId) =>
+      '${productId}_${DateTime.now().millisecondsSinceEpoch}_${_lineCounter++}';
+
   CartItem({
+    String? lineId,
     required this.productId,
     required this.productCode,
     required this.productName,
@@ -84,7 +90,7 @@ class CartItem {
     this.priceLevel3 = 0,
     this.priceLevel4 = 0,
     this.priceLevel5 = 0,
-  });
+  }) : lineId = lineId ?? _nextLineId(productId);
 
   /// ✅ คืนราคาตาม priceLevel (1-5), fallback = priceLevel1
   double priceForLevel(int level) {
@@ -102,15 +108,18 @@ class CartItem {
     }
   }
 
+  static const _keep = Object();
+
   CartItem copyWith({
     double? quantity,
     double? unitPrice,
     double? amount,
-    String? note,
+    Object? note = _keep, // use _keep sentinel to distinguish "not passed" from explicit null
     List<CartItemModifier>? modifiers,
     int? courseNo,
   }) {
     return CartItem(
+      lineId: lineId,
       productId: productId,
       productCode: productCode,
       productName: productName,
@@ -121,7 +130,7 @@ class CartItem {
       groupId: groupId,
       promotionId: promotionId,
       promotionName: promotionName,
-      note: note ?? this.note,
+      note: note == _keep ? this.note : note as String?,
       modifiers: modifiers ?? this.modifiers,
       courseNo: courseNo ?? this.courseNo,
       priceLevel1: priceLevel1,
@@ -133,6 +142,7 @@ class CartItem {
   }
 
   Map<String, dynamic> toJson() => {
+    'line_id': lineId,
     'product_id': productId,
     'product_code': productCode,
     'product_name': productName,
@@ -154,6 +164,7 @@ class CartItem {
   };
 
   factory CartItem.fromJson(Map<String, dynamic> json) => CartItem(
+    lineId: json['line_id'] as String?,
     productId: json['product_id'] as String? ?? '',
     productCode: json['product_code'] as String? ?? '',
     productName: json['product_name'] as String? ?? '',
@@ -214,6 +225,7 @@ class CartState {
   final double discountPercent;
   final double discountAmount;
   final List<AppliedCoupon> appliedCoupons; // คูปองที่ใช้งาน (หลายใบ)
+  final Set<String> kitchenSentLineIds; // lineIds ที่ส่งเข้าครัวแล้ว
 
   CartState({
     this.items = const [],
@@ -224,6 +236,7 @@ class CartState {
     this.discountPercent = 0,
     this.discountAmount = 0,
     this.appliedCoupons = const [],
+    this.kitchenSentLineIds = const {},
   });
 
   // Calculated values
@@ -244,6 +257,10 @@ class CartState {
   int get itemCount => items.length;
   bool get hasFreeItems => freeItems.isNotEmpty;
 
+  bool get hasUnsentItems =>
+      items.any((item) => !kitchenSentLineIds.contains(item.lineId));
+  bool get hasKitchenSentItems => kitchenSentLineIds.isNotEmpty;
+
   CartState copyWith({
     List<CartItem>? items,
     List<CartItem>? freeItems,
@@ -253,6 +270,7 @@ class CartState {
     double? discountPercent,
     double? discountAmount,
     List<AppliedCoupon>? appliedCoupons,
+    Set<String>? kitchenSentLineIds,
     bool clearCustomer = false,
   }) {
     return CartState(
@@ -268,6 +286,7 @@ class CartState {
       discountPercent: discountPercent ?? this.discountPercent,
       discountAmount: discountAmount ?? this.discountAmount,
       appliedCoupons: appliedCoupons ?? this.appliedCoupons,
+      kitchenSentLineIds: kitchenSentLineIds ?? this.kitchenSentLineIds,
     );
   }
 
@@ -334,8 +353,9 @@ class CartNotifier extends Notifier<CartState> {
     double priceLevel5 = 0,
   }) {
     final items = List<CartItem>.from(state.items);
+    // merge only into a row that has no note — same product with a note stays separate
     final existingIndex = items.indexWhere(
-      (item) => item.productId == productId,
+      (item) => item.productId == productId && (item.note == null || item.note!.isEmpty),
     );
 
     if (existingIndex >= 0) {
@@ -372,9 +392,9 @@ class CartNotifier extends Notifier<CartState> {
   }
 
   /// เพิ่มจำนวน
-  void increaseQuantity(String productId) {
+  void increaseQuantity(String lineId) {
     final items = List<CartItem>.from(state.items);
-    final index = items.indexWhere((item) => item.productId == productId);
+    final index = items.indexWhere((item) => item.lineId == lineId);
 
     if (index >= 0) {
       final item = items[index];
@@ -388,9 +408,9 @@ class CartNotifier extends Notifier<CartState> {
   }
 
   /// ลดจำนวน
-  void decreaseQuantity(String productId) {
+  void decreaseQuantity(String lineId) {
     final items = List<CartItem>.from(state.items);
-    final index = items.indexWhere((item) => item.productId == productId);
+    final index = items.indexWhere((item) => item.lineId == lineId);
 
     if (index >= 0) {
       final item = items[index];
@@ -407,9 +427,9 @@ class CartNotifier extends Notifier<CartState> {
   }
 
   /// ตั้งค่าจำนวนโดยตรง — ใช้กับ inline edit ใน CartPanel
-  void setQuantity(String productId, double quantity) {
+  void setQuantity(String lineId, double quantity) {
     final items = List<CartItem>.from(state.items);
-    final index = items.indexWhere((item) => item.productId == productId);
+    final index = items.indexWhere((item) => item.lineId == lineId);
     if (index >= 0) {
       final item = items[index];
       final safe = quantity < 0.001 ? 1.0 : quantity;
@@ -422,19 +442,34 @@ class CartNotifier extends Notifier<CartState> {
   }
 
   /// ลบสินค้า
-  void removeItem(String productId) {
+  void removeItem(String lineId) {
     final items = state.items
-        .where((item) => item.productId != productId)
+        .where((item) => item.lineId != lineId)
         .toList();
     state = state.copyWith(items: items);
   }
 
-  void setCourseNo(String productId, int courseNo) {
+  void setCourseNo(String lineId, int courseNo) {
     final items = state.items.map((item) {
-      if (item.productId != productId) return item;
+      if (item.lineId != lineId) return item;
       return item.copyWith(courseNo: courseNo);
     }).toList();
     state = state.copyWith(items: items);
+  }
+
+  void setNote(String lineId, String? note) {
+    final items = state.items.map((item) {
+      if (item.lineId != lineId) return item;
+      final trimmed = note?.trim();
+      return item.copyWith(note: trimmed == null || trimmed.isEmpty ? null : trimmed);
+    }).toList();
+    state = state.copyWith(items: items);
+  }
+
+  void markKitchenSent(Set<String> lineIds) {
+    state = state.copyWith(
+      kitchenSentLineIds: {...state.kitchenSentLineIds, ...lineIds},
+    );
   }
 
   /// ✅ ตั้งค่าลูกค้า พร้อม priceLevel (ไม่ re-price อัตโนมัติ)

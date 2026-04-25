@@ -20,7 +20,7 @@ class KitchenItemCard extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: AppRadius.md,
         side: BorderSide(color: colors.border, width: 1.5),
       ),
       elevation: 2,
@@ -99,7 +99,7 @@ class KitchenItemCard extends StatelessWidget {
                           horizontal: 10, vertical: 3),
                       decoration: BoxDecoration(
                         color: colors.border.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(20),
+                        borderRadius: AppRadius.xl,
                       ),
                       child: Text(
                         'x${_formatQty(item.quantity)} ${item.unit}',
@@ -122,7 +122,7 @@ class KitchenItemCard extends StatelessWidget {
                         horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: AppTheme.warningColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(6),
+                      borderRadius: AppRadius.sm,
                       border: Border.all(
                           color: AppTheme.warningColor.withValues(alpha: 0.4)),
                     ),
@@ -238,7 +238,7 @@ class _WaitTimeBadgeState extends State<_WaitTimeBadge> {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: AppRadius.md,
       ),
       child: Row(
         children: [

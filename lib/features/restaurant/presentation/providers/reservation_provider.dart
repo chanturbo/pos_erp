@@ -1,4 +1,3 @@
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
@@ -11,6 +10,10 @@ import 'table_provider.dart';
 final reservationDateProvider = StateProvider<DateTime>(
   (ref) => DateTime.now(),
 );
+final reservationCalendarMonthProvider = StateProvider<DateTime>((ref) {
+  final now = DateTime.now();
+  return DateTime(now.year, now.month);
+});
 final reservationStatusFilterProvider = StateProvider<String?>((ref) => null);
 final reservationSearchQueryProvider = StateProvider<String>((ref) => '');
 
@@ -18,6 +21,98 @@ final reservationsProvider =
     AsyncNotifierProvider<ReservationsNotifier, List<ReservationModel>>(
       ReservationsNotifier.new,
     );
+
+final reservationCalendarProvider =
+    AsyncNotifierProvider<ReservationCalendarNotifier, List<ReservationModel>>(
+      ReservationCalendarNotifier.new,
+    );
+
+String _dateParam(DateTime date) {
+  final y = date.year.toString().padLeft(4, '0');
+  final m = date.month.toString().padLeft(2, '0');
+  final d = date.day.toString().padLeft(2, '0');
+  return '$y-$m-$d';
+}
+
+String _reservationUrl({
+  DateTime? date,
+  DateTime? from,
+  DateTime? to,
+  String? branchId,
+  String? status,
+  String? searchQuery,
+}) {
+  final params = <String, String>{};
+  if (date != null) params['date'] = _dateParam(date);
+  if (from != null) params['from'] = _dateParam(from);
+  if (to != null) params['to'] = _dateParam(to);
+  if (branchId != null) params['branch_id'] = branchId;
+  if (status != null) params['status'] = status;
+  final trimmedQuery = (searchQuery ?? '').trim();
+  if (trimmedQuery.isNotEmpty) params['query'] = trimmedQuery;
+  final query = Uri(queryParameters: params).query;
+  return '/api/tables/reservations${query.isEmpty ? '' : '?$query'}';
+}
+
+class ReservationCalendarNotifier
+    extends AsyncNotifier<List<ReservationModel>> {
+  @override
+  Future<List<ReservationModel>> build() async {
+    final auth = ref.watch(authProvider);
+    if (auth.isRestoring || !auth.isAuthenticated) return [];
+    final month = ref.watch(reservationCalendarMonthProvider);
+    final status = ref.watch(reservationStatusFilterProvider);
+    final searchQuery = ref.watch(reservationSearchQueryProvider);
+    final branch = ref.watch(selectedBranchProvider);
+    return _load(
+      month: month,
+      status: status,
+      searchQuery: searchQuery,
+      branchId: branch?.branchId,
+    );
+  }
+
+  Future<List<ReservationModel>> _load({
+    required DateTime month,
+    String? status,
+    String? searchQuery,
+    String? branchId,
+  }) async {
+    final api = ref.read(apiClientProvider);
+    final firstDay = DateTime(month.year, month.month);
+    final lastDay = DateTime(month.year, month.month + 1, 0);
+    final url = _reservationUrl(
+      from: firstDay,
+      to: lastDay,
+      branchId: branchId,
+      status: status,
+      searchQuery: searchQuery,
+    );
+
+    final res = await api.get(url);
+    if (res.statusCode != 200) return [];
+    final list = res.data['data'] as List;
+    return list
+        .map((j) => ReservationModel.fromJson(j as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<void> refresh() async {
+    final month = ref.read(reservationCalendarMonthProvider);
+    final status = ref.read(reservationStatusFilterProvider);
+    final searchQuery = ref.read(reservationSearchQueryProvider);
+    final branch = ref.read(selectedBranchProvider);
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(
+      () => _load(
+        month: month,
+        status: status,
+        searchQuery: searchQuery,
+        branchId: branch?.branchId,
+      ),
+    );
+  }
+}
 
 class ReservationsNotifier extends AsyncNotifier<List<ReservationModel>> {
   @override
@@ -43,16 +138,12 @@ class ReservationsNotifier extends AsyncNotifier<List<ReservationModel>> {
     String? branchId,
   }) async {
     final api = ref.read(apiClientProvider);
-    final y = date.year.toString().padLeft(4, '0');
-    final m = date.month.toString().padLeft(2, '0');
-    final d = date.day.toString().padLeft(2, '0');
-    var url = '/api/tables/reservations?date=$y-$m-$d';
-    if (branchId != null) url += '&branch_id=$branchId';
-    if (status != null) url += '&status=$status';
-    final trimmedQuery = (searchQuery ?? '').trim();
-    if (trimmedQuery.isNotEmpty) {
-      url += '&query=${Uri.encodeQueryComponent(trimmedQuery)}';
-    }
+    final url = _reservationUrl(
+      date: date,
+      branchId: branchId,
+      status: status,
+      searchQuery: searchQuery,
+    );
 
     final res = await api.get(url);
     if (res.statusCode != 200) return [];

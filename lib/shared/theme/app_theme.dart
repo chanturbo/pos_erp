@@ -38,6 +38,56 @@ import 'package:google_fonts/google_fonts.dart';
 ///   AppColors.darkElement    → AppTheme.darkElement
 ///   AppColors.darkTopBar     → AppTheme.darkTopBar
 
+/// ─────────────────────────────────────────────────────────────────
+/// Border Radius Design Tokens
+///   xs   =  4  (tiny badges, progress indicators)
+///   sm   =  8  (inputs, buttons, small containers)
+///   md   = 12  (cards, panels, list tiles)
+///   lg   = 16  (dialogs, bottom sheets, modals)
+///   xl   = 20  (category chips, pill tabs)
+///   pill = 999 (fully-rounded status badges, avatars)
+/// ─────────────────────────────────────────────────────────────────
+class AppRadius {
+  AppRadius._();
+
+  static const double _xs   =  4;
+  static const double _sm   =  8;
+  static const double _md   = 12;
+  static const double _lg   = 16;
+  static const double _xl   = 20;
+  static const double _pill = 999;
+
+  // ── scalar values ──────────────────────────────────────────────
+  static const double xsValue   = _xs;
+  static const double smValue   = _sm;
+  static const double mdValue   = _md;
+  static const double lgValue   = _lg;
+  static const double xlValue   = _xl;
+  static const double pillValue = _pill;
+
+  // ── BorderRadius shortcuts ──────────────────────────────────────
+  static BorderRadius get xs   => BorderRadius.circular(_xs);
+  static BorderRadius get sm   => BorderRadius.circular(_sm);
+  static BorderRadius get md   => BorderRadius.circular(_md);
+  static BorderRadius get lg   => BorderRadius.circular(_lg);
+  static BorderRadius get xl   => BorderRadius.circular(_xl);
+  static BorderRadius get pill => BorderRadius.circular(_pill);
+
+  // ── RoundedRectangleBorder shortcuts (for shape: parameter) ────
+  static RoundedRectangleBorder get xsShape   => RoundedRectangleBorder(borderRadius: xs);
+  static RoundedRectangleBorder get smShape   => RoundedRectangleBorder(borderRadius: sm);
+  static RoundedRectangleBorder get mdShape   => RoundedRectangleBorder(borderRadius: md);
+  static RoundedRectangleBorder get lgShape   => RoundedRectangleBorder(borderRadius: lg);
+  static RoundedRectangleBorder get xlShape   => RoundedRectangleBorder(borderRadius: xl);
+  static RoundedRectangleBorder get pillShape => RoundedRectangleBorder(borderRadius: pill);
+
+  // ── Partial radius helpers ──────────────────────────────────────
+  static BorderRadius get topMd    => const BorderRadius.vertical(top: Radius.circular(_md));
+  static BorderRadius get topLg    => const BorderRadius.vertical(top: Radius.circular(_lg));
+  static BorderRadius get bottomMd => const BorderRadius.vertical(bottom: Radius.circular(_md));
+  static BorderRadius get bottomLg => const BorderRadius.vertical(bottom: Radius.circular(_lg));
+}
+
 class AppTheme {
   AppTheme._();
 
@@ -480,7 +530,7 @@ class AppTheme {
   );
 
   // ─────────────────────────────────────────────────────────────────
-  // 09 · Context-aware Helpers
+  // 09 · Context-aware Helpers — Surface & Border
   // ─────────────────────────────────────────────────────────────────
 
   static bool isDark(BuildContext context) =>
@@ -501,4 +551,100 @@ class AppTheme {
   /// Subtext color — subtextColor in light, muted in dark
   static Color subtextColorOf(BuildContext context) =>
       isDark(context) ? const Color(0xFF9E9E9E) : subtextColor;
+
+  // ─────────────────────────────────────────────────────────────────
+  // 10 · Context-aware Helpers — Text, Icon, Surface Tiers
+  // ─────────────────────────────────────────────────────────────────
+
+  /// Primary body text: near-black in light, near-white in dark
+  static Color textColorOf(BuildContext context) =>
+      isDark(context) ? const Color(0xFFE0E0E0) : const Color(0xFF1A1A1A);
+
+  /// Muted / secondary text: equivalent of Colors.black54, dark-aware
+  static Color mutedTextOf(BuildContext context) =>
+      isDark(context) ? const Color(0xFF9E9E9E) : const Color(0xFF757575);
+
+  /// Elevated surface element within a card (grey.shade100 in light = #F5F5F5)
+  static Color surface3Of(BuildContext context) =>
+      isDark(context) ? const Color(0xFF323232) : const Color(0xFFF5F5F5);
+
+  /// Table / list row — even row background
+  static Color rowEvenOf(BuildContext context) =>
+      isDark(context) ? darkCard : cardWhite;
+
+  /// Table / list row — odd row background (subtle alternating stripe)
+  static Color rowOddOf(BuildContext context) =>
+      isDark(context) ? const Color(0xFF242424) : const Color(0xFFF9F9F7);
+
+  /// General icon color (grey.shade600 equivalent)
+  static Color iconOf(BuildContext context) =>
+      isDark(context) ? const Color(0xFF9E9E9E) : const Color(0xFF757575);
+
+  /// Subtle / decorative icon color (grey.shade400 equivalent)
+  static Color iconSubtleOf(BuildContext context) =>
+      isDark(context) ? const Color(0xFF616161) : const Color(0xFFBDBDBD);
+
+  /// Input field border (grey.shade300 equivalent)
+  static Color inputBorderOf(BuildContext context) =>
+      isDark(context) ? const Color(0xFF444444) : const Color(0xFFDDDDDD);
+
+  // ─────────────────────────────────────────────────────────────────
+  // 11 · Button Style Hierarchy
+  //
+  //  Use in multi-button sections to create clear visual weight:
+  //   L1 = primary action  →  solid filled (highest weight)
+  //   L2 = secondary action → tonal filled (medium weight)
+  //   L3 = tertiary action  → outlined (lower weight)
+  //   L4 = ghost action     → text only (minimum weight)
+  // ─────────────────────────────────────────────────────────────────
+
+  /// L1 — Primary filled button.  Most important action per section.
+  static ButtonStyle buttonL1({
+    Color bg = primaryColor,
+    Color fg = Colors.white,
+    BorderRadius? radius,
+  }) =>
+      ElevatedButton.styleFrom(
+        backgroundColor: bg,
+        foregroundColor: fg,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: radius ?? AppRadius.md,
+        ),
+      );
+
+  /// L2 — Secondary tonal button.  Supporting / complementary action.
+  static ButtonStyle buttonL2(
+    BuildContext context, {
+    Color? bg,
+    Color? fg,
+    BorderRadius? radius,
+  }) =>
+      ElevatedButton.styleFrom(
+        backgroundColor:
+            bg ?? (isDark(context) ? darkElement : const Color(0xFFEDEDED)),
+        foregroundColor:
+            fg ?? (isDark(context) ? const Color(0xFFE0E0E0) : const Color(0xFF424242)),
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: radius ?? AppRadius.md,
+        ),
+      );
+
+  /// L3 — Tertiary outlined button.  Optional / reversible action.
+  static ButtonStyle buttonL3({
+    Color color = primaryColor,
+    BorderRadius? radius,
+  }) =>
+      OutlinedButton.styleFrom(
+        foregroundColor: color,
+        side: BorderSide(color: color),
+        shape: RoundedRectangleBorder(
+          borderRadius: radius ?? AppRadius.md,
+        ),
+      );
+
+  /// L4 — Ghost / text-only button.  Least-important or dismiss action.
+  static ButtonStyle buttonL4({Color color = primaryColor}) =>
+      TextButton.styleFrom(foregroundColor: color);
 }

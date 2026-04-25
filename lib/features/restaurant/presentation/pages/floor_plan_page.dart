@@ -260,7 +260,7 @@ class _FloorPlanPageState extends ConsumerState<FloorPlanPage> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.lg),
         title: const Text('ยืนยันรวมโต๊ะ'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -464,7 +464,7 @@ class _FloorTableCard extends StatelessWidget {
                   ? AppTheme.errorColor.withValues(alpha: 0.15)
                   : AppTheme.successColor.withValues(alpha: 0.15))
               : Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: AppRadius.md,
           border: Border.all(
             color: highlighted
                 ? (isSource ? AppTheme.errorColor : AppTheme.successColor)
@@ -500,7 +500,7 @@ class _FloorTableCard extends StatelessWidget {
                 child: Container(
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: AppRadius.md,
                   ),
                 ),
               ),
@@ -517,7 +517,7 @@ class _FloorTableCard extends StatelessWidget {
                     color: isSource
                         ? AppTheme.errorColor
                         : AppTheme.successColor,
-                    borderRadius: BorderRadius.circular(6),
+                    borderRadius: AppRadius.sm,
                   ),
                   child: Text(
                     isSource ? 'ต้นทาง' : 'ปลายทาง',
@@ -662,7 +662,7 @@ class _FloorTableCard extends StatelessWidget {
                                 ? Colors.grey
                                 : statusColor)
                             .withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(6),
+                        borderRadius: AppRadius.sm,
                       ),
                       child: Text(
                         _statusLabel(),
@@ -720,7 +720,7 @@ class _MergePreviewRow extends StatelessWidget {
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.07),
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: AppRadius.sm,
           border: Border.all(color: color.withValues(alpha: 0.3)),
         ),
         child: Row(
@@ -837,7 +837,7 @@ class _Chip extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
           decoration: BoxDecoration(
             color: selected ? AppTheme.primaryColor : Colors.grey.shade100,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: AppRadius.xl,
             border: Border.all(
               color: selected
                   ? AppTheme.primaryColor

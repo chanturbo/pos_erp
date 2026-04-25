@@ -906,7 +906,7 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                   height: 4,
                   decoration: BoxDecoration(
                     color: Colors.grey.shade400,
-                    borderRadius: BorderRadius.circular(999),
+                    borderRadius: AppRadius.pill,
                   ),
                 ),
                 const Text(
@@ -989,7 +989,7 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
           decoration: BoxDecoration(
             color: Theme.of(context).cardColor,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: AppRadius.topLg,
           ),
           child: Column(
             children: [
@@ -999,7 +999,7 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                 height: 4,
                 decoration: BoxDecoration(
                   color: Colors.grey.shade400,
-                  borderRadius: BorderRadius.circular(999),
+                  borderRadius: AppRadius.pill,
                 ),
               ),
               const Row(
@@ -1355,7 +1355,7 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
           decoration: BoxDecoration(
             color: Theme.of(context).cardColor,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: AppRadius.topLg,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1368,7 +1368,7 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                   margin: const EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(
                     color: Colors.grey.shade400,
-                    borderRadius: BorderRadius.circular(999),
+                    borderRadius: AppRadius.pill,
                   ),
                 ),
               ),
@@ -1539,7 +1539,7 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                       color: connection.isConnected
                           ? AppTheme.successColor.withValues(alpha: 0.15)
                           : AppTheme.errorColor.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: AppRadius.xl,
                       border: Border.all(
                         color: connection.isConnected
                             ? AppTheme.successColor.withValues(alpha: 0.5)
@@ -1580,7 +1580,7 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                             ),
                             decoration: BoxDecoration(
                               color: Colors.orange,
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: AppRadius.sm,
                             ),
                             child: Text(
                               '${syncValue!.pendingCount}',
@@ -1619,7 +1619,7 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                       ),
                       decoration: BoxDecoration(
                         color: AppTheme.primaryColor,
-                        borderRadius: BorderRadius.circular(999),
+                        borderRadius: AppRadius.pill,
                       ),
                       child: Text(
                         '${holdOrdersState.orders.length}',
@@ -1698,7 +1698,7 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                                   : AppTheme.borderColorOf(
                                       context,
                                     ).withValues(alpha: 0.25),
-                              borderRadius: BorderRadius.circular(20),
+                              borderRadius: AppRadius.xl,
                               border: Border.all(
                                 color:
                                     (cartState.customerId != null &&
@@ -1761,7 +1761,7 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                               color: AppTheme.borderColorOf(
                                 context,
                               ).withValues(alpha: 0.25),
-                              borderRadius: BorderRadius.circular(20),
+                              borderRadius: AppRadius.xl,
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -1789,7 +1789,7 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                             ),
                             decoration: BoxDecoration(
                               color: Colors.orange.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(20),
+                              borderRadius: AppRadius.xl,
                               border: Border.all(
                                 color: Colors.orange.withValues(alpha: 0.4),
                               ),
@@ -1832,7 +1832,7 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                             : AppTheme.borderColorOf(
                                 context,
                               ).withValues(alpha: 0.20),
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: AppRadius.md,
                         border: Border.all(
                           color: isRestaurantFlow
                               ? AppTheme.warningColor.withValues(alpha: 0.30)
@@ -1881,7 +1881,7 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                                             ? AppTheme.successColor
                                             : AppTheme.infoColor)
                                         .withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(999),
+                                borderRadius: AppRadius.pill,
                               ),
                               child: Text(
                                 isKitchenSent ? 'ส่งครัวแล้ว' : 'รอส่งครัว',
@@ -1974,7 +1974,7 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                                       ),
                                       decoration: BoxDecoration(
                                         color: color.withValues(alpha: 0.12),
-                                        borderRadius: BorderRadius.circular(18),
+                                        borderRadius: AppRadius.lg,
                                         border: Border.all(
                                           color: color.withValues(alpha: 0.3),
                                         ),
@@ -2050,7 +2050,7 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                     padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
                     decoration: BoxDecoration(
                       color: Theme.of(context).cardColor,
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: AppRadius.md,
                       border: Border.all(
                         color: _isProductListScrolled
                             ? AppTheme.primaryColor.withValues(alpha: 0.24)
@@ -2117,19 +2117,19 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                                         ? AppTheme.darkElement
                                         : Colors.white,
                                     border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(6),
+                                      borderRadius: AppRadius.sm,
                                       borderSide: BorderSide(
                                         color: searchBorderColor,
                                       ),
                                     ),
                                     enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(6),
+                                      borderRadius: AppRadius.sm,
                                       borderSide: BorderSide(
                                         color: searchBorderColor,
                                       ),
                                     ),
                                     focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(6),
+                                      borderRadius: AppRadius.sm,
                                       borderSide: const BorderSide(
                                         color: AppTheme.primaryColor,
                                         width: 1.5,
@@ -2145,7 +2145,7 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                               height: 34,
                               decoration: BoxDecoration(
                                 color: AppTheme.primaryColor,
-                                borderRadius: BorderRadius.circular(6),
+                                borderRadius: AppRadius.sm,
                               ),
                               child: IconButton(
                                 onPressed: _openContinuousScanner,
@@ -2166,7 +2166,7 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                                 color: isDark
                                     ? AppTheme.darkElement
                                     : Colors.white,
-                                borderRadius: BorderRadius.circular(6),
+                                borderRadius: AppRadius.sm,
                                 border: Border.all(color: searchBorderColor),
                               ),
                               child: IconButton(
@@ -2438,12 +2438,12 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                         return Card(
                           elevation: 0,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: AppRadius.md,
                             side: const BorderSide(color: AppTheme.border),
                           ),
                           color: Colors.white,
                           child: InkWell(
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: AppRadius.md,
                             onTap: () {
                               final stockMap = _currentStockMap();
                               if (!_ensureStockAvailable(
@@ -2539,7 +2539,7 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                                                     ? const Color(0xFFE8F5E9)
                                                     : const Color(0xFFFFEBEE),
                                                 borderRadius:
-                                                    BorderRadius.circular(10),
+                                                    AppRadius.md,
                                               ),
                                               child: Row(
                                                 mainAxisSize: MainAxisSize.min,
@@ -2663,7 +2663,7 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                                                     ? const Color(0xFFE8F5E9)
                                                     : const Color(0xFFFFEBEE),
                                                 borderRadius:
-                                                    BorderRadius.circular(999),
+                                                    AppRadius.pill,
                                               ),
                                               child: Text(
                                                 availableStock > 0
@@ -2690,9 +2690,7 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                                                     0xFFE8F5E9,
                                                   ),
                                                   borderRadius:
-                                                      BorderRadius.circular(
-                                                        999,
-                                                      ),
+                                                      AppRadius.pill,
                                                 ),
                                                 child: Text(
                                                   'ในบิล ${qtyInCart.toStringAsFixed(qtyInCart % 1 == 0 ? 0 : 1)}',
@@ -2714,9 +2712,7 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                                                   color: Colors.orange
                                                       .withValues(alpha: 0.12),
                                                   borderRadius:
-                                                      BorderRadius.circular(
-                                                        999,
-                                                      ),
+                                                      AppRadius.pill,
                                                 ),
                                                 child: Text(
                                                   'ใช้ราคา Lv.1',
@@ -2741,9 +2737,7 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                                                     alpha: 0.10,
                                                   ),
                                                   borderRadius:
-                                                      BorderRadius.circular(
-                                                        999,
-                                                      ),
+                                                      AppRadius.pill,
                                                 ),
                                                 child: Text(
                                                   productGroupsAsync.maybeWhen(
@@ -2780,9 +2774,7 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                                             color: actionColor.withValues(
                                               alpha: 0.08,
                                             ),
-                                            borderRadius: BorderRadius.circular(
-                                              10,
-                                            ),
+                                            borderRadius: AppRadius.md,
                                             border: Border.all(
                                               color: actionColor.withValues(
                                                 alpha: 0.20,
@@ -2902,7 +2894,7 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                                             ),
                                             shape: RoundedRectangleBorder(
                                               borderRadius:
-                                                  BorderRadius.circular(10),
+                                                  AppRadius.md,
                                             ),
                                           ),
                                           child: const Text(
@@ -2941,7 +2933,7 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                       color: AppTheme.borderColorOf(
                         context,
                       ).withValues(alpha: 0.18),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: AppRadius.md,
                     ),
                     padding: const EdgeInsets.all(3),
                     child: IntrinsicHeight(
@@ -3005,7 +2997,7 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                                               decoration: BoxDecoration(
                                                 color: AppTheme.primaryColor,
                                                 borderRadius:
-                                                    BorderRadius.circular(8),
+                                                    AppRadius.sm,
                                               ),
                                               child: Text(
                                                 '${cartState.itemCount}',
@@ -3123,7 +3115,7 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                     ),
                     decoration: BoxDecoration(
                       color: AppTheme.primary.withValues(alpha: 0.06),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: AppRadius.md,
                       border: Border.all(
                         color: AppTheme.primary.withValues(alpha: 0.12),
                       ),
@@ -3169,7 +3161,7 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                           style: OutlinedButton.styleFrom(
                             minimumSize: const Size(0, 48),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: AppRadius.md,
                             ),
                           ),
                           child: const FittedBox(
@@ -3234,7 +3226,7 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                             minimumSize: const Size(0, 48),
                             alignment: Alignment.center,
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: AppRadius.md,
                             ),
                           ),
                         ),
@@ -3286,7 +3278,7 @@ class _RestaurantModeSheet extends ConsumerWidget {
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
         decoration: BoxDecoration(
           color: Theme.of(context).cardColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          borderRadius: AppRadius.topLg,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -3298,7 +3290,7 @@ class _RestaurantModeSheet extends ConsumerWidget {
                 margin: const EdgeInsets.only(bottom: 14),
                 decoration: BoxDecoration(
                   color: Colors.grey.shade400,
-                  borderRadius: BorderRadius.circular(999),
+                  borderRadius: AppRadius.pill,
                 ),
               ),
             ),
@@ -3400,14 +3392,14 @@ class _RestaurantModeSheet extends ConsumerWidget {
 
                       return InkWell(
                         onTap: () => onSelectTable(table),
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: AppRadius.md,
                         child: Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
                             color: active
                                 ? AppTheme.primaryColor.withValues(alpha: 0.10)
                                 : statusColor.withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: AppRadius.md,
                             border: Border.all(
                               color: active
                                   ? AppTheme.primaryColor
@@ -3494,13 +3486,13 @@ class _RestaurantModeAction extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: AppRadius.md,
       child: Container(
         height: 48,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
           color: color.withValues(alpha: active ? 0.14 : 0.07),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: AppRadius.md,
           border: Border.all(
             color: color.withValues(alpha: active ? 0.45 : 0.18),
           ),
@@ -3545,7 +3537,7 @@ class _CompactStatusChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: AppRadius.pill,
         color: color.withValues(alpha: 0.08),
         border: Border.all(color: color.withValues(alpha: 0.18)),
       ),
@@ -3608,7 +3600,7 @@ class _MobileOrderSummarySheet extends ConsumerWidget {
       builder: (_, controller) => DecoratedBox(
         decoration: BoxDecoration(
           color: Theme.of(context).cardColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          borderRadius: AppRadius.topLg,
         ),
         child: Column(
           children: [
@@ -3618,7 +3610,7 @@ class _MobileOrderSummarySheet extends ConsumerWidget {
               height: 4,
               decoration: BoxDecoration(
                 color: Colors.grey.shade400,
-                borderRadius: BorderRadius.circular(999),
+                borderRadius: AppRadius.pill,
               ),
             ),
             Padding(
@@ -3641,7 +3633,7 @@ class _MobileOrderSummarySheet extends ConsumerWidget {
                     ),
                     decoration: BoxDecoration(
                       color: AppTheme.primary.withValues(alpha: 0.10),
-                      borderRadius: BorderRadius.circular(999),
+                      borderRadius: AppRadius.pill,
                     ),
                     child: Text(
                       '${cartState.itemCount} รายการ',
@@ -3698,7 +3690,7 @@ class _MobileOrderSummarySheet extends ConsumerWidget {
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius: AppRadius.md,
                               color: AppTheme.successColor.withValues(
                                 alpha: 0.08,
                               ),
@@ -3760,7 +3752,7 @@ class _SummaryStatChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: AppRadius.md,
         color: AppTheme.primary.withValues(alpha: 0.08),
       ),
       child: Column(
@@ -3806,7 +3798,7 @@ class _SummaryGroupCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: AppRadius.md,
         color: color.withValues(alpha: 0.05),
         border: Border.all(color: color.withValues(alpha: 0.22)),
       ),
@@ -3997,7 +3989,7 @@ class _QuantityPickerSheetState extends State<_QuantityPickerSheet> {
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
         decoration: BoxDecoration(
           color: Theme.of(context).cardColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          borderRadius: AppRadius.topLg,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -4009,7 +4001,7 @@ class _QuantityPickerSheetState extends State<_QuantityPickerSheet> {
               height: 4,
               decoration: BoxDecoration(
                 color: Colors.grey.shade400,
-                borderRadius: BorderRadius.circular(999),
+                borderRadius: AppRadius.pill,
               ),
             ),
             Text(

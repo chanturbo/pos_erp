@@ -1039,7 +1039,6 @@ class _SidebarBrand extends StatelessWidget {
                     color: Color(0xFF8A9BC0),
                     size: 18,
                   ),
-                  tooltip: 'ย่อ sidebar',
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(
                     minWidth: 32,

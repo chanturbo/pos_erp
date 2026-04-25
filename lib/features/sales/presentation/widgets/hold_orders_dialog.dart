@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import '../../../../shared/theme/app_theme.dart';
 import 'package:pos_erp/shared/widgets/app_dialogs.dart';
 import 'package:pos_erp/shared/widgets/mobile_home_button.dart';
 import '../../../branches/presentation/providers/branch_provider.dart';
@@ -133,7 +134,7 @@ class _HoldOrdersDialogState extends ConsumerState<HoldOrdersDialog> {
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
                   color: Colors.orange.shade50,
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: AppRadius.md,
                   border: Border.all(color: Colors.orange.shade200),
                 ),
                 child: Row(
@@ -203,7 +204,7 @@ class _HoldOrdersDialogState extends ConsumerState<HoldOrdersDialog> {
                                         horizontal: 7, vertical: 2),
                                     decoration: BoxDecoration(
                                       color: Colors.orange.shade100,
-                                      borderRadius: BorderRadius.circular(999),
+                                      borderRadius: AppRadius.pill,
                                       border: Border.all(
                                           color: Colors.orange.shade300),
                                     ),

@@ -859,7 +859,7 @@ class _ItemRow extends StatelessWidget {
             const SizedBox(width: 4),
             InkWell(
               onTap: onVoid,
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: AppRadius.sm,
               child: Padding(
                 padding: const EdgeInsets.all(4),
                 child: Icon(

@@ -1,4 +1,3 @@
-
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:shelf/shelf.dart';
@@ -1905,12 +1904,14 @@ class TableRoutes {
     'created_at': r.createdAt.toIso8601String(),
   };
 
-  /// GET /api/tables/reservations?branch_id=&date=YYYY-MM-DD&status=
+  /// GET /api/tables/reservations?branch_id=&date=YYYY-MM-DD&from=&to=&status=
   Future<Response> _listReservations(Request req) async {
     try {
       final params = req.url.queryParameters;
       final branchId = params['branch_id'];
       final dateStr = params['date'];
+      final fromStr = params['from'];
+      final toStr = params['to'];
       final status = params['status'];
       final searchQuery = (params['query'] ?? '').trim().toLowerCase();
 
@@ -1935,6 +1936,16 @@ class TableRoutes {
                 rt.day == date.day;
           }).toList();
         }
+      } else if (fromStr != null || toStr != null) {
+        final from = fromStr != null ? DateTime.tryParse(fromStr) : null;
+        final to = toStr != null ? DateTime.tryParse(toStr) : null;
+        reservations = reservations.where((r) {
+          final rt = r.reservationTime;
+          final day = DateTime(rt.year, rt.month, rt.day);
+          if (from != null && day.isBefore(from)) return false;
+          if (to != null && day.isAfter(to)) return false;
+          return true;
+        }).toList();
       }
 
       if (searchQuery.isNotEmpty) {

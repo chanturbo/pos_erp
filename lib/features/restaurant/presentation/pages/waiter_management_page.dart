@@ -202,7 +202,7 @@ class _StatCard extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: AppRadius.md,
             border: Border.all(color: color.withValues(alpha: 0.3)),
           ),
           child: Row(
@@ -286,7 +286,7 @@ class _WaiterGroup extends StatelessWidget {
                       horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
                     color: headerColor.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: AppRadius.md,
                   ),
                   child: Text(
                     '${tables.length} โต๊ะ',
@@ -304,7 +304,7 @@ class _WaiterGroup extends StatelessWidget {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius:
-                  const BorderRadius.vertical(bottom: Radius.circular(12)),
+                  AppRadius.bottomMd,
               border: Border.all(color: headerColor.withValues(alpha: 0.2)),
             ),
             child: Column(
@@ -478,7 +478,7 @@ class _AssignWaiterDialogState extends ConsumerState<_AssignWaiterDialog> {
     final usersAsync = ref.watch(userListProvider);
 
     return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(borderRadius: AppRadius.lg),
       title: Text('กำหนดพนักงาน — ${widget.tableName}'),
       contentPadding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       content: SizedBox(

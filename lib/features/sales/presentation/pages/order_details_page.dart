@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:printing/printing.dart';
+import '../../../../shared/theme/app_theme.dart';
 import '../providers/sales_provider.dart';
 import '../../data/models/sales_order_model.dart';
 import '../../../settings/presentation/pages/settings_page.dart';
@@ -151,7 +152,7 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
                                 horizontal: 12, vertical: 8),
                             decoration: BoxDecoration(
                               color: Colors.amber[50],
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: AppRadius.sm,
                               border: Border.all(color: Colors.amber[200]!),
                             ),
                             child: Row(
@@ -215,7 +216,7 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
                                 horizontal: 8, vertical: 2),
                             decoration: BoxDecoration(
                               color: Colors.blue[100],
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: AppRadius.md,
                             ),
                             child: Text(
                               '${regularItems.length} รายการ',
@@ -372,7 +373,7 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
                   color: const Color(0xFFE8F5E9),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: AppRadius.md,
                   border: Border.all(color: const Color(0xFF4CAF50)),
                 ),
                 child: Column(
@@ -396,7 +397,7 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
                               horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
                             color: const Color(0xFF4CAF50),
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: AppRadius.md,
                           ),
                           child: Text(
                             '${codes.length} ใบ',
@@ -432,7 +433,7 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
                               horizontal: 10, vertical: 6),
                           decoration: BoxDecoration(
                             color: const Color(0xFF4CAF50).withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: AppRadius.sm,
                             border: Border.all(
                                 color: const Color(0xFF4CAF50)
                                     .withValues(alpha: 0.4)),
@@ -489,7 +490,7 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
                   color: Colors.green[50],
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: AppRadius.md,
                   border: Border.all(color: Colors.green[300]!),
                 ),
                 child: Column(
@@ -513,7 +514,7 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
                               horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
                             color: Colors.green,
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: AppRadius.md,
                           ),
                           child: Text(
                             '${freeItems.length} รายการ',

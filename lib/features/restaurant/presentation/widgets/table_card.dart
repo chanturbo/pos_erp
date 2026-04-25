@@ -27,7 +27,7 @@ class TableCard extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         decoration: BoxDecoration(
           color: colors.bg,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: AppRadius.md,
           border: Border.all(color: colors.border, width: 1.5),
           boxShadow: [
             BoxShadow(
@@ -129,7 +129,7 @@ class TableCard extends StatelessWidget {
                   ),
                   decoration: BoxDecoration(
                     color: colors.badge,
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: AppRadius.xl,
                   ),
                   child: Text(
                     _statusLabel(table.status),

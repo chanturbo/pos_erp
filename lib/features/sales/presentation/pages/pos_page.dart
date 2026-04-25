@@ -462,7 +462,7 @@ class _PosPageState extends ConsumerState<PosPage> {
                           margin: const EdgeInsets.only(right: 8),
                           decoration: BoxDecoration(
                             color: AppTheme.primary.withValues(alpha: 0.20),
-                            borderRadius: BorderRadius.circular(6),
+                            borderRadius: AppRadius.sm,
                             border: Border.all(
                               color: AppTheme.primary.withValues(alpha: 0.5),
                             ),
@@ -492,7 +492,7 @@ class _PosPageState extends ConsumerState<PosPage> {
                         if (selectedBranch != null && selectedWarehouse != null)
                           InkWell(
                             onTap: _openConnectionSettings,
-                            borderRadius: BorderRadius.circular(20),
+                            borderRadius: AppRadius.xl,
                             child: Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 10,
@@ -500,7 +500,7 @@ class _PosPageState extends ConsumerState<PosPage> {
                               ),
                               decoration: BoxDecoration(
                                 color: AppTheme.border.withValues(alpha: 0.25),
-                                borderRadius: BorderRadius.circular(20),
+                                borderRadius: AppRadius.xl,
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
@@ -524,7 +524,7 @@ class _PosPageState extends ConsumerState<PosPage> {
                         else
                           InkWell(
                             onTap: _openConnectionSettings,
-                            borderRadius: BorderRadius.circular(20),
+                            borderRadius: AppRadius.xl,
                             child: Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 10,
@@ -532,7 +532,7 @@ class _PosPageState extends ConsumerState<PosPage> {
                               ),
                               decoration: BoxDecoration(
                                 color: Colors.orange.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(20),
+                                borderRadius: AppRadius.xl,
                                 border: Border.all(
                                   color: Colors.orange.withValues(alpha: 0.4),
                                 ),
@@ -567,7 +567,7 @@ class _PosPageState extends ConsumerState<PosPage> {
                             ),
                             decoration: BoxDecoration(
                               color: AppTheme.primary,
-                              borderRadius: BorderRadius.circular(999),
+                              borderRadius: AppRadius.pill,
                             ),
                             child: Text(
                               '${cartState.itemCount} รายการ',
@@ -608,7 +608,7 @@ class _PosPageState extends ConsumerState<PosPage> {
                               selectedWarehouse != null)
                             InkWell(
                               onTap: _openConnectionSettings,
-                              borderRadius: BorderRadius.circular(20),
+                              borderRadius: AppRadius.xl,
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 10,
@@ -617,7 +617,7 @@ class _PosPageState extends ConsumerState<PosPage> {
                                 decoration: BoxDecoration(
                                   color: AppTheme.border
                                       .withValues(alpha: 0.25),
-                                  borderRadius: BorderRadius.circular(20),
+                                  borderRadius: AppRadius.xl,
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
@@ -641,7 +641,7 @@ class _PosPageState extends ConsumerState<PosPage> {
                           else
                             InkWell(
                               onTap: _openConnectionSettings,
-                              borderRadius: BorderRadius.circular(20),
+                              borderRadius: AppRadius.xl,
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 10,
@@ -649,7 +649,7 @@ class _PosPageState extends ConsumerState<PosPage> {
                                 ),
                                 decoration: BoxDecoration(
                                   color: Colors.orange.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(20),
+                                  borderRadius: AppRadius.xl,
                                   border: Border.all(
                                     color:
                                         Colors.orange.withValues(alpha: 0.4),
@@ -684,7 +684,7 @@ class _PosPageState extends ConsumerState<PosPage> {
                               ),
                               decoration: BoxDecoration(
                                 color: AppTheme.primary,
-                                borderRadius: BorderRadius.circular(999),
+                                borderRadius: AppRadius.pill,
                               ),
                               child: Text(
                                 '${cartState.itemCount} รายการ',
@@ -793,10 +793,8 @@ class _PosPageState extends ConsumerState<PosPage> {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
       decoration: BoxDecoration(
-        color: Theme.of(context).brightness == Brightness.dark
-            ? AppTheme.darkTopBar
-            : Colors.white,
-        border: Border(bottom: BorderSide(color: AppTheme.border)),
+        color: AppTheme.cardColor(context),
+        border: Border(bottom: BorderSide(color: AppTheme.borderColorOf(context))),
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -828,10 +826,10 @@ class _PosPageState extends ConsumerState<PosPage> {
                 isDense: true,
                 contentPadding: EdgeInsets.zero,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: AppRadius.sm,
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: AppRadius.sm,
                   borderSide: const BorderSide(
                     color: AppTheme.primary,
                     width: 1.5,
@@ -1024,7 +1022,7 @@ class _PosPageState extends ConsumerState<PosPage> {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         decoration: BoxDecoration(
           color: bgColor,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: AppRadius.xl,
           border: Border.all(color: borderColor),
         ),
         child: Row(
@@ -1047,7 +1045,7 @@ class _PosPageState extends ConsumerState<PosPage> {
                 color: selected
                     ? AppTheme.primary.withValues(alpha: 0.2)
                     : AppTheme.border.withValues(alpha: 0.5),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: AppRadius.md,
               ),
               child: Text(
                 '$count',
@@ -1095,10 +1093,10 @@ class _PosPageState extends ConsumerState<PosPage> {
               shape: BoxShape.circle,
               border: Border.all(color: AppTheme.border),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.inventory_2_outlined,
               size: 38,
-              color: Colors.grey,
+              color: AppTheme.iconSubtleOf(context),
             ),
           ),
           const SizedBox(height: 16),
@@ -1261,7 +1259,7 @@ class _CustomerChip extends ConsumerWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: () => _selectCustomer(context, ref),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: AppRadius.xl,
         child: Container(
           constraints: const BoxConstraints(maxWidth: 240),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -1269,7 +1267,7 @@ class _CustomerChip extends ConsumerWidget {
             color: hasCustomer
                 ? AppTheme.infoContainer
                 : const Color(0xFF1F2E54),
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: AppRadius.xl,
             border: Border.all(
               color: hasCustomer
                   ? AppTheme.info.withValues(alpha: 0.5)
@@ -1322,7 +1320,7 @@ class _RestaurantContextChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
         color: Colors.orange.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: AppRadius.xl,
         border: Border.all(
           color: Colors.orange.withValues(alpha: 0.35),
         ),
@@ -1393,9 +1391,9 @@ class _HoldOrderNameDialogState extends State<_HoldOrderNameDialog> {
         autofocus: true,
         decoration: InputDecoration(
           labelText: 'ชื่อบิล',
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+          border: OutlineInputBorder(borderRadius: AppRadius.sm),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: AppRadius.sm,
             borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
           ),
         ),

@@ -21,7 +21,6 @@ import '../../../../shared/widgets/cart_toast.dart';
 // ── OAG Tokens ────────────────────────────────────────────────────
 const _navy = AppTheme.navyColor;
 const _orange = AppTheme.primaryColor;
-const _surface = AppTheme.surfaceColor;
 const _border = AppTheme.borderColor;
 const _success = AppTheme.successColor;
 const _error = AppTheme.errorColor;
@@ -87,18 +86,13 @@ class _CartPanelState extends ConsumerState<CartPanel> {
     final apiClient = ref.read(apiClientProvider);
 
     if (restaurantContext == null) return;
-    if (restaurantContext.currentOrderId != null &&
-        restaurantContext.currentOrderId!.isNotEmpty) {
-      final orderLabel = restaurantContext.displayName;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('$orderLabel ส่งออเดอร์เข้าครัวแล้ว'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
     if (cartState.items.isEmpty) return;
+
+    // Only send items that haven't been sent yet (second wave support)
+    final unsentItems = cartState.items
+        .where((i) => !cartState.kitchenSentLineIds.contains(i.lineId))
+        .toList();
+    if (unsentItems.isEmpty) return;
     if (selectedBranch == null || selectedWarehouse == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -116,6 +110,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
       for (final product in products) product.productId: product,
     };
 
+    final unsentSubtotal = unsentItems.fold<double>(0, (s, i) => s + i.amount);
     final orderData = {
       'status': 'OPEN',
       'customer_id': cartState.customerId,
@@ -129,20 +124,19 @@ class _CartPanelState extends ConsumerState<CartPanel> {
           : null,
       'service_type': restaurantContext.serviceType,
       'party_size': restaurantContext.guestCount,
-      'subtotal': cartState.subtotal,
-      'discount_amount':
-          cartState.totalDiscount + cartState.totalCouponDiscount,
-      'coupon_discount': cartState.totalCouponDiscount,
+      'subtotal': unsentSubtotal,
+      'discount_amount': 0.0,
+      'coupon_discount': 0.0,
       'points_used': 0,
-      'amount_before_vat': cartState.total,
+      'amount_before_vat': unsentSubtotal,
       'vat_amount': 0.0,
-      'total_amount': cartState.total,
+      'total_amount': unsentSubtotal,
       'payment_type': 'PENDING',
       'paid_amount': 0.0,
       'change_amount': 0.0,
-      if (cartState.appliedCoupons.isNotEmpty)
-        'coupon_codes': cartState.appliedCoupons.map((c) => c.code).toList(),
-      'items': cartState.items
+      if (restaurantContext.currentOrderId?.isNotEmpty == true)
+        'parent_order_id': restaurantContext.currentOrderId,
+      'items': unsentItems
           .map(
             (item) => {
               'product_id': item.productId,
@@ -169,25 +163,6 @@ class _CartPanelState extends ConsumerState<CartPanel> {
             },
           )
           .toList(),
-      if (cartState.freeItems.isNotEmpty) ...{
-        'free_items': cartState.freeItems
-            .map(
-              (item) => {
-                'product_id': item.productId,
-                'product_code': item.productCode,
-                'product_name': item.productName,
-                'unit': item.unit,
-                'quantity': item.quantity,
-                'promotion_id': item.promotionId,
-              },
-            )
-            .toList(),
-        'promotion_ids': cartState.freeItems
-            .map((i) => i.promotionId)
-            .whereType<String>()
-            .toSet()
-            .toList(),
-      },
     };
 
     try {
@@ -207,12 +182,18 @@ class _CartPanelState extends ConsumerState<CartPanel> {
         throw Exception('สร้างออเดอร์ไม่สำเร็จ');
       }
 
-      ref
-          .read(restaurantOrderContextProvider.notifier)
-          .state = restaurantContext.copyWith(
-        currentOrderId: orderId,
-        currentOrderNo: orderNo,
-      );
+      // Mark these items as sent (keep first orderId as the primary)
+      final sentLineIds = unsentItems.map((i) => i.lineId).toSet();
+      ref.read(cartProvider.notifier).markKitchenSent(sentLineIds);
+
+      if (restaurantContext.currentOrderId?.isEmpty ?? true) {
+        ref
+            .read(restaurantOrderContextProvider.notifier)
+            .state = restaurantContext.copyWith(
+          currentOrderId: orderId,
+          currentOrderNo: orderNo,
+        );
+      }
       ref.invalidate(tableListProvider);
 
       // Auto-print kitchen ticket if enabled
@@ -230,7 +211,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
           tableName: restaurantContext.displayName,
           orderNo: orderNo ?? orderId,
           orderTime: DateFormat('HH:mm').format(DateTime.now()),
-          items: cartState.items.map((item) {
+          items: unsentItems.map((item) {
             final product = productById[item.productId];
             return KitchenTicketItem(
               courseNo: item.courseNo,
@@ -303,10 +284,10 @@ class _CartPanelState extends ConsumerState<CartPanel> {
         final density = _CartPanelDensity.fromConstraints(constraints);
 
         return Container(
-          decoration: const BoxDecoration(
-            color: _surface,
-            border: Border(left: BorderSide(color: _border)),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+          decoration: BoxDecoration(
+            color: AppTheme.cardColor(context),
+            border: Border(left: BorderSide(color: AppTheme.borderColorOf(context))),
+            borderRadius: AppRadius.topMd,
           ),
           clipBehavior: Clip.antiAlias,
           child: Column(
@@ -347,10 +328,13 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                         itemBuilder: (_, i) {
                           // regular items
                           if (i < cartState.items.length) {
+                            final rowItem = cartState.items[i];
                             return _CartRow(
-                              item: cartState.items[i],
+                              item: rowItem,
                               isEven: i.isEven,
                               density: density,
+                              kitchenSent: cartState.kitchenSentLineIds
+                                  .contains(rowItem.lineId),
                             );
                           }
                           // free items header
@@ -382,6 +366,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                         ?.currentOrderId
                         ?.isNotEmpty ??
                     false),
+                hasUnsentItems: cartState.hasUnsentItems,
                 skipKitchen:
                     ref
                         .watch(restaurantOrderContextProvider)
@@ -500,9 +485,9 @@ class _CartHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: _navy,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+        borderRadius: AppRadius.topMd,
         border: Border(bottom: BorderSide(color: AppTheme.navyBorder)),
       ),
       child: Row(
@@ -523,7 +508,7 @@ class _CartHeader extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
               decoration: BoxDecoration(
                 color: _orange,
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: AppRadius.md,
               ),
               child: Text(
                 '$itemCount',
@@ -539,7 +524,7 @@ class _CartHeader extends StatelessWidget {
           if (onClear != null)
             InkWell(
               onTap: onClear,
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: AppRadius.sm,
               child: const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                 child: Row(
@@ -740,15 +725,15 @@ class _ScanRowState extends ConsumerState<_ScanRow> {
           filled: true,
           fillColor: isDark ? AppTheme.darkElement : Colors.white,
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: AppRadius.sm,
             borderSide: BorderSide(color: borderColor),
           ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: AppRadius.sm,
             borderSide: BorderSide(color: borderColor),
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: AppRadius.sm,
             borderSide: const BorderSide(color: _orange, width: 1.5),
           ),
         ),
@@ -774,7 +759,7 @@ class _ScanRowState extends ConsumerState<_ScanRow> {
             // handled inside _addByBarcode → _notFound
           }
         },
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: AppRadius.sm,
         child: Container(
           padding: EdgeInsets.symmetric(
             horizontal: widget.compact ? 8 : 10,
@@ -782,7 +767,7 @@ class _ScanRowState extends ConsumerState<_ScanRow> {
           ),
           decoration: BoxDecoration(
             color: _orange,
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: AppRadius.sm,
           ),
           child: const Row(
             mainAxisSize: MainAxisSize.min,
@@ -909,11 +894,13 @@ class _CartRow extends ConsumerStatefulWidget {
   final CartItem item;
   final bool isEven;
   final _CartPanelDensity density;
+  final bool kitchenSent;
 
   const _CartRow({
     required this.item,
     required this.isEven,
     required this.density,
+    this.kitchenSent = false,
   });
 
   @override
@@ -955,8 +942,222 @@ class _CartRowState extends ConsumerState<_CartRow> {
   void _commitQty() {
     final qty = double.tryParse(_qtyCtrl.text) ?? 1;
     final safe = qty < 0.001 ? 1.0 : qty;
-    ref.read(cartProvider.notifier).setQuantity(widget.item.productId, safe);
+    ref.read(cartProvider.notifier).setQuantity(widget.item.lineId, safe);
     setState(() => _editingQty = false);
+  }
+
+  Future<void> _showNoteSheet(CartItem item) async {
+    final presets = [
+      'ไม่ผงชูรส',
+      'ไม่หวาน',
+      'ไม่เค็ม',
+      'รสจืด',
+      'ไม่เผ็ด',
+      'เพิ่มเผ็ด',
+      'ไม่ใส่ผัก',
+      'ไม่ใส่หอม',
+      'ไม่ใส่กระเทียม',
+      'เพิ่มพริก',
+    ];
+
+    final ctrl = TextEditingController(text: item.note ?? '');
+    final selected = <String>{};
+    // pre-tick any preset that already appears in the existing note
+    for (final p in presets) {
+      if (ctrl.text.contains(p)) selected.add(p);
+    }
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheet) {
+            void togglePreset(String preset) {
+              setSheet(() {
+                if (selected.contains(preset)) {
+                  selected.remove(preset);
+                  ctrl.text =
+                      ctrl.text.replaceAll(preset, '').replaceAll(RegExp(r', *,'), ',').replaceAll(RegExp(r'^,\s*|,\s*$'), '').trim();
+                } else {
+                  selected.add(preset);
+                  final base = ctrl.text.trim();
+                  ctrl.text = base.isEmpty ? preset : '$base, $preset';
+                }
+              });
+            }
+
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(ctx).viewInsets.bottom,
+              ),
+              child: Container(
+                margin: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppTheme.cardColor(ctx),
+                  borderRadius: AppRadius.lg,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // header
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: _orange.withValues(alpha: 0.12),
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.edit_note, color: _orange, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'หมายเหตุ: ${item.productName}',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.textColorOf(ctx),
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () => Navigator.pop(ctx),
+                            child: Icon(Icons.close, size: 20, color: AppTheme.subtextColorOf(ctx)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // preset chips
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                      child: Text(
+                        'เลือกได้เลย',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.subtextColorOf(ctx),
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: presets.map((p) {
+                          final active = selected.contains(p);
+                          return GestureDetector(
+                            onTap: () => togglePreset(p),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 150),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: active ? _orange : AppTheme.surface3Of(ctx),
+                                borderRadius: AppRadius.sm,
+                                border: Border.all(
+                                  color: active ? _orange : AppTheme.borderColorOf(ctx),
+                                ),
+                              ),
+                              child: Text(
+                                p,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: active ? Colors.white : AppTheme.textColorOf(ctx),
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                    // free text
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                      child: Text(
+                        'หรือพิมพ์เพิ่มเติม',
+                        style: TextStyle(fontSize: 12, color: AppTheme.subtextColorOf(ctx)),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: TextField(
+                        controller: ctrl,
+                        autofocus: false,
+                        maxLines: 2,
+                        style: TextStyle(fontSize: 13, color: AppTheme.textColorOf(ctx)),
+                        decoration: InputDecoration(
+                          hintText: 'เช่น ไม่เผ็ด, เพิ่มน้ำมัน...',
+                          hintStyle: TextStyle(fontSize: 13, color: AppTheme.mutedTextOf(ctx)),
+                          filled: true,
+                          fillColor: AppTheme.surface3Of(ctx),
+                          border: OutlineInputBorder(
+                            borderRadius: AppRadius.sm,
+                            borderSide: BorderSide(color: AppTheme.borderColorOf(ctx)),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: AppRadius.sm,
+                            borderSide: BorderSide(color: AppTheme.borderColorOf(ctx)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: AppRadius.sm,
+                            borderSide: const BorderSide(color: _orange, width: 1.5),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        ),
+                      ),
+                    ),
+                    // action buttons
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () {
+                                ref.read(cartProvider.notifier).setNote(item.lineId, null);
+                                Navigator.pop(ctx);
+                              },
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(color: AppTheme.borderColorOf(ctx)),
+                                foregroundColor: AppTheme.subtextColorOf(ctx),
+                                shape: RoundedRectangleBorder(borderRadius: AppRadius.sm),
+                              ),
+                              child: const Text('ล้าง'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            flex: 2,
+                            child: ElevatedButton(
+                              onPressed: () {
+                                final note = ctrl.text.trim();
+                                ref.read(cartProvider.notifier).setNote(item.lineId, note.isEmpty ? null : note);
+                                Navigator.pop(ctx);
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: _orange,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: AppRadius.sm),
+                              ),
+                              child: const Text('บันทึก'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+    ctrl.dispose();
   }
 
   Future<void> _showCourseDialog(CartItem item) async {
@@ -990,7 +1191,7 @@ class _CartRowState extends ConsumerState<_CartRow> {
       ),
     );
     if (selected != null) {
-      ref.read(cartProvider.notifier).setCourseNo(item.productId, selected);
+      ref.read(cartProvider.notifier).setCourseNo(item.lineId, selected);
     }
   }
 
@@ -998,6 +1199,7 @@ class _CartRowState extends ConsumerState<_CartRow> {
   Widget build(BuildContext context) {
     final item = widget.item;
     final density = widget.density;
+    final kitchenSent = widget.kitchenSent;
     final isRestaurant = ref.watch(restaurantOrderContextProvider) != null;
     final productInfo = Expanded(
       flex: 5,
@@ -1007,16 +1209,83 @@ class _CartRowState extends ConsumerState<_CartRow> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              item.productName,
-              style: TextStyle(
-                fontSize: density.rowFontSize,
-                fontWeight: FontWeight.w500,
-                color: const Color(0xFF1A1A1A),
-              ),
-              overflow: TextOverflow.ellipsis,
-              maxLines: density.compact ? 2 : 1,
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    item.productName,
+                    style: TextStyle(
+                      fontSize: density.rowFontSize,
+                      fontWeight: FontWeight.w500,
+                      color: kitchenSent
+                          ? AppTheme.subtextColorOf(context)
+                          : AppTheme.textColorOf(context),
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: density.compact ? 2 : 1,
+                  ),
+                ),
+                if (kitchenSent)
+                  Container(
+                    margin: const EdgeInsets.only(left: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 5,
+                      vertical: 1,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _success.withValues(alpha: 0.12),
+                      borderRadius: AppRadius.xs,
+                      border: Border.all(
+                        color: _success.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.check_circle_outline,
+                          size: 10,
+                          color: _success,
+                        ),
+                        const SizedBox(width: 2),
+                        Text(
+                          'ส่งแล้ว',
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w600,
+                            color: _success,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
             ),
+            if (item.note?.isNotEmpty == true)
+              GestureDetector(
+                onTap: () => _showNoteSheet(item),
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 2, bottom: 1),
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit_note, size: 13, color: _orange.withValues(alpha: 0.85)),
+                      const SizedBox(width: 3),
+                      Expanded(
+                        child: Text(
+                          item.note!,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontStyle: FontStyle.italic,
+                            color: _orange.withValues(alpha: 0.85),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             Row(
               children: [
                 Expanded(
@@ -1024,11 +1293,36 @@ class _CartRowState extends ConsumerState<_CartRow> {
                     '฿${item.unitPrice.toStringAsFixed(2)} / ${item.unit}',
                     style: TextStyle(
                       fontSize: density.metaFontSize,
-                      color: AppTheme.subtextColor,
+                      color: AppTheme.subtextColorOf(context),
                     ),
                   ),
                 ),
-                if (isRestaurant)
+                if (isRestaurant) ...[
+                  GestureDetector(
+                    onTap: () => _showNoteSheet(item),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                      margin: const EdgeInsets.only(right: 4),
+                      decoration: BoxDecoration(
+                        color: item.note?.isNotEmpty == true
+                            ? _orange.withValues(alpha: 0.12)
+                            : AppTheme.surface3Of(context),
+                        borderRadius: AppRadius.xs,
+                        border: Border.all(
+                          color: item.note?.isNotEmpty == true
+                              ? _orange.withValues(alpha: 0.5)
+                              : AppTheme.borderColorOf(context),
+                        ),
+                      ),
+                      child: Icon(
+                        item.note?.isNotEmpty == true ? Icons.edit_note : Icons.add_comment_outlined,
+                        size: 13,
+                        color: item.note?.isNotEmpty == true
+                            ? _orange
+                            : AppTheme.subtextColorOf(context),
+                      ),
+                    ),
+                  ),
                   GestureDetector(
                     onTap: () => _showCourseDialog(item),
                     child: Container(
@@ -1038,13 +1332,17 @@ class _CartRowState extends ConsumerState<_CartRow> {
                       ),
                       decoration: BoxDecoration(
                         color: item.courseNo > 1
-                            ? Colors.blue.shade50
-                            : Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(4),
+                            ? (AppTheme.isDark(context)
+                                ? const Color(0xFF1A2A3A)
+                                : Colors.blue.shade50)
+                            : AppTheme.surface3Of(context),
+                        borderRadius: AppRadius.xs,
                         border: Border.all(
                           color: item.courseNo > 1
-                              ? Colors.blue.shade300
-                              : Colors.grey.shade300,
+                              ? (AppTheme.isDark(context)
+                                  ? AppTheme.infoColor
+                                  : Colors.blue.shade300)
+                              : AppTheme.borderColorOf(context),
                         ),
                       ),
                       child: Text(
@@ -1053,12 +1351,15 @@ class _CartRowState extends ConsumerState<_CartRow> {
                           fontSize: 10,
                           fontWeight: FontWeight.w600,
                           color: item.courseNo > 1
-                              ? Colors.blue.shade700
-                              : Colors.grey.shade600,
+                              ? (AppTheme.isDark(context)
+                                  ? Colors.blue.shade300
+                                  : Colors.blue.shade700)
+                              : AppTheme.subtextColorOf(context),
                         ),
                       ),
                     ),
                   ),
+                ],
               ],
             ),
           ],
@@ -1075,7 +1376,7 @@ class _CartRowState extends ConsumerState<_CartRow> {
             compact: density.compact,
             onTap: () => ref
                 .read(cartProvider.notifier)
-                .decreaseQuantity(item.productId),
+                .decreaseQuantity(item.lineId),
           ),
           GestureDetector(
             onTap: () {
@@ -1094,10 +1395,10 @@ class _CartRowState extends ConsumerState<_CartRow> {
               height: density.qtyBoxHeight,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(4),
+                color: AppTheme.cardColor(context),
+                borderRadius: AppRadius.xs,
                 border: Border.all(
-                  color: _editingQty ? _orange : _border,
+                  color: _editingQty ? _orange : AppTheme.borderColorOf(context),
                   width: _editingQty ? 1.5 : 1,
                 ),
               ),
@@ -1109,7 +1410,7 @@ class _CartRowState extends ConsumerState<_CartRow> {
                       style: TextStyle(
                         fontSize: density.rowFontSize,
                         fontWeight: FontWeight.bold,
-                        color: const Color(0xFF1A1A1A),
+                        color: AppTheme.textColorOf(context),
                       ),
                       keyboardType: TextInputType.number,
                       inputFormatters: [
@@ -1127,7 +1428,7 @@ class _CartRowState extends ConsumerState<_CartRow> {
                       style: TextStyle(
                         fontSize: density.rowFontSize,
                         fontWeight: FontWeight.bold,
-                        color: const Color(0xFF1A1A1A),
+                        color: AppTheme.textColorOf(context),
                       ),
                     ),
             ),
@@ -1137,7 +1438,7 @@ class _CartRowState extends ConsumerState<_CartRow> {
             compact: density.compact,
             onTap: () => ref
                 .read(cartProvider.notifier)
-                .increaseQuantity(item.productId),
+                .increaseQuantity(item.lineId),
           ),
         ],
       ),
@@ -1152,7 +1453,9 @@ class _CartRowState extends ConsumerState<_CartRow> {
     );
 
     return Container(
-      color: widget.isEven ? Colors.white : const Color(0xFFF9F9F7),
+      color: kitchenSent
+          ? _success.withValues(alpha: 0.06)
+          : (widget.isEven ? AppTheme.rowEvenOf(context) : AppTheme.rowOddOf(context)),
       padding: EdgeInsets.symmetric(horizontal: density.horizontalPadding),
       child: density.stackedRows
           ? Padding(
@@ -1167,7 +1470,7 @@ class _CartRowState extends ConsumerState<_CartRow> {
                         child: InkWell(
                           onTap: () => ref
                               .read(cartProvider.notifier)
-                              .removeItem(item.productId),
+                              .removeItem(item.lineId),
                           child: const Padding(
                             padding: EdgeInsets.all(6),
                             child: Icon(Icons.close, size: 13, color: _error),
@@ -1195,7 +1498,7 @@ class _CartRowState extends ConsumerState<_CartRow> {
                   child: InkWell(
                     onTap: () => ref
                         .read(cartProvider.notifier)
-                        .removeItem(item.productId),
+                        .removeItem(item.lineId),
                     child: const Padding(
                       padding: EdgeInsets.all(6),
                       child: Icon(Icons.close, size: 13, color: _error),
@@ -1238,7 +1541,7 @@ class _QtyBtn extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(4),
+      borderRadius: AppRadius.xs,
       child: Padding(
         padding: EdgeInsets.all(compact ? 2 : 3),
         child: Icon(icon, size: compact ? 13 : 14, color: _navy),
@@ -1334,7 +1637,7 @@ class _FreeItemRow extends StatelessWidget {
                             style: TextStyle(
                               fontSize: density.rowFontSize,
                               fontWeight: FontWeight.w500,
-                              color: const Color(0xFF1A1A1A),
+                              color: AppTheme.textColorOf(context),
                             ),
                             overflow: TextOverflow.ellipsis,
                             maxLines: 2,
@@ -1381,7 +1684,7 @@ class _FreeItemRow extends StatelessWidget {
                         style: TextStyle(
                           fontSize: density.rowFontSize,
                           fontWeight: FontWeight.w500,
-                          color: const Color(0xFF1A1A1A),
+                          color: AppTheme.textColorOf(context),
                         ),
                         overflow: TextOverflow.ellipsis,
                         maxLines: density.compact ? 2 : 1,
@@ -1433,7 +1736,7 @@ class _FreeQtyChip extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         color: Colors.green.shade50,
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: AppRadius.xs,
         border: Border.all(color: Colors.green.shade200),
       ),
       child: Text(
@@ -1488,6 +1791,7 @@ class _CartSummary extends StatelessWidget {
   final bool showHoldButton;
   final bool isRestaurantFlow;
   final bool isKitchenSent;
+  final bool hasUnsentItems;
   final bool skipKitchen;
   final bool isSendingRestaurantOrder;
   final VoidCallback? onHold;
@@ -1501,6 +1805,7 @@ class _CartSummary extends StatelessWidget {
     required this.showHoldButton,
     required this.isRestaurantFlow,
     required this.isKitchenSent,
+    required this.hasUnsentItems,
     required this.skipKitchen,
     required this.isSendingRestaurantOrder,
     required this.onHold,
@@ -1643,7 +1948,7 @@ class _CartSummary extends StatelessWidget {
                   color: isDark
                       ? AppTheme.darkElement.withValues(alpha: 0.5)
                       : _navy.withValues(alpha: 0.06),
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: AppRadius.sm,
                 ),
                 child: Wrap(
                   spacing: 10,
@@ -1668,7 +1973,7 @@ class _CartSummary extends StatelessWidget {
               padding: EdgeInsets.all(density.compactHeight ? 6 : 10),
               child: Row(
                 children: [
-                  if (isRestaurantFlow && !isKitchenSent && !skipKitchen) ...[
+                  if (isRestaurantFlow && hasUnsentItems && !skipKitchen) ...[
                     Expanded(
                       flex: showCheckoutButton || showHoldButton ? 6 : 1,
                       child: SizedBox(
@@ -1690,7 +1995,7 @@ class _CartSummary extends StatelessWidget {
                                 : Colors.grey[500],
                             elevation: 0,
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: AppRadius.md,
                             ),
                           ),
                           child: FittedBox(
@@ -1743,7 +2048,7 @@ class _CartSummary extends StatelessWidget {
                                 : (context.isMobile ? 44 : 48),
                           ),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: AppRadius.md,
                           ),
                         ),
                         child: const FittedBox(
@@ -1791,7 +2096,7 @@ class _CartSummary extends StatelessWidget {
                                 : Colors.grey[500],
                             elevation: 0,
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: AppRadius.md,
                             ),
                           ),
                           onPressed: !canCheckout
@@ -1938,7 +2243,7 @@ class _DiscountButton extends ConsumerWidget {
                 );
           }
         },
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: AppRadius.sm,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -1946,7 +2251,7 @@ class _DiscountButton extends ConsumerWidget {
             color: hasDiscount
                 ? _orange.withValues(alpha: 0.12)
                 : (isDark ? AppTheme.darkElement : const Color(0xFFF5F5F5)),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: AppRadius.sm,
             border: Border.all(
               color: hasDiscount
                   ? _orange.withValues(alpha: 0.6)

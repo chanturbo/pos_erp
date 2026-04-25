@@ -63,7 +63,7 @@ class _DiscountDialogState extends State<DiscountDialog> {
 
     return Dialog(
       backgroundColor: bgColor,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(borderRadius: AppRadius.lg),
       child: SizedBox(
         width: 420,
         child: Padding(
@@ -80,7 +80,7 @@ class _DiscountDialogState extends State<DiscountDialog> {
                     height: 36,
                     decoration: BoxDecoration(
                       color: AppTheme.primary.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: AppRadius.sm,
                     ),
                     child: const Icon(Icons.local_offer,
                         size: 18, color: AppTheme.primary),
@@ -151,7 +151,7 @@ class _DiscountDialogState extends State<DiscountDialog> {
                             color: AppTheme.error.withValues(alpha: 0.5)),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
+                            borderRadius: AppRadius.sm),
                       ),
                     ),
                   ),
@@ -169,7 +169,7 @@ class _DiscountDialogState extends State<DiscountDialog> {
                         elevation: 0,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
+                            borderRadius: AppRadius.sm),
                       ),
                     ),
                   ),
@@ -258,13 +258,13 @@ class _Tab extends StatelessWidget {
     return Expanded(
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: AppRadius.sm,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
             color: active ? activeBg : inactiveBg,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: AppRadius.sm,
             border: Border.all(
               color: active
                   ? activeColor.withValues(alpha: 0.5)
@@ -335,9 +335,9 @@ class _PercentInput extends StatelessWidget {
                 fontWeight: FontWeight.bold,
                 color: AppTheme.primary),
             border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10)),
+                borderRadius: AppRadius.md),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: AppRadius.md,
               borderSide:
                   const BorderSide(color: AppTheme.primary, width: 1.5),
             ),
@@ -379,7 +379,7 @@ class _PercentInput extends StatelessWidget {
               backgroundColor:
                   isDark ? AppTheme.darkElement : Colors.white,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
+                  borderRadius: AppRadius.sm),
               padding: const EdgeInsets.symmetric(
                   horizontal: 10, vertical: 2),
               showCheckmark: false,
@@ -431,9 +431,9 @@ class _AmountInput extends StatelessWidget {
                 fontWeight: FontWeight.bold,
                 color: AppTheme.primary),
             border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10)),
+                borderRadius: AppRadius.md),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: AppRadius.md,
               borderSide:
                   const BorderSide(color: AppTheme.primary, width: 1.5),
             ),
@@ -475,7 +475,7 @@ class _AmountInput extends StatelessWidget {
               backgroundColor:
                   isDark ? AppTheme.darkElement : Colors.white,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
+                  borderRadius: AppRadius.sm),
               padding: const EdgeInsets.symmetric(
                   horizontal: 10, vertical: 2),
               showCheckmark: false,

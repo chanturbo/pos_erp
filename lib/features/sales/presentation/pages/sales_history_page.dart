@@ -358,7 +358,7 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
 
                       decoration: BoxDecoration(
                         color: colors.cardBg,
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: AppRadius.md,
                         border: Border.all(color: colors.border),
                         boxShadow: [
                           if (!colors.isDark)
@@ -689,7 +689,7 @@ class _SalesHistoryTopBar extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(
             color: AppTheme.primary.withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: AppRadius.sm,
             border: Border.all(color: AppTheme.primary.withValues(alpha: 0.5)),
           ),
           child: const Text(
@@ -940,7 +940,7 @@ class _SummaryChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: colors.summaryChipBg,
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: AppRadius.pill,
         border: Border.all(color: colors.border),
       ),
       child: Row(
@@ -1050,7 +1050,7 @@ class _SalesTableHeader extends StatelessWidget {
             waitDuration: const Duration(milliseconds: 600),
             child: InkWell(
               onTap: onReset,
-              borderRadius: BorderRadius.circular(4),
+              borderRadius: AppRadius.xs,
               child: const Padding(
                 padding: EdgeInsets.all(4),
                 child: Icon(
@@ -1118,7 +1118,7 @@ class _ResizableHeaderCellState extends State<_ResizableHeaderCell> {
             child: canSort
                 ? InkWell(
                     onTap: widget.onSort,
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: AppRadius.xs,
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
                         vertical: 4,
@@ -1380,7 +1380,7 @@ class _SalesOrderRowState extends State<_SalesOrderRow> {
                       waitDuration: const Duration(milliseconds: 600),
                       child: InkWell(
                         onTap: widget.onTap,
-                        borderRadius: BorderRadius.circular(6),
+                        borderRadius: AppRadius.sm,
                         child: Container(
                           padding: const EdgeInsets.all(6),
                           decoration: BoxDecoration(
@@ -1388,7 +1388,7 @@ class _SalesOrderRowState extends State<_SalesOrderRow> {
                             border: Border.all(
                               color: AppTheme.primary.withValues(alpha: 0.18),
                             ),
-                            borderRadius: BorderRadius.circular(6),
+                            borderRadius: AppRadius.sm,
                           ),
                           child: const Icon(
                             Icons.open_in_new,
@@ -1405,7 +1405,7 @@ class _SalesOrderRowState extends State<_SalesOrderRow> {
                         waitDuration: const Duration(milliseconds: 600),
                         child: InkWell(
                           onTap: widget.onCancel,
-                          borderRadius: BorderRadius.circular(6),
+                          borderRadius: AppRadius.sm,
                           child: Container(
                             padding: const EdgeInsets.all(6),
                             decoration: BoxDecoration(
@@ -1413,7 +1413,7 @@ class _SalesOrderRowState extends State<_SalesOrderRow> {
                               border: Border.all(
                                 color: AppTheme.error.withValues(alpha: 0.18),
                               ),
-                              borderRadius: BorderRadius.circular(6),
+                              borderRadius: AppRadius.sm,
                             ),
                             child: const Icon(
                               Icons.cancel_outlined,
@@ -1456,7 +1456,7 @@ class _PaymentBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: AppRadius.md,
         border: Border.all(color: color.withValues(alpha: 0.18)),
       ),
       child: Text(
@@ -1488,7 +1488,7 @@ class _StatusBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: AppRadius.md,
         border: Border.all(color: color.withValues(alpha: 0.16)),
       ),
       child: Row(
@@ -1534,7 +1534,7 @@ class _ServiceTypeBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: AppRadius.sm,
         border: Border.all(color: color.withValues(alpha: 0.25)),
       ),
       child: Row(
@@ -1576,14 +1576,14 @@ class _DateChip extends StatelessWidget {
     final colors = _SalesHistoryColors.of(context);
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: AppRadius.sm,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
         decoration: BoxDecoration(
           color: active
               ? AppTheme.primary.withValues(alpha: 0.08)
               : colors.neutralChipBg,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: AppRadius.sm,
           border: Border.all(color: active ? AppTheme.primary : colors.border),
         ),
         child: Row(
@@ -1644,7 +1644,7 @@ class _DropdownChip<T> extends StatelessWidget {
         color: isActive
             ? AppTheme.primary.withValues(alpha: 0.08)
             : colors.neutralChipBg,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: AppRadius.sm,
         border: Border.all(color: isActive ? AppTheme.primary : colors.border),
       ),
       child: DropdownButtonHideUnderline(
@@ -1720,15 +1720,15 @@ class _SearchField extends StatelessWidget {
             : null,
         contentPadding: EdgeInsets.zero,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: AppRadius.sm,
           borderSide: const BorderSide(color: AppTheme.border),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: AppRadius.sm,
           borderSide: const BorderSide(color: AppTheme.border),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: AppRadius.sm,
           borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
         ),
         filled: true,
@@ -1749,12 +1749,12 @@ class _RefreshBtn extends StatelessWidget {
     waitDuration: const Duration(milliseconds: 600),
     child: InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: AppRadius.sm,
       child: Container(
         padding: const EdgeInsets.all(7),
         decoration: BoxDecoration(
           color: _SalesHistoryColors.of(context).navButtonBg,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: AppRadius.sm,
           border: Border.all(
             color: _SalesHistoryColors.of(context).navButtonBorder,
           ),
@@ -1775,12 +1775,12 @@ class _ClearFilterBtn extends StatelessWidget {
     waitDuration: const Duration(milliseconds: 600),
     child: InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: AppRadius.sm,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: AppRadius.sm,
           border: Border.all(color: Colors.white24),
         ),
         child: Row(
@@ -1812,12 +1812,12 @@ class _BackBtn extends StatelessWidget {
       ? buildMobileHomeCompactButton(context)
       : InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: AppRadius.sm,
           child: Container(
             padding: const EdgeInsets.all(7),
             decoration: BoxDecoration(
               color: _SalesHistoryColors.of(context).navButtonBg,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: AppRadius.sm,
               border: Border.all(
                 color: _SalesHistoryColors.of(context).navButtonBorder,
               ),
@@ -1838,7 +1838,7 @@ class _PageIcon extends StatelessWidget {
     height: 30,
     decoration: BoxDecoration(
       color: AppTheme.primary.withValues(alpha: 0.18),
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: AppRadius.sm,
       border: Border.all(color: AppTheme.primary.withValues(alpha: 0.28)),
     ),
     child: const Icon(Icons.history, size: 17, color: AppTheme.primaryLight),

@@ -109,13 +109,14 @@ class ProductGrid extends ConsumerWidget {
     final viewMode = ref.watch(productViewModeProvider);
 
     if (products.isEmpty) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.search_off, size: 80, color: Colors.grey),
-            SizedBox(height: 16),
-            Text('ไม่พบสินค้า'),
+            Icon(Icons.search_off, size: 80, color: AppTheme.iconSubtleOf(context)),
+            const SizedBox(height: 16),
+            Text('ไม่พบสินค้า',
+                style: TextStyle(color: AppTheme.subtextColorOf(context))),
           ],
         ),
       );
@@ -160,9 +161,9 @@ class _ProductToolbar extends ConsumerWidget {
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: _border)),
+      decoration: BoxDecoration(
+        color: AppTheme.cardColor(context),
+        border: Border(bottom: BorderSide(color: AppTheme.borderColorOf(context))),
       ),
       child: Row(
         children: [
@@ -171,7 +172,7 @@ class _ProductToolbar extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
             decoration: BoxDecoration(
               color: _navy.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: AppRadius.md,
             ),
             child: Text(
               '$productCount รายการ',
@@ -191,7 +192,7 @@ class _ProductToolbar extends ConsumerWidget {
                   const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
                 color: _success.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: AppRadius.md,
                 border: Border.all(color: _success.withValues(alpha: 0.4)),
               ),
               child: Row(
@@ -219,7 +220,7 @@ class _ProductToolbar extends ConsumerWidget {
           Container(
             decoration: BoxDecoration(
               color: _surface,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: AppRadius.sm,
               border: Border.all(color: _border),
             ),
             child: Row(
@@ -269,19 +270,19 @@ class _ToggleBtn extends StatelessWidget {
       message: tooltip,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: AppRadius.sm,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
           padding:
               const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
             color: active ? _orange : Colors.transparent,
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: AppRadius.sm,
           ),
           child: Icon(
             icon,
             size: 16,
-            color: active ? Colors.white : Colors.grey[600],
+            color: active ? Colors.white : AppTheme.iconOf(context),
           ),
         ),
       ),
@@ -325,7 +326,7 @@ class _ProductImage extends StatelessWidget {
           child: FittedBox(
             fit: BoxFit.contain,
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: AppRadius.sm,
               child: Image.file(
                 file,
                 errorBuilder: (_, _, _) => _placeholder(),
@@ -453,18 +454,18 @@ class _ProductGridCard extends ConsumerWidget {
         !lookup.isFallback &&
         unitPrice < product.priceLevel1;
 
-    const nameColor = Color(0xFF1A1A1A);
-    const codeColor = AppTheme.subtextColor;
+    final nameColor = AppTheme.textColorOf(context);
+    final codeColor = AppTheme.subtextColorOf(context);
 
     return Card(
       elevation: 0,
-      color: Colors.white,
+      color: AppTheme.cardColor(context),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10),
-        side: const BorderSide(color: _border),
+        borderRadius: AppRadius.md,
+        side: BorderSide(color: AppTheme.borderColorOf(context)),
       ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: AppRadius.md,
         hoverColor: _orange.withValues(alpha: 0.06),
         splashColor: _orange.withValues(alpha: 0.12),
         onTap: () => _addToCart(context, ref, lookup),
@@ -494,7 +495,7 @@ class _ProductGridCard extends ConsumerWidget {
                               horizontal: 5, vertical: 2),
                           decoration: BoxDecoration(
                             color: Colors.orange.shade700,
-                            borderRadius: BorderRadius.circular(4),
+                            borderRadius: AppRadius.xs,
                           ),
                           child: const Text(
                             'ราคาปกติ',
@@ -518,11 +519,11 @@ class _ProductGridCard extends ConsumerWidget {
                 children: [
                   Text(product.productCode,
                       style:
-                          const TextStyle(fontSize: 10, color: codeColor)),
+                          TextStyle(fontSize: 10, color: codeColor)),
                   const SizedBox(height: 2),
                   Text(
                     product.productName,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
                       color: nameColor,
@@ -564,7 +565,7 @@ class _ProductGridCard extends ConsumerWidget {
                         padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
                           color: _orange,
-                          borderRadius: BorderRadius.circular(6),
+                          borderRadius: AppRadius.sm,
                         ),
                         child: const Icon(Icons.add,
                             size: 14, color: Colors.white),
@@ -643,17 +644,21 @@ class _ProductListRow extends ConsumerWidget {
         padding:
             const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
         decoration: BoxDecoration(
-          // ✅ พื้นหลังสีส้มอ่อนถ้า fallback เพื่อให้ cashier สังเกตเห็น
+          // fallback = orange tint; otherwise alternating row stripe
           color: lookup.isFallback
-              ? Colors.orange.shade50
-              : isEven
-                  ? Colors.white
-                  : const Color(0xFFF9F9F7),
-          borderRadius: BorderRadius.circular(6),
+              ? (AppTheme.isDark(context)
+                  ? const Color(0xFF3A2800)
+                  : Colors.orange.shade50)
+              : (isEven
+                  ? AppTheme.rowEvenOf(context)
+                  : AppTheme.rowOddOf(context)),
+          borderRadius: AppRadius.sm,
           border: Border.all(
             color: lookup.isFallback
-                ? Colors.orange.shade200
-                : _border.withValues(alpha: 0.6),
+                ? (AppTheme.isDark(context)
+                    ? Colors.orange.shade800
+                    : Colors.orange.shade200)
+                : AppTheme.borderColorOf(context).withValues(alpha: 0.6),
           ),
         ),
         child: Row(
@@ -661,7 +666,7 @@ class _ProductListRow extends ConsumerWidget {
             _ProductImage(
               imagePath: product.imagePath,
               size: 40,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: AppRadius.sm,
             ),
             const SizedBox(width: 10),
 
@@ -671,10 +676,10 @@ class _ProductListRow extends ConsumerWidget {
                 children: [
                   Text(
                     product.productName,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
-                      color: Color(0xFF1A1A1A),
+                      color: AppTheme.textColorOf(context),
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -682,9 +687,9 @@ class _ProductListRow extends ConsumerWidget {
                     children: [
                       Text(
                         product.productCode,
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 11,
-                            color: AppTheme.subtextColor),
+                            color: AppTheme.subtextColorOf(context)),
                       ),
                       // ✅ Warning label ในแถว
                       if (lookup.isFallback) ...[
@@ -743,12 +748,12 @@ class _ProductListRow extends ConsumerWidget {
             // Add button
             InkWell(
               onTap: () => _addToCart(context, ref, lookup),
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: AppRadius.sm,
               child: Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
                   color: _orange,
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: AppRadius.sm,
                 ),
                 child: const Icon(Icons.add, size: 14, color: Colors.white),
               ),

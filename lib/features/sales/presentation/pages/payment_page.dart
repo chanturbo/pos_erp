@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:intl/intl.dart';
+import '../../../../shared/theme/app_theme.dart';
 import '../../../../core/client/api_client.dart';
 import '../../../../core/utils/promptpay_utils.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -342,7 +343,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: AppRadius.lg,
                           boxShadow: [
                             BoxShadow(
                               color: const Color(
@@ -557,7 +558,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                                 _receivedController.text = amount
                                     .toStringAsFixed(2);
                               }),
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: AppRadius.sm,
                               child: AnimatedContainer(
                                 duration: const Duration(milliseconds: 150),
                                 padding: const EdgeInsets.symmetric(
@@ -574,7 +575,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                                       : (isDark
                                             ? const Color(0xFF2A2A2A)
                                             : const Color(0xFFF5F5F5)),
-                                  borderRadius: BorderRadius.circular(8),
+                                  borderRadius: AppRadius.sm,
                                   border: Border.all(
                                     color: isSelected
                                         ? const Color(0xFF1565C0)
@@ -657,7 +658,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                                 : (isOk
                                       ? const Color(0xFFE8F5E9)
                                       : const Color(0xFFFFEBEE)),
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: AppRadius.md,
                             border: Border.all(
                               color: isDark
                                   ? (isOk
@@ -741,7 +742,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                               color: isDark
                                   ? const Color(0xFF2A1F00)
                                   : Colors.orange[50],
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: AppRadius.md,
                               border: Border.all(
                                 color: isDark
                                     ? Colors.orange.withValues(alpha: 0.4)
@@ -807,7 +808,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                             color: isDark
                                 ? const Color(0xFF0D2137)
                                 : Colors.blue[50],
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: AppRadius.md,
                             border: Border.all(
                               color: isDark
                                   ? const Color(0xFF1565C0).withValues(alpha: 0.5)
@@ -875,7 +876,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                                 ? const Color(0xFFE57200).withValues(alpha: 0.5)
                                 : null,
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: AppRadius.md,
                             ),
                           ),
                           child: _isProcessing
@@ -1527,7 +1528,7 @@ class _CouponSection extends StatelessWidget {
         color: hasApplied
             ? (isDark ? const Color(0xFF1A2E1A) : const Color(0xFFE8F5E9))
             : (isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF9F9F9)),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: AppRadius.md,
         border: Border.all(
           color: hasApplied
               ? const Color(0xFF4CAF50)
@@ -1565,7 +1566,7 @@ class _CouponSection extends StatelessWidget {
                   ),
                   decoration: BoxDecoration(
                     color: const Color(0xFF4CAF50),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: AppRadius.md,
                   ),
                   child: Text(
                     '${appliedCoupons.length} ใบ',
@@ -1603,7 +1604,7 @@ class _CouponSection extends StatelessWidget {
                   ),
                   decoration: BoxDecoration(
                     color: const Color(0xFF4CAF50).withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: AppRadius.sm,
                     border: Border.all(
                       color: const Color(0xFF4CAF50).withValues(alpha: 0.4),
                     ),
@@ -1651,7 +1652,7 @@ class _CouponSection extends StatelessWidget {
                       const SizedBox(width: 6),
                       InkWell(
                         onTap: () => onRemove(c.code),
-                        borderRadius: BorderRadius.circular(4),
+                        borderRadius: AppRadius.xs,
                         child: const Padding(
                           padding: EdgeInsets.all(2),
                           child: Icon(
@@ -1697,10 +1698,10 @@ class _CouponSection extends StatelessWidget {
                       vertical: 10,
                     ),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: AppRadius.sm,
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: AppRadius.sm,
                       borderSide: BorderSide(
                         color: errorText != null
                             ? const Color(0xFFEF5350)
@@ -1708,7 +1709,7 @@ class _CouponSection extends StatelessWidget {
                       ),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: AppRadius.sm,
                       borderSide: const BorderSide(
                         color: Color(0xFF1565C0),
                         width: 1.5,
@@ -1732,7 +1733,7 @@ class _CouponSection extends StatelessWidget {
                       foregroundColor: const Color(0xFF1565C0),
                       side: const BorderSide(color: Color(0xFF1565C0)),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: AppRadius.sm,
                       ),
                       padding: EdgeInsets.zero,
                     ),
@@ -1749,7 +1750,7 @@ class _CouponSection extends StatelessWidget {
                     backgroundColor: const Color(0xFF1565C0),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: AppRadius.sm,
                     ),
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                   ),
@@ -1790,7 +1791,7 @@ class _PromptPayQrSection extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: AppRadius.lg,
         border: Border.all(color: Colors.grey.shade200),
         boxShadow: [
           BoxShadow(
@@ -1805,9 +1806,9 @@ class _PromptPayQrSection extends StatelessWidget {
           // Header
           Container(
             padding: const EdgeInsets.symmetric(vertical: 12),
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               color: Color(0xFF1565C0),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+              borderRadius: AppRadius.topLg,
             ),
             child: const Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -1844,7 +1845,7 @@ class _PromptPayQrSection extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 10),
             decoration: BoxDecoration(
               color: Colors.blue[50],
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: AppRadius.sm,
             ),
             child: Column(
               children: [
@@ -1887,7 +1888,7 @@ class _PromptPayQrSection extends StatelessWidget {
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: Colors.grey[50],
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: AppRadius.sm,
               border: Border.all(color: Colors.grey.shade200),
             ),
             child: const Row(
@@ -1943,7 +1944,7 @@ class _CreditInfoPanel extends StatelessWidget {
         color: isOverLimit
             ? (isDark ? const Color(0xFF2A1A1A) : const Color(0xFFFFEBEE))
             : (isDark ? const Color(0xFF0D2137) : const Color(0xFFE3F2FD)),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: AppRadius.md,
         border: Border.all(
           color: isOverLimit
               ? const Color(0xFFEF5350).withValues(alpha: 0.5)
@@ -1990,7 +1991,7 @@ class _CreditInfoPanel extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: const Color(0xFFEF5350).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: AppRadius.sm,
               ),
               child: Row(
                 children: [
@@ -2453,7 +2454,7 @@ class _ReceiptPageState extends ConsumerState<ReceiptPage> {
                   ),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: AppRadius.md,
                     border: Border.all(color: const Color(0xFFDADADA)),
                   ),
                   child: Row(
@@ -2484,7 +2485,7 @@ class _ReceiptPageState extends ConsumerState<ReceiptPage> {
                   ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFFFF4E5),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: AppRadius.md,
                     border: Border.all(color: const Color(0xFFF0B95A)),
                   ),
                   child: Row(
@@ -2599,7 +2600,7 @@ class _PointsSectionState extends State<_PointsSection> {
         color: hasPoints
             ? (isDark ? const Color(0xFF2A1F00) : const Color(0xFFFFF8E1))
             : (isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF9F9F9)),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: AppRadius.md,
         border: Border.all(
           color: hasPoints ? Colors.amber : Colors.grey.shade300,
         ),
@@ -2658,7 +2659,7 @@ class _PointsSectionState extends State<_PointsSection> {
                 const Spacer(),
                 InkWell(
                   onTap: widget.onClear,
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: AppRadius.xs,
                   child: const Padding(
                     padding: EdgeInsets.all(2),
                     child: Icon(Icons.close, size: 16, color: Colors.red),
@@ -2688,7 +2689,7 @@ class _PointsSectionState extends State<_PointsSection> {
                       vertical: 10,
                     ),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: AppRadius.sm,
                     ),
                   ),
                 ),

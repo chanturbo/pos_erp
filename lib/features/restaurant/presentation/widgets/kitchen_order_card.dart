@@ -26,7 +26,7 @@ class KitchenOrderCard extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: AppRadius.md,
         side: BorderSide(color: headerTheme.border, width: 1.5),
       ),
       elevation: 3,
@@ -185,7 +185,7 @@ class _ItemRow extends StatelessWidget {
                             ),
                             decoration: BoxDecoration(
                               color: Colors.blue.shade50,
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: AppRadius.sm,
                               border: Border.all(color: Colors.blue.shade300),
                             ),
                             child: Text(
@@ -208,7 +208,7 @@ class _ItemRow extends StatelessWidget {
                           ),
                           decoration: BoxDecoration(
                             color: statusColor.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: AppRadius.md,
                           ),
                           child: Text(
                             'x${_fmtQty(item.quantity)} ${item.unit}',
@@ -381,7 +381,7 @@ class _OrderWaitBadgeState extends State<_OrderWaitBadge> {
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: AppRadius.md,
       ),
       child: Row(
         children: [
@@ -451,7 +451,7 @@ class _HeldOverdueBadgeState extends State<_HeldOverdueBadge> {
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: AppRadius.sm,
         border: Border.all(color: color.withValues(alpha: 0.6)),
       ),
       child: Row(

@@ -91,9 +91,13 @@ class _FakeRestaurantApiClient extends ApiClient {
   }) async {
     getCalls.add(path);
 
-    if (path.startsWith('/api/tables/reservations?date=')) {
+    if (path.startsWith('/api/tables/reservations?date=') ||
+        path.startsWith('/api/tables/reservations?from=')) {
       final uri = Uri.parse(path);
       final query = (uri.queryParameters['query'] ?? '').trim().toLowerCase();
+      final date = DateTime.tryParse(uri.queryParameters['date'] ?? '');
+      final from = DateTime.tryParse(uri.queryParameters['from'] ?? '');
+      final to = DateTime.tryParse(uri.queryParameters['to'] ?? '');
       if (refreshDelay != null) {
         await Future<void>.delayed(refreshDelay!);
       }
@@ -105,6 +109,20 @@ class _FakeRestaurantApiClient extends ApiClient {
             return reservation;
           })
           .where((reservation) {
+            final rawTime = reservation['reservation_time'] as String?;
+            final time = rawTime != null ? DateTime.tryParse(rawTime) : null;
+            if (time != null && date != null) {
+              final sameDay =
+                  time.year == date.year &&
+                  time.month == date.month &&
+                  time.day == date.day;
+              if (!sameDay) return false;
+            }
+            if (time != null && (from != null || to != null)) {
+              final day = DateTime(time.year, time.month, time.day);
+              if (from != null && day.isBefore(from)) return false;
+              if (to != null && day.isAfter(to)) return false;
+            }
             if (query.isEmpty) return true;
             final customerName = (reservation['customer_name'] as String? ?? '')
                 .toLowerCase();
@@ -1401,6 +1419,15 @@ void registerReservationsTests() {
   });
 
   group('Reservations widget tests', () {
+    Future<void> openReservationDay(WidgetTester tester) async {
+      await tester.tap(find.text('20').first);
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> tapConfirmReservation(WidgetTester tester) async {
+      await tester.tap(find.text('ยืนยัน').first);
+    }
+
     testWidgets(
       'reservations page shows busy overlay while confirming reservation',
       (tester) async {
@@ -1408,23 +1435,17 @@ void registerReservationsTests() {
           confirmDelay: const Duration(milliseconds: 300),
         );
 
-        await tester.pumpWidget(
-          ProviderScope(
-            overrides: [
-              apiClientProvider.overrideWithValue(fakeApi),
-              authProvider.overrideWith(_TestAuthNotifier.new),
-              selectedBranchProvider.overrideWith(
-                _TestSelectedBranchNotifier.new,
-              ),
-            ],
-            child: const MaterialApp(home: ReservationsPage()),
-          ),
+        await _pumpRestaurantApp(
+          tester,
+          home: const ReservationsPage(),
+          apiClient: fakeApi,
         );
 
         await tester.pumpAndSettle();
+        await openReservationDay(tester);
 
         expect(find.text('John'), findsOneWidget);
-        await tester.tap(find.text('ยืนยัน'));
+        await tapConfirmReservation(tester);
         await tester.pump();
 
         expect(find.text('กำลังอัปเดตการจอง...'), findsOneWidget);
@@ -1449,6 +1470,7 @@ void registerReservationsTests() {
       );
 
       await tester.pumpAndSettle();
+      await openReservationDay(tester);
 
       expect(find.text('John'), findsOneWidget);
       expect(find.text('Mali'), findsOneWidget);
@@ -1473,8 +1495,9 @@ void registerReservationsTests() {
         );
 
         await tester.pumpAndSettle();
+        await openReservationDay(tester);
 
-        await tester.tap(find.text('ยืนยัน'));
+        await tapConfirmReservation(tester);
         await tester.pumpAndSettle();
 
         expect(find.text('ยืนยันการจอง John แล้ว'), findsNothing);
