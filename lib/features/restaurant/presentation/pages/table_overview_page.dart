@@ -50,11 +50,6 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
         foregroundColor: Colors.white,
         actions: [
           IconButton(
-            icon: const Icon(Icons.takeout_dining),
-            tooltip: 'ซื้อกลับบ้าน',
-            onPressed: _isBusy ? null : _startTakeawayOrder,
-          ),
-          IconButton(
             icon: Stack(
               clipBehavior: Clip.none,
               children: [
@@ -259,7 +254,8 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
                           children: [
                             // ── ซื้อกลับ section ──────────────────────────
                             _TakeawaySectionPanel(
-                              onStartNew: _isBusy ? null : _startTakeawayOrder,
+                              onStartKitchen: _isBusy ? null : () => _startTakeawayOrder(skipKitchen: false),
+                              onStartSkipKitchen: _isBusy ? null : () => _startTakeawayOrder(skipKitchen: true),
                               onResume: _isBusy ? null : _resumeTakeawayHold,
                             ),
                             const SizedBox(height: 20),
@@ -723,12 +719,8 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
     await ref.read(tableListProvider.notifier).refresh(branchId: branchId);
   }
 
-  Future<void> _startTakeawayOrder() async {
-    final skipKitchen = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => const _TakeawayTypeDialog(),
-    );
-    if (skipKitchen == null || !mounted) return;
+  Future<void> _startTakeawayOrder({required bool skipKitchen}) async {
+    if (!mounted) return;
 
     final cartState = ref.read(cartProvider);
     final hasPendingCart =
@@ -1310,10 +1302,15 @@ class _ZoneHeader extends StatelessWidget {
 
 // ── Takeaway Section Panel ─────────────────────────────────────────────────────
 class _TakeawaySectionPanel extends ConsumerWidget {
-  final VoidCallback? onStartNew;
+  final VoidCallback? onStartKitchen;
+  final VoidCallback? onStartSkipKitchen;
   final void Function(int index)? onResume;
 
-  const _TakeawaySectionPanel({this.onStartNew, this.onResume});
+  const _TakeawaySectionPanel({
+    this.onStartKitchen,
+    this.onStartSkipKitchen,
+    this.onResume,
+  });
 
   Future<void> _confirmDelete(
     BuildContext context,
@@ -1407,14 +1404,28 @@ class _TakeawaySectionPanel extends ConsumerWidget {
                       ),
                     ),
                   ),
+                OutlinedButton.icon(
+                  onPressed: onStartKitchen,
+                  icon: const Icon(Icons.kitchen_outlined, size: 15),
+                  label: const Text('ส่งเข้าครัว', style: TextStyle(fontSize: 12)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.orange.shade700,
+                    side: BorderSide(color: Colors.orange.shade400),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: RoundedRectangleBorder(borderRadius: AppRadius.sm),
+                  ),
+                ),
+                const SizedBox(width: 6),
                 FilledButton.icon(
-                  onPressed: onStartNew,
-                  icon: const Icon(Icons.add, size: 16),
-                  label: const Text('ออเดอร์ใหม่', style: TextStyle(fontSize: 12)),
+                  onPressed: onStartSkipKitchen,
+                  icon: const Icon(Icons.shopping_bag_outlined, size: 15),
+                  label: const Text('พร้อมแล้ว', style: TextStyle(fontSize: 12)),
                   style: FilledButton.styleFrom(
                     backgroundColor: Colors.orange.shade600,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
                     minimumSize: Size.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     shape: RoundedRectangleBorder(borderRadius: AppRadius.sm),
@@ -1725,50 +1736,3 @@ class _TableOptionsSheet extends StatelessWidget {
 // Dialog: เลือกประเภทออเดอร์ Takeaway
 // คืน true = ข้ามครัว (อาหารพร้อม), false = ส่งครัวก่อน (สั่งทำ)
 // ─────────────────────────────────────────────────────────────────
-class _TakeawayTypeDialog extends StatelessWidget {
-  const _TakeawayTypeDialog();
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('ซื้อกลับบ้าน'),
-      content: const Text('อาหารต้องส่งเข้าครัวหรือพร้อมเสิร์ฟแล้ว?'),
-      contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
-      actionsPadding: const EdgeInsets.all(12),
-      actionsAlignment: MainAxisAlignment.center,
-      actions: [
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            icon: const Icon(Icons.kitchen_outlined),
-            label: const Text('ส่งเข้าครัวก่อน\n(สั่งทำ)'),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              textStyle: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            onPressed: () => Navigator.pop(context, false),
-          ),
-        ),
-        const SizedBox(height: 8),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            icon: const Icon(Icons.shopping_bag_outlined),
-            label: const Text('ชำระได้เลย\n(อาหารพร้อมแล้ว)'),
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              textStyle: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            onPressed: () => Navigator.pop(context, true),
-          ),
-        ),
-      ],
-    );
-  }
-}

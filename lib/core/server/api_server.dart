@@ -27,6 +27,7 @@ import 'routes/branch_routes.dart'; // 🆕 Week 7
 import 'routes/user_routes.dart';
 import 'routes/table_routes.dart'; // Restaurant Phase R1
 import 'routes/kitchen_routes.dart'; // Restaurant Phase R2
+import 'routes/modifier_routes.dart'; // Restaurant Modifiers
 import 'routes/setup_routes.dart';
 import 'middleware/auth_middleware.dart';
 import 'middleware/license_middleware.dart';
@@ -185,6 +186,12 @@ class ApiServer {
       router.mount('/api/kitchen', KitchenRoutes(db).router.call);
       if (kDebugMode) {
         debugPrint('   ✅ /api/kitchen');
+      }
+
+      // Modifier routes ✅ Restaurant Modifiers
+      router.mount('/api/modifiers', ModifierRoutes(db).router.call);
+      if (kDebugMode) {
+        debugPrint('   ✅ /api/modifiers');
       }
 
       // Setup / Demo seeding (no auth required — first-time setup)

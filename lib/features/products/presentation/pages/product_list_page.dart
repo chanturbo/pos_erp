@@ -9,6 +9,7 @@ import '../../data/models/product_model.dart';
 import 'barcode_generator_page.dart';
 import 'product_form_page.dart';
 import 'product_group_management_page.dart';
+import 'modifier_management_page.dart';
 import 'product_pdf_report.dart'; // ✅ PDF report
 import '../../../../shared/pdf/pdf_report_button.dart';
 import '../../../../shared/utils/responsive_utils.dart';
@@ -294,6 +295,14 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
                 context,
                 MaterialPageRoute(
                   builder: (_) => const ProductGroupManagementPage(),
+                ),
+              );
+            },
+            onManageModifiers: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const ModifierManagementPage(),
                 ),
               );
             },
@@ -1095,6 +1104,7 @@ class _ProductListTopBar extends StatelessWidget {
   final VoidCallback onToggleView;
   final VoidCallback onRefresh;
   final VoidCallback onManageGroups;
+  final VoidCallback onManageModifiers;
   final VoidCallback onBarcodeGenerator;
   final VoidCallback onAdd;
 
@@ -1111,6 +1121,7 @@ class _ProductListTopBar extends StatelessWidget {
     required this.onToggleView,
     required this.onRefresh,
     required this.onManageGroups,
+    required this.onManageModifiers,
     required this.onBarcodeGenerator,
     required this.onAdd,
   });
@@ -1189,6 +1200,8 @@ class _ProductListTopBar extends StatelessWidget {
         _PRefreshBtn(onTap: onRefresh),
         const SizedBox(width: 6),
         _PManageGroupsBtn(onTap: onManageGroups, compact: true),
+        const SizedBox(width: 6),
+        _PManageModifiersBtn(onTap: onManageModifiers, compact: true),
         const SizedBox(width: 6),
         _PBarcodeBtn(onTap: onBarcodeGenerator, compact: true),
         const SizedBox(width: 6),
@@ -1561,6 +1574,42 @@ class _PManageGroupsBtn extends StatelessWidget {
         color: compact
             ? _ProductListColors.of(context).navButtonBorder
             : AppTheme.primaryColor.withValues(alpha: 0.28),
+      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+    ),
+  );
+}
+
+class _PManageModifiersBtn extends StatelessWidget {
+  final VoidCallback onTap;
+  final bool compact;
+  const _PManageModifiersBtn({required this.onTap, this.compact = false});
+
+  @override
+  Widget build(BuildContext context) => OutlinedButton.icon(
+    onPressed: onTap,
+    icon: const Icon(Icons.tune, size: 18),
+    label: compact
+        ? const SizedBox.shrink()
+        : const Text(
+            'Modifiers',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          ),
+    style: OutlinedButton.styleFrom(
+      foregroundColor: compact ? Colors.white70 : const Color(0xFF7B61FF),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 12 : 16,
+        vertical: 13,
+      ),
+      minimumSize: Size.zero,
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      backgroundColor: compact
+          ? _ProductListColors.of(context).navButtonBg
+          : null,
+      side: BorderSide(
+        color: compact
+            ? _ProductListColors.of(context).navButtonBorder
+            : const Color(0xFF7B61FF).withValues(alpha: 0.28),
       ),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
     ),

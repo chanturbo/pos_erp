@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../products/data/models/product_model.dart';
+import '../../../products/data/models/modifier_model.dart';
+import '../../../products/presentation/providers/modifier_provider.dart';
 import '../providers/cart_provider.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/cart_toast.dart';
@@ -581,8 +583,27 @@ class _ProductGridCard extends ConsumerWidget {
     );
   }
 
-  void _addToCart(
-      BuildContext context, WidgetRef ref, PriceLookupResult lookup) {
+  Future<void> _addToCart(
+      BuildContext context, WidgetRef ref, PriceLookupResult lookup) async {
+    final groups = await ref
+        .read(productModifierGroupsProvider(product.productId).future);
+
+    List<CartItemModifier> modifiers = const [];
+    if (groups.isNotEmpty && context.mounted) {
+      final picked = await showModalBottomSheet<List<CartItemModifier>>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => _ModifierPickerSheet(
+          groups: groups,
+          productName: product.productName,
+          basePrice: lookup.price,
+        ),
+      );
+      if (picked == null) return; // user dismissed
+      modifiers = picked;
+    }
+
     ref.read(cartProvider.notifier).addItem(
           productId: product.productId,
           productCode: product.productCode,
@@ -590,7 +611,7 @@ class _ProductGridCard extends ConsumerWidget {
           unit: product.baseUnit,
           unitPrice: lookup.price,
           groupId: product.groupId,
-          // ✅ ส่งราคาทุก level เก็บไว้ใน CartItem เพื่อ re-price ได้
+          modifiers: modifiers,
           priceLevel1: product.priceLevel1,
           priceLevel2: product.priceLevel2,
           priceLevel3: product.priceLevel3,
@@ -598,6 +619,7 @@ class _ProductGridCard extends ConsumerWidget {
           priceLevel5: product.priceLevel5,
         );
 
+    if (!context.mounted) return;
     if (lookup.isFallback) {
       ref.read(cartToastProvider.notifier).show(
         '⚠ ราคา Lv.${lookup.requestedLevel} ยังไม่ได้ตั้งค่า '
@@ -764,21 +786,25 @@ class _ProductListRow extends ConsumerWidget {
     );
   }
 
-  void _addToCart(
-      BuildContext context, WidgetRef ref, PriceLookupResult lookup) {
-    if (lookup.isFallback) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '⚠ ราคา Lv.${lookup.requestedLevel} ยังไม่ได้ตั้งค่า '
-            '— ใช้ราคาปกติ ฿${lookup.price.toStringAsFixed(2)}',
-          ),
-          backgroundColor: Colors.orange.shade700,
-          duration: const Duration(seconds: 3),
-          behavior: SnackBarBehavior.floating,
-          width: 380,
+  Future<void> _addToCart(
+      BuildContext context, WidgetRef ref, PriceLookupResult lookup) async {
+    final groups = await ref
+        .read(productModifierGroupsProvider(product.productId).future);
+
+    List<CartItemModifier> modifiers = const [];
+    if (groups.isNotEmpty && context.mounted) {
+      final picked = await showModalBottomSheet<List<CartItemModifier>>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => _ModifierPickerSheet(
+          groups: groups,
+          productName: product.productName,
+          basePrice: lookup.price,
         ),
       );
+      if (picked == null) return;
+      modifiers = picked;
     }
 
     ref.read(cartProvider.notifier).addItem(
@@ -788,7 +814,7 @@ class _ProductListRow extends ConsumerWidget {
           unit: product.baseUnit,
           unitPrice: lookup.price,
           groupId: product.groupId,
-          // ✅ ส่งราคาทุก level เก็บไว้ใน CartItem เพื่อ re-price ได้
+          modifiers: modifiers,
           priceLevel1: product.priceLevel1,
           priceLevel2: product.priceLevel2,
           priceLevel3: product.priceLevel3,
@@ -796,16 +822,377 @@ class _ProductListRow extends ConsumerWidget {
           priceLevel5: product.priceLevel5,
         );
 
-    if (!lookup.isFallback) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('เพิ่ม ${product.productName} แล้ว'),
-          duration: const Duration(milliseconds: 500),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: _success,
-          width: 300,
-        ),
-      );
+    if (!context.mounted) return;
+    if (lookup.isFallback) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('⚠ ราคา Lv.${lookup.requestedLevel} ยังไม่ได้ตั้งค่า '
+            '— ใช้ราคาปกติ ฿${lookup.price.toStringAsFixed(2)}'),
+        backgroundColor: Colors.orange.shade700,
+        duration: const Duration(seconds: 3),
+        behavior: SnackBarBehavior.floating,
+        width: 380,
+      ));
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('เพิ่ม ${product.productName} แล้ว'),
+        duration: const Duration(milliseconds: 500),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: _success,
+        width: 300,
+      ));
     }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Modifier Picker Bottom Sheet
+// ─────────────────────────────────────────────────────────────────
+class _ModifierPickerSheet extends StatefulWidget {
+  final List<ModifierGroupModel> groups;
+  final String productName;
+  final double basePrice;
+
+  const _ModifierPickerSheet({
+    required this.groups,
+    required this.productName,
+    required this.basePrice,
+  });
+
+  @override
+  State<_ModifierPickerSheet> createState() =>
+      _ModifierPickerSheetState();
+}
+
+class _ModifierPickerSheetState extends State<_ModifierPickerSheet> {
+  // groupId → selected modifierId(s)
+  late final Map<String, Set<String>> _selections;
+
+  @override
+  void initState() {
+    super.initState();
+    _selections = {};
+    for (final g in widget.groups) {
+      final defaults = g.options
+          .where((o) => o.isDefault)
+          .map((o) => o.modifierId)
+          .toSet();
+      _selections[g.modifierGroupId] =
+          defaults.isNotEmpty ? defaults : {};
+    }
+  }
+
+  double get _totalAdj {
+    double adj = 0;
+    for (final g in widget.groups) {
+      final sel = _selections[g.modifierGroupId] ?? {};
+      for (final opt in g.options) {
+        if (sel.contains(opt.modifierId)) adj += opt.priceAdjustment;
+      }
+    }
+    return adj;
+  }
+
+  bool get _canConfirm {
+    for (final g in widget.groups) {
+      if (!g.isRequired) continue;
+      final sel = _selections[g.modifierGroupId] ?? {};
+      if (sel.isEmpty) return false;
+    }
+    return true;
+  }
+
+  List<CartItemModifier> _buildModifiers() {
+    final result = <CartItemModifier>[];
+    for (final g in widget.groups) {
+      final sel = _selections[g.modifierGroupId] ?? {};
+      for (final opt in g.options) {
+        if (sel.contains(opt.modifierId)) {
+          result.add(CartItemModifier(
+            modifierId: opt.modifierId,
+            modifierName: opt.modifierName,
+            priceAdjustment: opt.priceAdjustment,
+          ));
+        }
+      }
+    }
+    return result;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final totalPrice = widget.basePrice + _totalAdj;
+    final isDark = AppTheme.isDark(context);
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.6,
+      minChildSize: 0.4,
+      maxChildSize: 0.92,
+      builder: (_, scrollCtrl) => Container(
+        decoration: BoxDecoration(
+          color: AppTheme.cardColor(context),
+          borderRadius:
+              const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          children: [
+            // Handle
+            Container(
+              margin: const EdgeInsets.only(top: 10),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppTheme.borderColorOf(context),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+
+            // Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.productName,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.textColorOf(context),
+                          ),
+                        ),
+                        Text(
+                          'เลือกตัวเลือกเพิ่มเติม',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.subtextColorOf(context),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    '฿${totalPrice.toStringAsFixed(2)}',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? _orange : _navy,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const Divider(height: 24),
+
+            // Groups
+            Expanded(
+              child: ListView(
+                controller: scrollCtrl,
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                children: widget.groups.map(_buildGroup).toList(),
+              ),
+            ),
+
+            // Confirm button
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: _canConfirm
+                        ? () => Navigator.pop(
+                            context, _buildModifiers())
+                        : null,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: _orange,
+                      disabledBackgroundColor:
+                          _orange.withValues(alpha: 0.3),
+                      padding:
+                          const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: AppRadius.md),
+                    ),
+                    child: Text(
+                      'เพิ่มลงตะกร้า · ฿${totalPrice.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                          fontSize: 15, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGroup(ModifierGroupModel group) {
+    final sel = _selections[group.modifierGroupId] ?? {};
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              group.groupName,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.textColorOf(context),
+              ),
+            ),
+            const SizedBox(width: 6),
+            if (group.isRequired)
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 6, vertical: 1),
+                decoration: BoxDecoration(
+                  color: AppTheme.errorColor.withValues(alpha: 0.1),
+                  borderRadius: AppRadius.xs,
+                ),
+                child: Text(
+                  'บังคับเลือก',
+                  style: TextStyle(
+                      fontSize: 10,
+                      color: AppTheme.errorColor,
+                      fontWeight: FontWeight.w500),
+                ),
+              )
+            else
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 6, vertical: 1),
+                decoration: BoxDecoration(
+                  color: AppTheme.subtextColorOf(context)
+                      .withValues(alpha: 0.1),
+                  borderRadius: AppRadius.xs,
+                ),
+                child: Text(
+                  'ไม่บังคับ',
+                  style: TextStyle(
+                      fontSize: 10,
+                      color: AppTheme.subtextColorOf(context)),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ...group.options.map((opt) {
+          final isSelected = sel.contains(opt.modifierId);
+          return _OptionTile(
+            option: opt,
+            isSelected: isSelected,
+            isSingle: group.isSingle,
+            onTap: () => setState(() {
+              if (group.isSingle) {
+                _selections[group.modifierGroupId] =
+                    isSelected ? {} : {opt.modifierId};
+              } else {
+                final updated = Set<String>.from(sel);
+                isSelected
+                    ? updated.remove(opt.modifierId)
+                    : updated.add(opt.modifierId);
+                _selections[group.modifierGroupId] = updated;
+              }
+            }),
+          );
+        }),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+}
+
+class _OptionTile extends StatelessWidget {
+  final ModifierOptionModel option;
+  final bool isSelected;
+  final bool isSingle;
+  final VoidCallback onTap;
+
+  const _OptionTile({
+    required this.option,
+    required this.isSelected,
+    required this.isSingle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final adj = option.priceAdjustment;
+    final adjText = adj == 0
+        ? ''
+        : adj > 0
+            ? '+฿${adj.toStringAsFixed(2)}'
+            : '-฿${adj.abs().toStringAsFixed(2)}';
+    final adjColor =
+        adj > 0 ? _success : (adj < 0 ? AppTheme.errorColor : null);
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: AppRadius.sm,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 6),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? _orange.withValues(alpha: 0.08)
+              : AppTheme.surfaceColorOf(context),
+          borderRadius: AppRadius.sm,
+          border: Border.all(
+            color: isSelected
+                ? _orange
+                : AppTheme.borderColorOf(context),
+            width: isSelected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              isSingle
+                  ? (isSelected
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_unchecked)
+                  : (isSelected
+                      ? Icons.check_box
+                      : Icons.check_box_outline_blank),
+              size: 18,
+              color: isSelected
+                  ? _orange
+                  : AppTheme.subtextColorOf(context),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                option.modifierName,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: isSelected
+                      ? FontWeight.w600
+                      : FontWeight.normal,
+                  color: AppTheme.textColorOf(context),
+                ),
+              ),
+            ),
+            if (adjText.isNotEmpty)
+              Text(
+                adjText,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: adjColor ??
+                      AppTheme.subtextColorOf(context),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 }

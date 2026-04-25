@@ -1261,6 +1261,40 @@ class _CartRowState extends ConsumerState<_CartRow> {
                   ),
               ],
             ),
+            if (item.modifiers.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 2, bottom: 2),
+                child: Wrap(
+                  spacing: 4,
+                  runSpacing: 2,
+                  children: item.modifiers.map((m) {
+                    final adj = m.priceAdjustment;
+                    final adjText = adj == 0
+                        ? ''
+                        : adj > 0
+                            ? ' +฿${adj.toStringAsFixed(0)}'
+                            : ' -฿${adj.abs().toStringAsFixed(0)}';
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: _navy.withValues(alpha: 0.07),
+                        borderRadius: AppRadius.xs,
+                        border: Border.all(
+                            color: _navy.withValues(alpha: 0.2)),
+                      ),
+                      child: Text(
+                        '${m.modifierName}$adjText',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: AppTheme.textColorOf(context),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
             if (item.note?.isNotEmpty == true)
               GestureDetector(
                 onTap: () => _showNoteSheet(item),

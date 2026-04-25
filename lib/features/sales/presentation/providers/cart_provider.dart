@@ -345,6 +345,7 @@ class CartNotifier extends Notifier<CartState> {
     required double unitPrice,
     double quantity = 1,
     String? groupId,
+    List<CartItemModifier> modifiers = const [],
     // ✅ รับราคาทุก level เพื่อให้ re-price ได้
     double priceLevel1 = 0,
     double priceLevel2 = 0,
@@ -353,9 +354,12 @@ class CartNotifier extends Notifier<CartState> {
     double priceLevel5 = 0,
   }) {
     final items = List<CartItem>.from(state.items);
-    // merge only into a row that has no note — same product with a note stays separate
+    // merge only into a row with no note and same modifier selection
     final existingIndex = items.indexWhere(
-      (item) => item.productId == productId && (item.note == null || item.note!.isEmpty),
+      (item) =>
+          item.productId == productId &&
+          (item.note == null || item.note!.isEmpty) &&
+          _sameModifiers(item.modifiers, modifiers),
     );
 
     if (existingIndex >= 0) {
@@ -367,7 +371,10 @@ class CartNotifier extends Notifier<CartState> {
         amount: newQuantity * existing.unitPrice,
       );
     } else {
-      // เพิ่มรายการใหม่
+      // modifier price adjustment บวกเข้าไปใน unitPrice
+      final modAdj =
+          modifiers.fold(0.0, (s, m) => s + m.priceAdjustment);
+      final effectivePrice = unitPrice + modAdj;
       final p1 = priceLevel1 > 0 ? priceLevel1 : unitPrice;
       items.add(
         CartItem(
@@ -376,9 +383,10 @@ class CartNotifier extends Notifier<CartState> {
           productName: productName,
           unit: unit,
           quantity: quantity,
-          unitPrice: unitPrice,
-          amount: quantity * unitPrice,
+          unitPrice: effectivePrice,
+          amount: quantity * effectivePrice,
           groupId: groupId,
+          modifiers: modifiers,
           priceLevel1: p1,
           priceLevel2: priceLevel2,
           priceLevel3: priceLevel3,
@@ -389,6 +397,14 @@ class CartNotifier extends Notifier<CartState> {
     }
 
     state = state.copyWith(items: items);
+  }
+
+  static bool _sameModifiers(
+      List<CartItemModifier> a, List<CartItemModifier> b) {
+    if (a.length != b.length) return false;
+    final idsA = a.map((m) => m.modifierId).toSet();
+    final idsB = b.map((m) => m.modifierId).toSet();
+    return idsA.containsAll(idsB);
   }
 
   /// เพิ่มจำนวน
@@ -489,7 +505,10 @@ class CartNotifier extends Notifier<CartState> {
   void repriceItems() {
     final level = state.customerPriceLevel;
     final repriced = state.items.map((item) {
-      final newPrice = item.priceForLevel(level);
+      final basePrice = item.priceForLevel(level);
+      final modAdj =
+          item.modifiers.fold(0.0, (s, m) => s + m.priceAdjustment);
+      final newPrice = basePrice + modAdj;
       return item.copyWith(
         unitPrice: newPrice,
         amount: item.quantity * newPrice,
