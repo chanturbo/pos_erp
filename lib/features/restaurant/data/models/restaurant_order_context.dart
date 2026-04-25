@@ -14,6 +14,7 @@ class RestaurantOrderContext {
   final double? totalOverride;
   final String? paymentTitle;
   final String? splitLabel;
+  final bool skipKitchen;
 
   bool get hasTable => tableId.trim().isNotEmpty;
   bool get hasSession => sessionId.trim().isNotEmpty;
@@ -38,6 +39,7 @@ class RestaurantOrderContext {
     this.totalOverride,
     this.paymentTitle,
     this.splitLabel,
+    this.skipKitchen = false,
   });
 
   factory RestaurantOrderContext.takeaway({
@@ -45,6 +47,7 @@ class RestaurantOrderContext {
     int guestCount = 1,
     String? currentOrderId,
     String? currentOrderNo,
+    bool skipKitchen = false,
   }) =>
       RestaurantOrderContext(
         tableId: '',
@@ -55,6 +58,7 @@ class RestaurantOrderContext {
         serviceType: 'TAKEAWAY',
         currentOrderId: currentOrderId,
         currentOrderNo: currentOrderNo,
+        skipKitchen: skipKitchen,
       );
 
   Map<String, dynamic> toJson() => {
@@ -73,6 +77,7 @@ class RestaurantOrderContext {
         'total_override': totalOverride,
         'payment_title': paymentTitle,
         'split_label': splitLabel,
+        'skip_kitchen': skipKitchen,
       };
 
   factory RestaurantOrderContext.fromJson(Map<String, dynamic> json) =>
@@ -96,6 +101,7 @@ class RestaurantOrderContext {
         totalOverride: (json['total_override'] as num?)?.toDouble(),
         paymentTitle: json['payment_title'] as String?,
         splitLabel: json['split_label'] as String?,
+        skipKitchen: json['skip_kitchen'] as bool? ?? false,
       );
 
   RestaurantOrderContext copyWith({
@@ -114,6 +120,7 @@ class RestaurantOrderContext {
     double? totalOverride,
     String? paymentTitle,
     String? splitLabel,
+    bool? skipKitchen,
   }) =>
       RestaurantOrderContext(
         tableId: tableId ?? this.tableId,
@@ -132,5 +139,6 @@ class RestaurantOrderContext {
         totalOverride: totalOverride ?? this.totalOverride,
         paymentTitle: paymentTitle ?? this.paymentTitle,
         splitLabel: splitLabel ?? this.splitLabel,
+        skipKitchen: skipKitchen ?? this.skipKitchen,
       );
 }

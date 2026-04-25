@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,11 +19,16 @@ class KitchenDisplayPage extends ConsumerStatefulWidget {
   ConsumerState<KitchenDisplayPage> createState() => _KitchenDisplayPageState();
 }
 
+const _kAutoRefreshSeconds = 15;
+
 class _KitchenDisplayPageState extends ConsumerState<KitchenDisplayPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   bool _isFullScreen = false;
   int _lastStationIndex = 0;
+
+  int _countdown = _kAutoRefreshSeconds;
+  Timer? _countdownTimer;
 
   static List<_StationTab> get _stations => [
     const _StationTab(key: null, label: 'ทั้งหมด', icon: Icons.grid_view),
@@ -35,6 +42,22 @@ class _KitchenDisplayPageState extends ConsumerState<KitchenDisplayPage>
     super.initState();
     _tabController = TabController(length: _stations.length, vsync: this);
     _tabController.addListener(_onTabChanged);
+    _startCountdown();
+  }
+
+  void _startCountdown() {
+    _countdownTimer?.cancel();
+    _countdown = _kAutoRefreshSeconds;
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      setState(() {
+        _countdown--;
+        if (_countdown <= 0) {
+          _countdown = _kAutoRefreshSeconds;
+          _doRefresh();
+        }
+      });
+    });
   }
 
   void _onTabChanged() {
@@ -42,8 +65,7 @@ class _KitchenDisplayPageState extends ConsumerState<KitchenDisplayPage>
     _lastStationIndex = _tabController.index;
     final station = _stations[_tabController.index].key;
     ref.read(selectedKitchenStationProvider.notifier).state = station;
-    ref.read(kitchenQueueProvider.notifier).refresh();
-    ref.read(kitchenSummaryProvider.notifier).refresh();
+    _doRefresh();
   }
 
   void _toggleFullScreen() {
@@ -55,13 +77,21 @@ class _KitchenDisplayPageState extends ConsumerState<KitchenDisplayPage>
     }
   }
 
+  Future<void> _doRefresh() async {
+    await ref.read(kitchenQueueProvider.notifier).silentRefresh();
+    ref.read(kitchenSummaryProvider.notifier).refresh();
+  }
+
   void _refreshAll() {
+    _startCountdown();
+    // manual refresh แสดง loading spinner
     ref.read(kitchenQueueProvider.notifier).refresh();
     ref.read(kitchenSummaryProvider.notifier).refresh();
   }
 
   @override
   void dispose() {
+    _countdownTimer?.cancel();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _tabController
       ..removeListener(_onTabChanged)
@@ -82,7 +112,11 @@ class _KitchenDisplayPageState extends ConsumerState<KitchenDisplayPage>
         backgroundColor: AppTheme.navyColor,
         foregroundColor: Colors.white,
         actions: [
-          _RefreshButton(onTap: _refreshAll),
+          _CountdownRefreshButton(
+            countdown: _countdown,
+            total: _kAutoRefreshSeconds,
+            onTap: _refreshAll,
+          ),
           IconButton(
             icon: Icon(
               _isFullScreen ? Icons.fullscreen_exit : Icons.fullscreen,
@@ -861,23 +895,30 @@ class _KdsMessageState extends StatelessWidget {
   }
 }
 
-class _RefreshButton extends StatefulWidget {
-  const _RefreshButton({required this.onTap});
+class _CountdownRefreshButton extends StatefulWidget {
+  const _CountdownRefreshButton({
+    required this.countdown,
+    required this.total,
+    required this.onTap,
+  });
 
+  final int countdown;
+  final int total;
   final VoidCallback onTap;
 
   @override
-  State<_RefreshButton> createState() => _RefreshButtonState();
+  State<_CountdownRefreshButton> createState() =>
+      _CountdownRefreshButtonState();
 }
 
-class _RefreshButtonState extends State<_RefreshButton>
+class _CountdownRefreshButtonState extends State<_CountdownRefreshButton>
     with SingleTickerProviderStateMixin {
-  late AnimationController _ctrl;
+  late AnimationController _spinCtrl;
 
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(
+    _spinCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 600),
     );
@@ -885,24 +926,64 @@ class _RefreshButtonState extends State<_RefreshButton>
 
   @override
   void dispose() {
-    _ctrl.dispose();
+    _spinCtrl.dispose();
     super.dispose();
   }
 
   void _tap() {
-    _ctrl.forward(from: 0);
+    _spinCtrl.forward(from: 0);
     widget.onTap();
   }
 
   @override
-  Widget build(BuildContext context) => RotationTransition(
-    turns: _ctrl,
-    child: IconButton(
-      icon: const Icon(Icons.refresh),
-      tooltip: 'รีเฟรช',
-      onPressed: _tap,
-    ),
-  );
+  Widget build(BuildContext context) {
+    final progress = widget.countdown / widget.total;
+    final isUrgent = widget.countdown <= 5;
+
+    return Tooltip(
+      message: 'อัพเดทใน ${widget.countdown} วิ  (กดเพื่อรีเฟรชทันที)',
+      child: InkWell(
+        onTap: _tap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 22,
+                height: 22,
+                child: RotationTransition(
+                  turns: _spinCtrl,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      CircularProgressIndicator(
+                        value: progress,
+                        strokeWidth: 2.5,
+                        backgroundColor: Colors.white24,
+                        color: isUrgent ? Colors.orangeAccent : Colors.white,
+                      ),
+                      const Icon(Icons.refresh, size: 12, color: Colors.white),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                '${widget.countdown}s',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: isUrgent ? Colors.orangeAccent : Colors.white70,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _Badge extends StatelessWidget {

@@ -382,6 +382,11 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                         ?.currentOrderId
                         ?.isNotEmpty ??
                     false),
+                skipKitchen:
+                    ref
+                        .watch(restaurantOrderContextProvider)
+                        ?.skipKitchen ??
+                    false,
                 isSendingRestaurantOrder: _isSendingRestaurantOrder,
                 onSendToKitchen: _sendRestaurantOrder,
                 onOpenNewBill: () => setState(() => _scanRowSession++),
@@ -1483,6 +1488,7 @@ class _CartSummary extends StatelessWidget {
   final bool showHoldButton;
   final bool isRestaurantFlow;
   final bool isKitchenSent;
+  final bool skipKitchen;
   final bool isSendingRestaurantOrder;
   final VoidCallback? onHold;
   final Future<void> Function()? onSendToKitchen;
@@ -1495,6 +1501,7 @@ class _CartSummary extends StatelessWidget {
     required this.showHoldButton,
     required this.isRestaurantFlow,
     required this.isKitchenSent,
+    required this.skipKitchen,
     required this.isSendingRestaurantOrder,
     required this.onHold,
     this.onSendToKitchen,
@@ -1515,7 +1522,8 @@ class _CartSummary extends StatelessWidget {
     final dividerColor = isDark ? const Color(0xFF333333) : _border;
     final disabledColor = isDark ? const Color(0xFF2A2A2A) : Colors.grey[300];
     final canCheckout =
-        cartState.items.isNotEmpty && (!isRestaurantFlow || isKitchenSent);
+        cartState.items.isNotEmpty &&
+        (!isRestaurantFlow || isKitchenSent || skipKitchen);
 
     return Container(
       decoration: BoxDecoration(
@@ -1660,7 +1668,7 @@ class _CartSummary extends StatelessWidget {
               padding: EdgeInsets.all(density.compactHeight ? 6 : 10),
               child: Row(
                 children: [
-                  if (isRestaurantFlow && !isKitchenSent) ...[
+                  if (isRestaurantFlow && !isKitchenSent && !skipKitchen) ...[
                     Expanded(
                       flex: showCheckoutButton || showHoldButton ? 6 : 1,
                       child: SizedBox(
@@ -1808,7 +1816,8 @@ class _CartSummary extends StatelessWidget {
                                 Icon(
                                   !canCheckout &&
                                           isRestaurantFlow &&
-                                          !isKitchenSent
+                                          !isKitchenSent &&
+                                          !skipKitchen
                                       ? Icons.lock_outline_rounded
                                       : Icons.payment,
                                   size: 18,
@@ -1816,7 +1825,9 @@ class _CartSummary extends StatelessWidget {
                                 const SizedBox(width: 8),
                                 Text(
                                   !canCheckout
-                                      ? (isRestaurantFlow && !isKitchenSent
+                                      ? (isRestaurantFlow &&
+                                                !isKitchenSent &&
+                                                !skipKitchen
                                             ? 'กรุณาส่งเข้าครัวก่อน'
                                             : 'ชำระเงิน')
                                       : (isRestaurantFlow

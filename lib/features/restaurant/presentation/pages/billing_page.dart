@@ -122,6 +122,8 @@ class _BillingPageState extends ConsumerState<BillingPage> {
             scController: _scController,
             applyingSC: _applyingSC,
             onApplySC: () => _applyServiceCharge(bill),
+            onDisableSC: () => _disableServiceCharge(bill),
+            onEnableSC: () => _enableServiceCharge(bill),
             onSplitBill: () => _openSplitBill(bill),
             onMerge: () => _showMergeDialog(),
             onPrintPreBill: () => _printPreBill(bill),
@@ -320,12 +322,25 @@ class _BillingPageState extends ConsumerState<BillingPage> {
       SnackBar(
         content: Text(
           ok
-              ? 'ตั้ง service charge ${rate.toStringAsFixed(0)}% แล้ว'
+              ? rate > 0
+                    ? 'ตั้ง service charge ${rate.toStringAsFixed(0)}% แล้ว'
+                    : 'ปิด service charge แล้ว'
               : 'ไม่สามารถตั้ง service charge ได้',
         ),
         backgroundColor: ok ? AppTheme.successColor : AppTheme.errorColor,
       ),
     );
+  }
+
+  Future<void> _disableServiceCharge(BillModel bill) async {
+    _scController.text = '0';
+    await _applyServiceCharge(bill);
+  }
+
+  Future<void> _enableServiceCharge(BillModel bill) async {
+    final defaultRate = ref.read(settingsProvider).defaultServiceChargeRate;
+    _scController.text = _formatServiceChargeRate(defaultRate > 0 ? defaultRate : 10);
+    await _applyServiceCharge(bill);
   }
 
   Future<void> _openSplitBill(BillModel bill) async {
@@ -534,6 +549,8 @@ class _BillBody extends StatelessWidget {
   final TextEditingController scController;
   final bool applyingSC;
   final VoidCallback onApplySC;
+  final VoidCallback onDisableSC;
+  final VoidCallback onEnableSC;
   final VoidCallback onSplitBill;
   final VoidCallback onMerge;
   final VoidCallback onPrintPreBill;
@@ -547,6 +564,8 @@ class _BillBody extends StatelessWidget {
     required this.scController,
     required this.applyingSC,
     required this.onApplySC,
+    required this.onDisableSC,
+    required this.onEnableSC,
     required this.onSplitBill,
     required this.onMerge,
     required this.onPrintPreBill,
@@ -635,36 +654,66 @@ class _BillBody extends StatelessWidget {
               if (canManageTable) ...[
                 _SectionCard(
                   title: 'Service Charge',
-                  child: Row(
+                  child: Column(
                     children: [
-                      Expanded(
-                        child: TextField(
-                          controller: scController,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
+                      Row(
+                        children: [
+                          Switch(
+                            value: bill.hasServiceCharge,
+                            onChanged: applyingSC
+                                ? null
+                                : (val) =>
+                                      val ? onEnableSC() : onDisableSC(),
                           ),
-                          decoration: const InputDecoration(
-                            suffixText: '%',
-                            labelText: 'อัตรา',
-                            isDense: true,
-                            border: OutlineInputBorder(),
+                          const SizedBox(width: 8),
+                          Text(
+                            bill.hasServiceCharge
+                                ? 'เปิดใช้งาน'
+                                : 'ปิดใช้งาน',
+                            style: TextStyle(
+                              color: bill.hasServiceCharge
+                                  ? AppTheme.successColor
+                                  : AppTheme.subtextColor,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
-                        ),
+                          if (applyingSC) ...[
+                            const SizedBox(width: 8),
+                            const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          ],
+                        ],
                       ),
-                      const SizedBox(width: 12),
-                      FilledButton(
-                        onPressed: applyingSC ? null : onApplySC,
-                        child: applyingSC
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
+                      if (bill.hasServiceCharge) ...[
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: scController,
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                  decimal: true,
                                 ),
-                              )
-                            : const Text('ใช้'),
-                      ),
+                                decoration: const InputDecoration(
+                                  suffixText: '%',
+                                  labelText: 'อัตรา',
+                                  isDense: true,
+                                  border: OutlineInputBorder(),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            FilledButton(
+                              onPressed: applyingSC ? null : onApplySC,
+                              child: const Text('ใช้'),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),

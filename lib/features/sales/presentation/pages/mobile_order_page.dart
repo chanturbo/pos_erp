@@ -1096,11 +1096,12 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
 
     if (holdName == null || holdName.trim().isEmpty) return;
 
-    final isTakeaway =
-        ref.read(restaurantOrderContextProvider)?.isTakeaway ?? false;
+    final holdCtx = ref.read(restaurantOrderContextProvider);
+    final isTakeaway = holdCtx?.isTakeaway ?? false;
+    final skipKitchen = holdCtx?.skipKitchen ?? false;
     ref
         .read(cartProvider.notifier)
-        .hold(holdName.trim(), isTakeaway: isTakeaway);
+        .hold(holdName.trim(), isTakeaway: isTakeaway, skipKitchen: skipKitchen);
     if (!mounted) return;
     ScaffoldMessenger.of(
       context,
@@ -1470,11 +1471,12 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
     final isRestaurantFlow = restaurantContext != null;
     final isKitchenSent =
         restaurantContext?.currentOrderId?.isNotEmpty ?? false;
+    final skipKitchen = restaurantContext?.skipKitchen ?? false;
     final isReadyForCheckout =
         cartState.items.isNotEmpty &&
         selectedBranch != null &&
         selectedWarehouse != null &&
-        (!isRestaurantFlow || isKitchenSent);
+        (!isRestaurantFlow || isKitchenSent || skipKitchen);
     final autoOpenCartOnTap = settings.mobilePosAutoOpenCartOnTap;
 
     final expectedFavoriteScope = _favoriteScopeKey(
@@ -1866,7 +1868,7 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                               ),
                             ),
                           ),
-                          if (isRestaurantFlow) ...[
+                          if (isRestaurantFlow && !skipKitchen) ...[
                             const SizedBox(width: 8),
                             Container(
                               padding: const EdgeInsets.symmetric(
@@ -3203,7 +3205,9 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                           icon: Icon(
                             selectedBranch == null || selectedWarehouse == null
                                 ? Icons.settings_ethernet_rounded
-                                : isRestaurantFlow && !isKitchenSent
+                                : isRestaurantFlow &&
+                                      !isKitchenSent &&
+                                      !skipKitchen
                                 ? Icons.lock_outline_rounded
                                 : Icons.payment_rounded,
                             size: 18,
@@ -3211,7 +3215,9 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                           label: Text(
                             cartState.items.isEmpty
                                 ? 'ชำระเงิน'
-                                : isRestaurantFlow && !isKitchenSent
+                                : isRestaurantFlow &&
+                                      !isKitchenSent &&
+                                      !skipKitchen
                                 ? 'กรุณาส่งเข้าครัวก่อน'
                                 : 'ชำระเงิน  ฿${cartState.total.toStringAsFixed(2)}',
                             style: const TextStyle(

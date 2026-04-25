@@ -5,6 +5,7 @@ import '../../../../shared/widgets/busy_overlay.dart';
 import '../../data/models/dining_table_model.dart';
 import '../providers/table_provider.dart';
 import '../../../branches/presentation/providers/branch_provider.dart';
+import '../../../users/presentation/providers/user_provider.dart';
 
 class WaiterManagementPage extends ConsumerStatefulWidget {
   const WaiterManagementPage({super.key});
@@ -108,70 +109,39 @@ class _WaiterManagementPageState extends ConsumerState<WaiterManagementPage> {
 
   Future<void> _showAssignDialog(
       BuildContext context, DiningTableModel table) async {
-    final nameCtrl =
-        TextEditingController(text: table.waiterName ?? '');
-    await showDialog(
+    final selected = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('กำหนดพนักงาน — ${table.displayName}'),
-        content: TextField(
-          controller: nameCtrl,
-          autofocus: true,
-          decoration: const InputDecoration(
-            labelText: 'ชื่อพนักงานเสิร์ฟ',
-            prefixIcon: Icon(Icons.badge),
-            border: OutlineInputBorder(),
-          ),
-          textCapitalization: TextCapitalization.words,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('ยกเลิก'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-                backgroundColor: AppTheme.primaryColor),
-            onPressed: () async {
-              final name = nameCtrl.text.trim();
-              Navigator.pop(ctx);
-              if (name.isEmpty) return;
-              setState(() => _busyMessage = 'กำลังกำหนดพนักงานเสิร์ฟ...');
-              try {
-                await ref
-                    .read(tableListProvider.notifier)
-                    .assignWaiter(table.tableId, name);
-                final branchId =
-                    ref.read(selectedBranchProvider)?.branchId;
-                await ref
-                    .read(tableListProvider.notifier)
-                    .refresh(branchId: branchId);
-                if (mounted) {
-                  ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(
-                    content: Text('กำหนดพนักงาน $name แล้ว'),
-                    backgroundColor: AppTheme.successColor,
-                    behavior: SnackBarBehavior.floating,
-                  ));
-                }
-              } catch (_) {
-                if (mounted) {
-                  ScaffoldMessenger.of(this.context).showSnackBar(const SnackBar(
-                    content: Text('เกิดข้อผิดพลาด ลองใหม่อีกครั้ง'),
-                    backgroundColor: AppTheme.errorColor,
-                  ));
-                }
-              } finally {
-                if (mounted) setState(() => _busyMessage = null);
-              }
-            },
-            child: const Text('บันทึก'),
-          ),
-        ],
+      builder: (ctx) => _AssignWaiterDialog(
+        tableName: table.displayName,
+        currentWaiter: table.waiterName,
       ),
     );
-    nameCtrl.dispose();
+    if (selected == null || !mounted) return;
+
+    setState(() => _busyMessage = 'กำลังกำหนดพนักงานเสิร์ฟ...');
+    try {
+      await ref
+          .read(tableListProvider.notifier)
+          .assignWaiter(table.tableId, selected);
+      final branchId = ref.read(selectedBranchProvider)?.branchId;
+      await ref.read(tableListProvider.notifier).refresh(branchId: branchId);
+      if (mounted) {
+        ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(
+          content: Text('กำหนดพนักงาน $selected แล้ว'),
+          backgroundColor: AppTheme.successColor,
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(this.context).showSnackBar(const SnackBar(
+          content: Text('เกิดข้อผิดพลาด ลองใหม่อีกครั้ง'),
+          backgroundColor: AppTheme.errorColor,
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _busyMessage = null);
+    }
   }
 }
 
@@ -471,6 +441,170 @@ class _EmptyState extends StatelessWidget {
               style: TextStyle(color: Colors.grey.shade400),
             ),
           ],
+        ),
+      );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Dialog: เลือกพนักงานเสิร์ฟจาก user list หรือพิมพ์ชื่อเอง
+// คืน String ชื่อที่เลือก หรือ null ถ้ายกเลิก
+// ─────────────────────────────────────────────────────────────────
+class _AssignWaiterDialog extends ConsumerStatefulWidget {
+  const _AssignWaiterDialog({
+    required this.tableName,
+    this.currentWaiter,
+  });
+
+  final String tableName;
+  final String? currentWaiter;
+
+  @override
+  ConsumerState<_AssignWaiterDialog> createState() =>
+      _AssignWaiterDialogState();
+}
+
+class _AssignWaiterDialogState extends ConsumerState<_AssignWaiterDialog> {
+  final _customCtrl = TextEditingController();
+  bool _showCustomInput = false;
+
+  @override
+  void dispose() {
+    _customCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final usersAsync = ref.watch(userListProvider);
+
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Text('กำหนดพนักงาน — ${widget.tableName}'),
+      contentPadding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      content: SizedBox(
+        width: 320,
+        child: usersAsync.when(
+          loading: () => const SizedBox(
+            height: 80,
+            child: Center(child: CircularProgressIndicator()),
+          ),
+          error: (e, _) => _customInputSection(),
+          data: (users) {
+            final activeUsers = users.where((u) => u.isActive).toList();
+            if (activeUsers.isEmpty) return _customInputSection();
+
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'เลือกจากรายชื่อ',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.subtextColor,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 240),
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: activeUsers.length,
+                    separatorBuilder: (context, _) =>
+                        const Divider(height: 1),
+                    itemBuilder: (_, i) {
+                      final user = activeUsers[i];
+                      final isCurrent =
+                          user.fullName == widget.currentWaiter;
+                      return ListTile(
+                        dense: true,
+                        leading: CircleAvatar(
+                          radius: 16,
+                          backgroundColor:
+                              AppTheme.primaryColor.withValues(alpha: 0.12),
+                          child: Text(
+                            user.fullName.isNotEmpty
+                                ? user.fullName[0].toUpperCase()
+                                : '?',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.primaryColor,
+                            ),
+                          ),
+                        ),
+                        title: Text(user.fullName),
+                        subtitle: user.roleName != null
+                            ? Text(
+                                user.roleName!,
+                                style: const TextStyle(fontSize: 11),
+                              )
+                            : null,
+                        trailing: isCurrent
+                            ? const Icon(
+                                Icons.check_circle,
+                                color: AppTheme.successColor,
+                                size: 18,
+                              )
+                            : null,
+                        onTap: () =>
+                            Navigator.pop(context, user.fullName),
+                      );
+                    },
+                  ),
+                ),
+                const Divider(height: 20),
+                if (!_showCustomInput)
+                  TextButton.icon(
+                    icon: const Icon(Icons.edit, size: 16),
+                    label: const Text('พิมพ์ชื่ออื่น'),
+                    onPressed: () =>
+                        setState(() => _showCustomInput = true),
+                  )
+                else
+                  _customInputSection(),
+              ],
+            );
+          },
+        ),
+      ),
+      actionsPadding: const EdgeInsets.all(12),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('ยกเลิก'),
+        ),
+        if (_showCustomInput)
+          FilledButton(
+            style: FilledButton.styleFrom(
+                backgroundColor: AppTheme.primaryColor),
+            onPressed: () {
+              final name = _customCtrl.text.trim();
+              if (name.isEmpty) return;
+              Navigator.pop(context, name);
+            },
+            child: const Text('บันทึก'),
+          ),
+      ],
+    );
+  }
+
+  Widget _customInputSection() => Padding(
+        padding: const EdgeInsets.only(top: 4, bottom: 8),
+        child: TextField(
+          controller: _customCtrl,
+          autofocus: _showCustomInput,
+          decoration: const InputDecoration(
+            labelText: 'ชื่อพนักงานเสิร์ฟ',
+            prefixIcon: Icon(Icons.badge),
+            border: OutlineInputBorder(),
+            isDense: true,
+          ),
+          textCapitalization: TextCapitalization.words,
+          onSubmitted: (v) {
+            if (v.trim().isNotEmpty) Navigator.pop(context, v.trim());
+          },
         ),
       );
 }

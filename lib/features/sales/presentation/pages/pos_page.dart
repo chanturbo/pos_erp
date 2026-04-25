@@ -215,8 +215,10 @@ class _PosPageState extends ConsumerState<PosPage> {
     );
     if (result == null || result.isEmpty) return;
 
-    final isTakeaway = ref.read(restaurantOrderContextProvider)?.isTakeaway ?? false;
-    ref.read(cartProvider.notifier).hold(result, isTakeaway: isTakeaway);
+    final ctx = ref.read(restaurantOrderContextProvider);
+    final isTakeaway = ctx?.isTakeaway ?? false;
+    final skipKitchen = ctx?.skipKitchen ?? false;
+    ref.read(cartProvider.notifier).hold(result, isTakeaway: isTakeaway, skipKitchen: skipKitchen);
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(

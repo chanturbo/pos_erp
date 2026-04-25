@@ -737,6 +737,12 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
   }
 
   Future<void> _startTakeawayOrder() async {
+    final skipKitchen = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => const _TakeawayTypeDialog(),
+    );
+    if (skipKitchen == null || !mounted) return;
+
     final cartState = ref.read(cartProvider);
     final hasPendingCart =
         cartState.items.isNotEmpty ||
@@ -752,7 +758,11 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
       final baseName =
           'ซื้อกลับ ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
       autoHoldName = _uniqueHoldName(baseName);
-      ref.read(cartProvider.notifier).hold(autoHoldName, isTakeaway: true);
+      ref.read(cartProvider.notifier).hold(
+        autoHoldName,
+        isTakeaway: true,
+        skipKitchen: skipKitchen,
+      );
       // hold() clears the cart internally
     }
 
@@ -760,6 +770,7 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
         .read(restaurantOrderContextProvider.notifier)
         .state = RestaurantOrderContext.takeaway(
       branchId: ref.read(selectedBranchProvider)?.branchId ?? '',
+      skipKitchen: skipKitchen,
     );
 
     if (!mounted) return;
@@ -791,6 +802,11 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
   }
 
   Future<void> _resumeTakeawayHold(int index) async {
+    // อ่าน skipKitchen จาก hold order ก่อน recall เพื่อ restore context ได้ถูกต้อง
+    final holdOrders = ref.read(holdOrdersProvider).orders;
+    final recalledSkipKitchen =
+        index < holdOrders.length ? holdOrders[index].skipKitchen : false;
+
     final cartState = ref.read(cartProvider);
     final hasPendingCart =
         cartState.items.isNotEmpty ||
@@ -801,16 +817,18 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
 
     if (hasPendingCart) {
       // Auto-hold current cart before recalling — prevents merging two customers' orders
-      // Use the existing context to determine isTakeaway, not always true
-      final existingIsTakeaway =
-          ref.read(restaurantOrderContextProvider)?.isTakeaway ?? false;
+      final existingCtx = ref.read(restaurantOrderContextProvider);
+      final existingIsTakeaway = existingCtx?.isTakeaway ?? false;
+      final existingSkipKitchen = existingCtx?.skipKitchen ?? false;
       final now = DateTime.now();
       final holdName = _uniqueHoldName(
         'ซื้อกลับ ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}',
       );
-      ref
-          .read(cartProvider.notifier)
-          .hold(holdName, isTakeaway: existingIsTakeaway);
+      ref.read(cartProvider.notifier).hold(
+        holdName,
+        isTakeaway: existingIsTakeaway,
+        skipKitchen: existingSkipKitchen,
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -826,6 +844,7 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
         .read(restaurantOrderContextProvider.notifier)
         .state = RestaurantOrderContext.takeaway(
       branchId: ref.read(selectedBranchProvider)?.branchId ?? '',
+      skipKitchen: recalledSkipKitchen,
     );
     if (!mounted) return;
     Navigator.push(context, MaterialPageRoute(builder: (_) => const PosPage()));
@@ -1752,5 +1771,51 @@ class _TableOptionsSheet extends StatelessWidget {
   String _formatTime(DateTime? dt) {
     if (dt == null) return '-';
     return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Dialog: เลือกประเภทออเดอร์ Takeaway
+// คืน true = ข้ามครัว (อาหารพร้อม), false = ส่งครัวก่อน (สั่งทำ)
+// ─────────────────────────────────────────────────────────────────
+class _TakeawayTypeDialog extends StatelessWidget {
+  const _TakeawayTypeDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('ซื้อกลับบ้าน'),
+      content: const Text('อาหารต้องส่งเข้าครัวหรือพร้อมเสิร์ฟแล้ว?'),
+      contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+      actionsPadding: const EdgeInsets.all(12),
+      actionsAlignment: MainAxisAlignment.center,
+      actions: [
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            icon: const Icon(Icons.kitchen_outlined),
+            label: const Text('ส่งเข้าครัวก่อน\n(สั่งทำ)'),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            ),
+            onPressed: () => Navigator.pop(context, false),
+          ),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            icon: const Icon(Icons.shopping_bag_outlined),
+            label: const Text('ชำระได้เลย\n(อาหารพร้อมแล้ว)'),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            ),
+            onPressed: () => Navigator.pop(context, true),
+          ),
+        ),
+      ],
+    );
   }
 }

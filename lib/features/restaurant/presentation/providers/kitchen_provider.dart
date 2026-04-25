@@ -23,20 +23,10 @@ final kitchenQueueProvider =
     );
 
 class KitchenQueueNotifier extends AsyncNotifier<List<KitchenQueueItemModel>> {
-  Timer? _pollingTimer;
-
   @override
   Future<List<KitchenQueueItemModel>> build() async {
     final auth = ref.watch(authProvider);
     if (auth.isRestoring || !auth.isAuthenticated) return [];
-
-    // เริ่ม auto-refresh ทุก 15 วินาที
-    _pollingTimer?.cancel();
-    _pollingTimer = Timer.periodic(const Duration(seconds: 15), (_) {
-      _silentRefresh();
-    });
-    ref.onDispose(() => _pollingTimer?.cancel());
-
     return _load();
   }
 
@@ -65,7 +55,7 @@ class KitchenQueueNotifier extends AsyncNotifier<List<KitchenQueueItemModel>> {
     state = await AsyncValue.guard(_load);
   }
 
-  Future<void> _silentRefresh() async {
+  Future<void> silentRefresh() async {
     try {
       final prev = state.asData?.value ?? [];
       final prevIds = prev.map((i) => i.itemId).toSet();
