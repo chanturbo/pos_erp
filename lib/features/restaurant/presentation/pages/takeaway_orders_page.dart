@@ -1051,141 +1051,170 @@ class _TakeawayOrderCard extends StatelessWidget {
   final VoidCallback onTap;
   final bool isHighlighted;
 
+  static const _avatarPalette = [
+    AppTheme.primaryColor,
+    AppTheme.infoColor,
+    AppTheme.successColor,
+    AppTheme.warningColor,
+    AppTheme.purpleColor,
+    AppTheme.tealColor,
+  ];
+
   @override
   Widget build(BuildContext context) {
     final status = order.status.toUpperCase();
-    final (statusBackground, statusForeground) = _statusColors(status);
+    final (statusBg, statusFg, statusLabel) = _statusStyle(status);
+    final isDark = AppTheme.isDark(context);
+
+    final label = order.orderNo.isNotEmpty ? order.orderNo : '?';
+    final initial = label.substring(0, 1).toUpperCase();
+    final avatarColor =
+        _avatarPalette[label.codeUnitAt(0) % _avatarPalette.length];
+
+    final customerName = order.customerName?.trim().isNotEmpty == true
+        ? order.customerName!
+        : 'ลูกค้าทั่วไป';
 
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 350),
+      duration: const Duration(milliseconds: 300),
       curve: Curves.easeOut,
       decoration: BoxDecoration(
         borderRadius: AppRadius.md,
-        boxShadow: [
-          if (isHighlighted)
-            BoxShadow(
-              color: AppTheme.primaryColor.withValues(alpha: 0.22),
-              blurRadius: 24,
-              spreadRadius: 1,
-              offset: const Offset(0, 10),
-            ),
-        ],
+        boxShadow: isHighlighted
+            ? [
+                BoxShadow(
+                  color: AppTheme.primaryColor.withValues(alpha: 0.18),
+                  blurRadius: 18,
+                  spreadRadius: 1,
+                  offset: const Offset(0, 6),
+                ),
+              ]
+            : null,
       ),
       child: Card(
+        elevation: 0,
+        margin: EdgeInsets.zero,
         clipBehavior: Clip.antiAlias,
         color: isHighlighted
-            ? const Color(0xFFFFF8E6)
-            : Theme.of(context).cardColor,
+            ? (isDark ? const Color(0xFF2A2000) : const Color(0xFFFFF8E6))
+            : AppTheme.cardColor(context),
         shape: RoundedRectangleBorder(
           borderRadius: AppRadius.md,
           side: BorderSide(
             color: isHighlighted
-                ? AppTheme.primaryColor.withValues(alpha: 0.75)
+                ? AppTheme.primaryColor.withValues(alpha: 0.6)
                 : AppTheme.borderColorOf(context),
-            width: isHighlighted ? 1.6 : 1,
+            width: isHighlighted ? 1.5 : 1,
           ),
         ),
         child: InkWell(
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            padding: const EdgeInsets.all(12),
+            child: Row(
               children: [
-                Row(
+                // ── Avatar ──────────────────────────────────────
+                Stack(
+                  clipBehavior: Clip.none,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primaryColor.withValues(alpha: 0.12),
-                        borderRadius: AppRadius.md,
-                      ),
-                      child: Icon(
-                        isHighlighted
-                            ? Icons.notifications_active_outlined
-                            : Icons.takeout_dining,
-                        color: AppTheme.primaryColor,
+                    CircleAvatar(
+                      radius: 22,
+                      backgroundColor: avatarColor,
+                      child: Text(
+                        initial,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            order.orderNo,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
+                    if (isHighlighted)
+                      Positioned(
+                        right: -3,
+                        top: -3,
+                        child: Container(
+                          width: 14,
+                          height: 14,
+                          decoration: BoxDecoration(
+                            color: AppTheme.primaryColor,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: AppTheme.cardColor(context),
+                              width: 1.5,
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            order.customerName?.trim().isNotEmpty == true
-                                ? order.customerName!
-                                : 'ลูกค้าทั่วไป',
-                            style: TextStyle(
-                              color: AppTheme.mutedTextOf(context),
+                          child: const Icon(
+                            Icons.fiber_new_rounded,
+                            size: 8,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(width: 12),
+
+                // ── Info ─────────────────────────────────────────
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // บิลเลข + status badge
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              order.orderNo,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: AppTheme.textColorOf(context),
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
+                          ),
+                          const SizedBox(width: 8),
+                          _StatusBadge(
+                            label: statusLabel,
+                            background: statusBg,
+                            foreground: statusFg,
                           ),
                         ],
                       ),
-                    ),
-                    const Icon(Icons.chevron_right),
-                  ],
-                ),
-                if (isHighlighted) ...[
-                  const SizedBox(height: 10),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryColor.withValues(alpha: 0.1),
-                      borderRadius: AppRadius.md,
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.fiber_new_rounded,
-                          size: 18,
-                          color: AppTheme.primaryColor,
+                      const SizedBox(height: 3),
+                      // ชื่อลูกค้า
+                      Text(
+                        customerName,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.subtextColorOf(context),
                         ),
-                        SizedBox(width: 6),
-                        Text(
-                          'บิลใหม่',
-                          style: TextStyle(
-                            color: AppTheme.primaryColor,
-                            fontWeight: FontWeight.w700,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 6),
+                      // Meta chips row
+                      Row(
+                        children: [
+                          _MetaChip(
+                            icon: Icons.payments_outlined,
+                            label: '฿${order.totalAmount.toStringAsFixed(2)}',
                           ),
-                        ),
-                      ],
-                    ),
+                          const SizedBox(width: 6),
+                          _MetaChip(
+                            icon: Icons.schedule,
+                            label: _formatTime(order.orderDate),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                ],
-                const SizedBox(height: 14),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _MetaChip(
-                      icon: Icons.payments_outlined,
-                      label: '฿${order.totalAmount.toStringAsFixed(2)}',
-                    ),
-                    _MetaChip(
-                      icon: Icons.schedule,
-                      label: _formatOrderDate(order.orderDate),
-                    ),
-                    _MetaChip(
-                      icon: Icons.flag_outlined,
-                      label: status,
-                      backgroundColor: statusBackground,
-                      foregroundColor: statusForeground,
-                      borderColor: statusForeground.withValues(alpha: 0.18),
-                    ),
-                  ],
+                ),
+                const SizedBox(width: 8),
+                Icon(
+                  Icons.chevron_right,
+                  size: 20,
+                  color: AppTheme.subtextColorOf(context),
                 ),
               ],
             ),
@@ -1195,24 +1224,82 @@ class _TakeawayOrderCard extends StatelessWidget {
     );
   }
 
-  (Color, Color) _statusColors(String status) {
+  (Color, Color, String) _statusStyle(String status) {
     switch (status) {
       case 'COMPLETED':
-        return (const Color(0xFFE8F5E9), const Color(0xFF2E7D32));
+        return (
+          const Color(0xFFE8F5E9),
+          const Color(0xFF2E7D32),
+          'ปิดแล้ว',
+        );
       case 'CANCELLED':
-        return (const Color(0xFFFFEBEE), const Color(0xFFC62828));
+        return (
+          const Color(0xFFFFEBEE),
+          const Color(0xFFC62828),
+          'ยกเลิก',
+        );
       case 'OPEN':
       default:
-        return (const Color(0xFFFFF3E0), const Color(0xFFE65100));
+        return (
+          const Color(0xFFFFF3E0),
+          const Color(0xFFE65100),
+          'ค้างอยู่',
+        );
     }
   }
 
-  String _formatOrderDate(DateTime date) {
+  String _formatTime(DateTime date) {
     final hh = date.hour.toString().padLeft(2, '0');
     final mm = date.minute.toString().padLeft(2, '0');
-    final dd = date.day.toString().padLeft(2, '0');
-    final month = date.month.toString().padLeft(2, '0');
-    return '$dd/$month/${date.year} $hh:$mm';
+    return '$hh:$mm';
+  }
+}
+
+// ─── Status Badge ─────────────────────────────────────────────────────────────
+
+class _StatusBadge extends StatelessWidget {
+  const _StatusBadge({
+    required this.label,
+    required this.background,
+    required this.foreground,
+  });
+
+  final String label;
+  final Color background;
+  final Color foreground;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: foreground.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 5,
+            height: 5,
+            decoration: BoxDecoration(
+              color: foreground,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: foreground,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -1222,22 +1309,16 @@ class _MetaChip extends StatelessWidget {
   const _MetaChip({
     required this.icon,
     required this.label,
-    this.backgroundColor,
-    this.foregroundColor,
-    this.borderColor,
   });
 
   final IconData icon;
   final String label;
-  final Color? backgroundColor;
-  final Color? foregroundColor;
-  final Color? borderColor;
 
   @override
   Widget build(BuildContext context) {
-    final bg = backgroundColor ?? AppTheme.surface3Of(context);
-    final fg = foregroundColor ?? AppTheme.mutedTextOf(context);
-    final border = borderColor ?? AppTheme.inputBorderOf(context);
+    final bg = AppTheme.surface3Of(context);
+    final fg = AppTheme.mutedTextOf(context);
+    final border = AppTheme.inputBorderOf(context);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
