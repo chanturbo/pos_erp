@@ -757,14 +757,16 @@ class HoldOrdersNotifier extends Notifier<HoldOrdersState> {
 
   @override
   HoldOrdersState build() {
-    final authState = ref.watch(authProvider);
-    final scope = _scopeKey(authState.user?.userId);
+    // Watch only userId — prevents spurious rebuilds from isRestoring/isLoading changes
+    final userId = ref.watch(authProvider.select((a) => a.user?.userId));
+    final scope = _scopeKey(userId);
 
     if (_restoredScope != scope) {
       _restoredScope = scope;
       Future.microtask(() => _restore(scope));
+      return HoldOrdersState();
     }
-    return HoldOrdersState();
+    return state;
   }
 
   void addOrder(String name, CartState cartState, {bool isTakeaway = false, bool skipKitchen = false}) {
@@ -817,6 +819,17 @@ class HoldOrdersNotifier extends Notifier<HoldOrdersState> {
       );
       removeOrder(index);
     }
+  }
+
+  /// ลบ hold orders ที่เป็น takeaway และมี kitchenSentItems
+  /// (items เหล่านั้นถูก track ใน DB แล้ว หลังชำระเงินแล้ว hold นี้เป็น stale)
+  void removeKitchenSentTakeawayHolds() {
+    final filtered = state.orders
+        .where((o) => !(o.isTakeaway && o.cartState.hasKitchenSentItems))
+        .toList();
+    if (filtered.length == state.orders.length) return;
+    state = state.copyWith(orders: filtered);
+    _persist();
   }
 
   CartState _mergeCartStates(CartState current, CartState recalled) {

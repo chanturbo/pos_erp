@@ -332,7 +332,10 @@ class _HoldOrdersDialogState extends ConsumerState<HoldOrdersDialog> {
                               if (order.isTakeaway) {
                                 final branchId = ref.read(selectedBranchProvider)?.branchId ?? '';
                                 ref.read(restaurantOrderContextProvider.notifier).state =
-                                    RestaurantOrderContext.takeaway(branchId: branchId);
+                                    RestaurantOrderContext.takeaway(
+                                      branchId: branchId,
+                                      skipKitchen: order.skipKitchen,
+                                    );
                               }
                               Navigator.pop(context);
 

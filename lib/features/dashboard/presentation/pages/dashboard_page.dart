@@ -15,6 +15,10 @@ class DashboardPage extends ConsumerWidget {
   final VoidCallback? onGoToCustomers;
   final VoidCallback? onGoToSalesHistory;
   final bool showBackButton;
+  final bool isRestaurantMode;
+  final VoidCallback? onGoToTakeaway;
+  final VoidCallback? onGoToTakeawayKitchen;
+  final VoidCallback? onGoToTableOverview;
 
   /// เปิดหน้ารายการขาย กรองเฉพาะวันนี้ (ใช้ตอนกด card ยอดขายวันนี้/ออเดอร์วันนี้)
   final VoidCallback? onGoToTodaySales;
@@ -31,6 +35,10 @@ class DashboardPage extends ConsumerWidget {
     this.onGoToTodaySales,
     this.onGoToMonthSales,
     this.showBackButton = true,
+    this.isRestaurantMode = false,
+    this.onGoToTakeaway,
+    this.onGoToTakeawayKitchen,
+    this.onGoToTableOverview,
   });
 
   @override
@@ -95,6 +103,10 @@ class DashboardPage extends ConsumerWidget {
             onGoToSalesHistory: onGoToSalesHistory,
             onGoToTodaySales: onGoToTodaySales,
             onGoToMonthSales: onGoToMonthSales,
+            isRestaurantMode: isRestaurantMode,
+            onGoToTakeaway: onGoToTakeaway,
+            onGoToTakeawayKitchen: onGoToTakeawayKitchen,
+            onGoToTableOverview: onGoToTableOverview,
           ),
         ),
       ),
@@ -113,6 +125,10 @@ class _DashboardBody extends StatelessWidget {
   final VoidCallback? onGoToSalesHistory;
   final VoidCallback? onGoToTodaySales;
   final VoidCallback? onGoToMonthSales;
+  final bool isRestaurantMode;
+  final VoidCallback? onGoToTakeaway;
+  final VoidCallback? onGoToTakeawayKitchen;
+  final VoidCallback? onGoToTableOverview;
 
   const _DashboardBody({
     required this.stats,
@@ -122,6 +138,10 @@ class _DashboardBody extends StatelessWidget {
     this.onGoToSalesHistory,
     this.onGoToTodaySales,
     this.onGoToMonthSales,
+    this.isRestaurantMode = false,
+    this.onGoToTakeaway,
+    this.onGoToTakeawayKitchen,
+    this.onGoToTableOverview,
   });
 
   @override
@@ -149,6 +169,10 @@ class _DashboardBody extends StatelessWidget {
                         onGoToProducts: onGoToProducts,
                         onGoToCustomers: onGoToCustomers,
                         onGoToSalesHistory: onGoToSalesHistory,
+                        isRestaurantMode: isRestaurantMode,
+                        onGoToTakeaway: onGoToTakeaway,
+                        onGoToTakeawayKitchen: onGoToTakeawayKitchen,
+                        onGoToTableOverview: onGoToTableOverview,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -168,6 +192,10 @@ class _DashboardBody extends StatelessWidget {
                   onGoToProducts: onGoToProducts,
                   onGoToCustomers: onGoToCustomers,
                   onGoToSalesHistory: onGoToSalesHistory,
+                  isRestaurantMode: isRestaurantMode,
+                  onGoToTakeaway: onGoToTakeaway,
+                  onGoToTakeawayKitchen: onGoToTakeawayKitchen,
+                  onGoToTableOverview: onGoToTableOverview,
                 ),
                 const SizedBox(height: 12),
                 _TodayCard(
@@ -485,57 +513,132 @@ class _QuickActionsCard extends StatelessWidget {
   final VoidCallback? onGoToProducts;
   final VoidCallback? onGoToCustomers;
   final VoidCallback? onGoToSalesHistory;
+  final bool isRestaurantMode;
+  final VoidCallback? onGoToTakeaway;
+  final VoidCallback? onGoToTakeawayKitchen;
+  final VoidCallback? onGoToTableOverview;
 
   const _QuickActionsCard({
     this.onGoToPos,
     this.onGoToProducts,
     this.onGoToCustomers,
     this.onGoToSalesHistory,
+    this.isRestaurantMode = false,
+    this.onGoToTakeaway,
+    this.onGoToTakeawayKitchen,
+    this.onGoToTableOverview,
   });
 
   @override
   Widget build(BuildContext context) {
-    final actions = [
-      _QuickAction(
-        icon: Icons.add_shopping_cart,
-        label: 'เปิดจุดขาย',
-        color: AppTheme.primaryColor,
-        onTap: onGoToPos ?? () => Navigator.pushNamed(context, '/pos'),
-      ),
-      _QuickAction(
-        icon: Icons.add_box_outlined,
-        label: 'เพิ่มสินค้า',
-        color: AppTheme.infoColor,
-        onTap:
-            onGoToProducts ??
-            () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ProductListPage()),
-            ),
-      ),
-      _QuickAction(
-        icon: Icons.person_add_outlined,
-        label: 'เพิ่มลูกค้า',
-        color: AppTheme.successColor,
-        onTap:
-            onGoToCustomers ??
-            () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const CustomerListPage()),
-            ),
-      ),
-      _QuickAction(
-        icon: Icons.receipt_long_outlined,
-        label: 'รายการขาย',
-        color: const Color(0xFFAD1457),
-        onTap:
-            onGoToSalesHistory ??
-            () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const SalesHistoryPage()),
-            ),
-      ),
-    ];
+    final posAction = _QuickAction(
+      icon: Icons.add_shopping_cart,
+      label: 'เปิดจุดขาย',
+      color: AppTheme.primaryColor,
+      onTap: onGoToPos ?? () => Navigator.pushNamed(context, '/pos'),
+    );
+    final tableAction = _QuickAction(
+      icon: Icons.table_restaurant,
+      label: 'เปิดโต๊ะอาหาร',
+      color: AppTheme.primaryColor,
+      onTap: onGoToTableOverview ?? onGoToPos ?? () => Navigator.pushNamed(context, '/pos'),
+    );
+    final takeawayAction = _QuickAction(
+      icon: Icons.takeout_dining,
+      label: 'ขายหน้าร้าน',
+      color: const Color(0xFF6D4C41),
+      onTap: onGoToTakeaway ?? () {},
+    );
+    final kitchenTakeawayAction = _QuickAction(
+      icon: Icons.kitchen_outlined,
+      label: 'ขายหน้าร้าน (ส่งเข้าครัว)',
+      color: AppTheme.infoColor,
+      onTap: onGoToTakeawayKitchen ?? onGoToTakeaway ?? () {},
+    );
+    final productsAction = _QuickAction(
+      icon: Icons.add_box_outlined,
+      label: 'เพิ่มสินค้า',
+      color: AppTheme.infoColor,
+      onTap:
+          onGoToProducts ??
+          () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ProductListPage()),
+          ),
+    );
+    final customersAction = _QuickAction(
+      icon: Icons.person_add_outlined,
+      label: 'เพิ่มลูกค้า',
+      color: AppTheme.successColor,
+      onTap:
+          onGoToCustomers ??
+          () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const CustomerListPage()),
+          ),
+    );
+    final salesAction = _QuickAction(
+      icon: Icons.receipt_long_outlined,
+      label: 'รายการขาย',
+      color: const Color(0xFFAD1457),
+      onTap:
+          onGoToSalesHistory ??
+          () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const SalesHistoryPage()),
+          ),
+    );
+
+    final Widget grid;
+    if (isRestaurantMode) {
+      grid = Column(
+        children: [
+          Row(
+            children: [
+              Expanded(child: _QuickItemCard(action: takeawayAction)),
+              const SizedBox(width: 10),
+              Expanded(child: _QuickItemCard(action: kitchenTakeawayAction)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(child: _QuickItemCard(action: tableAction)),
+              const SizedBox(width: 10),
+              Expanded(child: _QuickItemCard(action: productsAction)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(child: _QuickItemCard(action: customersAction)),
+              const SizedBox(width: 10),
+              Expanded(child: _QuickItemCard(action: salesAction)),
+            ],
+          ),
+        ],
+      );
+    } else {
+      grid = Column(
+        children: [
+          Row(
+            children: [
+              Expanded(child: _QuickItemCard(action: posAction)),
+              const SizedBox(width: 10),
+              Expanded(child: _QuickItemCard(action: productsAction)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(child: _QuickItemCard(action: customersAction)),
+              const SizedBox(width: 10),
+              Expanded(child: _QuickItemCard(action: salesAction)),
+            ],
+          ),
+        ],
+      );
+    }
 
     return Card(
       elevation: 0,
@@ -551,25 +654,7 @@ class _QuickActionsCard extends StatelessWidget {
           children: [
             _CardHeader(title: 'เมนูด่วน'),
             const SizedBox(height: 14),
-            Column(
-              children: [
-                Row(
-                  children: [
-                    Expanded(child: _QuickItemCard(action: actions[0])),
-                    const SizedBox(width: 10),
-                    Expanded(child: _QuickItemCard(action: actions[1])),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(child: _QuickItemCard(action: actions[2])),
-                    const SizedBox(width: 10),
-                    Expanded(child: _QuickItemCard(action: actions[3])),
-                  ],
-                ),
-              ],
-            ),
+            grid,
           ],
         ),
       ),
@@ -760,6 +845,7 @@ class _QuickItemCard extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                     color: const Color(0xFF1A1A1A),
                   ),
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),

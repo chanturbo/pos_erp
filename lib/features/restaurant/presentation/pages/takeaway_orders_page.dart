@@ -268,9 +268,9 @@ class _TakeawayOrdersPageState extends ConsumerState<TakeawayOrdersPage> {
     });
   }
 
-  void _openOrder(SalesOrderModel order) {
+  Future<void> _openOrder(SalesOrderModel order) async {
     final branchId = ref.read(selectedBranchProvider)?.branchId ?? '';
-    final context =
+    final orderContext =
         RestaurantOrderContext.takeaway(
           branchId: branchId,
           currentOrderId: order.orderId,
@@ -282,10 +282,15 @@ class _TakeawayOrdersPageState extends ConsumerState<TakeawayOrdersPage> {
           serviceType: order.serviceType ?? 'TAKEAWAY',
         );
 
-    Navigator.push(
-      this.context,
-      MaterialPageRoute(builder: (_) => BillingPage(tableContext: context)),
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => BillingPage(tableContext: orderContext)),
     );
+
+    // refresh หลัง BillingPage ปิด เพื่อให้รายการ OPEN/COMPLETED อัปเดตทันที
+    if (mounted) {
+      unawaited(ref.read(salesHistoryProvider.notifier).refreshSilently());
+    }
   }
 }
 

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart' show StateController;
 import '../../../branches/presentation/pages/sync_status_page.dart';
 import '../../../branches/presentation/providers/branch_provider.dart';
 import '../../../products/presentation/providers/product_provider.dart';
@@ -38,6 +40,28 @@ class PosPage extends ConsumerStatefulWidget {
 }
 
 class _PosPageState extends ConsumerState<PosPage> {
+  static const _groupPalette = <Color>[
+    Color(0xFF1565C0),
+    Color(0xFF2E7D32),
+    Color(0xFFEF6C00),
+    Color(0xFF6A1B9A),
+    Color(0xFFC62828),
+    Color(0xFF00838F),
+    Color(0xFF5D4037),
+    Color(0xFFAD1457),
+  ];
+
+  static const _groupIconList = <IconData>[
+    Icons.local_drink_outlined,
+    Icons.fastfood_outlined,
+    Icons.icecream_outlined,
+    Icons.shopping_basket_outlined,
+    Icons.spa_outlined,
+    Icons.kitchen_outlined,
+    Icons.inventory_2_outlined,
+    Icons.sell_outlined,
+  ];
+
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _categoryScrollController = ScrollController();
   final Map<String?, GlobalKey> _chipKeys = {};
@@ -45,10 +69,23 @@ class _PosPageState extends ConsumerState<PosPage> {
   List<PromotionModel> _buyXGetYPromos = [];
   bool _restoredRestaurantOrder = false;
   String? _selectedGroupId; // restaurant category filter
+  late final CartNotifier _cartNotifier;
+  late final HoldOrdersNotifier _holdOrdersNotifier;
+  late final StateController<RestaurantOrderContext?>
+  _restaurantOrderContextNotifier;
+  CartState _latestCart = CartState();
+  RestaurantOrderContext? _latestRestaurantOrderContext;
 
   @override
   void initState() {
     super.initState();
+    _cartNotifier = ref.read(cartProvider.notifier);
+    _holdOrdersNotifier = ref.read(holdOrdersProvider.notifier);
+    _restaurantOrderContextNotifier = ref.read(
+      restaurantOrderContextProvider.notifier,
+    );
+    _latestCart = ref.read(cartProvider);
+    _latestRestaurantOrderContext = ref.read(restaurantOrderContextProvider);
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _loadPromos();
       await _restoreOpenRestaurantOrder();
@@ -59,9 +96,32 @@ class _PosPageState extends ConsumerState<PosPage> {
   void dispose() {
     _searchController.dispose();
     _categoryScrollController.dispose();
-    // Clear restaurant context when leaving POS (no payment completed path)
-    // Safe: payment flow clears it before popping, so this is a no-op after payment
-    ref.read(restaurantOrderContextProvider.notifier).state = null;
+    // Takeaway back-navigation guard (payment flow clears context first → ctx null → no-op).
+    final ctx = _latestRestaurantOrderContext;
+    final cart = _latestCart;
+    Future<void>(() {
+      if (ctx != null && ctx.isTakeaway && cart.items.isNotEmpty) {
+        if (cart.hasKitchenSentItems) {
+          // Items already sent to kitchen → tracked server-side via salesHistoryProvider.
+          // Just clear local cart; do NOT put in hold list (would lose currentOrderId).
+          _cartNotifier.clear();
+        } else {
+          // Nothing sent yet → preserve in local hold list so order reappears on overview.
+          final now = DateTime.now();
+          final name =
+              'ซื้อกลับ ${now.hour.toString().padLeft(2, '0')}:'
+              '${now.minute.toString().padLeft(2, '0')}';
+          _holdOrdersNotifier.addOrder(
+            name,
+            cart,
+            isTakeaway: true,
+            skipKitchen: ctx.skipKitchen,
+          );
+          _cartNotifier.clear();
+        }
+      }
+      _restaurantOrderContextNotifier.state = null;
+    });
     super.dispose();
   }
 
@@ -139,9 +199,14 @@ class _PosPageState extends ConsumerState<PosPage> {
         )
         .toList();
 
-    final totalDiscount = (order.subtotal - order.totalAmount).clamp(0, double.infinity);
+    final totalDiscount = (order.subtotal - order.totalAmount).clamp(
+      0,
+      double.infinity,
+    );
 
-    ref.read(cartProvider.notifier).replaceCart(
+    ref
+        .read(cartProvider.notifier)
+        .replaceCart(
           CartState(
             items: regularItems,
             freeItems: freeItems,
@@ -151,10 +216,8 @@ class _PosPageState extends ConsumerState<PosPage> {
           ),
         );
 
-    ref.read(restaurantOrderContextProvider.notifier).state = restaurantContext.copyWith(
-          currentOrderId: order.orderId,
-          currentOrderNo: order.orderNo,
-        );
+    ref.read(restaurantOrderContextProvider.notifier).state = restaurantContext
+        .copyWith(currentOrderId: order.orderId, currentOrderNo: order.orderNo);
   }
 
   void _syncFreeItems() {
@@ -218,7 +281,9 @@ class _PosPageState extends ConsumerState<PosPage> {
     final ctx = ref.read(restaurantOrderContextProvider);
     final isTakeaway = ctx?.isTakeaway ?? false;
     final skipKitchen = ctx?.skipKitchen ?? false;
-    ref.read(cartProvider.notifier).hold(result, isTakeaway: isTakeaway, skipKitchen: skipKitchen);
+    ref
+        .read(cartProvider.notifier)
+        .hold(result, isTakeaway: isTakeaway, skipKitchen: skipKitchen);
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -368,11 +433,16 @@ class _PosPageState extends ConsumerState<PosPage> {
   Widget build(BuildContext context) {
     // ฟัง cart changes → คำนวณของแถมใหม่เมื่อ regular items เปลี่ยน
     ref.listen<CartState>(cartProvider, (prev, next) {
+      _latestCart = next;
       if (prev?.items != next.items) _syncFreeItems();
     });
 
     // Clear category filter when restaurant context changes (new table / back to retail)
-    ref.listen<RestaurantOrderContext?>(restaurantOrderContextProvider, (prev, next) {
+    ref.listen<RestaurantOrderContext?>(restaurantOrderContextProvider, (
+      prev,
+      next,
+    ) {
+      _latestRestaurantOrderContext = next;
       if (prev?.tableId != next?.tableId || (prev != null) != (next != null)) {
         if (mounted) setState(() => _selectedGroupId = null);
       }
@@ -420,6 +490,8 @@ class _PosPageState extends ConsumerState<PosPage> {
       return const MobileOrderPage();
     }
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return PopScope(
       canPop: !widget.isCashierMode,
       // ✅ BarcodeListener ครอบทั้งหน้า
@@ -430,9 +502,12 @@ class _PosPageState extends ConsumerState<PosPage> {
           setState(() => _searchQuery = barcode);
         },
         child: Scaffold(
-          backgroundColor: AppTheme.surface,
+          backgroundColor: isDark ? AppTheme.darkBg : AppTheme.surface,
           appBar: AppBar(
             toolbarHeight: hideTabletTopBar ? 0 : (isTablet ? 40 : null),
+            backgroundColor: isDark ? AppTheme.navyDark : AppTheme.navy,
+            foregroundColor: Colors.white,
+            elevation: 0,
             // ── Leading ────────────────────────────────────
             automaticallyImplyLeading: hideTabletTopBar
                 ? false
@@ -450,8 +525,24 @@ class _PosPageState extends ConsumerState<PosPage> {
             title: hideTabletTopBar
                 ? null
                 : Row(
-                    mainAxisSize: MainAxisSize.min,
                     children: [
+                      // Page icon
+                      Container(
+                        padding: const EdgeInsets.all(7),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primary.withValues(alpha: 0.18),
+                          borderRadius: AppRadius.sm,
+                          border: Border.all(
+                            color: AppTheme.primary.withValues(alpha: 0.28),
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.point_of_sale,
+                          size: 18,
+                          color: AppTheme.primaryLight,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
                       // Cashier badge
                       if (widget.isCashierMode && user != null) ...[
                         Container(
@@ -478,10 +569,22 @@ class _PosPageState extends ConsumerState<PosPage> {
                           ),
                         ),
                       ],
+                      // Title
+                      const Text(
+                        'ขายสินค้า',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const Spacer(),
                       // Desktop: chips อยู่ใน toolbar โดยตรง
                       if (!isTablet) ...[
                         if (restaurantContext != null) ...[
-                          _RestaurantContextChip(contextData: restaurantContext),
+                          _RestaurantContextChip(
+                            contextData: restaurantContext,
+                          ),
                           const SizedBox(width: 8),
                         ],
                         _CustomerChip(
@@ -499,8 +602,11 @@ class _PosPageState extends ConsumerState<PosPage> {
                                 vertical: 7,
                               ),
                               decoration: BoxDecoration(
-                                color: AppTheme.border.withValues(alpha: 0.25),
+                                color: Colors.white.withValues(alpha: 0.10),
                                 borderRadius: AppRadius.xl,
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.20),
+                                ),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
@@ -508,6 +614,7 @@ class _PosPageState extends ConsumerState<PosPage> {
                                   const Icon(
                                     Icons.storefront_outlined,
                                     size: 13,
+                                    color: Colors.white70,
                                   ),
                                   const SizedBox(width: 5),
                                   Text(
@@ -515,6 +622,7 @@ class _PosPageState extends ConsumerState<PosPage> {
                                     style: const TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w600,
+                                      color: Colors.white,
                                     ),
                                   ),
                                 ],
@@ -579,7 +687,30 @@ class _PosPageState extends ConsumerState<PosPage> {
                             ),
                           ),
                         ],
+                        const SizedBox(width: 8),
                       ],
+                      // POS module badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primary.withValues(alpha: 0.2),
+                          borderRadius: AppRadius.sm,
+                          border: Border.all(
+                            color: AppTheme.primary.withValues(alpha: 0.5),
+                          ),
+                        ),
+                        child: const Text(
+                          'POS',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.primaryLight,
+                          ),
+                        ),
+                      ),
                     ],
                   ),
 
@@ -615,9 +746,11 @@ class _PosPageState extends ConsumerState<PosPage> {
                                   vertical: 7,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: AppTheme.border
-                                      .withValues(alpha: 0.25),
+                                  color: Colors.white.withValues(alpha: 0.10),
                                   borderRadius: AppRadius.xl,
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.20),
+                                  ),
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
@@ -625,6 +758,7 @@ class _PosPageState extends ConsumerState<PosPage> {
                                     const Icon(
                                       Icons.storefront_outlined,
                                       size: 13,
+                                      color: Colors.white70,
                                     ),
                                     const SizedBox(width: 5),
                                     Text(
@@ -632,6 +766,7 @@ class _PosPageState extends ConsumerState<PosPage> {
                                       style: const TextStyle(
                                         fontSize: 11,
                                         fontWeight: FontWeight.w600,
+                                        color: Colors.white,
                                       ),
                                     ),
                                   ],
@@ -651,8 +786,7 @@ class _PosPageState extends ConsumerState<PosPage> {
                                   color: Colors.orange.withValues(alpha: 0.1),
                                   borderRadius: AppRadius.xl,
                                   border: Border.all(
-                                    color:
-                                        Colors.orange.withValues(alpha: 0.4),
+                                    color: Colors.orange.withValues(alpha: 0.4),
                                   ),
                                 ),
                                 child: const Row(
@@ -738,9 +872,14 @@ class _PosPageState extends ConsumerState<PosPage> {
                 flex: 60,
                 child: productAsync.when(
                   data: (products) {
-                    final filtered = _filterProducts(products, stockMap: stockMap);
+                    final filtered = _filterProducts(
+                      products,
+                      stockMap: stockMap,
+                    );
                     final displayed = _selectedGroupId != null
-                        ? filtered.where((p) => p.groupId == _selectedGroupId).toList()
+                        ? filtered
+                              .where((p) => p.groupId == _selectedGroupId)
+                              .toList()
                         : filtered;
                     return Column(
                       children: [
@@ -768,10 +907,10 @@ class _PosPageState extends ConsumerState<PosPage> {
               ),
 
               // Divider
-              const VerticalDivider(
+              VerticalDivider(
                 width: 1,
                 thickness: 1,
-                color: AppTheme.border,
+                color: AppTheme.borderColorOf(context),
               ),
 
               // Cart Panel (40%)
@@ -789,23 +928,44 @@ class _PosPageState extends ConsumerState<PosPage> {
     );
   }
 
-  Widget _buildSearchToolbar(CartState cartState, {bool compact = false, Map<String, double> stockMap = const {}}) {
+  Widget _buildSearchToolbar(
+    CartState cartState, {
+    bool compact = false,
+    Map<String, double> stockMap = const {},
+  }) {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
       decoration: BoxDecoration(
         color: AppTheme.cardColor(context),
-        border: Border(bottom: BorderSide(color: AppTheme.borderColorOf(context))),
+        border: Border(
+          bottom: BorderSide(color: AppTheme.borderColorOf(context)),
+        ),
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
+          final isDark = Theme.of(context).brightness == Brightness.dark;
           final shouldStack = compact || constraints.maxWidth < 760;
           final searchField = SizedBox(
             height: 40,
             child: TextField(
               controller: _searchController,
+              style: TextStyle(
+                fontSize: 13,
+                color: isDark
+                    ? const Color(0xFFE0E0E0)
+                    : const Color(0xFF1A1A1A),
+              ),
               decoration: InputDecoration(
                 hintText: 'ค้นหาสินค้า / บาร์โค้ด...',
-                prefixIcon: const Icon(Icons.search, size: 18),
+                hintStyle: TextStyle(
+                  fontSize: 13,
+                  color: isDark ? const Color(0xFF9E9E9E) : AppTheme.textSub,
+                ),
+                prefixIcon: Icon(
+                  Icons.search,
+                  size: 18,
+                  color: isDark ? const Color(0xFF9E9E9E) : AppTheme.textSub,
+                ),
                 suffixIcon: _searchQuery.isNotEmpty
                     ? IconButton(
                         icon: const Icon(Icons.clear, size: 16),
@@ -825,8 +985,19 @@ class _PosPageState extends ConsumerState<PosPage> {
                       ),
                 isDense: true,
                 contentPadding: EdgeInsets.zero,
+                filled: true,
+                fillColor: isDark ? AppTheme.darkElement : Colors.white,
                 border: OutlineInputBorder(
                   borderRadius: AppRadius.sm,
+                  borderSide: BorderSide(
+                    color: isDark ? const Color(0xFF333333) : AppTheme.border,
+                  ),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: AppRadius.sm,
+                  borderSide: BorderSide(
+                    color: isDark ? const Color(0xFF333333) : AppTheme.border,
+                  ),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: AppRadius.sm,
@@ -863,45 +1034,67 @@ class _PosPageState extends ConsumerState<PosPage> {
           return Row(
             children: [
               Expanded(child: searchField),
-              const SizedBox(width: 4),
-              Stack(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.folder_outlined),
-                    tooltip: 'บิลที่พัก',
-                    onPressed: () => showDialog(
-                      context: context,
-                      builder: (_) => const HoldOrdersDialog(),
-                    ),
+              const SizedBox(width: 8),
+              Tooltip(
+                message: 'บิลที่พัก',
+                waitDuration: const Duration(milliseconds: 400),
+                child: InkWell(
+                  onTap: () => showDialog(
+                    context: context,
+                    builder: (_) => const HoldOrdersDialog(),
                   ),
-                  if (holdOrdersState.orders.isNotEmpty)
-                    Positioned(
-                      right: 8,
-                      top: 8,
-                      child: IgnorePointer(
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: const BoxDecoration(
-                            color: AppTheme.primary,
-                            shape: BoxShape.circle,
-                          ),
-                          constraints: const BoxConstraints(
-                            minWidth: 16,
-                            minHeight: 16,
-                          ),
-                          child: Text(
-                            '${holdOrdersState.orders.length}',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            textAlign: TextAlign.center,
+                  borderRadius: AppRadius.sm,
+                  child: Stack(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.08)
+                              : AppTheme.primary.withValues(alpha: 0.08),
+                          borderRadius: AppRadius.sm,
+                          border: Border.all(
+                            color: isDark
+                                ? Colors.white24
+                                : AppTheme.primary.withValues(alpha: 0.2),
                           ),
                         ),
+                        child: Icon(
+                          Icons.folder_outlined,
+                          size: 17,
+                          color: isDark ? Colors.white70 : AppTheme.primary,
+                        ),
                       ),
-                    ),
-                ],
+                      if (holdOrdersState.orders.isNotEmpty)
+                        Positioned(
+                          right: 0,
+                          top: 0,
+                          child: IgnorePointer(
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(
+                                color: AppTheme.primary,
+                                shape: BoxShape.circle,
+                              ),
+                              constraints: const BoxConstraints(
+                                minWidth: 16,
+                                minHeight: 16,
+                              ),
+                              child: Text(
+                                '${holdOrdersState.orders.length}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
               ),
             ],
           );
@@ -923,160 +1116,192 @@ class _PosPageState extends ConsumerState<PosPage> {
     });
   }
 
-  // ── Restaurant category filter bar ──────────────────────────────
+  // ── Group color / icon helpers (mirrors mobile_order_page) ────────
+
+  int _groupSeed(String? groupId) {
+    final key = (groupId == null || groupId.isEmpty) ? 'ungrouped' : groupId;
+    return key.codeUnits.fold<int>(0, (sum, code) => sum + code);
+  }
+
+  Color _parseConfiguredColor(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return Colors.transparent;
+    final value = raw.trim();
+    if (value.startsWith('#')) {
+      final hex = value.substring(1);
+      if (hex.length == 6 || hex.length == 8) {
+        final normalized = hex.length == 6 ? 'FF$hex' : hex;
+        final parsed = int.tryParse(normalized, radix: 16);
+        if (parsed != null) return Color(parsed);
+      }
+    }
+    switch (value.toLowerCase()) {
+      case 'red':       return Colors.red;
+      case 'pink':      return Colors.pink;
+      case 'purple':    return Colors.purple;
+      case 'indigo':    return Colors.indigo;
+      case 'blue':      return Colors.blue;
+      case 'cyan':      return Colors.cyan;
+      case 'teal':      return Colors.teal;
+      case 'green':     return Colors.green;
+      case 'lime':      return Colors.lime;
+      case 'yellow':    return Colors.yellow;
+      case 'amber':     return Colors.amber;
+      case 'orange':    return Colors.orange;
+      case 'brown':     return Colors.brown;
+      case 'grey':
+      case 'gray':      return Colors.grey;
+      default:          return Colors.transparent;
+    }
+  }
+
+  IconData _iconFromKey(String? key) {
+    switch (key?.trim().toLowerCase()) {
+      case 'apps':              return Icons.apps_rounded;
+      case 'inventory':         return Icons.inventory_outlined;
+      case 'inventory_2':       return Icons.inventory_2_outlined;
+      case 'shopping_basket':   return Icons.shopping_basket_outlined;
+      case 'sell':              return Icons.sell_outlined;
+      case 'local_drink':       return Icons.local_drink_outlined;
+      case 'fastfood':          return Icons.fastfood_outlined;
+      case 'icecream':          return Icons.icecream_outlined;
+      case 'kitchen':           return Icons.kitchen_outlined;
+      case 'spa':               return Icons.spa_outlined;
+      case 'bakery_dining':     return Icons.bakery_dining_outlined;
+      case 'lunch_dining':      return Icons.lunch_dining_outlined;
+      case 'local_cafe':        return Icons.local_cafe_outlined;
+      case 'storefront':        return Icons.storefront_outlined;
+      default:                  return _groupIcon(null);
+    }
+  }
+
+  Color _groupColor(String? groupId) {
+    final groups = ref.read(productGroupsProvider).value ?? const [];
+    final group = groups.cast<dynamic>().firstWhere(
+      (g) => g.groupId == groupId,
+      orElse: () => null,
+    );
+    final configured = _parseConfiguredColor(group?.mobileColor as String?);
+    if (configured != Colors.transparent) return configured;
+    final index = _groupSeed(groupId) % _groupPalette.length;
+    return _groupPalette[index];
+  }
+
+  IconData _groupIcon(String? groupId) {
+    if (groupId == null) {
+      final index = _groupSeed(null) % _groupIconList.length;
+      return _groupIconList[index];
+    }
+    final groups = ref.read(productGroupsProvider).value ?? const [];
+    final group = groups.cast<dynamic>().firstWhere(
+      (g) => g.groupId == groupId,
+      orElse: () => null,
+    );
+    final configured = group?.mobileIcon as String?;
+    if (configured != null && configured.trim().isNotEmpty) {
+      return _iconFromKey(configured);
+    }
+    final index = _groupSeed(groupId) % _groupIconList.length;
+    return _groupIconList[index];
+  }
+
+  // ── Category filter bar — navy background + pill chips (mirrors mobile) ──
   Widget _buildCategoryBar(List<ProductModel> filteredProducts) {
     final groups = ref.watch(productGroupsProvider).value ?? [];
 
-    // แสดงเฉพาะ group ที่ showInPos=true และมีสินค้าอยู่จริง
-    final presentGroupIds = filteredProducts
-        .map((p) => p.groupId)
-        .whereType<String>()
-        .toSet();
-    final relevantGroups = groups
-        .where((g) => g.showInPos && presentGroupIds.contains(g.groupId))
-        .toList();
+    if (groups.isEmpty) return const SizedBox.shrink();
 
-    // Reset stale selection if the selected group is no longer visible
     if (_selectedGroupId != null &&
-        !relevantGroups.any((g) => g.groupId == _selectedGroupId)) {
+        !groups.any((g) => g.groupId == _selectedGroupId)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) setState(() => _selectedGroupId = null);
       });
     }
 
-    if (relevantGroups.isEmpty) return const SizedBox.shrink();
-
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? AppTheme.darkTopBar : Colors.white;
+    final barBg = isDark ? AppTheme.navyDark : AppTheme.navy;
 
     return Container(
-      height: 48,
-      decoration: BoxDecoration(
-        color: bg,
-        border: Border(bottom: BorderSide(color: AppTheme.border)),
-      ),
-      child: SingleChildScrollView(
+      height: 46,
+      color: barBg,
+      child: ListView(
         controller: _categoryScrollController,
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        child: Row(
-          children: [
-            // "ทั้งหมด" chip
-            KeyedSubtree(
-              key: _chipKeys[null] ??= GlobalKey(),
-              child: _groupChip(
-                label: 'ทั้งหมด',
-                count: filteredProducts.length,
-                icon: Icons.apps_rounded,
-                selected: _selectedGroupId == null,
-                onTap: () {
-                  setState(() => _selectedGroupId = null);
-                  _scrollChipIntoView(null);
-                },
-              ),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        children: [
+          _navyChip(
+            label: 'ทั้งหมด',
+            icon: Icons.apps_rounded,
+            color: AppTheme.primary,
+            selected: _selectedGroupId == null,
+            onTap: () {
+              HapticFeedback.selectionClick();
+              setState(() => _selectedGroupId = null);
+              _scrollChipIntoView(null);
+            },
+          ),
+          for (final group in groups)
+            _navyChip(
+              label: group.groupName,
+              icon: _groupIcon(group.groupId),
+              color: _groupColor(group.groupId),
+              selected: _selectedGroupId == group.groupId,
+              onTap: () {
+                HapticFeedback.selectionClick();
+                setState(() {
+                  _selectedGroupId =
+                      _selectedGroupId == group.groupId ? null : group.groupId;
+                });
+                _scrollChipIntoView(
+                  _selectedGroupId == null ? null : group.groupId,
+                );
+              },
             ),
-            ...relevantGroups.map((group) {
-              final count = filteredProducts
-                  .where((p) => p.groupId == group.groupId)
-                  .length;
-              return KeyedSubtree(
-                key: _chipKeys[group.groupId] ??= GlobalKey(),
-                child: _groupChip(
-                  label: group.groupName,
-                  count: count,
-                  icon: _groupIcon(group.groupName),
-                  selected: _selectedGroupId == group.groupId,
-                  onTap: () {
-                    setState(() => _selectedGroupId = group.groupId);
-                    _scrollChipIntoView(group.groupId);
-                  },
-                ),
-              );
-            }),
-          ],
-        ),
+        ],
       ),
     );
   }
 
-  Widget _groupChip({
+  Widget _navyChip({
     required String label,
-    required int count,
     required IconData icon,
+    required Color color,
     required bool selected,
     required VoidCallback onTap,
   }) {
-    final color = selected ? AppTheme.primary : AppTheme.navy.withValues(alpha: 0.55);
-    final bgColor = selected
-        ? AppTheme.primary.withValues(alpha: 0.12)
-        : Colors.transparent;
-    final borderColor = selected
-        ? AppTheme.primary.withValues(alpha: 0.6)
-        : AppTheme.border;
-
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         margin: const EdgeInsets.only(right: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
         decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: AppRadius.xl,
-          border: Border.all(color: borderColor),
+          color: selected ? color : Colors.white.withValues(alpha: 0.08),
+          borderRadius: AppRadius.pill,
+          border: Border.all(
+            color: selected ? color : Colors.white.withValues(alpha: 0.18),
+          ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 14, color: color),
-            const SizedBox(width: 5),
+            Icon(
+              icon,
+              size: 14,
+              color: selected ? Colors.white : color,
+            ),
+            const SizedBox(width: 6),
             Text(
               label,
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                color: color,
-              ),
-            ),
-            const SizedBox(width: 5),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-              decoration: BoxDecoration(
-                color: selected
-                    ? AppTheme.primary.withValues(alpha: 0.2)
-                    : AppTheme.border.withValues(alpha: 0.5),
-                borderRadius: AppRadius.md,
-              ),
-              child: Text(
-                '$count',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  color: color,
-                ),
+                color: selected ? Colors.white : Colors.white.withValues(alpha: 0.85),
               ),
             ),
           ],
         ),
       ),
     );
-  }
-
-  IconData _groupIcon(String groupName) {
-    final name = groupName.toLowerCase();
-    if (name.contains('อาหาร') || name.contains('ข้าว') || name.contains('จาน')) {
-      return Icons.lunch_dining_rounded;
-    }
-    if (name.contains('เครื่องดื่ม') || name.contains('ชา') || name.contains('กาแฟ') || name.contains('น้ำ')) {
-      return Icons.local_cafe_rounded;
-    }
-    if (name.contains('ของหวาน') || name.contains('เค้ก') || name.contains('ไอศ')) {
-      return Icons.icecream_rounded;
-    }
-    if (name.contains('ของว่าง') || name.contains('ขนม') || name.contains('สแน็ค')) {
-      return Icons.cookie_rounded;
-    }
-    return Icons.category_rounded;
   }
 
   // ── Empty state ────────────────────────────────────────────────
@@ -1321,9 +1546,7 @@ class _RestaurantContextChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.orange.withValues(alpha: 0.12),
         borderRadius: AppRadius.xl,
-        border: Border.all(
-          color: Colors.orange.withValues(alpha: 0.35),
-        ),
+        border: Border.all(color: Colors.orange.withValues(alpha: 0.35)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

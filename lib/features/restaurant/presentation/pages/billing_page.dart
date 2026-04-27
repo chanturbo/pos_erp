@@ -408,6 +408,20 @@ class _BillingPageState extends ConsumerState<BillingPage> {
   }
 
   Future<void> _proceedToPayment(BillModel bill) async {
+    final blockingTakeawayItems = _takeawayItemsWaitingForServe(bill);
+    if (blockingTakeawayItems.isNotEmpty) {
+      final count = blockingTakeawayItems.length;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'ยังปิดบิลไม่ได้: รายการซื้อกลับบ้าน $count รายการต้องเป็นสถานะเสิร์ฟแล้วก่อน',
+          ),
+          backgroundColor: AppTheme.warningColor,
+        ),
+      );
+      return;
+    }
+
     final currentCart = ref.read(cartProvider);
     final billingCustomerId = bill.customerId;
     final billingCustomerName = bill.customerName;
@@ -483,6 +497,19 @@ class _BillingPageState extends ConsumerState<BillingPage> {
     }
   }
 
+  List<BillItemModel> _takeawayItemsWaitingForServe(BillModel bill) {
+    if (!widget.tableContext.isTakeaway || widget.tableContext.skipKitchen) {
+      return const [];
+    }
+    return bill.items
+        .where(
+          (item) =>
+              item.kitchenStatus.toUpperCase() != 'SERVED' &&
+              item.kitchenStatus.toUpperCase() != 'CANCELLED',
+        )
+        .toList();
+  }
+
   Future<void> _printPreBill(BillModel bill) async {
     final settings = ref.read(settingsProvider);
     final printSettings = ThermalPrintSettings(
@@ -513,6 +540,7 @@ class _BillingPageState extends ConsumerState<BillingPage> {
                   quantity: item.quantity,
                   unitPrice: item.unitPrice,
                   amount: item.amount,
+                  note: item.specialInstructions,
                 ),
               )
               .toList(),

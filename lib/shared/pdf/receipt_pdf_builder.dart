@@ -93,6 +93,14 @@ class ReceiptPdfBuilder {
               children: [
                 pw.Text(item.name,
                     style: pw.TextStyle(font: bold, fontSize: 9)),
+                if (item.note != null && item.note!.trim().isNotEmpty)
+                  pw.Text(
+                    '  * ${item.note!.trim()}',
+                    style: pw.TextStyle(
+                        font: regular,
+                        fontSize: 8,
+                        color: PdfColors.grey700),
+                  ),
                 pw.Row(
                   mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                   children: [

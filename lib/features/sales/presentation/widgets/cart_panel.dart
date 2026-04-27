@@ -9,6 +9,7 @@ import '../widgets/discount_dialog.dart';
 import '../../../products/presentation/providers/product_provider.dart'; // ✅ scan เพิ่มสินค้า
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../branches/presentation/providers/branch_provider.dart';
+import '../../../restaurant/data/models/restaurant_order_context.dart';
 import '../../../restaurant/presentation/providers/table_provider.dart';
 import '../../../../core/client/api_client.dart';
 import '../../../../shared/services/mobile_scanner_service.dart'; // ✅ MobileScannerService
@@ -240,6 +241,11 @@ class _CartPanelState extends ConsumerState<CartPanel> {
           backgroundColor: _success,
         ),
       );
+      // Takeaway: pop back to overview so cashier can serve next customer.
+      // dispose() will clear the cart (items are kitchen-sent → no hold needed).
+      if (restaurantContext.isTakeaway && mounted) {
+        Navigator.maybePop(context);
+      }
     } on DioException catch (e) {
       if (!mounted) return;
       final serverMsg = e.response?.data is Map
@@ -286,7 +292,9 @@ class _CartPanelState extends ConsumerState<CartPanel> {
         return Container(
           decoration: BoxDecoration(
             color: AppTheme.cardColor(context),
-            border: Border(left: BorderSide(color: AppTheme.borderColorOf(context))),
+            border: Border(
+              left: BorderSide(color: AppTheme.borderColorOf(context)),
+            ),
             borderRadius: AppRadius.topMd,
           ),
           clipBehavior: Clip.antiAlias,
@@ -368,9 +376,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                     false),
                 hasUnsentItems: cartState.hasUnsentItems,
                 skipKitchen:
-                    ref
-                        .watch(restaurantOrderContextProvider)
-                        ?.skipKitchen ??
+                    ref.watch(restaurantOrderContextProvider)?.skipKitchen ??
                     false,
                 isSendingRestaurantOrder: _isSendingRestaurantOrder,
                 onSendToKitchen: _sendRestaurantOrder,
@@ -765,10 +771,7 @@ class _ScanRowState extends ConsumerState<_ScanRow> {
             horizontal: widget.compact ? 8 : 10,
             vertical: 6,
           ),
-          decoration: BoxDecoration(
-            color: _orange,
-            borderRadius: AppRadius.sm,
-          ),
+          decoration: BoxDecoration(color: _orange, borderRadius: AppRadius.sm),
           child: const Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -978,8 +981,11 @@ class _CartRowState extends ConsumerState<_CartRow> {
               setSheet(() {
                 if (selected.contains(preset)) {
                   selected.remove(preset);
-                  ctrl.text =
-                      ctrl.text.replaceAll(preset, '').replaceAll(RegExp(r', *,'), ',').replaceAll(RegExp(r'^,\s*|,\s*$'), '').trim();
+                  ctrl.text = ctrl.text
+                      .replaceAll(preset, '')
+                      .replaceAll(RegExp(r', *,'), ',')
+                      .replaceAll(RegExp(r'^,\s*|,\s*$'), '')
+                      .trim();
                 } else {
                   selected.add(preset);
                   final base = ctrl.text.trim();
@@ -1004,10 +1010,15 @@ class _CartRowState extends ConsumerState<_CartRow> {
                   children: [
                     // header
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                       decoration: BoxDecoration(
                         color: _orange.withValues(alpha: 0.12),
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(16),
+                        ),
                       ),
                       child: Row(
                         children: [
@@ -1026,7 +1037,11 @@ class _CartRowState extends ConsumerState<_CartRow> {
                           ),
                           GestureDetector(
                             onTap: () => Navigator.pop(ctx),
-                            child: Icon(Icons.close, size: 20, color: AppTheme.subtextColorOf(ctx)),
+                            child: Icon(
+                              Icons.close,
+                              size: 20,
+                              color: AppTheme.subtextColorOf(ctx),
+                            ),
                           ),
                         ],
                       ),
@@ -1053,12 +1068,19 @@ class _CartRowState extends ConsumerState<_CartRow> {
                             onTap: () => togglePreset(p),
                             child: AnimatedContainer(
                               duration: const Duration(milliseconds: 150),
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 5,
+                              ),
                               decoration: BoxDecoration(
-                                color: active ? _orange : AppTheme.surface3Of(ctx),
+                                color: active
+                                    ? _orange
+                                    : AppTheme.surface3Of(ctx),
                                 borderRadius: AppRadius.sm,
                                 border: Border.all(
-                                  color: active ? _orange : AppTheme.borderColorOf(ctx),
+                                  color: active
+                                      ? _orange
+                                      : AppTheme.borderColorOf(ctx),
                                 ),
                               ),
                               child: Text(
@@ -1066,7 +1088,9 @@ class _CartRowState extends ConsumerState<_CartRow> {
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w500,
-                                  color: active ? Colors.white : AppTheme.textColorOf(ctx),
+                                  color: active
+                                      ? Colors.white
+                                      : AppTheme.textColorOf(ctx),
                                 ),
                               ),
                             ),
@@ -1079,7 +1103,10 @@ class _CartRowState extends ConsumerState<_CartRow> {
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
                       child: Text(
                         'หรือพิมพ์เพิ่มเติม',
-                        style: TextStyle(fontSize: 12, color: AppTheme.subtextColorOf(ctx)),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.subtextColorOf(ctx),
+                        ),
                       ),
                     ),
                     Padding(
@@ -1088,25 +1115,41 @@ class _CartRowState extends ConsumerState<_CartRow> {
                         controller: ctrl,
                         autofocus: false,
                         maxLines: 2,
-                        style: TextStyle(fontSize: 13, color: AppTheme.textColorOf(ctx)),
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppTheme.textColorOf(ctx),
+                        ),
                         decoration: InputDecoration(
                           hintText: 'เช่น ไม่เผ็ด, เพิ่มน้ำมัน...',
-                          hintStyle: TextStyle(fontSize: 13, color: AppTheme.mutedTextOf(ctx)),
+                          hintStyle: TextStyle(
+                            fontSize: 13,
+                            color: AppTheme.mutedTextOf(ctx),
+                          ),
                           filled: true,
                           fillColor: AppTheme.surface3Of(ctx),
                           border: OutlineInputBorder(
                             borderRadius: AppRadius.sm,
-                            borderSide: BorderSide(color: AppTheme.borderColorOf(ctx)),
+                            borderSide: BorderSide(
+                              color: AppTheme.borderColorOf(ctx),
+                            ),
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: AppRadius.sm,
-                            borderSide: BorderSide(color: AppTheme.borderColorOf(ctx)),
+                            borderSide: BorderSide(
+                              color: AppTheme.borderColorOf(ctx),
+                            ),
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: AppRadius.sm,
-                            borderSide: const BorderSide(color: _orange, width: 1.5),
+                            borderSide: const BorderSide(
+                              color: _orange,
+                              width: 1.5,
+                            ),
                           ),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
                         ),
                       ),
                     ),
@@ -1118,13 +1161,19 @@ class _CartRowState extends ConsumerState<_CartRow> {
                           Expanded(
                             child: OutlinedButton(
                               onPressed: () {
-                                ref.read(cartProvider.notifier).setNote(item.lineId, null);
+                                ref
+                                    .read(cartProvider.notifier)
+                                    .setNote(item.lineId, null);
                                 Navigator.pop(ctx);
                               },
                               style: OutlinedButton.styleFrom(
-                                side: BorderSide(color: AppTheme.borderColorOf(ctx)),
+                                side: BorderSide(
+                                  color: AppTheme.borderColorOf(ctx),
+                                ),
                                 foregroundColor: AppTheme.subtextColorOf(ctx),
-                                shape: RoundedRectangleBorder(borderRadius: AppRadius.sm),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: AppRadius.sm,
+                                ),
                               ),
                               child: const Text('ล้าง'),
                             ),
@@ -1135,13 +1184,20 @@ class _CartRowState extends ConsumerState<_CartRow> {
                             child: ElevatedButton(
                               onPressed: () {
                                 final note = ctrl.text.trim();
-                                ref.read(cartProvider.notifier).setNote(item.lineId, note.isEmpty ? null : note);
+                                ref
+                                    .read(cartProvider.notifier)
+                                    .setNote(
+                                      item.lineId,
+                                      note.isEmpty ? null : note,
+                                    );
                                 Navigator.pop(ctx);
                               },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: _orange,
                                 foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(borderRadius: AppRadius.sm),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: AppRadius.sm,
+                                ),
                               ),
                               child: const Text('บันทึก'),
                             ),
@@ -1272,16 +1328,17 @@ class _CartRowState extends ConsumerState<_CartRow> {
                     final adjText = adj == 0
                         ? ''
                         : adj > 0
-                            ? ' +฿${adj.toStringAsFixed(0)}'
-                            : ' -฿${adj.abs().toStringAsFixed(0)}';
+                        ? ' +฿${adj.toStringAsFixed(0)}'
+                        : ' -฿${adj.abs().toStringAsFixed(0)}';
                     return Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 1),
+                        horizontal: 6,
+                        vertical: 1,
+                      ),
                       decoration: BoxDecoration(
                         color: _navy.withValues(alpha: 0.07),
                         borderRadius: AppRadius.xs,
-                        border: Border.all(
-                            color: _navy.withValues(alpha: 0.2)),
+                        border: Border.all(color: _navy.withValues(alpha: 0.2)),
                       ),
                       child: Text(
                         '${m.modifierName}$adjText',
@@ -1302,7 +1359,11 @@ class _CartRowState extends ConsumerState<_CartRow> {
                   padding: const EdgeInsets.only(top: 2, bottom: 1),
                   child: Row(
                     children: [
-                      Icon(Icons.edit_note, size: 13, color: _orange.withValues(alpha: 0.85)),
+                      Icon(
+                        Icons.edit_note,
+                        size: 13,
+                        color: _orange.withValues(alpha: 0.85),
+                      ),
                       const SizedBox(width: 3),
                       Expanded(
                         child: Text(
@@ -1335,7 +1396,10 @@ class _CartRowState extends ConsumerState<_CartRow> {
                   GestureDetector(
                     onTap: () => _showNoteSheet(item),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 5,
+                        vertical: 2,
+                      ),
                       margin: const EdgeInsets.only(right: 4),
                       decoration: BoxDecoration(
                         color: item.note?.isNotEmpty == true
@@ -1349,7 +1413,9 @@ class _CartRowState extends ConsumerState<_CartRow> {
                         ),
                       ),
                       child: Icon(
-                        item.note?.isNotEmpty == true ? Icons.edit_note : Icons.add_comment_outlined,
+                        item.note?.isNotEmpty == true
+                            ? Icons.edit_note
+                            : Icons.add_comment_outlined,
                         size: 13,
                         color: item.note?.isNotEmpty == true
                             ? _orange
@@ -1367,15 +1433,15 @@ class _CartRowState extends ConsumerState<_CartRow> {
                       decoration: BoxDecoration(
                         color: item.courseNo > 1
                             ? (AppTheme.isDark(context)
-                                ? const Color(0xFF1A2A3A)
-                                : Colors.blue.shade50)
+                                  ? const Color(0xFF1A2A3A)
+                                  : Colors.blue.shade50)
                             : AppTheme.surface3Of(context),
                         borderRadius: AppRadius.xs,
                         border: Border.all(
                           color: item.courseNo > 1
                               ? (AppTheme.isDark(context)
-                                  ? AppTheme.infoColor
-                                  : Colors.blue.shade300)
+                                    ? AppTheme.infoColor
+                                    : Colors.blue.shade300)
                               : AppTheme.borderColorOf(context),
                         ),
                       ),
@@ -1386,8 +1452,8 @@ class _CartRowState extends ConsumerState<_CartRow> {
                           fontWeight: FontWeight.w600,
                           color: item.courseNo > 1
                               ? (AppTheme.isDark(context)
-                                  ? Colors.blue.shade300
-                                  : Colors.blue.shade700)
+                                    ? Colors.blue.shade300
+                                    : Colors.blue.shade700)
                               : AppTheme.subtextColorOf(context),
                         ),
                       ),
@@ -1408,9 +1474,8 @@ class _CartRowState extends ConsumerState<_CartRow> {
           _QtyBtn(
             icon: Icons.remove,
             compact: density.compact,
-            onTap: () => ref
-                .read(cartProvider.notifier)
-                .decreaseQuantity(item.lineId),
+            onTap: () =>
+                ref.read(cartProvider.notifier).decreaseQuantity(item.lineId),
           ),
           GestureDetector(
             onTap: () {
@@ -1432,7 +1497,9 @@ class _CartRowState extends ConsumerState<_CartRow> {
                 color: AppTheme.cardColor(context),
                 borderRadius: AppRadius.xs,
                 border: Border.all(
-                  color: _editingQty ? _orange : AppTheme.borderColorOf(context),
+                  color: _editingQty
+                      ? _orange
+                      : AppTheme.borderColorOf(context),
                   width: _editingQty ? 1.5 : 1,
                 ),
               ),
@@ -1470,9 +1537,8 @@ class _CartRowState extends ConsumerState<_CartRow> {
           _QtyBtn(
             icon: Icons.add,
             compact: density.compact,
-            onTap: () => ref
-                .read(cartProvider.notifier)
-                .increaseQuantity(item.lineId),
+            onTap: () =>
+                ref.read(cartProvider.notifier).increaseQuantity(item.lineId),
           ),
         ],
       ),
@@ -1489,7 +1555,9 @@ class _CartRowState extends ConsumerState<_CartRow> {
     return Container(
       color: kitchenSent
           ? _success.withValues(alpha: 0.06)
-          : (widget.isEven ? AppTheme.rowEvenOf(context) : AppTheme.rowOddOf(context)),
+          : (widget.isEven
+                ? AppTheme.rowEvenOf(context)
+                : AppTheme.rowOddOf(context)),
       padding: EdgeInsets.symmetric(horizontal: density.horizontalPadding),
       child: density.stackedRows
           ? Padding(
@@ -1530,9 +1598,8 @@ class _CartRowState extends ConsumerState<_CartRow> {
                 SizedBox(
                   width: density.leadingWidth,
                   child: InkWell(
-                    onTap: () => ref
-                        .read(cartProvider.notifier)
-                        .removeItem(item.lineId),
+                    onTap: () =>
+                        ref.read(cartProvider.notifier).removeItem(item.lineId),
                     child: const Padding(
                       padding: EdgeInsets.all(6),
                       child: Icon(Icons.close, size: 13, color: _error),
@@ -1818,7 +1885,7 @@ class _EmptyCart extends StatelessWidget {
 // Summary + Pay button
 // รักษา subtotal / totalDiscount / total จากไฟล์เดิม
 // ─────────────────────────────────────────────────────────────────
-class _CartSummary extends StatelessWidget {
+class _CartSummary extends ConsumerWidget {
   final CartState cartState;
   final _CartPanelDensity density;
   final bool showCheckoutButton;
@@ -1848,7 +1915,7 @@ class _CartSummary extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final totalFontSize = density.compact
         ? 18.0
@@ -2136,6 +2203,9 @@ class _CartSummary extends StatelessWidget {
                           onPressed: !canCheckout
                               ? null
                               : () async {
+                                  final checkoutContext = ref.read(
+                                    restaurantOrderContextProvider,
+                                  );
                                   final result =
                                       await Navigator.push<ReceiptExitAction>(
                                         context,
@@ -2143,6 +2213,23 @@ class _CartSummary extends StatelessWidget {
                                           builder: (_) => const PaymentPage(),
                                         ),
                                       );
+                                  if (checkoutContext?.isTakeaway == true &&
+                                      ref.read(
+                                            restaurantOrderContextProvider,
+                                          ) ==
+                                          null) {
+                                    ref
+                                            .read(
+                                              restaurantOrderContextProvider
+                                                  .notifier,
+                                            )
+                                            .state =
+                                        RestaurantOrderContext.takeaway(
+                                          branchId: checkoutContext!.branchId,
+                                          skipKitchen:
+                                              checkoutContext.skipKitchen,
+                                        );
+                                  }
                                   if (result == ReceiptExitAction.openNewBill) {
                                     onOpenNewBill?.call();
                                   }

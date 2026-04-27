@@ -100,6 +100,10 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
     final allItems     = order.items ?? [];
     final regularItems = allItems.where((i) => !i.isFreeItem).toList();
     final freeItems    = allItems.where((i) => i.isFreeItem).toList();
+    final isRestaurantOrder =
+        (order.serviceType?.trim().isNotEmpty ?? false) ||
+        (order.tableId?.trim().isNotEmpty ?? false) ||
+        (order.sessionId?.trim().isNotEmpty ?? false);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -229,7 +233,12 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
                         ],
                       ),
                       const Divider(),
-                      ...regularItems.map((item) => _buildItemRow(item)),
+                      ...regularItems.map(
+                        (item) => _buildItemRow(
+                          item,
+                          showRestaurantDetails: isRestaurantOrder,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -595,7 +604,11 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
     );
   }
 
-  Widget _buildItemRow(SalesOrderItemModel item) {
+  Widget _buildItemRow(
+    SalesOrderItemModel item, {
+    bool showRestaurantDetails = false,
+  }) {
+    final detail = item.specialInstructions?.trim();
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
@@ -609,6 +622,29 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
                     style: const TextStyle(fontWeight: FontWeight.w500)),
                 Text(item.productCode,
                     style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                if (showRestaurantDetails &&
+                    detail != null &&
+                    detail.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.notes, size: 14, color: Colors.orange[700]),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            detail,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.orange[800],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
               ],
             ),
           ),
@@ -760,6 +796,7 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
               quantity: i.quantity,
               unitPrice: i.unitPrice,
               amount: i.amount,
+              note: i.specialInstructions,
             ),
           )
           .toList(),
@@ -909,6 +946,7 @@ class _OrderReceiptPageState extends ConsumerState<_OrderReceiptPage> {
                 quantity:  i.quantity,
                 unitPrice: i.unitPrice,
                 amount:    i.amount,
+                note:      i.specialInstructions,
               ))
           .toList(),
       freeItems: freeItems
@@ -1132,6 +1170,7 @@ class _OrderReceiptPageState extends ConsumerState<_OrderReceiptPage> {
                   quantity:  i.quantity,
                   unitPrice: i.unitPrice,
                   amount:    i.amount,
+                  note:      i.specialInstructions,
                 )).toList(),
             freeItems: freeItems.map((i) => ReceiptFreeItem(
                   name:          i.productName,

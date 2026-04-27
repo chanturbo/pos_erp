@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/busy_overlay.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -43,7 +42,7 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
     final takeawayPendingCount = ref.watch(takeawayOpenOrdersCountProvider);
 
     return Scaffold(
-      backgroundColor: AppTheme.surfaceColor,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('โต๊ะอาหาร'),
         backgroundColor: AppTheme.navyColor,
@@ -117,8 +116,9 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
             tooltip: 'รีเฟรช',
           ),
           PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert),
+            icon: const Icon(Icons.more_vert, color: Colors.white),
             onSelected: (v) {
+              if (v == 'add_table') _showAddTableDialog(context);
               if (v == 'zones') _showZoneManagerDialog(context);
               if (v == 'floor_plan') {
                 Navigator.push(
@@ -135,8 +135,19 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
                 );
               }
             },
-            itemBuilder: (_) => const [
-              PopupMenuItem(
+            itemBuilder: (_) => [
+              const PopupMenuItem(
+                value: 'add_table',
+                child: Row(
+                  children: [
+                    Icon(Icons.add_circle_outline, size: 18),
+                    SizedBox(width: 8),
+                    Text('เพิ่มโต๊ะ'),
+                  ],
+                ),
+              ),
+              const PopupMenuDivider(),
+              const PopupMenuItem(
                 value: 'floor_plan',
                 child: Row(
                   children: [
@@ -146,7 +157,7 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
                   ],
                 ),
               ),
-              PopupMenuItem(
+              const PopupMenuItem(
                 value: 'waiters',
                 child: Row(
                   children: [
@@ -156,7 +167,7 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
                   ],
                 ),
               ),
-              PopupMenuItem(
+              const PopupMenuItem(
                 value: 'zones',
                 child: Row(
                   children: [
@@ -178,7 +189,7 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
               children: [
                 // ── Status Legend ──────────────────────────────────────────
                 _StatusLegend(),
-                const SizedBox(height: 4),
+                const Divider(height: 1),
 
                 // ── Zone Filter ────────────────────────────────────────────
                 zonesAsync.when(
@@ -252,13 +263,6 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
                         child: ListView(
                           padding: const EdgeInsets.all(16),
                           children: [
-                            // ── ซื้อกลับ section ──────────────────────────
-                            _TakeawaySectionPanel(
-                              onStartKitchen: _isBusy ? null : () => _startTakeawayOrder(skipKitchen: false),
-                              onStartSkipKitchen: _isBusy ? null : () => _startTakeawayOrder(skipKitchen: true),
-                              onResume: _isBusy ? null : _resumeTakeawayHold,
-                            ),
-                            const SizedBox(height: 20),
                             // ── Zone sections ─────────────────────────────
                             ...byZone.entries.map((entry) {
                               final zoneName =
@@ -314,12 +318,6 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
           ),
           BusyOverlay(message: _busyMessage),
         ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _isBusy ? null : () => _showAddTableDialog(context),
-        backgroundColor: AppTheme.primaryColor,
-        icon: const Icon(Icons.add),
-        label: const Text('เพิ่มโต๊ะ'),
       ),
     );
   }
@@ -719,117 +717,6 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
     await ref.read(tableListProvider.notifier).refresh(branchId: branchId);
   }
 
-  Future<void> _startTakeawayOrder({required bool skipKitchen}) async {
-    if (!mounted) return;
-
-    final cartState = ref.read(cartProvider);
-    final hasPendingCart =
-        cartState.items.isNotEmpty ||
-        cartState.freeItems.isNotEmpty ||
-        cartState.appliedCoupons.isNotEmpty ||
-        cartState.discountAmount > 0 ||
-        cartState.discountPercent > 0;
-
-    String? autoHoldName;
-    if (hasPendingCart) {
-      // Auto-hold the current order instead of asking to clear
-      final now = DateTime.now();
-      final baseName =
-          'ซื้อกลับ ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
-      autoHoldName = _uniqueHoldName(baseName);
-      ref
-          .read(cartProvider.notifier)
-          .hold(autoHoldName, isTakeaway: true, skipKitchen: skipKitchen);
-      // hold() clears the cart internally
-    }
-
-    ref
-        .read(restaurantOrderContextProvider.notifier)
-        .state = RestaurantOrderContext.takeaway(
-      branchId: ref.read(selectedBranchProvider)?.branchId ?? '',
-      skipKitchen: skipKitchen,
-    );
-
-    if (!mounted) return;
-    if (autoHoldName != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('พักบิล "$autoHoldName" ไว้แล้ว'),
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    }
-    Navigator.push(context, MaterialPageRoute(builder: (_) => const PosPage()));
-  }
-
-  /// คืนชื่อที่ไม่ซ้ำกับ hold orders ที่มีอยู่แล้ว
-  /// ถ้า "ซื้อกลับ 14:30" มีอยู่แล้ว → คืน "ซื้อกลับ 14:30 (2)", "(3)", ...
-  String _uniqueHoldName(String base) {
-    final existing = ref
-        .read(holdOrdersProvider)
-        .orders
-        .map((o) => o.name)
-        .toSet();
-    if (!existing.contains(base)) return base;
-    int counter = 2;
-    while (existing.contains('$base ($counter)')) {
-      counter++;
-    }
-    return '$base ($counter)';
-  }
-
-  Future<void> _resumeTakeawayHold(int index) async {
-    // อ่าน skipKitchen จาก hold order ก่อน recall เพื่อ restore context ได้ถูกต้อง
-    final holdOrders = ref.read(holdOrdersProvider).orders;
-    final recalledSkipKitchen = index < holdOrders.length
-        ? holdOrders[index].skipKitchen
-        : false;
-
-    final cartState = ref.read(cartProvider);
-    final hasPendingCart =
-        cartState.items.isNotEmpty ||
-        cartState.freeItems.isNotEmpty ||
-        cartState.appliedCoupons.isNotEmpty ||
-        cartState.discountAmount > 0 ||
-        cartState.discountPercent > 0;
-
-    if (hasPendingCart) {
-      // Auto-hold current cart before recalling — prevents merging two customers' orders
-      final existingCtx = ref.read(restaurantOrderContextProvider);
-      final existingIsTakeaway = existingCtx?.isTakeaway ?? false;
-      final existingSkipKitchen = existingCtx?.skipKitchen ?? false;
-      final now = DateTime.now();
-      final holdName = _uniqueHoldName(
-        'ซื้อกลับ ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}',
-      );
-      ref
-          .read(cartProvider.notifier)
-          .hold(
-            holdName,
-            isTakeaway: existingIsTakeaway,
-            skipKitchen: existingSkipKitchen,
-          );
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('พักบิล "$holdName" ไว้แล้ว'),
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      }
-    }
-
-    ref.read(holdOrdersProvider.notifier).recallOrder(index);
-    ref
-        .read(restaurantOrderContextProvider.notifier)
-        .state = RestaurantOrderContext.takeaway(
-      branchId: ref.read(selectedBranchProvider)?.branchId ?? '',
-      skipKitchen: recalledSkipKitchen,
-    );
-    if (!mounted) return;
-    Navigator.push(context, MaterialPageRoute(builder: (_) => const PosPage()));
-  }
-
   void _openOrderPage(DiningTableModel table, TableSessionModel session) {
     ref
         .read(restaurantOrderContextProvider.notifier)
@@ -1093,22 +980,66 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
                         : ListView.builder(
                             shrinkWrap: true,
                             itemCount: zones.length,
-                            itemBuilder: (_, i) => ListTile(
-                              dense: true,
-                              title: Text(zones[i].zoneName),
-                              trailing: IconButton(
-                                icon: const Icon(
-                                  Icons.delete_outline,
-                                  color: Colors.red,
-                                  size: 20,
+                            itemBuilder: (_, i) {
+                              final tables =
+                                  ref.read(tableListProvider).asData?.value ??
+                                  [];
+                              final zoneTableCount = tables
+                                  .where((t) => t.zoneId == zones[i].zoneId)
+                                  .length;
+                              return ListTile(
+                                dense: true,
+                                title: Text(zones[i].zoneName),
+                                subtitle: zoneTableCount > 0
+                                    ? Text(
+                                        '$zoneTableCount โต๊ะ',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: AppTheme.mutedTextOf(ctx),
+                                        ),
+                                      )
+                                    : null,
+                                trailing: IconButton(
+                                  icon: Icon(
+                                    Icons.delete_outline,
+                                    color: zoneTableCount > 0
+                                        ? Colors.grey.shade400
+                                        : Colors.red,
+                                    size: 20,
+                                  ),
+                                  tooltip: zoneTableCount > 0
+                                      ? 'มีโต๊ะอยู่ในโซนนี้ ไม่สามารถลบได้'
+                                      : 'ลบโซน',
+                                  onPressed: () async {
+                                    if (zoneTableCount > 0) {
+                                      await showDialog<void>(
+                                        context: ctx,
+                                        builder: (_) => AlertDialog(
+                                          title: const Text(
+                                            'ไม่สามารถลบโซนได้',
+                                          ),
+                                          content: Text(
+                                            'โซน "${zones[i].zoneName}" ยังมีโต๊ะอยู่ $zoneTableCount โต๊ะ\n'
+                                            'กรุณาลบหรือย้ายโต๊ะออกจากโซนก่อน',
+                                          ),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () =>
+                                                  Navigator.pop(ctx),
+                                              child: const Text('ตกลง'),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                      return;
+                                    }
+                                    await ref
+                                        .read(zoneListProvider.notifier)
+                                        .deleteZone(zones[i].zoneId);
+                                  },
                                 ),
-                                onPressed: () async {
-                                  await ref
-                                      .read(zoneListProvider.notifier)
-                                      .deleteZone(zones[i].zoneId);
-                                },
-                              ),
-                            ),
+                              );
+                            },
                           ),
                     loading: () =>
                         const Center(child: CircularProgressIndicator()),
@@ -1213,7 +1144,7 @@ class _ZoneFilterBar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final selected = ref.watch(selectedZoneFilterProvider);
     return Container(
-      color: Colors.white,
+      color: AppTheme.cardColor(context),
       height: 44,
       child: ListView(
         scrollDirection: Axis.horizontal,
@@ -1298,255 +1229,6 @@ class _ZoneHeader extends StatelessWidget {
       ),
     ],
   );
-}
-
-// ── Takeaway Section Panel ─────────────────────────────────────────────────────
-class _TakeawaySectionPanel extends ConsumerWidget {
-  final VoidCallback? onStartKitchen;
-  final VoidCallback? onStartSkipKitchen;
-  final void Function(int index)? onResume;
-
-  const _TakeawaySectionPanel({
-    this.onStartKitchen,
-    this.onStartSkipKitchen,
-    this.onResume,
-  });
-
-  Future<void> _confirmDelete(
-    BuildContext context,
-    WidgetRef ref,
-    int originalIndex,
-    String name,
-  ) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('ยกเลิกบิล'),
-        content: Text('ต้องการยกเลิกบิล "$name" ใช่หรือไม่?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('ไม่ใช่'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('ยกเลิกบิล'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true) {
-      ref.read(holdOrdersProvider.notifier).removeOrder(originalIndex);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final holdOrders = ref.watch(holdOrdersProvider);
-    final takeawayEntries = holdOrders.orders
-        .asMap()
-        .entries
-        .where((e) => e.value.isTakeaway)
-        .toList();
-
-    return Container(
-      decoration: BoxDecoration(
-        color: AppTheme.cardColor(context),
-        borderRadius: AppRadius.md,
-        border: Border.all(color: Colors.orange.shade300),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ── Header ────────────────────────────────────────────────
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.orange.shade50,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(7),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withValues(alpha: 0.15),
-                    borderRadius: AppRadius.sm,
-                  ),
-                  child: Icon(Icons.takeout_dining, color: Colors.orange.shade700, size: 18),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'ซื้อกลับบ้าน',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                      color: Colors.orange.shade800,
-                    ),
-                  ),
-                ),
-                if (takeawayEntries.isNotEmpty)
-                  Container(
-                    margin: const EdgeInsets.only(right: 10),
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.shade600,
-                      borderRadius: AppRadius.pill,
-                    ),
-                    child: Text(
-                      '${takeawayEntries.length}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                OutlinedButton.icon(
-                  onPressed: onStartKitchen,
-                  icon: const Icon(Icons.kitchen_outlined, size: 15),
-                  label: const Text('ส่งเข้าครัว', style: TextStyle(fontSize: 12)),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.orange.shade700,
-                    side: BorderSide(color: Colors.orange.shade400),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    shape: RoundedRectangleBorder(borderRadius: AppRadius.sm),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                FilledButton.icon(
-                  onPressed: onStartSkipKitchen,
-                  icon: const Icon(Icons.shopping_bag_outlined, size: 15),
-                  label: const Text('พร้อมแล้ว', style: TextStyle(fontSize: 12)),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: Colors.orange.shade600,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    shape: RoundedRectangleBorder(borderRadius: AppRadius.sm),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // ── Hold order list ────────────────────────────────────────
-          if (takeawayEntries.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-              child: Row(
-                children: [
-                  Icon(Icons.inbox_outlined, size: 16, color: AppTheme.mutedTextOf(context)),
-                  const SizedBox(width: 8),
-                  Text(
-                    'ยังไม่มีออเดอร์ที่พักไว้',
-                    style: TextStyle(fontSize: 13, color: AppTheme.mutedTextOf(context)),
-                  ),
-                ],
-              ),
-            )
-          else
-            ...takeawayEntries.map((entry) {
-              final order = entry.value;
-              final cart = order.cartState;
-              final isLast = entry == takeawayEntries.last;
-              return Column(
-                children: [
-                  InkWell(
-                    onTap: onResume != null ? () => onResume!(entry.key) : null,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(7),
-                            decoration: BoxDecoration(
-                              color: Colors.orange.withValues(alpha: 0.10),
-                              borderRadius: AppRadius.sm,
-                            ),
-                            child: Icon(
-                              Icons.pause_circle_outline_rounded,
-                              size: 16,
-                              color: Colors.orange.shade700,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  order.name,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 13,
-                                    color: Colors.orange.shade800,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  '${cart.items.length} รายการ · ฿${cart.total.toStringAsFixed(2)} · ${DateFormat('HH:mm').format(order.timestamp)}',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: AppTheme.mutedTextOf(context),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                            decoration: BoxDecoration(
-                              color: Colors.orange.shade600,
-                              borderRadius: AppRadius.pill,
-                            ),
-                            child: const Text(
-                              'ต่อ',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          GestureDetector(
-                            onTap: () => _confirmDelete(context, ref, entry.key, order.name),
-                            child: Container(
-                              width: 22,
-                              height: 22,
-                              decoration: BoxDecoration(
-                                color: Colors.red.shade400,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(Icons.close, size: 13, color: Colors.white),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  if (!isLast)
-                    Divider(
-                      height: 1,
-                      indent: 14,
-                      endIndent: 14,
-                      color: AppTheme.borderColorOf(context),
-                    ),
-                ],
-              );
-            }),
-          const SizedBox(height: 4),
-        ],
-      ),
-    );
-  }
 }
 
 class _EmptyState extends StatelessWidget {

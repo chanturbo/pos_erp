@@ -322,6 +322,8 @@ class _SetupOnboardingPageState extends ConsumerState<SetupOnboardingPage> {
   final _addressController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   final _dateTimeFmt = DateFormat('dd/MM/yyyy HH:mm', 'th_TH');
+  final _scrollController = ScrollController();
+  final _stepSectionKey = GlobalKey();
 
   int _currentStep = 0;
   bool _saving = false;
@@ -336,6 +338,7 @@ class _SetupOnboardingPageState extends ConsumerState<SetupOnboardingPage> {
   // Demo data selection state
   bool _demoChoicePending = false;
   bool _demoSeeding = false;
+  String? _selectedDemoMode;
   SetupRestoreSnapshot _restoreSnapshot = const SetupRestoreSnapshot(
     status: SetupRestoreStatus.undecided,
   );
@@ -376,6 +379,7 @@ class _SetupOnboardingPageState extends ConsumerState<SetupOnboardingPage> {
     _companyNameController.dispose();
     _phoneController.dispose();
     _addressController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -434,7 +438,10 @@ class _SetupOnboardingPageState extends ConsumerState<SetupOnboardingPage> {
   Future<void> _checkDemoChoice() async {
     final mode = await SetupStorage.getDemoMode();
     if (!mounted) return;
-    setState(() => _demoChoicePending = mode == null);
+    setState(() {
+      _demoChoicePending = mode == null;
+      _selectedDemoMode = mode;
+    });
   }
 
   Future<void> _applyDemoMode(String mode) async {
@@ -452,6 +459,7 @@ class _SetupOnboardingPageState extends ConsumerState<SetupOnboardingPage> {
       setState(() {
         _demoChoicePending = false;
         _demoSeeding = false;
+        _selectedDemoMode = mode;
       });
     } catch (e) {
       if (!mounted) return;
@@ -465,8 +473,35 @@ class _SetupOnboardingPageState extends ConsumerState<SetupOnboardingPage> {
     }
   }
 
+  ({IconData icon, String label, Color color}) _demoModeInfo(String mode) =>
+      switch (mode) {
+        'pos' => (
+            icon: Icons.point_of_sale,
+            label: 'POS ร้านค้า',
+            color: Colors.green,
+          ),
+        'restaurant' => (
+            icon: Icons.restaurant,
+            label: 'ร้านอาหาร',
+            color: Colors.orange,
+          ),
+        'both' => (
+            icon: Icons.store,
+            label: 'ทั้งสองระบบ',
+            color: Colors.purple,
+          ),
+        _ => (
+            icon: Icons.do_not_disturb_alt_outlined,
+            label: 'ไม่ต้องการ',
+            color: Colors.grey,
+          ),
+      };
+
   Widget _demoDataCard() {
-    if (!_demoChoicePending) return const SizedBox.shrink();
+    if (!_demoChoicePending && _selectedDemoMode == null) {
+      return const SizedBox.shrink();
+    }
+
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       shape: RoundedRectangleBorder(
@@ -478,6 +513,7 @@ class _SetupOnboardingPageState extends ConsumerState<SetupOnboardingPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // ── Header ──────────────────────────────────────────────
             Row(
               children: [
                 Icon(Icons.dataset_outlined, color: Colors.blue.shade700, size: 20),
@@ -505,64 +541,155 @@ class _SetupOnboardingPageState extends ConsumerState<SetupOnboardingPage> {
               ],
             ),
             const SizedBox(height: 8),
-            Text(
-              'เลือกประเภทข้อมูลตัวอย่างที่ต้องการสร้างสำหรับการใช้งานครั้งแรก',
-              style: TextStyle(fontSize: 13, color: AppTheme.subtextColorOf(context)),
-            ),
-            const SizedBox(height: 14),
-            if (_demoSeeding)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 12),
+
+            // ── Body: pending หรือ selected ──────────────────────────
+            if (_demoChoicePending) ...[
+              Text(
+                'เลือกประเภทข้อมูลตัวอย่างที่ต้องการสร้างสำหรับการใช้งานครั้งแรก',
+                style: TextStyle(fontSize: 13, color: AppTheme.subtextColorOf(context)),
+              ),
+              const SizedBox(height: 14),
+              if (_demoSeeding)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                        SizedBox(width: 12),
+                        Text('กำลังสร้างข้อมูลตัวอย่าง...'),
+                      ],
+                    ),
+                  ),
+                )
+              else
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    _demoOptionButton(
+                      icon: Icons.point_of_sale,
+                      label: 'POS ร้านค้า',
+                      description: 'สินค้าขายปลีก + สต๊อก',
+                      color: Colors.green,
+                      onTap: () => _applyDemoMode('pos'),
+                    ),
+                    _demoOptionButton(
+                      icon: Icons.restaurant,
+                      label: 'ร้านอาหาร',
+                      description: 'เมนูอาหาร + โต๊ะ + KDS',
+                      color: Colors.orange,
+                      onTap: () => _applyDemoMode('restaurant'),
+                    ),
+                    _demoOptionButton(
+                      icon: Icons.store,
+                      label: 'ทั้งสองระบบ',
+                      description: 'POS + ร้านอาหาร',
+                      color: Colors.purple,
+                      onTap: () => _applyDemoMode('both'),
+                    ),
+                    _demoOptionButton(
+                      icon: Icons.close,
+                      label: 'ไม่ต้องการ',
+                      description: 'เริ่มจากข้อมูลเปล่า',
+                      color: Colors.grey,
+                      onTap: () => _applyDemoMode('none'),
+                    ),
+                  ],
+                ),
+            ] else if (_selectedDemoMode != null) ...[
+              // ── แสดงสถานะที่เลือกแล้ว ─────────────────────────────
+              const SizedBox(height: 4),
+              Builder(builder: (context) {
+                final info = _demoModeInfo(_selectedDemoMode!);
+                return Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: info.color.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: info.color.withValues(alpha: 0.3)),
+                  ),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: info.color.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(info.icon, color: info.color, size: 20),
                       ),
-                      SizedBox(width: 12),
-                      Text('กำลังสร้างข้อมูลตัวอย่าง...'),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'เลือกไว้: ${info.label}',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: info.color,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'ข้อมูลตัวอย่างถูกสร้างแล้ว',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppTheme.subtextColorOf(context),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () async {
+                          final confirmed = await showDialog<bool>(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              title: const Text('เปลี่ยนประเภทข้อมูลตัวอย่าง?'),
+                              content: const Text(
+                                'ข้อมูลตัวอย่างเดิม (สินค้า, หมวดหมู่, โต๊ะ, สต๊อก) จะถูกลบออก\nแล้วสร้างใหม่ตามประเภทที่เลือก',
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(ctx, false),
+                                  child: const Text('ยกเลิก'),
+                                ),
+                                FilledButton(
+                                  onPressed: () => Navigator.pop(ctx, true),
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: AppTheme.errorColor,
+                                  ),
+                                  child: const Text('ลบและเปลี่ยน'),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirmed == true && mounted) {
+                            setState(() => _demoChoicePending = true);
+                          }
+                        },
+                        style: TextButton.styleFrom(
+                          foregroundColor: info.color,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                        ),
+                        child: const Text('เปลี่ยน'),
+                      ),
                     ],
                   ),
-                ),
-              )
-            else
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: [
-                  _demoOptionButton(
-                    icon: Icons.point_of_sale,
-                    label: 'POS ร้านค้า',
-                    description: 'สินค้าขายปลีก + สต๊อก',
-                    color: Colors.green,
-                    onTap: () => _applyDemoMode('pos'),
-                  ),
-                  _demoOptionButton(
-                    icon: Icons.restaurant,
-                    label: 'ร้านอาหาร',
-                    description: 'เมนูอาหาร + โต๊ะ + KDS',
-                    color: Colors.orange,
-                    onTap: () => _applyDemoMode('restaurant'),
-                  ),
-                  _demoOptionButton(
-                    icon: Icons.store,
-                    label: 'ทั้งสองระบบ',
-                    description: 'POS + ร้านอาหาร',
-                    color: Colors.purple,
-                    onTap: () => _applyDemoMode('both'),
-                  ),
-                  _demoOptionButton(
-                    icon: Icons.close,
-                    label: 'ไม่ต้องการ',
-                    description: 'เริ่มจากข้อมูลเปล่า',
-                    color: Colors.grey,
-                    onTap: () => _applyDemoMode('none'),
-                  ),
-                ],
-              ),
+                );
+              }),
+            ],
           ],
         ),
       ),
@@ -951,6 +1078,16 @@ class _SetupOnboardingPageState extends ConsumerState<SetupOnboardingPage> {
   void _jumpToStep(int step) {
     if (!mounted) return;
     setState(() => _currentStep = step.clamp(0, 3));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = _stepSectionKey.currentContext;
+      if (ctx != null) {
+        Scrollable.ensureVisible(
+          ctx,
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeInOut,
+        );
+      }
+    });
   }
 
   @override
@@ -1032,6 +1169,7 @@ class _SetupOnboardingPageState extends ConsumerState<SetupOnboardingPage> {
           child: ConstrainedBox(
             constraints: BoxConstraints(maxWidth: context.contentMaxWidth),
             child: SingleChildScrollView(
+              controller: _scrollController,
               padding: const EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1049,6 +1187,7 @@ class _SetupOnboardingPageState extends ConsumerState<SetupOnboardingPage> {
                   _restoreChoiceCard(),
                   const SizedBox(height: 16),
                   _demoDataCard(),
+                  SizedBox(key: _stepSectionKey, width: double.infinity),
                   if (_currentStep == 0) _storeInfoStep(),
                   if (_currentStep == 1)
                     _branchWarehouseStep(

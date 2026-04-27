@@ -220,33 +220,33 @@ class _ProductToolbar extends ConsumerWidget {
 
           // View toggle
           Container(
-            decoration: BoxDecoration(
-              color: _surface,
-              borderRadius: AppRadius.sm,
-              border: Border.all(color: _border),
+              decoration: BoxDecoration(
+                color: _surface,
+                borderRadius: AppRadius.sm,
+                border: Border.all(color: _border),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _ToggleBtn(
+                    icon: Icons.grid_view,
+                    active: viewMode == ProductViewMode.grid,
+                    tooltip: 'Grid View',
+                    onTap: () => ref
+                        .read(productViewModeProvider.notifier)
+                        .set(ProductViewMode.grid),
+                  ),
+                  _ToggleBtn(
+                    icon: Icons.view_list,
+                    active: viewMode == ProductViewMode.list,
+                    tooltip: 'List View',
+                    onTap: () => ref
+                        .read(productViewModeProvider.notifier)
+                        .set(ProductViewMode.list),
+                  ),
+                ],
+              ),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _ToggleBtn(
-                  icon: Icons.grid_view,
-                  active: viewMode == ProductViewMode.grid,
-                  tooltip: 'Grid View',
-                  onTap: () => ref
-                      .read(productViewModeProvider.notifier)
-                      .set(ProductViewMode.grid),
-                ),
-                _ToggleBtn(
-                  icon: Icons.view_list,
-                  active: viewMode == ProductViewMode.list,
-                  tooltip: 'List View',
-                  onTap: () => ref
-                      .read(productViewModeProvider.notifier)
-                      .set(ProductViewMode.list),
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );

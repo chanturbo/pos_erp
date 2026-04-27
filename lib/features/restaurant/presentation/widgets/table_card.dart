@@ -18,7 +18,7 @@ class TableCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = _statusColors(table.status);
+    final colors = _statusColors(context, table.status);
 
     return GestureDetector(
       onTap: onTap,
@@ -169,52 +169,53 @@ class TableCard extends StatelessWidget {
     }
   }
 
-  _TableColors _statusColors(String status) {
+  _TableColors _statusColors(BuildContext context, String status) {
+    final isDark = AppTheme.isDark(context);
     switch (status) {
       case 'OCCUPIED':
         return _TableColors(
-          bg: const Color(0xFFFFF3E0),
+          bg: isDark ? const Color(0xFF2E1A00) : const Color(0xFFFFF3E0),
           border: const Color(0xFFFF9800),
           dot: const Color(0xFFFF9800),
-          text: const Color(0xFF5D4037),
+          text: isDark ? const Color(0xFFFFB74D) : const Color(0xFF5D4037),
           badge: const Color(0xFFFF9800),
           badgeText: Colors.white,
         );
       case 'RESERVED':
         return _TableColors(
-          bg: const Color(0xFFE3F2FD),
-          border: AppTheme.infoColor,
-          dot: AppTheme.infoColor,
-          text: const Color(0xFF1A237E),
-          badge: AppTheme.infoColor,
+          bg: isDark ? const Color(0xFF0D1F3A) : const Color(0xFFE3F2FD),
+          border: isDark ? AppTheme.infoLight : AppTheme.infoColor,
+          dot: isDark ? AppTheme.infoLight : AppTheme.infoColor,
+          text: isDark ? const Color(0xFF90CAF9) : const Color(0xFF1A237E),
+          badge: isDark ? AppTheme.infoLight : AppTheme.infoColor,
           badgeText: Colors.white,
         );
       case 'CLEANING':
         return _TableColors(
-          bg: const Color(0xFFFFFDE7),
+          bg: isDark ? const Color(0xFF2E2400) : const Color(0xFFFFFDE7),
           border: AppTheme.warningColor,
           dot: AppTheme.warningColor,
-          text: const Color(0xFF5D4037),
+          text: isDark ? const Color(0xFFFFD54F) : const Color(0xFF5D4037),
           badge: AppTheme.warningColor,
           badgeText: Colors.white,
         );
       case 'DISABLED':
         return _TableColors(
-          bg: const Color(0xFFF5F5F5),
-          border: Colors.grey.shade400,
-          dot: Colors.grey.shade400,
-          text: Colors.grey.shade600,
-          badge: Colors.grey.shade400,
+          bg: isDark ? const Color(0xFF242424) : const Color(0xFFF5F5F5),
+          border: isDark ? const Color(0xFF444444) : Colors.grey.shade400,
+          dot: isDark ? const Color(0xFF616161) : Colors.grey.shade400,
+          text: isDark ? const Color(0xFF757575) : Colors.grey.shade600,
+          badge: isDark ? const Color(0xFF444444) : Colors.grey.shade400,
           badgeText: Colors.white,
         );
       default: // AVAILABLE
         return _TableColors(
-          bg: const Color(0xFFE8F5E9),
-          border: AppTheme.successColor,
-          dot: AppTheme.successColor,
-          text: const Color(0xFF1B5E20),
-          badge: AppTheme.successColor,
-          badgeText: Colors.white,
+          bg: isDark ? const Color(0xFF1A2E1A) : const Color(0xFFE8F5E9),
+          border: isDark ? AppTheme.successLight : AppTheme.successColor,
+          dot: isDark ? AppTheme.successLight : AppTheme.successColor,
+          text: isDark ? const Color(0xFF81C784) : const Color(0xFF1B5E20),
+          badge: isDark ? AppTheme.successLight : AppTheme.successColor,
+          badgeText: isDark ? const Color(0xFF1B3A1F) : Colors.white,
         );
     }
   }

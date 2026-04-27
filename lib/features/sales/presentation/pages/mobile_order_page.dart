@@ -1163,7 +1163,10 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
     }
 
     ref.read(restaurantOrderContextProvider.notifier).state =
-        RestaurantOrderContext.takeaway(branchId: branch.branchId);
+        RestaurantOrderContext.takeaway(
+          branchId: branch.branchId,
+          skipKitchen: true,
+        );
     if (!mounted) return;
     Navigator.pop(context);
     _showCartAndRefocus();
@@ -1183,6 +1186,37 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
         ),
       );
       return;
+    }
+
+    // ── Guard: switching from takeaway → dine-in with items in cart ──
+    final currentCtx = ref.read(restaurantOrderContextProvider);
+    if (currentCtx?.isTakeaway == true) {
+      final cartItems = ref.read(cartProvider).items;
+      if (cartItems.isNotEmpty) {
+        if (!mounted) return;
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: const Text('เปลี่ยนไปโต๊ะอาหาร?'),
+            content: Text(
+              'มีสินค้า ${cartItems.length} รายการในตะกร้า (ซื้อกลับบ้าน)\n'
+              'การเปลี่ยนไปโต๊ะ ${table.displayName} จะล้างตะกร้าทั้งหมด',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('ยกเลิก'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('ล้างตะกร้า & เลือกโต๊ะ'),
+              ),
+            ],
+          ),
+        );
+        if (confirmed != true || !mounted) return;
+        ref.read(cartProvider.notifier).clear();
+      }
     }
 
     TableSessionModel? session;
@@ -1494,6 +1528,12 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
       child: Scaffold(
         backgroundColor: AppTheme.surfaceColorOf(context),
         appBar: AppBar(
+          backgroundColor:
+              Theme.of(context).brightness == Brightness.dark
+                  ? AppTheme.navyDark
+                  : AppTheme.navy,
+          foregroundColor: Colors.white,
+          elevation: 0,
           leading: AppRouter.isCashierRole(authState.user?.roleId)
               ? IconButton(
                   tooltip: 'ออกจากระบบ',

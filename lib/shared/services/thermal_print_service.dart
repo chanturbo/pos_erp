@@ -212,6 +212,11 @@ class ThermalPrintService {
       for (final line in _wrapText(item.name, lineWidth)) {
         writeln(line);
       }
+      if (item.note != null && item.note!.trim().isNotEmpty) {
+        for (final line in _wrapText(item.note!.trim(), lineWidth - 4)) {
+          writeln('  * $line');
+        }
+      }
       final detail =
           '  ${_formatQty(item.quantity)} x ${_money(item.unitPrice)}';
       writeln(_pair(detail, _money(item.amount), lineWidth));

@@ -36,9 +36,92 @@ class SeedData {
     }
   }
 
+  /// Clear all previously seeded demo data (products, groups, zones, tables, stock movements).
+  /// Essential data (company, branch, warehouse, users, roles, customers, suppliers) is kept.
+  static Future<void> clearDemoData(AppDatabase db) async {
+    if (kDebugMode) debugPrint('🗑️ Clearing demo data...');
+
+    // Stock movements — POS demo
+    await (db.delete(db.stockMovements)
+          ..where(
+            (s) => s.movementId.isIn([
+              'STK001', 'STK002', 'STK003', 'STK004',
+              'STK005', 'STK006', 'STK007', 'STK008',
+            ]),
+          ))
+        .go();
+
+    // Stock movements — restaurant demo
+    await (db.delete(db.stockMovements)
+          ..where(
+            (s) => s.movementId.isIn([
+              'RST-STK-001', 'RST-STK-002', 'RST-STK-003', 'RST-STK-004',
+              'RST-STK-005', 'RST-STK-006', 'RST-STK-007',
+            ]),
+          ))
+        .go();
+
+    // Dining tables — delete by zone (also clears any table with those zone IDs)
+    await (db.delete(db.diningTables)
+          ..where(
+            (t) => t.zoneId.isIn(['RST-ZONE-FRONT', 'RST-ZONE-AIR']),
+          ))
+        .go();
+
+    // Zones
+    await (db.delete(db.zones)
+          ..where(
+            (z) => z.zoneId.isIn(['RST-ZONE-FRONT', 'RST-ZONE-AIR']),
+          ))
+        .go();
+
+    // Products — POS demo
+    await (db.delete(db.products)
+          ..where(
+            (p) => p.productId.isIn([
+              'PRD001', 'PRD002', 'PRD003', 'PRD004',
+              'PRD005', 'PRD006', 'PRD007', 'PRD008',
+            ]),
+          ))
+        .go();
+
+    // Products — restaurant demo
+    await (db.delete(db.products)
+          ..where(
+            (p) => p.productId.isIn([
+              'RST-PRD-001', 'RST-PRD-002', 'RST-PRD-003', 'RST-PRD-004',
+              'RST-PRD-005', 'RST-PRD-006', 'RST-PRD-007',
+            ]),
+          ))
+        .go();
+
+    // Product groups — POS demo
+    await (db.delete(db.productGroups)
+          ..where(
+            (g) => g.groupId.isIn([
+              'GRP001', 'GRP002', 'GRP003', 'GRP004',
+              'GRP005', 'GRP006', 'GRP007', 'GRP008',
+            ]),
+          ))
+        .go();
+
+    // Product groups — restaurant demo
+    await (db.delete(db.productGroups)
+          ..where(
+            (g) => g.groupId.isIn([
+              'RST-GRP-FOOD', 'RST-GRP-DESSERT', 'RST-GRP-DRINK', 'RST-GRP-SNACK',
+              'RST-GRP-BAKERY', 'RST-GRP-BUFFET', 'RST-GRP-HEALTHY', 'RST-GRP-OTHER',
+            ]),
+          ))
+        .go();
+
+    if (kDebugMode) debugPrint('✅ Demo data cleared');
+  }
+
   /// Seed demo data by mode
   static Future<void> seedByMode(AppDatabase db, DemoMode mode) async {
     await seedEssential(db);
+    await clearDemoData(db);
     switch (mode) {
       case DemoMode.posOnly:
         await seedPosDemo(db);

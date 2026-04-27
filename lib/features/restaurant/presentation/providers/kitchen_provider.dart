@@ -15,6 +15,17 @@ import '../../data/models/kitchen_queue_model.dart';
 // null = ทุก station, 'kitchen' | 'bar' | 'dessert'
 final selectedKitchenStationProvider = StateProvider<String?>((ref) => null);
 
+// ── KDS pending badge count (PENDING + PREPARING) ────────────────────────────
+final kdsPendingCountProvider = Provider<int>((ref) {
+  return ref.watch(kitchenQueueProvider).maybeWhen(
+    data: (items) => items
+        .where((i) =>
+            i.kitchenStatus == 'PENDING' || i.kitchenStatus == 'PREPARING')
+        .length,
+    orElse: () => 0,
+  );
+});
+
 // ── Kitchen Queue ─────────────────────────────────────────────────────────────
 
 final kitchenQueueProvider =

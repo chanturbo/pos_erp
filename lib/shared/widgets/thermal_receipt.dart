@@ -15,12 +15,14 @@ class ReceiptItem {
   final double quantity;
   final double unitPrice;
   final double amount;
+  final String? note;
 
   const ReceiptItem({
     required this.name,
     required this.quantity,
     required this.unitPrice,
     required this.amount,
+    this.note,
   });
 }
 
@@ -201,6 +203,15 @@ class ThermalReceiptWidget extends StatelessWidget {
                         children: [
                           Text(item.name, style: _monoBd,
                               overflow: TextOverflow.ellipsis),
+                          if (item.note != null &&
+                              item.note!.trim().isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 1),
+                              child: Text(
+                                '  * ${item.note!.trim()}',
+                                style: _monoSm,
+                              ),
+                            ),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [

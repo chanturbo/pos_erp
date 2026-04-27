@@ -21,8 +21,10 @@ import '../../../branches/presentation/providers/branch_provider.dart';
 import '../../../testing/test_page.dart';
 import '../../../restaurant/presentation/pages/table_overview_page.dart';
 import '../../../restaurant/presentation/pages/kitchen_display_page.dart';
+import '../../../restaurant/presentation/providers/kitchen_provider.dart';
 import '../../../restaurant/presentation/pages/kitchen_analytics_page.dart';
 import '../../../restaurant/presentation/pages/reservations_page.dart';
+import '../../../restaurant/presentation/pages/takeaway_sales_page.dart';
 import '../../../restaurant/presentation/pages/takeaway_orders_page.dart';
 import '../../../sales/presentation/pages/pos_page.dart';
 import '../../../sales/presentation/pages/sales_history_page.dart';
@@ -102,6 +104,12 @@ class _HomePageState extends ConsumerState<HomePage> {
       if (showRestaurantSection)
         _MenuSection('ร้านอาหาร', [
           _MenuItem(
+            icon: Icons.takeout_dining,
+            title: 'ขายกลับบ้าน',
+            page: const TakeawaySalesPage(),
+            permissionKey: AppPermission.pos,
+          ),
+          _MenuItem(
             icon: Icons.table_restaurant,
             title: 'โต๊ะอาหาร',
             page: const TableOverviewPage(),
@@ -112,12 +120,7 @@ class _HomePageState extends ConsumerState<HomePage> {
             title: 'หน้าจอครัว (KDS)',
             page: const KitchenDisplayPage(),
             permissionKey: AppPermission.pos,
-          ),
-          _MenuItem(
-            icon: Icons.event_note,
-            title: 'การจองโต๊ะ',
-            page: const ReservationsPage(),
-            permissionKey: AppPermission.pos,
+            badgeId: 'kds_pending',
           ),
           _MenuItem(
             icon: Icons.receipt_long,
@@ -125,6 +128,12 @@ class _HomePageState extends ConsumerState<HomePage> {
             page: const TakeawayOrdersPage(),
             permissionKey: AppPermission.pos,
             badgeId: 'takeaway_pending',
+          ),
+          _MenuItem(
+            icon: Icons.event_note,
+            title: 'การจองโต๊ะ',
+            page: const ReservationsPage(),
+            permissionKey: AppPermission.pos,
           ),
           _MenuItem(
             icon: Icons.analytics,
@@ -280,9 +289,25 @@ class _HomePageState extends ConsumerState<HomePage> {
   Widget get _currentPage => _overridePage ?? _allItems[_selectedIndex].page;
 
   DashboardPage _buildDashboardPage() {
+    final selectedBranch = ref.read(selectedBranchProvider);
+    final isRestaurantMode = selectedBranch?.isRestaurantMode ?? true;
+
     return DashboardPage(
       showBackButton: false,
+      isRestaurantMode: isRestaurantMode,
       onGoToPos: _openPointOfSaleShortcut,
+      onGoToTableOverview: () => _openShortcutByTitle(
+        title: 'โต๊ะอาหาร',
+        fallbackPage: const TableOverviewPage(),
+      ),
+      onGoToTakeaway: () => _showOverridePageByTitle(
+        const TakeawaySalesPage(autoStartSkipKitchen: true),
+        'ขายกลับบ้าน',
+      ),
+      onGoToTakeawayKitchen: () => _showOverridePageByTitle(
+        const TakeawaySalesPage(autoStartSkipKitchen: false),
+        'ขายกลับบ้าน',
+      ),
       onGoToSalesHistory: () =>
           _showOverridePageByTitle(const SalesHistoryPage(), 'รายการขาย'),
       onGoToProducts: () => _openShortcutByTitle(
@@ -509,6 +534,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     final syncAsync = ref.watch(syncStatusProvider);
     final connectionAsync = ref.watch(connectionStatusProvider);
     final takeawayPendingCount = ref.watch(takeawayOpenOrdersCountProvider);
+    final kdsPendingCount = ref.watch(kdsPendingCountProvider);
     final roleId = user?.roleId?.toUpperCase();
     // watch provider (ไม่ใช่ notifier) เพื่อ rebuild เมื่อ async data โหลดเสร็จ
     final permData = ref.watch(rolePermissionsProvider).value;
@@ -542,7 +568,10 @@ class _HomePageState extends ConsumerState<HomePage> {
       allItems: _allItems,
       selectedIndex: _selectedIndex,
       visibleIndices: visibleIndices,
-      menuBadges: {'takeaway_pending': takeawayPendingCount},
+      menuBadges: {
+        'takeaway_pending': takeawayPendingCount,
+        'kds_pending': kdsPendingCount,
+      },
       user: user,
       syncAsync: syncAsync,
       connectionAsync: connectionAsync,
@@ -634,7 +663,6 @@ class _HomePageState extends ConsumerState<HomePage> {
       data: (value) => value,
       orElse: () => null,
     );
-    final takeawayPendingCount = ref.watch(takeawayOpenOrdersCountProvider);
 
     return AppBar(
       // Hamburger menu icon สำหรับเปิด Drawer
@@ -645,43 +673,6 @@ class _HomePageState extends ConsumerState<HomePage> {
         ),
       ),
       actions: [
-        IconButton(
-          tooltip: 'บิลกลับบ้านค้าง',
-          onPressed: () => _push(context, const TakeawayOrdersPage()),
-          icon: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              const Icon(Icons.receipt_long),
-              if (takeawayPendingCount > 0)
-                Positioned(
-                  right: -6,
-                  top: -6,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 5,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryColor,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    constraints: const BoxConstraints(minWidth: 18),
-                    child: Text(
-                      takeawayPendingCount > 99
-                          ? '99+'
-                          : '$takeawayPendingCount',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
         // Sync badge
         connectionAsync.when(
           data: (connection) => IconButton(
