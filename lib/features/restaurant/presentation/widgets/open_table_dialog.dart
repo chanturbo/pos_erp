@@ -127,6 +127,15 @@ class _OpenTableDialogState extends ConsumerState<OpenTableDialog> {
       actions: [
         TextButton(
           onPressed: _loading ? null : () => Navigator.pop(context),
+          style: TextButton.styleFrom(
+            foregroundColor: AppTheme.subtextColor,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            shape: RoundedRectangleBorder(borderRadius: AppRadius.sm),
+            textStyle: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           child: const Text('ยกเลิก'),
         ),
         FilledButton.icon(
@@ -139,7 +148,17 @@ class _OpenTableDialogState extends ConsumerState<OpenTableDialog> {
                 )
               : const Icon(Icons.check, size: 18),
           label: Text(_loading ? 'กำลังเปิด...' : 'เปิดโต๊ะ'),
-          style: FilledButton.styleFrom(backgroundColor: AppTheme.primaryColor),
+          style: FilledButton.styleFrom(
+            backgroundColor: AppTheme.primaryColor,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            shape: RoundedRectangleBorder(borderRadius: AppRadius.sm),
+            textStyle: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ),
       ],
     );
@@ -180,18 +199,25 @@ class _CountButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) => InkWell(
     onTap: onTap,
-    borderRadius: BorderRadius.circular(8),
+    borderRadius: AppRadius.sm,
     child: Container(
       width: 40,
       height: 40,
       decoration: BoxDecoration(
-        color: onTap != null ? AppTheme.primaryColor : Colors.grey.shade300,
-        borderRadius: BorderRadius.circular(8),
+        color: onTap != null
+            ? AppTheme.primaryColor.withValues(alpha: 0.12)
+            : Colors.grey.shade300,
+        borderRadius: AppRadius.sm,
+        border: Border.all(
+          color: onTap != null
+              ? AppTheme.primaryColor.withValues(alpha: 0.35)
+              : Colors.grey.shade300,
+        ),
       ),
       child: Icon(
         icon,
-        color: onTap != null ? Colors.white : Colors.grey.shade500,
-        size: 20,
+        color: onTap != null ? AppTheme.primaryColor : Colors.grey.shade500,
+        size: 18,
       ),
     ),
   );

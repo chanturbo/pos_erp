@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -22,7 +21,9 @@ final masterBackgroundHostStatusProvider = FutureProvider<bool?>((ref) async {
 });
 
 class SyncStatusPage extends ConsumerWidget {
-  const SyncStatusPage({super.key});
+  final bool preferBackButton;
+
+  const SyncStatusPage({super.key, this.preferBackButton = false});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -33,7 +34,13 @@ class SyncStatusPage extends ConsumerWidget {
     return Scaffold(
       backgroundColor: AppTheme.surfaceColorOf(context),
       appBar: AppBar(
-        leading: buildMobileHomeLeading(context),
+        leading: preferBackButton && Navigator.of(context).canPop()
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back_rounded),
+                tooltip: 'ย้อนกลับ',
+                onPressed: () => Navigator.of(context).maybePop(),
+              )
+            : buildMobileHomeLeading(context),
         automaticallyImplyLeading: Navigator.of(context).canPop(),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -231,9 +238,7 @@ class SyncStatusPage extends ConsumerWidget {
           const SizedBox(height: 16),
           _sectionTitle(
             context,
-            AppModeConfig.isStandalone
-                ? 'โหมดการใช้งาน'
-                : 'โหมดการเชื่อมต่อ',
+            AppModeConfig.isStandalone ? 'โหมดการใช้งาน' : 'โหมดการเชื่อมต่อ',
             AppModeConfig.isStandalone
                 ? Icons.computer_rounded
                 : Icons.router_outlined,
@@ -401,7 +406,8 @@ class SyncStatusPage extends ConsumerWidget {
                 ChoiceChip(
                   label: const Text('Slave POS'),
                   selected: AppModeConfig.mode == AppMode.clientPOS,
-                  onSelected: (_) => _switchMode(context, ref, AppMode.clientPOS),
+                  onSelected: (_) =>
+                      _switchMode(context, ref, AppMode.clientPOS),
                 ),
                 ChoiceChip(
                   label: const Text('Slave Mobile'),
@@ -431,30 +437,30 @@ class SyncStatusPage extends ConsumerWidget {
               icon: AppModeConfig.isStandalone
                   ? Icons.computer_rounded
                   : AppModeConfig.isMaster
-                      ? Icons.wifi_tethering_rounded
-                      : Icons.link_rounded,
+                  ? Icons.wifi_tethering_rounded
+                  : Icons.link_rounded,
               title: AppModeConfig.isStandalone
                   ? 'โหมดเครื่องเดียว'
                   : AppModeConfig.isMaster
-                      ? 'Master พร้อมให้เชื่อมต่อ'
-                      : (sync.masterName ?? 'ยังไม่ได้เชื่อมต่อ Master'),
+                  ? 'Master พร้อมให้เชื่อมต่อ'
+                  : (sync.masterName ?? 'ยังไม่ได้เชื่อมต่อ Master'),
               subtitle: AppModeConfig.isStandalone
                   ? 'ปิดระบบ sync และใช้งานฐานข้อมูลในเครื่องนี้เท่านั้น'
                   : AppModeConfig.isMaster
-                      ? (sync.serverBaseUrl ?? 'กำลังระบุ IP')
-                      : (AppModeConfig.masterIp != null
-                          ? '${AppModeConfig.masterIp}:${AppModeConfig.masterPort}'
-                          : 'เลือก Master ในรายการด้านล่าง'),
+                  ? (sync.serverBaseUrl ?? 'กำลังระบุ IP')
+                  : (AppModeConfig.masterIp != null
+                        ? '${AppModeConfig.masterIp}:${AppModeConfig.masterPort}'
+                        : 'เลือก Master ในรายการด้านล่าง'),
               color: AppModeConfig.isStandalone
                   ? AppTheme.infoColor
                   : AppModeConfig.isMaster
-                      ? AppTheme.successColor
-                      : AppTheme.infoColor,
+                  ? AppTheme.successColor
+                  : AppTheme.infoColor,
               buttonLabel: AppModeConfig.isStandalone
                   ? 'ใช้งานอยู่'
                   : AppModeConfig.isMaster
-                      ? 'ประกาศอยู่'
-                      : (AppModeConfig.masterIp != null ? 'ยกเลิก' : 'รอเชื่อมต่อ'),
+                  ? 'ประกาศอยู่'
+                  : (AppModeConfig.masterIp != null ? 'ยกเลิก' : 'รอเชื่อมต่อ'),
               onTap: AppModeConfig.isStandalone || AppModeConfig.isMaster
                   ? () {}
                   : () => _disconnectMaster(context, ref),
@@ -816,9 +822,11 @@ class SyncStatusPage extends ConsumerWidget {
                         (range) => ChoiceChip(
                           label: Text(_timeRangeLabel(range)),
                           selected: timeRange == range,
-                          onSelected: (_) => ref
-                              .read(syncBatchTimeRangeProvider.notifier)
-                              .state = range,
+                          onSelected: (_) =>
+                              ref
+                                      .read(syncBatchTimeRangeProvider.notifier)
+                                      .state =
+                                  range,
                         ),
                       )
                       .toList(),
@@ -837,18 +845,20 @@ class SyncStatusPage extends ConsumerWidget {
                         isDense: true,
                       ),
                       onChanged: (value) =>
-                          ref.read(syncBatchSearchProvider.notifier).state = value,
+                          ref.read(syncBatchSearchProvider.notifier).state =
+                              value,
                     ),
                     const SizedBox(height: 8),
                     SwitchListTile.adaptive(
                       contentPadding: EdgeInsets.zero,
                       value: issuesOnly,
-                      onChanged: (value) => ref
-                          .read(syncBatchIssuesOnlyProvider.notifier)
-                          .state = value,
+                      onChanged: (value) =>
+                          ref.read(syncBatchIssuesOnlyProvider.notifier).state =
+                              value,
                       title: const Text('แสดงเฉพาะ batch ที่มีปัญหา'),
-                      subtitle:
-                          const Text('โฟกัสเฉพาะ replay > 0 หรือ pending > 0'),
+                      subtitle: const Text(
+                        'โฟกัสเฉพาะ replay > 0 หรือ pending > 0',
+                      ),
                     ),
                   ],
                 ),
@@ -856,9 +866,7 @@ class SyncStatusPage extends ConsumerWidget {
               ...recent.map<Widget>((entry) {
                 final color = entry.hasPending
                     ? AppTheme.errorColor
-                    : (entry.hasReplay
-                        ? Colors.orange
-                        : AppTheme.successColor);
+                    : (entry.hasReplay ? Colors.orange : AppTheme.successColor);
                 return InkWell(
                   borderRadius: BorderRadius.circular(10),
                   onTap: () => _showBatchDetails(context, entry),
@@ -1031,15 +1039,14 @@ class SyncStatusPage extends ConsumerWidget {
 
     await Clipboard.setData(ClipboardData(text: buffer.toString()));
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('คัดลอก Debug Report แล้ว')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('คัดลอก Debug Report แล้ว')));
     }
   }
 
   List<SyncBatchHistoryModel> _filterHistory(
-    List<SyncBatchHistoryModel> history,
-    {
+    List<SyncBatchHistoryModel> history, {
     required SyncBatchTimeRange timeRange,
     required String searchQuery,
     required bool issuesOnly,
@@ -1059,7 +1066,9 @@ class SyncStatusPage extends ConsumerWidget {
     }
 
     if (issuesOnly) {
-      filtered = filtered.where((entry) => entry.hasReplay || entry.hasPending).toList();
+      filtered = filtered
+          .where((entry) => entry.hasReplay || entry.hasPending)
+          .toList();
     }
 
     return filtered;
@@ -1079,7 +1088,9 @@ class SyncStatusPage extends ConsumerWidget {
       SyncBatchTimeRange.all => DateTime.fromMillisecondsSinceEpoch(0),
     };
 
-    return history.where((entry) => entry.createdAt.isAfter(threshold)).toList();
+    return history
+        .where((entry) => entry.createdAt.isAfter(threshold))
+        .toList();
   }
 
   String _timeRangeLabel(SyncBatchTimeRange range) {
@@ -1444,7 +1455,9 @@ class SyncStatusPage extends ConsumerWidget {
                   title: Text(w.warehouseName),
                   subtitle: Text(w.warehouseCode),
                   onTap: () {
-                    ref.read(selectedWarehouseProvider.notifier).setWarehouse(w);
+                    ref
+                        .read(selectedWarehouseProvider.notifier)
+                        .setWarehouse(w);
                     Navigator.pop(context);
                   },
                 ),
@@ -1577,9 +1590,9 @@ class SyncStatusPage extends ConsumerWidget {
     ref.invalidate(syncStatusProvider);
 
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('บันทึกชื่ออุปกรณ์แล้ว')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('บันทึกชื่ออุปกรณ์แล้ว')));
     }
   }
 
@@ -1599,7 +1612,9 @@ class SyncStatusPage extends ConsumerWidget {
     WidgetRef ref,
     DiscoveredMaster master,
   ) async {
-    final tempClient = ApiClient(baseUrl: 'http://${master.host}:${master.port}');
+    final tempClient = ApiClient(
+      baseUrl: 'http://${master.host}:${master.port}',
+    );
 
     try {
       final health = await tempClient.get('/api/health');

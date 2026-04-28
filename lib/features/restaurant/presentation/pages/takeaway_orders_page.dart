@@ -37,7 +37,7 @@ class _TakeawayOrdersPageState extends ConsumerState<TakeawayOrdersPage> {
   String _searchQuery = '';
   _TakeawayDateFilter _dateFilter = _TakeawayDateFilter.today;
   _TakeawayStatusFilter _statusFilter = _TakeawayStatusFilter.open;
-  final _TakeawaySort _sort = _TakeawaySort.latest;
+  _TakeawaySort _sort = _TakeawaySort.latest;
   Set<String> _knownOpenOrderIds = <String>{};
   Timer? _highlightClearTimer;
   Timer? _countdownTimer;
@@ -67,11 +67,34 @@ class _TakeawayOrdersPageState extends ConsumerState<TakeawayOrdersPage> {
 
   void _refreshAll() {
     _startCountdown();
-    unawaited(ref.read(salesHistoryProvider.notifier).refresh());
+    unawaited(_refreshAndHighlightNewOrders());
   }
 
-  Future<void> _pullRefresh() =>
-      ref.read(salesHistoryProvider.notifier).refresh();
+  Future<void> _pullRefresh() => _refreshAndHighlightNewOrders();
+
+  Future<void> _refreshAndHighlightNewOrders() async {
+    final previousIds = Set<String>.of(_knownOpenOrderIds);
+
+    await ref.read(salesHistoryProvider.notifier).refresh();
+    if (!mounted) return;
+
+    final openOrders = ref.read(takeawayOpenOrdersProvider);
+    final nextIds = openOrders.map((o) => o.orderId).toSet();
+
+    if (!_didPrimeOpenOrders) {
+      _knownOpenOrderIds = nextIds;
+      _didPrimeOpenOrders = true;
+      return;
+    }
+
+    final newIds = nextIds.difference(previousIds);
+    _knownOpenOrderIds = nextIds;
+
+    final unhighlightedNewIds = newIds.difference(_highlightedOrderIds);
+    if (unhighlightedNewIds.isNotEmpty) {
+      _highlightNewOrders(unhighlightedNewIds, openOrders);
+    }
+  }
 
   @override
   void dispose() {
@@ -111,6 +134,11 @@ class _TakeawayOrdersPageState extends ConsumerState<TakeawayOrdersPage> {
 
     final ordersAsync = ref.watch(salesHistoryProvider);
     final takeawayOrders = ref.watch(takeawayOrdersProvider);
+    final currentOpenOrders = ref.watch(takeawayOpenOrdersProvider);
+    if (!_didPrimeOpenOrders && ordersAsync.hasValue) {
+      _knownOpenOrderIds = currentOpenOrders.map((o) => o.orderId).toSet();
+      _didPrimeOpenOrders = true;
+    }
 
     return Scaffold(
       backgroundColor: AppTheme.surfaceColor,
@@ -140,13 +168,13 @@ class _TakeawayOrdersPageState extends ConsumerState<TakeawayOrdersPage> {
           final filteredOrders = _applyStatusAndSort(dateSearchFiltered);
 
           final openCount = dateSearchFiltered
-              .where((o) => o.status.toUpperCase() == 'OPEN')
+              .where((o) => _normalizedOrderStatus(o) == 'OPEN')
               .length;
           final completedCount = dateSearchFiltered
-              .where((o) => o.status.toUpperCase() == 'COMPLETED')
+              .where((o) => _normalizedOrderStatus(o) == 'COMPLETED')
               .length;
           final cancelledCount = dateSearchFiltered
-              .where((o) => o.status.toUpperCase() == 'CANCELLED')
+              .where((o) => _normalizedOrderStatus(o) == 'CANCELLED')
               .length;
 
           return Column(
@@ -180,6 +208,14 @@ class _TakeawayOrdersPageState extends ConsumerState<TakeawayOrdersPage> {
                   onChanged: (f) => setState(() => _statusFilter = f),
                 ),
               ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: _TakeawayListToolbar(
+                  resultCount: filteredOrders.length,
+                  sort: _sort,
+                  onSortChanged: (sort) => setState(() => _sort = sort),
+                ),
+              ),
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -211,8 +247,8 @@ class _TakeawayOrdersPageState extends ConsumerState<TakeawayOrdersPage> {
         _TakeawayDateFilter.all => true,
         _TakeawayDateFilter.today =>
           order.orderDate.year == now.year &&
-          order.orderDate.month == now.month &&
-          order.orderDate.day == now.day,
+              order.orderDate.month == now.month &&
+              order.orderDate.day == now.day,
       };
       return matchesQuery && matchesDate;
     }).toList();
@@ -220,7 +256,7 @@ class _TakeawayOrdersPageState extends ConsumerState<TakeawayOrdersPage> {
 
   List<SalesOrderModel> _applyStatusAndSort(List<SalesOrderModel> orders) {
     final filtered = orders.where((order) {
-      final s = order.status.toUpperCase();
+      final s = _normalizedOrderStatus(order);
       return switch (_statusFilter) {
         _TakeawayStatusFilter.all => true,
         _TakeawayStatusFilter.open => s == 'OPEN',
@@ -284,7 +320,9 @@ class _TakeawayOrdersPageState extends ConsumerState<TakeawayOrdersPage> {
 
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => BillingPage(tableContext: orderContext)),
+      MaterialPageRoute(
+        builder: (_) => BillingPage(tableContext: orderContext),
+      ),
     );
 
     // refresh หลัง BillingPage ปิด เพื่อให้รายการ OPEN/COMPLETED อัปเดตทันที
@@ -293,6 +331,9 @@ class _TakeawayOrdersPageState extends ConsumerState<TakeawayOrdersPage> {
     }
   }
 }
+
+String _normalizedOrderStatus(SalesOrderModel order) =>
+    order.status.trim().toUpperCase();
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
@@ -364,10 +405,7 @@ class _TakeawaySummaryPanel extends StatelessWidget {
                   ),
                 ),
               ),
-              _DateToggle(
-                selected: dateFilter,
-                onChanged: onDateFilterChanged,
-              ),
+              _DateToggle(selected: dateFilter, onChanged: onDateFilterChanged),
             ],
           ),
           const SizedBox(height: 10),
@@ -521,6 +559,126 @@ class _ToggleOption extends StatelessWidget {
   }
 }
 
+// ─── List Toolbar ─────────────────────────────────────────────────────────────
+
+class _TakeawayListToolbar extends StatelessWidget {
+  const _TakeawayListToolbar({
+    required this.resultCount,
+    required this.sort,
+    required this.onSortChanged,
+  });
+
+  final int resultCount;
+  final _TakeawaySort sort;
+  final ValueChanged<_TakeawaySort> onSortChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final time =
+        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+
+    return Row(
+      children: [
+        Expanded(
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 2,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(
+                'พบ $resultCount รายการ',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textColorOf(context),
+                ),
+              ),
+              Text(
+                'อัปเดตล่าสุดเมื่อ $time',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppTheme.mutedTextOf(context),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 12),
+        _SortToggle(selected: sort, onChanged: onSortChanged),
+      ],
+    );
+  }
+}
+
+class _SortToggle extends StatelessWidget {
+  const _SortToggle({required this.selected, required this.onChanged});
+
+  final _TakeawaySort selected;
+  final ValueChanged<_TakeawaySort> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.surface3Of(context),
+        borderRadius: AppRadius.pill,
+        border: Border.all(color: AppTheme.borderColorOf(context)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _SortOption(
+            label: 'ล่าสุด',
+            selected: selected == _TakeawaySort.latest,
+            onTap: () => onChanged(_TakeawaySort.latest),
+          ),
+          _SortOption(
+            label: 'ยอดสูงสุด',
+            selected: selected == _TakeawaySort.highestAmount,
+            onTap: () => onChanged(_TakeawaySort.highestAmount),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SortOption extends StatelessWidget {
+  const _SortOption({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected ? AppTheme.navyColor : Colors.transparent,
+          borderRadius: AppRadius.pill,
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: selected ? Colors.white : AppTheme.mutedTextOf(context),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // ─── Summary Card (mirrors _SummaryCard from KDS) ─────────────────────────────
 
 class _SummaryCard extends StatelessWidget {
@@ -548,10 +706,7 @@ class _SummaryCard extends StatelessWidget {
         horizontal: compact ? 10 : 12,
         vertical: compact ? 8 : 10,
       ),
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: AppRadius.md,
-      ),
+      decoration: BoxDecoration(color: background, borderRadius: AppRadius.md),
       child: Row(
         children: [
           Icon(icon, color: color, size: compact ? 16 : 18),
@@ -608,19 +763,19 @@ class _TakeawayStatusFilterBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final tabs = [
       (
-        label: 'ค้างอยู่',
+        label: 'OPEN',
         filter: _TakeawayStatusFilter.open,
         count: openCount,
         color: AppTheme.warningColor,
       ),
       (
-        label: 'ปิดแล้ว',
+        label: 'COMPLETED',
         filter: _TakeawayStatusFilter.completed,
         count: completedCount,
         color: AppTheme.successColor,
       ),
       (
-        label: 'ยกเลิก',
+        label: 'CANCELLED',
         filter: _TakeawayStatusFilter.cancelled,
         count: cancelledCount,
         color: AppTheme.errorColor,
@@ -653,9 +808,7 @@ class _TakeawayStatusFilterBar extends StatelessWidget {
                     : AppTheme.cardColor(context),
                 borderRadius: AppRadius.pill,
                 border: Border.all(
-                  color: selected
-                      ? tab.color
-                      : AppTheme.borderColorOf(context),
+                  color: selected ? tab.color : AppTheme.borderColorOf(context),
                 ),
               ),
               child: Row(
@@ -1067,7 +1220,7 @@ class _TakeawayOrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final status = order.status.toUpperCase();
+    final status = _normalizedOrderStatus(order);
     final (statusBg, statusFg, statusLabel) = _statusStyle(status);
     final isDark = AppTheme.isDark(context);
 
@@ -1180,6 +1333,16 @@ class _TakeawayOrderCard extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(width: 8),
+                          if (isHighlighted) ...[
+                            _StatusBadge(
+                              label: 'บิลใหม่',
+                              background: AppTheme.primaryColor.withValues(
+                                alpha: 0.12,
+                              ),
+                              foreground: AppTheme.primaryColor,
+                            ),
+                            const SizedBox(width: 6),
+                          ],
                           _StatusBadge(
                             label: statusLabel,
                             background: statusBg,
@@ -1232,24 +1395,12 @@ class _TakeawayOrderCard extends StatelessWidget {
   (Color, Color, String) _statusStyle(String status) {
     switch (status) {
       case 'COMPLETED':
-        return (
-          const Color(0xFFE8F5E9),
-          const Color(0xFF2E7D32),
-          'ปิดแล้ว',
-        );
+        return (const Color(0xFFE8F5E9), const Color(0xFF2E7D32), 'ปิดแล้ว');
       case 'CANCELLED':
-        return (
-          const Color(0xFFFFEBEE),
-          const Color(0xFFC62828),
-          'ยกเลิก',
-        );
+        return (const Color(0xFFFFEBEE), const Color(0xFFC62828), 'ยกเลิก');
       case 'OPEN':
       default:
-        return (
-          const Color(0xFFFFF3E0),
-          const Color(0xFFE65100),
-          'ค้างอยู่',
-        );
+        return (const Color(0xFFFFF3E0), const Color(0xFFE65100), 'ค้างอยู่');
     }
   }
 
@@ -1311,10 +1462,7 @@ class _StatusBadge extends StatelessWidget {
 // ─── Meta Chip ────────────────────────────────────────────────────────────────
 
 class _MetaChip extends StatelessWidget {
-  const _MetaChip({
-    required this.icon,
-    required this.label,
-  });
+  const _MetaChip({required this.icon, required this.label});
 
   final IconData icon;
   final String label;

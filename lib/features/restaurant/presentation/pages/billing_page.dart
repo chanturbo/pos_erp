@@ -15,6 +15,7 @@ import '../providers/table_provider.dart';
 import 'split_bill_page.dart';
 
 final _fmt = NumberFormat('#,##0.00');
+const _takeawayBillMaxWidth = 520.0;
 
 class BillingPage extends ConsumerStatefulWidget {
   final RestaurantOrderContext tableContext;
@@ -339,7 +340,9 @@ class _BillingPageState extends ConsumerState<BillingPage> {
 
   Future<void> _enableServiceCharge(BillModel bill) async {
     final defaultRate = ref.read(settingsProvider).defaultServiceChargeRate;
-    _scController.text = _formatServiceChargeRate(defaultRate > 0 ? defaultRate : 10);
+    _scController.text = _formatServiceChargeRate(
+      defaultRate > 0 ? defaultRate : 10,
+    );
     await _applyServiceCharge(bill);
   }
 
@@ -408,6 +411,19 @@ class _BillingPageState extends ConsumerState<BillingPage> {
   }
 
   Future<void> _proceedToPayment(BillModel bill) async {
+    if (!bill.isOpen) {
+      final message = bill.isCompleted
+          ? 'บิลนี้ปิดแล้ว ไม่ต้องชำระเงินซ้ำ'
+          : 'บิลนี้ไม่อยู่ในสถานะที่ชำระเงินได้ (${bill.status})';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: AppTheme.warningColor,
+        ),
+      );
+      return;
+    }
+
     final blockingTakeawayItems = _takeawayItemsWaitingForServe(bill);
     if (blockingTakeawayItems.isNotEmpty) {
       final count = blockingTakeawayItems.length;
@@ -605,11 +621,13 @@ class _BillBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final canManageTable = tableContext.hasTable;
+    final compact = tableContext.isTakeaway;
+    final canPay = bill.isOpen;
     return Column(
       children: [
         Expanded(
           child: ListView(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(compact ? 8 : 16),
             children: [
               // ── Held Courses (fire button) ─────────────────────────
               if (canManageTable)
@@ -627,12 +645,14 @@ class _BillBody extends StatelessWidget {
                       ...courses.map(
                         (courseNo) => _SectionCard(
                           title: 'Course $courseNo — รอ Fire',
+                          compact: compact,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               ...heldByCourse[courseNo]!.map(
                                 (item) => _ItemRow(
                                   item: item,
+                                  compact: compact,
                                   onVoid: () => onVoidItem(item),
                                 ),
                               ),
@@ -661,8 +681,18 @@ class _BillBody extends StatelessWidget {
                 }(),
 
               // ── Items ──────────────────────────────────────────────────
+              if (!canPay) ...[
+                _SectionCard(
+                  title: 'สถานะบิล',
+                  compact: compact,
+                  child: _BillStatusBanner(status: bill.status),
+                ),
+                SizedBox(height: compact ? 8 : 12),
+              ],
+
               _SectionCard(
                 title: 'รายการอาหาร',
+                compact: compact,
                 child: Column(
                   children: [
                     ...bill.items
@@ -670,18 +700,20 @@ class _BillBody extends StatelessWidget {
                         .map(
                           (item) => _ItemRow(
                             item: item,
+                            compact: compact,
                             onVoid: () => onVoidItem(item),
                           ),
                         ),
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: compact ? 8 : 12),
 
               // ── Service Charge ─────────────────────────────────────────
               if (canManageTable) ...[
                 _SectionCard(
                   title: 'Service Charge',
+                  compact: compact,
                   child: Column(
                     children: [
                       Row(
@@ -690,14 +722,11 @@ class _BillBody extends StatelessWidget {
                             value: bill.hasServiceCharge,
                             onChanged: applyingSC
                                 ? null
-                                : (val) =>
-                                      val ? onEnableSC() : onDisableSC(),
+                                : (val) => val ? onEnableSC() : onDisableSC(),
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            bill.hasServiceCharge
-                                ? 'เปิดใช้งาน'
-                                : 'ปิดใช้งาน',
+                            bill.hasServiceCharge ? 'เปิดใช้งาน' : 'ปิดใช้งาน',
                             style: TextStyle(
                               color: bill.hasServiceCharge
                                   ? AppTheme.successColor
@@ -724,8 +753,8 @@ class _BillBody extends StatelessWidget {
                                 controller: scController,
                                 keyboardType:
                                     const TextInputType.numberWithOptions(
-                                  decimal: true,
-                                ),
+                                      decimal: true,
+                                    ),
                                 decoration: const InputDecoration(
                                   suffixText: '%',
                                   labelText: 'อัตรา',
@@ -745,32 +774,40 @@ class _BillBody extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: compact ? 8 : 12),
               ],
 
               // ── Summary ────────────────────────────────────────────────
               _SectionCard(
                 title: 'สรุปยอด',
+                compact: compact,
                 child: Column(
                   children: [
-                    _SummaryRow('ยอดก่อนส่วนลด', bill.subtotal),
+                    _SummaryRow(
+                      'ยอดก่อนส่วนลด',
+                      bill.subtotal,
+                      compact: compact,
+                    ),
                     if (bill.discountAmount > 0)
                       _SummaryRow(
                         'ส่วนลด',
                         -bill.discountAmount,
                         color: AppTheme.errorColor,
+                        compact: compact,
                       ),
                     if (bill.hasServiceCharge)
                       _SummaryRow(
                         'Service Charge (${bill.serviceChargeRate.toStringAsFixed(0)}%)',
                         bill.serviceChargeAmount,
+                        compact: compact,
                       ),
-                    const Divider(),
+                    Divider(height: compact ? 10 : 16),
                     _SummaryRow(
                       'ยอดสุทธิ',
                       bill.grandTotal,
                       bold: true,
                       large: true,
+                      compact: compact,
                     ),
                   ],
                 ),
@@ -782,46 +819,92 @@ class _BillBody extends StatelessWidget {
         // ── Bottom action bar ───────────────────────────────────────────
         SafeArea(
           child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    if (canManageTable)
-                      OutlinedButton.icon(
-                        onPressed: onMerge,
-                        icon: const Icon(Icons.merge_type, size: 18),
-                        label: const Text('รวมโต๊ะ'),
-                      ),
-                    OutlinedButton.icon(
-                      onPressed: onPrintPreBill,
-                      icon: const Icon(Icons.print_outlined, size: 18),
-                      label: const Text('Pre-bill'),
-                    ),
-                    if (canManageTable)
-                      OutlinedButton.icon(
-                        onPressed: onSplitBill,
-                        icon: const Icon(Icons.call_split, size: 18),
-                        label: const Text('แยกบิล'),
-                      ),
-                  ],
+            padding: EdgeInsets.fromLTRB(12, compact ? 6 : 12, 12, 12),
+            child: Align(
+              alignment: Alignment.center,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: compact ? _takeawayBillMaxWidth : double.infinity,
                 ),
-                const SizedBox(height: 8),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: onPay,
-                    icon: const Icon(Icons.payment),
-                    label: Text('ชำระเงิน  ฿${_fmt.format(bill.grandTotal)}'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppTheme.primaryColor,
-                    ),
-                  ),
-                ),
-              ],
+                child: canManageTable
+                    ? Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              OutlinedButton.icon(
+                                onPressed: onMerge,
+                                icon: const Icon(Icons.merge_type, size: 18),
+                                label: const Text('รวมโต๊ะ'),
+                              ),
+                              OutlinedButton.icon(
+                                onPressed: onPrintPreBill,
+                                icon: const Icon(
+                                  Icons.print_outlined,
+                                  size: 18,
+                                ),
+                                label: const Text('Pre-bill'),
+                              ),
+                              OutlinedButton.icon(
+                                onPressed: onSplitBill,
+                                icon: const Icon(Icons.call_split, size: 18),
+                                label: const Text('แยกบิล'),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton.icon(
+                              onPressed: canPay ? onPay : null,
+                              icon: Icon(
+                                canPay
+                                    ? Icons.payment
+                                    : Icons.check_circle_outline,
+                              ),
+                              label: Text(
+                                canPay
+                                    ? 'ชำระเงิน  ฿${_fmt.format(bill.grandTotal)}'
+                                    : 'ชำระแล้ว  ฿${_fmt.format(bill.grandTotal)}',
+                              ),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: AppTheme.primaryColor,
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                    : Row(
+                        children: [
+                          OutlinedButton.icon(
+                            onPressed: onPrintPreBill,
+                            icon: const Icon(Icons.print_outlined, size: 18),
+                            label: const Text('Pre-bill'),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: FilledButton.icon(
+                              onPressed: canPay ? onPay : null,
+                              icon: Icon(
+                                canPay
+                                    ? Icons.payment
+                                    : Icons.check_circle_outline,
+                              ),
+                              label: Text(
+                                canPay
+                                    ? 'ชำระเงิน  ฿${_fmt.format(bill.grandTotal)}'
+                                    : 'ชำระแล้ว  ฿${_fmt.format(bill.grandTotal)}',
+                              ),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: AppTheme.primaryColor,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
             ),
           ),
         ),
@@ -835,30 +918,34 @@ class _BillBody extends StatelessWidget {
 class _ItemRow extends StatelessWidget {
   final BillItemModel item;
   final VoidCallback? onVoid;
-  const _ItemRow({required this.item, this.onVoid});
+  final bool compact;
+  const _ItemRow({required this.item, this.onVoid, this.compact = false});
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
+      padding: EdgeInsets.symmetric(vertical: compact ? 2 : 5),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // qty badge
           Container(
-            width: 36,
+            width: compact ? 30 : 36,
             alignment: Alignment.centerRight,
             child: Text(
               'x${_fmtQty(item.quantity)}',
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
             ),
           ),
-          const SizedBox(width: 10),
+          SizedBox(width: compact ? 8 : 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(item.productName, style: const TextStyle(fontSize: 14)),
+                Text(
+                  item.productName,
+                  style: TextStyle(fontSize: compact ? 13 : 14),
+                ),
                 if (item.specialInstructions != null &&
                     item.specialInstructions!.isNotEmpty)
                   Text(
@@ -881,7 +968,7 @@ class _ItemRow extends StatelessWidget {
           const SizedBox(width: 8),
           Text(
             '฿${_fmt.format(item.amount)}',
-            style: const TextStyle(fontSize: 14),
+            style: TextStyle(fontSize: compact ? 13 : 14),
           ),
           if (onVoid != null) ...[
             const SizedBox(width: 4),
@@ -907,6 +994,55 @@ class _ItemRow extends StatelessWidget {
       q == q.truncateToDouble() ? q.toInt().toString() : q.toString();
 }
 
+class _BillStatusBanner extends StatelessWidget {
+  final String status;
+  const _BillStatusBanner({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    final normalized = status.toUpperCase();
+    final isCompleted = normalized == 'COMPLETED';
+    final color = isCompleted ? AppTheme.successColor : AppTheme.warningColor;
+    final label = switch (normalized) {
+      'COMPLETED' => 'ปิดแล้ว / ชำระแล้ว',
+      'CANCELLED' => 'ยกเลิกแล้ว',
+      _ => status,
+    };
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: AppRadius.sm,
+        border: Border.all(color: color.withValues(alpha: 0.28)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            isCompleted
+                ? Icons.check_circle_outline
+                : Icons.info_outline_rounded,
+            color: color,
+            size: 18,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ── Summary row ───────────────────────────────────────────────────────────────
 
 class _SummaryRow extends StatelessWidget {
@@ -915,6 +1051,7 @@ class _SummaryRow extends StatelessWidget {
   final Color? color;
   final bool bold;
   final bool large;
+  final bool compact;
 
   const _SummaryRow(
     this.label,
@@ -922,17 +1059,18 @@ class _SummaryRow extends StatelessWidget {
     this.color,
     this.bold = false,
     this.large = false,
+    this.compact = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final style = TextStyle(
-      fontSize: large ? 16 : 14,
+      fontSize: large ? (compact ? 15 : 16) : (compact ? 13 : 14),
       fontWeight: bold ? FontWeight.bold : FontWeight.normal,
       color: color,
     );
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
+      padding: EdgeInsets.symmetric(vertical: compact ? 1 : 3),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -949,22 +1087,42 @@ class _SummaryRow extends StatelessWidget {
 class _SectionCard extends StatelessWidget {
   final String title;
   final Widget child;
-  const _SectionCard({required this.title, required this.child});
+  final bool compact;
+  const _SectionCard({
+    required this.title,
+    required this.child,
+    this.compact = false,
+  });
 
   @override
-  Widget build(BuildContext context) => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+  Widget build(BuildContext context) => Align(
+    alignment: Alignment.topCenter,
+    child: ConstrainedBox(
+      constraints: BoxConstraints(
+        maxWidth: compact ? _takeawayBillMaxWidth : double.infinity,
+      ),
+      child: Card(
+        margin: EdgeInsets.symmetric(
+          horizontal: compact ? 0 : 4,
+          vertical: compact ? 3 : 4,
+        ),
+        child: Padding(
+          padding: EdgeInsets.all(compact ? 10 : 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
+              ),
+              SizedBox(height: compact ? 5 : 8),
+              child,
+            ],
           ),
-          const SizedBox(height: 8),
-          child,
-        ],
+        ),
       ),
     ),
   );

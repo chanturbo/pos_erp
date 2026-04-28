@@ -12,11 +12,11 @@ class SalesOrderModel {
   final double changeAmount;
   final String status;
   final List<SalesOrderItemModel>? items;
-  final List<String>? couponCodes;           // รหัสคูปองที่ใช้
+  final List<String>? couponCodes; // รหัสคูปองที่ใช้
   final Map<String, String>? couponPromotionNames; // code → promotionName
-  final double couponDiscount;               // ส่วนลดรวมจากคูปอง
-  final int pointsUsed;                      // แต้มที่แลกในใบขายนี้
-  final DateTime? dueDate;                   // วันครบกำหนดชำระ (สำหรับการขายเครดิต)
+  final double couponDiscount; // ส่วนลดรวมจากคูปอง
+  final int pointsUsed; // แต้มที่แลกในใบขายนี้
+  final DateTime? dueDate; // วันครบกำหนดชำระ (สำหรับการขายเครดิต)
   final String? tableId;
   final String? sessionId;
   final String? serviceType;
@@ -47,6 +47,56 @@ class SalesOrderModel {
     this.partySize,
   });
 
+  SalesOrderModel copyWith({
+    String? orderId,
+    String? orderNo,
+    DateTime? orderDate,
+    String? customerId,
+    String? customerName,
+    double? subtotal,
+    double? discountAmount,
+    double? totalAmount,
+    String? paymentType,
+    double? paidAmount,
+    double? changeAmount,
+    String? status,
+    List<SalesOrderItemModel>? items,
+    List<String>? couponCodes,
+    Map<String, String>? couponPromotionNames,
+    double? couponDiscount,
+    int? pointsUsed,
+    DateTime? dueDate,
+    String? tableId,
+    String? sessionId,
+    String? serviceType,
+    int? partySize,
+  }) {
+    return SalesOrderModel(
+      orderId: orderId ?? this.orderId,
+      orderNo: orderNo ?? this.orderNo,
+      orderDate: orderDate ?? this.orderDate,
+      customerId: customerId ?? this.customerId,
+      customerName: customerName ?? this.customerName,
+      subtotal: subtotal ?? this.subtotal,
+      discountAmount: discountAmount ?? this.discountAmount,
+      totalAmount: totalAmount ?? this.totalAmount,
+      paymentType: paymentType ?? this.paymentType,
+      paidAmount: paidAmount ?? this.paidAmount,
+      changeAmount: changeAmount ?? this.changeAmount,
+      status: status ?? this.status,
+      items: items ?? this.items,
+      couponCodes: couponCodes ?? this.couponCodes,
+      couponPromotionNames: couponPromotionNames ?? this.couponPromotionNames,
+      couponDiscount: couponDiscount ?? this.couponDiscount,
+      pointsUsed: pointsUsed ?? this.pointsUsed,
+      dueDate: dueDate ?? this.dueDate,
+      tableId: tableId ?? this.tableId,
+      sessionId: sessionId ?? this.sessionId,
+      serviceType: serviceType ?? this.serviceType,
+      partySize: partySize ?? this.partySize,
+    );
+  }
+
   factory SalesOrderModel.fromJson(Map<String, dynamic> json) {
     return SalesOrderModel(
       orderId: json['order_id'] as String,
@@ -55,31 +105,41 @@ class SalesOrderModel {
       customerId: json['customer_id'] as String?,
       customerName: json['customer_name'] as String?,
       // ✅ ใช้ default value ถ้าไม่มี
-      subtotal: (json['subtotal'] as num?)?.toDouble() ?? (json['total_amount'] as num).toDouble(),
+      subtotal:
+          (json['subtotal'] as num?)?.toDouble() ??
+          (json['total_amount'] as num).toDouble(),
       discountAmount: (json['discount_amount'] as num?)?.toDouble() ?? 0.0,
       totalAmount: (json['total_amount'] as num).toDouble(),
       paymentType: json['payment_type'] as String? ?? 'CASH',
-      paidAmount: (json['paid_amount'] as num?)?.toDouble() ?? (json['total_amount'] as num).toDouble(),
+      paidAmount:
+          (json['paid_amount'] as num?)?.toDouble() ??
+          (json['total_amount'] as num).toDouble(),
       changeAmount: (json['change_amount'] as num?)?.toDouble() ?? 0.0,
       status: json['status'] as String? ?? 'COMPLETED',
       items: json['items'] != null
           ? (json['items'] as List)
-              .map((item) => SalesOrderItemModel.fromJson(item))
-              .toList()
+                .map((item) => SalesOrderItemModel.fromJson(item))
+                .toList()
           : null,
-      couponCodes: (json['coupon_codes'] as List?)?.map((e) => e.toString()).toList(),
-      couponPromotionNames: (json['coupon_promotion_names'] as Map<String, dynamic>?)
-          ?.map((k, v) => MapEntry(k, v.toString())),
+      couponCodes: (json['coupon_codes'] as List?)
+          ?.map((e) => e.toString())
+          .toList(),
+      couponPromotionNames:
+          (json['coupon_promotion_names'] as Map<String, dynamic>?)?.map(
+            (k, v) => MapEntry(k, v.toString()),
+          ),
       couponDiscount: (json['coupon_discount'] as num?)?.toDouble() ?? 0.0,
       pointsUsed: (json['points_used'] as int?) ?? 0,
-      dueDate: json['due_date'] != null ? DateTime.parse(json['due_date'] as String) : null,
+      dueDate: json['due_date'] != null
+          ? DateTime.parse(json['due_date'] as String)
+          : null,
       tableId: json['table_id'] as String?,
       sessionId: json['session_id'] as String?,
       serviceType: json['service_type'] as String?,
       partySize: (json['party_size'] as num?)?.toInt(),
     );
   }
-  
+
   Map<String, dynamic> toJson() {
     return {
       'order_id': orderId,
@@ -121,8 +181,8 @@ class SalesOrderItemModel {
   final List<SalesOrderItemModifierModel> modifiers;
   final bool isFreeItem;
   final String? promotionName;
-  final double unitCost;    // ต้นทุนเฉลี่ย (WAC) ณ เวลาขาย
-  final double cogsAmount;  // ต้นทุนสินค้าที่ขาย = unitCost × quantity
+  final double unitCost; // ต้นทุนเฉลี่ย (WAC) ณ เวลาขาย
+  final double cogsAmount; // ต้นทุนสินค้าที่ขาย = unitCost × quantity
 
   /// กำไรขั้นต้น = รายได้ - ต้นทุน
   double get grossProfit => amount - cogsAmount;
@@ -157,9 +217,13 @@ class SalesOrderItemModel {
       unitPrice: (json['unit_price'] as num).toDouble(),
       amount: (json['amount'] as num).toDouble(),
       specialInstructions: json['special_instructions'] as String?,
-      modifiers: (json['modifiers'] as List?)
-              ?.map((item) => SalesOrderItemModifierModel.fromJson(
-                  item as Map<String, dynamic>))
+      modifiers:
+          (json['modifiers'] as List?)
+              ?.map(
+                (item) => SalesOrderItemModifierModel.fromJson(
+                  item as Map<String, dynamic>,
+                ),
+              )
               .toList() ??
           const [],
       isFreeItem: (json['is_free_item'] as bool?) ?? false,

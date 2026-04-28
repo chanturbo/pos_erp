@@ -1,4 +1,3 @@
-
 import 'dart:convert';
 import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
@@ -355,7 +354,9 @@ class SalesRoutes {
               warehouseId,
             );
             if (kDebugMode) {
-              debugPrint( '📊 Available stock $productId: $availableStock (need: $quantity)', );
+              debugPrint(
+                '📊 Available stock $productId: $availableStock (need: $quantity)',
+              );
             }
 
             if (availableStock < quantity) {
@@ -527,7 +528,9 @@ class SalesRoutes {
                   );
               await _upsertStockBalance(warehouseId, productId, -quantity, 0);
               if (kDebugMode) {
-                debugPrint( '✅ Stock movement: $movementNo (-$quantity @ cost $avgCost)', );
+                debugPrint(
+                  '✅ Stock movement: $movementNo (-$quantity @ cost $avgCost)',
+                );
               }
             }
           }
@@ -597,7 +600,9 @@ class SalesRoutes {
                   );
               await _upsertStockBalance(warehouseId, productId, -quantity, 0);
               if (kDebugMode) {
-                debugPrint( '✅ Free item stock movement: $movementNo (-$quantity @ cost $freeAvgCost)', );
+                debugPrint(
+                  '✅ Free item stock movement: $movementNo (-$quantity @ cost $freeAvgCost)',
+                );
               }
             }
           }
@@ -828,14 +833,40 @@ class SalesRoutes {
       if (orders.length != targetOrderIds.length) {
         throw _ValidationException('ไม่พบ order บางรายการที่ต้องการปิดบิล');
       }
+      final alreadyCompleted = orders.every(
+        (order) => order.status == 'COMPLETED',
+      );
+      if (alreadyCompleted) {
+        return Response.ok(
+          jsonEncode({
+            'success': true,
+            'message': 'ใบขายนี้ชำระเงินแล้ว',
+            'data': {
+              'order_id': primaryOrder.orderId,
+              'order_no': primaryOrder.orderNo,
+              'completed_order_ids': targetOrderIds,
+              'status': 'COMPLETED',
+            },
+          }),
+          headers: {'Content-Type': 'application/json'},
+        );
+      }
+
+      String? normalizeRestaurantRef(String? value) {
+        final trimmed = value?.trim();
+        return trimmed == null || trimmed.isEmpty ? null : trimmed;
+      }
+
+      final primaryTableId = normalizeRestaurantRef(primaryOrder.tableId);
+      final primarySessionId = normalizeRestaurantRef(primaryOrder.sessionId);
       for (final order in orders) {
         if (order.status != 'OPEN') {
           throw _ValidationException(
             'ใบขายต้องอยู่ในสถานะ OPEN เท่านั้น (ปัจจุบัน: ${order.status})',
           );
         }
-        if (primaryOrder.tableId != order.tableId ||
-            primaryOrder.sessionId != order.sessionId) {
+        if (primaryTableId != normalizeRestaurantRef(order.tableId) ||
+            primarySessionId != normalizeRestaurantRef(order.sessionId)) {
           throw _ValidationException(
             'สามารถปิดหลายบิลพร้อมกันได้เฉพาะในโต๊ะ/รอบเดียวกัน',
           );
@@ -902,7 +933,9 @@ class SalesRoutes {
                 0,
               );
               if (kDebugMode) {
-                debugPrint( '✅ Complete: ${item.productId} -${item.quantity} @ cost $avgCost, released reserve', );
+                debugPrint(
+                  '✅ Complete: ${item.productId} -${item.quantity} @ cost $avgCost, released reserve',
+                );
               }
             }
           }
@@ -967,7 +1000,9 @@ class SalesRoutes {
       });
 
       if (kDebugMode) {
-        debugPrint('✅ SalesRoutes: Orders ${targetOrderIds.join(",")} completed');
+        debugPrint(
+          '✅ SalesRoutes: Orders ${targetOrderIds.join(",")} completed',
+        );
       }
 
       return Response.ok(
@@ -984,6 +1019,9 @@ class SalesRoutes {
         headers: {'Content-Type': 'application/json'},
       );
     } on _ValidationException catch (e) {
+      if (kDebugMode) {
+        debugPrint('❌ POST /api/sales/$id/complete validation: ${e.message}');
+      }
       return Response(
         400,
         body: jsonEncode({'success': false, 'message': e.message}),
@@ -1018,7 +1056,8 @@ class SalesRoutes {
           400,
           body: jsonEncode({
             'success': false,
-            'message': 'ยกเลิกได้เฉพาะ order ที่อยู่ในสถานะ OPEN หรือ COMPLETED เท่านั้น',
+            'message':
+                'ยกเลิกได้เฉพาะ order ที่อยู่ในสถานะ OPEN หรือ COMPLETED เท่านั้น',
           }),
           headers: {'Content-Type': 'application/json'},
         );
@@ -1055,20 +1094,22 @@ class SalesRoutes {
                 0,
               );
               // บันทึก movement ย้อนกลับ
-              await db.into(db.stockMovements).insert(
-                StockMovementsCompanion(
-                  movementId: Value('CANCEL_${item.itemId}_$ts'),
-                  movementNo: Value('CANCEL-${order.orderNo}'),
-                  movementDate: Value(now),
-                  movementType: const Value('SALE_CANCEL'),
-                  productId: Value(item.productId),
-                  warehouseId: Value(order.warehouseId),
-                  quantity: Value(item.quantity),
-                  unitCost: const Value(0),
-                  referenceNo: Value(order.orderNo),
-                  remark: const Value('ยกเลิกการขาย'),
-                ),
-              );
+              await db
+                  .into(db.stockMovements)
+                  .insert(
+                    StockMovementsCompanion(
+                      movementId: Value('CANCEL_${item.itemId}_$ts'),
+                      movementNo: Value('CANCEL-${order.orderNo}'),
+                      movementDate: Value(now),
+                      movementType: const Value('SALE_CANCEL'),
+                      productId: Value(item.productId),
+                      warehouseId: Value(order.warehouseId),
+                      quantity: Value(item.quantity),
+                      unitCost: const Value(0),
+                      referenceNo: Value(order.orderNo),
+                      remark: const Value('ยกเลิกการขาย'),
+                    ),
+                  );
             }
           }
         }

@@ -11,6 +11,7 @@ import 'package:pos_erp/features/branches/presentation/providers/branch_provider
 import 'package:pos_erp/features/dashboard/presentation/providers/dashboard_provider.dart';
 import 'package:pos_erp/features/home/presentation/pages/home_page.dart';
 import 'package:pos_erp/features/restaurant/data/models/restaurant_order_context.dart';
+import 'package:pos_erp/features/restaurant/presentation/pages/billing_page.dart';
 import 'package:pos_erp/features/restaurant/presentation/pages/takeaway_orders_page.dart';
 import 'package:pos_erp/features/sales/presentation/pages/payment_page.dart';
 import 'package:pos_erp/features/sales/presentation/providers/cart_provider.dart';
@@ -73,7 +74,13 @@ class _FakeTakeawayApiClient extends ApiClient {
       {
         'order_id': 'SO-TK-2',
         'order_no': 'TK-002',
-        'order_date': now.subtract(const Duration(days: 1)).toIso8601String(),
+        'order_date': DateTime(
+          now.year,
+          now.month,
+          now.day,
+          10,
+          15,
+        ).toIso8601String(),
         'customer_id': 'CUS3',
         'customer_name': 'ลูกค้าปิดบิลแล้ว',
         'total_amount': 99,
@@ -135,6 +142,7 @@ class _FakeTakeawayApiClient extends ApiClient {
     required String orderNo,
     required String customerName,
     required double totalAmount,
+    String status = 'OPEN',
   }) {
     final now = DateTime.now();
     _sales.insert(0, {
@@ -145,8 +153,10 @@ class _FakeTakeawayApiClient extends ApiClient {
       'customer_name': customerName,
       'total_amount': totalAmount,
       'discount_amount': 0,
-      'payment_type': 'PENDING',
-      'status': 'OPEN',
+      'payment_type': status.toUpperCase().trim() == 'COMPLETED'
+          ? 'CASH'
+          : 'PENDING',
+      'status': status,
       'table_id': null,
       'session_id': null,
       'service_type': 'TAKEAWAY',
@@ -211,6 +221,54 @@ class _FakeTakeawayApiClient extends ApiClient {
               'special_instructions': null,
               'course_no': 1,
               'kitchen_status': 'PENDING',
+              'modifiers': const [],
+              'is_free_item': false,
+            },
+          ],
+        },
+      });
+    }
+
+    if (path == '/api/sales/SO-TK-2') {
+      return _response(path, 200, {
+        'success': true,
+        'data': {
+          'order_id': 'SO-TK-2',
+          'order_no': 'TK-002',
+          'order_date': DateTime(2026, 4, 22, 10, 30).toIso8601String(),
+          'customer_id': 'CUS3',
+          'customer_name': 'ลูกค้าปิดบิลแล้ว',
+          'subtotal': 99,
+          'discount_amount': 0,
+          'coupon_discount': 0,
+          'table_id': null,
+          'session_id': null,
+          'service_type': 'TAKEAWAY',
+          'party_size': 1,
+          'service_charge_rate': 0,
+          'service_charge_amount': 0,
+          'total_amount': 99,
+          'payment_type': 'CASH',
+          'paid_amount': 99,
+          'change_amount': 0,
+          'points_used': 0,
+          'status': 'COMPLETED',
+          'items': [
+            {
+              'item_id': 'IT-TK-2',
+              'order_id': 'SO-TK-2',
+              'line_no': 1,
+              'product_id': 'P2',
+              'product_code': 'P2',
+              'product_name': 'Iced Tea',
+              'unit': 'cup',
+              'quantity': 1,
+              'unit_price': 99,
+              'amount': 99,
+              'discount_amount': 0,
+              'special_instructions': null,
+              'course_no': 1,
+              'kitchen_status': 'SERVED',
               'modifiers': const [],
               'is_free_item': false,
             },
@@ -598,7 +656,7 @@ void main() {
         totalAmount: 199,
       );
 
-      await tester.tap(find.byTooltip('รีเฟรช'));
+      await tester.tap(find.byIcon(Icons.refresh).first);
       await tester.pump();
       await tester.pumpAndSettle();
 
@@ -609,6 +667,45 @@ void main() {
         findsOneWidget,
       );
       expect(fakeAlertService.takeawayAlertCount, 1);
+    });
+
+    testWidgets('completed takeaway orders do not badge or notify as pending', (
+      tester,
+    ) async {
+      final fakeApi = _FakeTakeawayApiClient.seeded();
+      final fakeAlertService = _FakeAppAlertService();
+      final container = _createContainer(
+        apiClient: fakeApi,
+        alertService: fakeAlertService,
+      );
+
+      await _pumpWithContainer(
+        tester,
+        container: container,
+        child: const TakeawayOrdersPage(enableAutoRefresh: false),
+      );
+
+      await tester.pumpAndSettle();
+
+      fakeApi.addOpenTakeawayOrder(
+        orderId: 'SO-TK-DONE',
+        orderNo: 'TK-101',
+        customerName: 'ลูกค้าปิดแล้ว',
+        totalAmount: 210,
+        status: ' completed ',
+      );
+
+      await container.read(salesHistoryProvider.notifier).refresh();
+      await tester.pumpAndSettle();
+
+      expect(find.text('TK-101'), findsNothing);
+      expect(find.text('บิลใหม่'), findsNothing);
+      expect(find.textContaining('มีบิลซื้อกลับบ้านใหม่'), findsNothing);
+      expect(fakeAlertService.takeawayAlertCount, 0);
+
+      await tester.tap(find.text('COMPLETED').last);
+      await tester.pumpAndSettle();
+      expect(find.text('TK-101'), findsOneWidget);
     });
 
     testWidgets('auto refresh picks up new takeaway orders and plays alert', (
@@ -673,6 +770,33 @@ void main() {
       expect(find.text('Pad Thai'), findsOneWidget);
       expect(find.text('รวมโต๊ะ'), findsNothing);
       expect(find.text('แยกบิล'), findsNothing);
+    });
+
+    testWidgets('completed takeaway order opens as paid detail only', (
+      tester,
+    ) async {
+      final fakeApi = _FakeTakeawayApiClient.seeded();
+      final container = _createContainer(apiClient: fakeApi);
+
+      await _pumpWithContainer(
+        tester,
+        container: container,
+        child: BillingPage(
+          tableContext: RestaurantOrderContext.takeaway(
+            branchId: 'BR1',
+            currentOrderId: 'SO-TK-2',
+            currentOrderNo: 'TK-002',
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(fakeApi.getCalls, contains('/api/sales/SO-TK-2'));
+      expect(find.text('Iced Tea'), findsOneWidget);
+      expect(find.text('ปิดแล้ว / ชำระแล้ว'), findsOneWidget);
+      expect(find.textContaining('ชำระแล้ว'), findsWidgets);
+      expect(find.textContaining('ชำระเงิน'), findsNothing);
     });
 
     testWidgets('takeaway payment completes without table endpoints', (

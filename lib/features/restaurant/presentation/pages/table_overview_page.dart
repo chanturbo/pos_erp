@@ -48,7 +48,7 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
         backgroundColor: AppTheme.navyColor,
         foregroundColor: Colors.white,
         actions: [
-          IconButton(
+          _TitleBarIconButton(
             icon: Stack(
               clipBehavior: Clip.none,
               children: [
@@ -92,7 +92,7 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
                     ),
                   ),
           ),
-          IconButton(
+          _TitleBarIconButton(
             icon: const Icon(Icons.event_note),
             tooltip: 'การจองโต๊ะ',
             onPressed: _isBusy
@@ -102,7 +102,7 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
                     MaterialPageRoute(builder: (_) => const ReservationsPage()),
                   ),
           ),
-          IconButton(
+          _TitleBarIconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _isBusy
                 ? null
@@ -115,69 +115,81 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
                   }),
             tooltip: 'รีเฟรช',
           ),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert, color: Colors.white),
-            onSelected: (v) {
-              if (v == 'add_table') _showAddTableDialog(context);
-              if (v == 'zones') _showZoneManagerDialog(context);
-              if (v == 'floor_plan') {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const FloorPlanPage()),
-                );
-              }
-              if (v == 'waiters') {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const WaiterManagementPage(),
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: PopupMenuButton<String>(
+              tooltip: 'เมนูจัดการโต๊ะ',
+              offset: const Offset(0, 8),
+              shape: RoundedRectangleBorder(borderRadius: AppRadius.sm),
+              icon: _TitleBarIconButtonShell(
+                child: const Icon(
+                  Icons.more_vert,
+                  color: Colors.white70,
+                  size: 17,
+                ),
+              ),
+              onSelected: (v) {
+                if (v == 'add_table') _showAddTableDialog(context);
+                if (v == 'zones') _showZoneManagerDialog(context);
+                if (v == 'floor_plan') {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const FloorPlanPage()),
+                  );
+                }
+                if (v == 'waiters') {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const WaiterManagementPage(),
+                    ),
+                  );
+                }
+              },
+              itemBuilder: (_) => [
+                const PopupMenuItem(
+                  value: 'add_table',
+                  child: Row(
+                    children: [
+                      Icon(Icons.add_circle_outline, size: 18),
+                      SizedBox(width: 8),
+                      Text('เพิ่มโต๊ะ'),
+                    ],
                   ),
-                );
-              }
-            },
-            itemBuilder: (_) => [
-              const PopupMenuItem(
-                value: 'add_table',
-                child: Row(
-                  children: [
-                    Icon(Icons.add_circle_outline, size: 18),
-                    SizedBox(width: 8),
-                    Text('เพิ่มโต๊ะ'),
-                  ],
                 ),
-              ),
-              const PopupMenuDivider(),
-              const PopupMenuItem(
-                value: 'floor_plan',
-                child: Row(
-                  children: [
-                    Icon(Icons.map_outlined, size: 18),
-                    SizedBox(width: 8),
-                    Text('ผังโต๊ะ / รวมโต๊ะ'),
-                  ],
+                const PopupMenuDivider(),
+                const PopupMenuItem(
+                  value: 'floor_plan',
+                  child: Row(
+                    children: [
+                      Icon(Icons.map_outlined, size: 18),
+                      SizedBox(width: 8),
+                      Text('ผังโต๊ะ / รวมโต๊ะ'),
+                    ],
+                  ),
                 ),
-              ),
-              const PopupMenuItem(
-                value: 'waiters',
-                child: Row(
-                  children: [
-                    Icon(Icons.badge_outlined, size: 18),
-                    SizedBox(width: 8),
-                    Text('จัดการพนักงานเสิร์ฟ'),
-                  ],
+                const PopupMenuItem(
+                  value: 'waiters',
+                  child: Row(
+                    children: [
+                      Icon(Icons.badge_outlined, size: 18),
+                      SizedBox(width: 8),
+                      Text('จัดการพนักงานเสิร์ฟ'),
+                    ],
+                  ),
                 ),
-              ),
-              const PopupMenuItem(
-                value: 'zones',
-                child: Row(
-                  children: [
-                    Icon(Icons.layers, size: 18),
-                    SizedBox(width: 8),
-                    Text('จัดการโซน'),
-                  ],
+                const PopupMenuItem(
+                  value: 'zones',
+                  child: Row(
+                    children: [
+                      Icon(Icons.layers, size: 18),
+                      SizedBox(width: 8),
+                      Text('จัดการโซน'),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
@@ -230,6 +242,7 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
                                 ),
                             icon: const Icon(Icons.refresh, size: 16),
                             label: const Text('ลองใหม่'),
+                            style: _tablePrimaryButtonStyle(),
                           ),
                         ],
                       ),
@@ -362,13 +375,12 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
+            style: _tableTextButtonStyle(),
             child: const Text('ยกเลิก'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: AppTheme.successColor,
-            ),
+            style: _tablePrimaryButtonStyle(color: AppTheme.successColor),
             child: const Text('ทำความสะอาดเสร็จแล้ว'),
           ),
         ],
@@ -487,13 +499,12 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(ctx, false),
+                  style: _tableTextButtonStyle(),
                   child: const Text('ยกเลิก'),
                 ),
                 FilledButton(
                   onPressed: () => Navigator.pop(ctx, true),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppTheme.errorColor,
-                  ),
+                  style: _tablePrimaryButtonStyle(color: AppTheme.errorColor),
                   child: const Text('ปิดโต๊ะ'),
                 ),
               ],
@@ -565,6 +576,7 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
                 icon: const Icon(Icons.remove_circle_outline),
                 onPressed: count > 1 ? () => setS(() => count--) : null,
                 color: AppTheme.primaryColor,
+                style: _tableIconButtonStyle(color: AppTheme.primaryColor),
               ),
               const SizedBox(width: 12),
               Container(
@@ -590,12 +602,14 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
                     ? () => setS(() => count++)
                     : null,
                 color: AppTheme.primaryColor,
+                style: _tableIconButtonStyle(color: AppTheme.primaryColor),
               ),
             ],
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
+              style: _tableTextButtonStyle(),
               child: const Text('ยกเลิก'),
             ),
             FilledButton(
@@ -622,9 +636,7 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
                   ),
                 );
               },
-              style: FilledButton.styleFrom(
-                backgroundColor: AppTheme.primaryColor,
-              ),
+              style: _tablePrimaryButtonStyle(),
               child: const Text('บันทึก'),
             ),
           ],
@@ -655,6 +667,7 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
+            style: _tableTextButtonStyle(),
             child: const Text('ยกเลิก'),
           ),
           FilledButton(
@@ -689,9 +702,7 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
                 }
               }
             },
-            style: FilledButton.styleFrom(
-              backgroundColor: AppTheme.primaryColor,
-            ),
+            style: _tablePrimaryButtonStyle(),
             child: const Text('บันทึก'),
           ),
         ],
@@ -781,6 +792,7 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext),
+              style: _tableTextButtonStyle(),
               child: const Text('ยกเลิก'),
             ),
             FilledButton(
@@ -809,6 +821,7 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
                   ),
                 );
               },
+              style: _tablePrimaryButtonStyle(),
               child: const Text('ย้ายโต๊ะ'),
             ),
           ],
@@ -833,6 +846,7 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
+                style: _tableTextButtonStyle(),
                 child: const Text('ตกลง'),
               ),
             ],
@@ -914,12 +928,11 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
+              style: _tableTextButtonStyle(),
               child: const Text('ยกเลิก'),
             ),
             FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: AppTheme.primaryColor,
-              ),
+              style: _tablePrimaryButtonStyle(),
               onPressed: () async {
                 final no = tableNoCtrl.text.trim();
                 if (no.isEmpty) return;
@@ -1007,6 +1020,11 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
                                         : Colors.red,
                                     size: 20,
                                   ),
+                                  style: _tableIconButtonStyle(
+                                    color: zoneTableCount > 0
+                                        ? Colors.grey
+                                        : AppTheme.errorColor,
+                                  ),
                                   tooltip: zoneTableCount > 0
                                       ? 'มีโต๊ะอยู่ในโซนนี้ ไม่สามารถลบได้'
                                       : 'ลบโซน',
@@ -1026,6 +1044,7 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
                                             TextButton(
                                               onPressed: () =>
                                                   Navigator.pop(ctx),
+                                              style: _tableTextButtonStyle(),
                                               child: const Text('ตกลง'),
                                             ),
                                           ],
@@ -1062,8 +1081,8 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
                       ),
                       const SizedBox(width: 8),
                       FilledButton(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: AppTheme.primaryColor,
+                        style: _tablePrimaryButtonStyle(
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
                           minimumSize: const Size(48, 40),
                         ),
                         onPressed: () => _addZone(nameCtrl, branchId),
@@ -1077,6 +1096,7 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
+                style: _tableTextButtonStyle(),
                 child: const Text('ปิด'),
               ),
             ],
@@ -1097,6 +1117,97 @@ class _TableOverviewPageState extends ConsumerState<TableOverviewPage> {
 }
 
 // ── Subwidgets ────────────────────────────────────────────────────────────────
+
+ButtonStyle _tablePrimaryButtonStyle({
+  Color color = AppTheme.primaryColor,
+  EdgeInsetsGeometry padding = const EdgeInsets.symmetric(
+    horizontal: 24,
+    vertical: 12,
+  ),
+  Size? minimumSize,
+}) {
+  return FilledButton.styleFrom(
+    backgroundColor: color,
+    foregroundColor: Colors.white,
+    elevation: 0,
+    minimumSize: minimumSize,
+    padding: padding,
+    shape: RoundedRectangleBorder(borderRadius: AppRadius.sm),
+    textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+  );
+}
+
+ButtonStyle _tableTextButtonStyle({Color color = AppTheme.primaryColor}) {
+  return TextButton.styleFrom(
+    foregroundColor: color,
+    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+    shape: RoundedRectangleBorder(borderRadius: AppRadius.sm),
+    textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+  );
+}
+
+ButtonStyle _tableIconButtonStyle({Color color = AppTheme.primaryColor}) {
+  return IconButton.styleFrom(
+    foregroundColor: color,
+    backgroundColor: color.withValues(alpha: 0.08),
+    disabledBackgroundColor: Colors.grey.withValues(alpha: 0.08),
+    disabledForegroundColor: Colors.grey.shade400,
+    shape: RoundedRectangleBorder(
+      borderRadius: AppRadius.sm,
+      side: BorderSide(color: color.withValues(alpha: 0.18)),
+    ),
+  );
+}
+
+class _TitleBarIconButton extends StatelessWidget {
+  final Widget icon;
+  final String tooltip;
+  final VoidCallback? onPressed;
+
+  const _TitleBarIconButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 3),
+    child: Tooltip(
+      message: tooltip,
+      waitDuration: const Duration(milliseconds: 400),
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: AppRadius.sm,
+        child: Opacity(
+          opacity: onPressed == null ? 0.45 : 1,
+          child: _TitleBarIconButtonShell(child: icon),
+        ),
+      ),
+    ),
+  );
+}
+
+class _TitleBarIconButtonShell extends StatelessWidget {
+  final Widget child;
+  const _TitleBarIconButtonShell({required this.child});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 32,
+    height: 32,
+    alignment: Alignment.center,
+    decoration: BoxDecoration(
+      color: AppTheme.navyLight,
+      borderRadius: AppRadius.sm,
+      border: Border.all(color: Colors.white24),
+    ),
+    child: IconTheme.merge(
+      data: const IconThemeData(color: Colors.white70, size: 17),
+      child: child,
+    ),
+  );
+}
 
 class _StatusLegend extends StatelessWidget {
   @override
@@ -1181,26 +1292,39 @@ class _ZoneChip extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => GestureDetector(
-    onTap: onTap,
-    child: Container(
-      margin: const EdgeInsets.only(right: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-      decoration: BoxDecoration(
-        color: selected ? AppTheme.primaryColor : AppTheme.surface3Of(context),
-        borderRadius: AppRadius.xl,
-        border: Border.all(
-          color: selected
-              ? AppTheme.primaryColor
-              : AppTheme.borderColorOf(context),
-        ),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 13,
-          color: selected ? Colors.white : AppTheme.textColorOf(context),
-          fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(right: 8),
+    child: Tooltip(
+      message: label,
+      waitDuration: const Duration(milliseconds: 400),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: AppRadius.pill,
+        child: Container(
+          height: 32,
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            color: selected
+                ? AppTheme.primaryColor.withValues(alpha: 0.14)
+                : AppTheme.cardColor(context),
+            borderRadius: AppRadius.pill,
+            border: Border.all(
+              color: selected
+                  ? AppTheme.primaryColor
+                  : AppTheme.borderColorOf(context),
+            ),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              color: selected
+                  ? AppTheme.primaryColor
+                  : AppTheme.textColorOf(context),
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+            ),
+          ),
         ),
       ),
     ),
@@ -1260,7 +1384,7 @@ class _EmptyState extends StatelessWidget {
           onPressed: onAdd,
           icon: const Icon(Icons.add),
           label: const Text('เพิ่มโต๊ะ'),
-          style: FilledButton.styleFrom(backgroundColor: AppTheme.primaryColor),
+          style: _tablePrimaryButtonStyle(),
         ),
       ],
     ),

@@ -1,4 +1,3 @@
-
 import 'package:flutter/foundation.dart';
 import 'dart:async';
 
@@ -25,6 +24,15 @@ final salesHistoryProvider =
       return SalesHistoryNotifier();
     });
 
+String _normalizedOrderText(String? value) =>
+    (value ?? '').trim().toUpperCase();
+
+bool _isTakeawayOrder(SalesOrderModel order) =>
+    _normalizedOrderText(order.serviceType) == 'TAKEAWAY';
+
+bool _isOpenOrder(SalesOrderModel order) =>
+    _normalizedOrderText(order.status) == 'OPEN';
+
 final takeawayOrdersProvider = Provider<List<SalesOrderModel>>((ref) {
   final orders = ref
       .watch(salesHistoryProvider)
@@ -32,19 +40,13 @@ final takeawayOrdersProvider = Provider<List<SalesOrderModel>>((ref) {
         data: (value) => value,
         orElse: () => const <SalesOrderModel>[],
       );
-  final takeawayOrders =
-      orders
-          .where((order) => order.serviceType?.toUpperCase() == 'TAKEAWAY')
-          .toList()
-        ..sort((a, b) => b.orderDate.compareTo(a.orderDate));
+  final takeawayOrders = orders.where(_isTakeawayOrder).toList()
+    ..sort((a, b) => b.orderDate.compareTo(a.orderDate));
   return takeawayOrders;
 });
 
 final takeawayOpenOrdersProvider = Provider<List<SalesOrderModel>>((ref) {
-  return ref
-      .watch(takeawayOrdersProvider)
-      .where((order) => order.status.toUpperCase() == 'OPEN')
-      .toList();
+  return ref.watch(takeawayOrdersProvider).where(_isOpenOrder).toList();
 });
 
 final takeawayOpenOrdersCountProvider = Provider<int>((ref) {
@@ -118,13 +120,42 @@ class SalesHistoryNotifier extends AsyncNotifier<List<SalesOrderModel>> {
     state = await AsyncValue.guard(() => loadOrders());
   }
 
-  Future<void> refreshSilently() async {
+  Future<void> refreshSilently({bool preserveOnError = false}) async {
     try {
       final orders = await loadOrders();
       state = AsyncValue.data(orders);
     } catch (e, st) {
+      if (preserveOnError) return;
       state = AsyncValue.error(e, st);
     }
+  }
+
+  void markOrdersCompleted(
+    List<String> orderIds, {
+    required String paymentType,
+    required double paidAmount,
+    required double changeAmount,
+  }) {
+    final ids = orderIds.where((id) => id.trim().isNotEmpty).toSet();
+    if (ids.isEmpty) return;
+
+    final currentOrders = state.asData?.value;
+    if (currentOrders == null) return;
+
+    state = AsyncValue.data(
+      currentOrders
+          .map(
+            (order) => ids.contains(order.orderId)
+                ? order.copyWith(
+                    status: 'COMPLETED',
+                    paymentType: paymentType,
+                    paidAmount: paidAmount,
+                    changeAmount: changeAmount,
+                  )
+                : order,
+          )
+          .toList(),
+    );
   }
 
   /// ยกเลิกใบขาย — คืน (success, message)
@@ -132,7 +163,9 @@ class SalesHistoryNotifier extends AsyncNotifier<List<SalesOrderModel>> {
     try {
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.post('/api/sales/$orderId/cancel');
-      final msg = (response.data is Map ? response.data['message'] as String? : null) ?? '';
+      final msg =
+          (response.data is Map ? response.data['message'] as String? : null) ??
+          '';
       if (response.statusCode == 200) {
         await refreshSilently();
         return (true, msg.isEmpty ? 'ยกเลิกออเดอร์สำเร็จ' : msg);

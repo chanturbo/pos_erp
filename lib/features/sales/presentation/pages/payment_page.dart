@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -36,7 +37,9 @@ import '../../../../shared/widgets/thermal_receipt.dart';
 enum ReceiptExitAction { openNewBill }
 
 class PaymentPage extends ConsumerStatefulWidget {
-  const PaymentPage({super.key});
+  final bool preferBackButton;
+
+  const PaymentPage({super.key, this.preferBackButton = false});
 
   @override
   ConsumerState<PaymentPage> createState() => _PaymentPageState();
@@ -307,7 +310,13 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: buildMobileHomeLeading(context),
+        leading: widget.preferBackButton && Navigator.of(context).canPop()
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back_rounded),
+                tooltip: 'กลับไปตะกร้า',
+                onPressed: () => Navigator.of(context).maybePop(),
+              )
+            : buildMobileHomeLeading(context),
         title: Text(restaurantContext?.paymentTitle ?? 'ชำระเงิน'),
       ),
       body: SingleChildScrollView(
@@ -1158,6 +1167,14 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
         final orderNo = dataMap['order_no'] as String? ?? '-';
         final orderId = dataMap['order_id'] as String? ?? '';
         final earnedPoints = dataMap['earned_points'] as int? ?? 0;
+        final completedOrderIds =
+            (dataMap['completed_order_ids'] as List?)
+                ?.map((id) => id.toString())
+                .where((id) => id.isNotEmpty)
+                .toList() ??
+            (targetOrderIds.isNotEmpty
+                ? targetOrderIds
+                : [if (orderId.isNotEmpty) orderId]);
 
         // ── Mark all coupons as used ──────────────────────────────
         if (_supportsAdjustments) {
@@ -1276,11 +1293,37 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
         // ✅ ล้าง hold orders ที่เป็น takeaway และมี kitchenSentItems
         // (items เหล่านั้นถูกบันทึกใน DB แล้ว หลังชำระเงินแล้ว hold ค้างใน TakeawaySalesPage)
         if (restaurantContext?.isTakeaway == true) {
-          ref.read(holdOrdersProvider.notifier).removeKitchenSentTakeawayHolds();
+          ref
+              .read(holdOrdersProvider.notifier)
+              .removeKitchenSentTakeawayHolds();
         }
 
+        // ✅ คำนวณค่าทั้งหมดก่อน navigate — ป้องกัน ref ถูกเรียกหลัง unmount
+        final paidAmount = _paymentType == 'CASH' ? _receivedAmount : netTotal;
+        final changeAmount = _paymentType == 'CASH'
+            ? _receivedAmount - netTotal
+            : 0.0;
+
         // ✅ refresh sales list & dashboard หลังบันทึกออเดอร์สำเร็จ
-        ref.invalidate(salesHistoryProvider);
+        ref
+            .read(salesHistoryProvider.notifier)
+            .markOrdersCompleted(
+              completedOrderIds,
+              paymentType: _paymentType,
+              paidAmount: paidAmount,
+              changeAmount: changeAmount,
+            );
+        await ref
+            .read(salesHistoryProvider.notifier)
+            .refreshSilently(preserveOnError: true);
+        ref
+            .read(salesHistoryProvider.notifier)
+            .markOrdersCompleted(
+              completedOrderIds,
+              paymentType: _paymentType,
+              paidAmount: paidAmount,
+              changeAmount: changeAmount,
+            );
         ref.invalidate(dashboardProvider);
         // ✅ refresh stock — ตัดสต๊อกแล้วต้องให้ UI อัปเดตทันที
         ref.invalidate(stockBalanceProvider);
@@ -1293,12 +1336,6 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
         if (_paymentType == 'CREDIT') {
           ref.invalidate(arInvoiceListProvider);
         }
-
-        // ✅ คำนวณค่าทั้งหมดก่อน navigate — ป้องกัน ref ถูกเรียกหลัง unmount
-        final paidAmount = _paymentType == 'CASH' ? _receivedAmount : netTotal;
-        final changeAmount = _paymentType == 'CASH'
-            ? _receivedAmount - netTotal
-            : 0.0;
 
         if (mounted) {
           final receiptAction = await Navigator.push<ReceiptExitAction>(
@@ -1501,6 +1538,25 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
   /// ✅ แปลง exception เป็น user-friendly message
   /// — ไม่หลุด schema, path, stack trace ไปยัง UI
   String _toUserMessage(Object e) {
+    if (e is DioException) {
+      final data = e.response?.data;
+      if (data is Map) {
+        final message = data['message']?.toString().trim();
+        if (message != null && message.isNotEmpty) return message;
+      }
+      if (data is String && data.trim().isNotEmpty) {
+        try {
+          final decoded = jsonDecode(data);
+          if (decoded is Map) {
+            final message = decoded['message']?.toString().trim();
+            if (message != null && message.isNotEmpty) return message;
+          }
+        } catch (_) {
+          // Fall through to the generic Dio handling below.
+        }
+      }
+    }
+
     final msg = e.toString();
 
     // ถ้าเป็น server message ที่เราโยนเอง (Exception: xxx) → แสดงตรงๆ

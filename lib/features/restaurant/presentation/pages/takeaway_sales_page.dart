@@ -145,8 +145,11 @@ class _TakeawaySalesPageState extends ConsumerState<TakeawaySalesPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('ยกเลิกบิล'),
-        content: Text('ต้องการยกเลิกบิล "$name" ใช่หรือไม่?'),
+        title: const Text('ลบรายการพักไว้'),
+        content: Text(
+          'ต้องการลบ "$name" ออกจากรายการพักไว้ใช่หรือไม่?\n'
+          'การลบนี้ไม่ยกเลิกบิลที่ส่งเข้าครัวหรือบิลซื้อกลับบ้านค้าง',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -155,13 +158,17 @@ class _TakeawaySalesPageState extends ConsumerState<TakeawaySalesPage> {
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('ยกเลิกบิล'),
+            child: const Text('ลบรายการพักไว้'),
           ),
         ],
       ),
     );
     if (confirmed == true) {
       ref.read(holdOrdersProvider.notifier).removeOrder(index);
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('ลบรายการพักไว้แล้ว')));
     }
   }
 
@@ -171,7 +178,11 @@ class _TakeawaySalesPageState extends ConsumerState<TakeawaySalesPage> {
     final takeawayEntries = holdOrders.orders
         .asMap()
         .entries
-        .where((entry) => entry.value.isTakeaway)
+        .where(
+          (entry) =>
+              entry.value.isTakeaway &&
+              !entry.value.cartState.hasKitchenSentItems,
+        )
         .toList();
 
     return Scaffold(

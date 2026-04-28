@@ -2210,7 +2210,9 @@ class _CartSummary extends ConsumerWidget {
                                       await Navigator.push<ReceiptExitAction>(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (_) => const PaymentPage(),
+                                          builder: (_) => const PaymentPage(
+                                            preferBackButton: true,
+                                          ),
                                         ),
                                       );
                                   if (checkoutContext?.isTakeaway == true &&

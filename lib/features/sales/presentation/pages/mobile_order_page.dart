@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -98,6 +99,7 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
   @override
   void initState() {
     super.initState();
+    _showCart = ref.read(restaurantOrderContextProvider) == null;
     _productListController.addListener(() {
       final isScrolled =
           _productListController.hasClients &&
@@ -823,6 +825,11 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
     });
   }
 
+  void _showProducts() {
+    if (!mounted) return;
+    setState(() => _showCart = false);
+  }
+
   Future<void> _handleScannedValue(
     String value, {
     BuildContext? messengerContext,
@@ -1101,7 +1108,11 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
     final skipKitchen = holdCtx?.skipKitchen ?? false;
     ref
         .read(cartProvider.notifier)
-        .hold(holdName.trim(), isTakeaway: isTakeaway, skipKitchen: skipKitchen);
+        .hold(
+          holdName.trim(),
+          isTakeaway: isTakeaway,
+          skipKitchen: skipKitchen,
+        );
     if (!mounted) return;
     ScaffoldMessenger.of(
       context,
@@ -1134,7 +1145,7 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
       backgroundColor: Colors.transparent,
       builder: (_) => _RestaurantModeSheet(
         onClear: _clearRestaurantContext,
-        onTakeaway: _startTakeawayContext,
+        onTakeaway: () => _startTakeawayContext(closeSheet: true),
         onSelectTable: _selectRestaurantTable,
       ),
     );
@@ -1149,7 +1160,7 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
     ).showSnackBar(const SnackBar(content: Text('เปลี่ยนเป็นโหมดขายปกติแล้ว')));
   }
 
-  Future<void> _startTakeawayContext() async {
+  Future<void> _startTakeawayContext({bool closeSheet = false}) async {
     final branch = ref.read(selectedBranchProvider);
     if (branch == null) {
       if (!mounted) return;
@@ -1162,14 +1173,17 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
       return;
     }
 
-    ref.read(restaurantOrderContextProvider.notifier).state =
-        RestaurantOrderContext.takeaway(
-          branchId: branch.branchId,
-          skipKitchen: true,
-        );
+    ref
+        .read(restaurantOrderContextProvider.notifier)
+        .state = RestaurantOrderContext.takeaway(
+      branchId: branch.branchId,
+      skipKitchen: true,
+    );
     if (!mounted) return;
-    Navigator.pop(context);
-    _showCartAndRefocus();
+    if (closeSheet) {
+      Navigator.pop(context);
+    }
+    _showProducts();
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('เริ่มออเดอร์ซื้อกลับบ้านแล้ว')),
     );
@@ -1277,7 +1291,7 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
       currentOrderId: table.currentOrderId,
     );
     Navigator.pop(context);
-    _showCartAndRefocus();
+    _showProducts();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('เลือกโต๊ะ ${table.displayName} แล้ว')),
     );
@@ -1303,7 +1317,9 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
 
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const PaymentPage()),
+      MaterialPageRoute(
+        builder: (_) => const PaymentPage(preferBackButton: true),
+      ),
     );
   }
 
@@ -1325,7 +1341,9 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
   Future<void> _openConnectionSettings() async {
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const SyncStatusPage()),
+      MaterialPageRoute(
+        builder: (_) => const SyncStatusPage(preferBackButton: true),
+      ),
     );
   }
 
@@ -1372,6 +1390,21 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
       if (group.groupId == groupId) return group.groupName;
     }
     return 'หมวดสินค้า';
+  }
+
+  Widget _gridImgPlaceholder() {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.primary.withValues(alpha: 0.06),
+      ),
+      child: Center(
+        child: Icon(
+          Icons.inventory_2_outlined,
+          size: 36,
+          color: AppTheme.primary.withValues(alpha: 0.45),
+        ),
+      ),
+    );
   }
 
   void _showProductMetaSheet(
@@ -1528,10 +1561,9 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
       child: Scaffold(
         backgroundColor: AppTheme.surfaceColorOf(context),
         appBar: AppBar(
-          backgroundColor:
-              Theme.of(context).brightness == Brightness.dark
-                  ? AppTheme.navyDark
-                  : AppTheme.navy,
+          backgroundColor: Theme.of(context).brightness == Brightness.dark
+              ? AppTheme.navyDark
+              : AppTheme.navy,
           foregroundColor: Colors.white,
           elevation: 0,
           leading: AppRouter.isCashierRole(authState.user?.roleId)
@@ -1789,33 +1821,93 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                         ),
                       ),
                       const SizedBox(width: 8),
+                      GestureDetector(
+                        onTap: (restaurantContext?.isTakeaway ?? false)
+                            ? _openRestaurantModeSheet
+                            : _startTakeawayContext,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: (restaurantContext?.isTakeaway ?? false)
+                                ? AppTheme.warningColor.withValues(alpha: 0.12)
+                                : AppTheme.borderColorOf(
+                                    context,
+                                  ).withValues(alpha: 0.25),
+                            borderRadius: AppRadius.xl,
+                            border: Border.all(
+                              color: (restaurantContext?.isTakeaway ?? false)
+                                  ? AppTheme.warningColor.withValues(
+                                      alpha: 0.40,
+                                    )
+                                  : AppTheme.borderColorOf(context),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.takeout_dining_rounded,
+                                size: 14,
+                                color: (restaurantContext?.isTakeaway ?? false)
+                                    ? AppTheme.warningColor
+                                    : AppTheme.subtextColorOf(context),
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                'ซื้อกลับบ้าน',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color:
+                                      (restaurantContext?.isTakeaway ?? false)
+                                      ? AppTheme.warningColor
+                                      : null,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
                       if (selectedBranch != null && selectedWarehouse != null)
                         GestureDetector(
                           onTap: _openConnectionSettings,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppTheme.borderColorOf(
-                                context,
-                              ).withValues(alpha: 0.25),
-                              borderRadius: AppRadius.xl,
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.storefront_outlined, size: 13),
-                                const SizedBox(width: 5),
-                                Text(
-                                  selectedBranch.branchName,
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 104),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppTheme.borderColorOf(
+                                  context,
+                                ).withValues(alpha: 0.25),
+                                borderRadius: AppRadius.xl,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.storefront_outlined,
+                                    size: 13,
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(width: 5),
+                                  Flexible(
+                                    child: Text(
+                                      selectedBranch.branchName,
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         )
@@ -1856,94 +1948,6 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                           ),
                         ),
                     ],
-                  ),
-                  const SizedBox(height: 8),
-                  GestureDetector(
-                    onTap: _openRestaurantModeSheet,
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 9,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isRestaurantFlow
-                            ? AppTheme.warningColor.withValues(alpha: 0.10)
-                            : AppTheme.borderColorOf(
-                                context,
-                              ).withValues(alpha: 0.20),
-                        borderRadius: AppRadius.md,
-                        border: Border.all(
-                          color: isRestaurantFlow
-                              ? AppTheme.warningColor.withValues(alpha: 0.30)
-                              : AppTheme.borderColorOf(context),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            isRestaurantFlow
-                                ? (restaurantContext.isTakeaway
-                                      ? Icons.takeout_dining_rounded
-                                      : Icons.table_restaurant_rounded)
-                                : Icons.restaurant_menu_rounded,
-                            size: 17,
-                            color: isRestaurantFlow
-                                ? AppTheme.warningColor
-                                : AppTheme.subtextColorOf(context),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              isRestaurantFlow
-                                  ? restaurantContext.displayName
-                                  : 'โหมดขายปกติ',
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w800,
-                                color: isRestaurantFlow
-                                    ? AppTheme.warningColor
-                                    : null,
-                              ),
-                            ),
-                          ),
-                          if (isRestaurantFlow && !skipKitchen) ...[
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color:
-                                    (isKitchenSent
-                                            ? AppTheme.successColor
-                                            : AppTheme.infoColor)
-                                        .withValues(alpha: 0.12),
-                                borderRadius: AppRadius.pill,
-                              ),
-                              child: Text(
-                                isKitchenSent ? 'ส่งครัวแล้ว' : 'รอส่งครัว',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w800,
-                                  color: isKitchenSent
-                                      ? AppTheme.successColor
-                                      : AppTheme.infoColor,
-                                ),
-                              ),
-                            ),
-                          ],
-                          const SizedBox(width: 4),
-                          Icon(
-                            Icons.expand_more_rounded,
-                            size: 18,
-                            color: AppTheme.subtextColorOf(context),
-                          ),
-                        ],
-                      ),
-                    ),
                   ),
                   // Favorites quick-sell strip (always visible)
                   if (_favoriteProductIds.isNotEmpty)
@@ -2438,516 +2442,247 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                       );
                     }
 
-                    return ListView.separated(
-                      controller: _productListController,
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
-                      itemCount: filtered.length,
-                      separatorBuilder: (_, $i) => const SizedBox(height: 8),
-                      itemBuilder: (_, index) {
-                        final product = filtered[index];
-                        final priceLevel = cartState.customerPriceLevel;
-                        final lookup = getPriceByLevel(product, priceLevel);
-                        final groupColor = _groupColor(product.groupId);
-                        final actionColor = AppTheme.info;
-                        final initial = product.productName.isNotEmpty
-                            ? product.productName.substring(0, 1).toUpperCase()
-                            : '?';
-                        const avatarPalette = [
-                          AppTheme.primary,
-                          AppTheme.info,
-                          AppTheme.success,
-                          AppTheme.warning,
-                          AppTheme.purpleColor,
-                          AppTheme.tealColor,
-                        ];
-                        final avatarColor =
-                            avatarPalette[product.productName.codeUnitAt(0) %
-                                avatarPalette.length];
-                        final availableStock = stockMap[product.productId] ?? 0;
-                        final qtyInCart = cartState.items
-                            .where(
-                              (item) => item.productId == product.productId,
-                            )
-                            .fold<double>(
-                              0,
-                              (sum, item) => sum + item.quantity,
-                            );
-                        final screenWidth = MediaQuery.sizeOf(context).width;
-                        final isCompactCard = screenWidth < 380;
+                    return LayoutBuilder(
+                      builder: (_, constraints) {
+                        final cols = constraints.maxWidth >= 720
+                            ? 5
+                            : constraints.maxWidth >= 520
+                            ? 4
+                            : 3;
+                        const gridPadding = 8.0;
+                        const gridGap = 5.0;
+                        final tileWidth =
+                            (constraints.maxWidth -
+                                (gridPadding * 2) -
+                                ((cols - 1) * gridGap)) /
+                            cols;
+                        final compactTile = tileWidth < 112;
 
-                        return Card(
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: AppRadius.md,
-                            side: const BorderSide(color: AppTheme.border),
+                        return GridView.builder(
+                          controller: _productListController,
+                          padding: const EdgeInsets.fromLTRB(
+                            gridPadding,
+                            8,
+                            gridPadding,
+                            120,
                           ),
-                          color: Colors.white,
-                          child: InkWell(
-                            borderRadius: AppRadius.md,
-                            onTap: () {
-                              final stockMap = _currentStockMap();
-                              if (!_ensureStockAvailable(
-                                product,
-                                1,
-                                stockMap,
-                              )) {
-                                return;
-                              }
-                              _addProduct(product);
-                            },
-                            onLongPress: () => _showProductMetaSheet(
-                              product,
-                              lookup: lookup,
-                              availableStock: availableStock,
-                              qtyInCart: qtyInCart,
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Stack(
-                                    clipBehavior: Clip.none,
-                                    children: [
-                                      CircleAvatar(
-                                        radius: isCompactCard ? 19 : 20,
-                                        backgroundColor: avatarColor,
-                                        child: Text(
-                                          initial,
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.bold,
+                          gridDelegate:
+                              SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: cols,
+                                childAspectRatio: compactTile ? 0.72 : 0.76,
+                                crossAxisSpacing: gridGap,
+                                mainAxisSpacing: gridGap,
+                              ),
+                          itemCount: filtered.length,
+                          itemBuilder: (_, index) {
+                            final product = filtered[index];
+                            final priceLevel = cartState.customerPriceLevel;
+                            final lookup = getPriceByLevel(product, priceLevel);
+                            final availableStock =
+                                stockMap[product.productId] ?? 0;
+                            final qtyInCart = cartState.items
+                                .where(
+                                  (item) => item.productId == product.productId,
+                                )
+                                .fold<double>(
+                                  0,
+                                  (sum, item) => sum + item.quantity,
+                                );
+
+                            final imgPath = product.imagePath;
+                            final imgFile =
+                                (imgPath != null && imgPath.isNotEmpty)
+                                ? File(imgPath)
+                                : null;
+                            final hasImg =
+                                imgFile != null && imgFile.existsSync();
+
+                            return Card(
+                              elevation: 0,
+                              color: AppTheme.cardColor(context),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: AppRadius.md,
+                                side: BorderSide(
+                                  color: AppTheme.borderColorOf(context),
+                                ),
+                              ),
+                              child: InkWell(
+                                borderRadius: AppRadius.md,
+                                splashColor: AppTheme.primary.withValues(
+                                  alpha: 0.12,
+                                ),
+                                onTap: () {
+                                  _feedbackTap();
+                                  if (!_ensureStockAvailable(
+                                    product,
+                                    1,
+                                    _currentStockMap(),
+                                  )) {
+                                    return;
+                                  }
+                                  _addProduct(product);
+                                },
+                                onLongPress: () => _showProductMetaSheet(
+                                  product,
+                                  lookup: lookup,
+                                  availableStock: availableStock,
+                                  qtyInCart: qtyInCart,
+                                ),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    Expanded(
+                                      child: Stack(
+                                        children: [
+                                          ClipRRect(
+                                            borderRadius:
+                                                const BorderRadius.vertical(
+                                                  top: Radius.circular(10),
+                                                ),
+                                            child: SizedBox.expand(
+                                              child: hasImg
+                                                  ? Container(
+                                                      color: AppTheme.primary
+                                                          .withValues(
+                                                            alpha: 0.06,
+                                                          ),
+                                                      padding: EdgeInsets.all(
+                                                        compactTile ? 4 : 6,
+                                                      ),
+                                                      child: FittedBox(
+                                                        fit: BoxFit.contain,
+                                                        child: Image.file(
+                                                          imgFile,
+                                                          errorBuilder: (_, _, _) =>
+                                                              _gridImgPlaceholder(),
+                                                        ),
+                                                      ),
+                                                    )
+                                                  : _gridImgPlaceholder(),
+                                            ),
                                           ),
-                                        ),
-                                      ),
-                                      if (!product.isStockControl)
-                                        Positioned(
-                                          right: -2,
-                                          bottom: -2,
-                                          child: Container(
-                                            width: 14,
-                                            height: 14,
-                                            decoration: BoxDecoration(
-                                              color: AppTheme.textSub,
-                                              shape: BoxShape.circle,
-                                              border: Border.all(
-                                                color: Colors.white,
-                                                width: 1.5,
-                                              ),
-                                            ),
-                                            child: const Icon(
-                                              Icons.remove_circle_outline,
-                                              size: 8,
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Expanded(
-                                              child: Text(
-                                                product.productName,
-                                                maxLines: isCompactCard ? 1 : 2,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: const TextStyle(
-                                                  fontSize: 13,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: Color(0xFF1A1A1A),
-                                                ),
-                                              ),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 8,
-                                                    vertical: 2,
-                                                  ),
-                                              decoration: BoxDecoration(
-                                                color: product.isActive
-                                                    ? const Color(0xFFE8F5E9)
-                                                    : const Color(0xFFFFEBEE),
-                                                borderRadius:
-                                                    AppRadius.md,
-                                              ),
-                                              child: Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Container(
-                                                    width: 5,
-                                                    height: 5,
-                                                    decoration: BoxDecoration(
-                                                      color: product.isActive
-                                                          ? const Color(
-                                                              0xFF4CAF50,
-                                                            )
-                                                          : const Color(
-                                                              0xFFF44336,
-                                                            ),
-                                                      shape: BoxShape.circle,
-                                                    ),
-                                                  ),
-                                                  const SizedBox(width: 4),
-                                                  Text(
-                                                    product.isActive
-                                                        ? 'ใช้งาน'
-                                                        : 'ปิดใช้',
-                                                    style: TextStyle(
-                                                      fontSize: 10,
-                                                      fontWeight:
-                                                          FontWeight.w600,
-                                                      color: product.isActive
-                                                          ? const Color(
-                                                              0xFF2E7D32,
-                                                            )
-                                                          : const Color(
-                                                              0xFFC62828,
-                                                            ),
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 3),
-                                        Text(
-                                          'รหัส: ${product.productCode}',
-                                          style: const TextStyle(
-                                            fontSize: 11,
-                                            color: AppTheme.textSub,
-                                          ),
-                                        ),
-                                        if (product.barcode != null &&
-                                            product.barcode!.isNotEmpty)
-                                          Row(
-                                            children: [
-                                              const Icon(
-                                                Icons.qr_code,
-                                                size: 11,
-                                                color: AppTheme.textSub,
-                                              ),
-                                              const SizedBox(width: 3),
-                                              Flexible(
-                                                child: Text(
-                                                  product.barcode!,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                  style: const TextStyle(
-                                                    fontSize: 11,
-                                                    color: AppTheme.textSub,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        const SizedBox(height: 6),
-                                        Row(
-                                          children: [
-                                            Text(
-                                              '฿${lookup.price.toStringAsFixed(2)}',
-                                              style: const TextStyle(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w700,
-                                                color: AppTheme.info,
-                                              ),
-                                            ),
-                                            const SizedBox(width: 6),
-                                            Text(
-                                              '/ ${product.baseUnit}',
-                                              style: const TextStyle(
-                                                fontSize: 11,
-                                                color: AppTheme.textSub,
-                                              ),
-                                            ),
-                                            if (product.standardCost > 0) ...[
-                                              const SizedBox(width: 8),
-                                              Flexible(
-                                                child: Text(
-                                                  'ต้นทุน: ฿${product.standardCost.toStringAsFixed(2)}',
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                  style: const TextStyle(
-                                                    fontSize: 11,
-                                                    color: AppTheme.textSub,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ],
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Wrap(
-                                          spacing: 6,
-                                          runSpacing: 6,
-                                          children: [
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 8,
-                                                    vertical: 3,
-                                                  ),
-                                              decoration: BoxDecoration(
-                                                color: availableStock > 0
-                                                    ? const Color(0xFFE8F5E9)
-                                                    : const Color(0xFFFFEBEE),
-                                                borderRadius:
-                                                    AppRadius.pill,
-                                              ),
-                                              child: Text(
-                                                availableStock > 0
-                                                    ? 'คงเหลือ ${availableStock.toStringAsFixed(0)}'
-                                                    : 'หมดสต๊อก',
-                                                style: TextStyle(
-                                                  fontSize: 10,
-                                                  fontWeight: FontWeight.w700,
-                                                  color: availableStock > 0
-                                                      ? const Color(0xFF2E7D32)
-                                                      : const Color(0xFFC62828),
-                                                ),
-                                              ),
-                                            ),
-                                            if (qtyInCart > 0)
-                                              Container(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                      horizontal: 8,
-                                                      vertical: 3,
-                                                    ),
-                                                decoration: BoxDecoration(
-                                                  color: const Color(
-                                                    0xFFE8F5E9,
-                                                  ),
-                                                  borderRadius:
-                                                      AppRadius.pill,
-                                                ),
-                                                child: Text(
-                                                  'ในบิล ${qtyInCart.toStringAsFixed(qtyInCart % 1 == 0 ? 0 : 1)}',
-                                                  style: const TextStyle(
-                                                    fontSize: 10,
-                                                    fontWeight: FontWeight.w700,
-                                                    color: Color(0xFF2E7D32),
-                                                  ),
-                                                ),
-                                              ),
-                                            if (lookup.isFallback) ...[
-                                              Container(
+                                          if (qtyInCart > 0)
+                                            Positioned(
+                                              top: 5,
+                                              right: 5,
+                                              child: Container(
                                                 padding:
                                                     const EdgeInsets.symmetric(
                                                       horizontal: 6,
                                                       vertical: 2,
                                                     ),
                                                 decoration: BoxDecoration(
-                                                  color: Colors.orange
-                                                      .withValues(alpha: 0.12),
-                                                  borderRadius:
-                                                      AppRadius.pill,
+                                                  color: AppTheme.primary,
+                                                  borderRadius: AppRadius.pill,
                                                 ),
-                                                child: Text(
-                                                  'ใช้ราคา Lv.1',
-                                                  style: TextStyle(
-                                                    fontSize: 10,
-                                                    fontWeight: FontWeight.w700,
-                                                    color:
-                                                        Colors.orange.shade900,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                            if (product.groupId != null)
-                                              Container(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                      horizontal: 8,
-                                                      vertical: 3,
-                                                    ),
-                                                decoration: BoxDecoration(
-                                                  color: groupColor.withValues(
-                                                    alpha: 0.10,
-                                                  ),
-                                                  borderRadius:
-                                                      AppRadius.pill,
-                                                ),
-                                                child: Text(
-                                                  productGroupsAsync.maybeWhen(
-                                                    data: (groups) =>
-                                                        groups
-                                                            .where(
-                                                              (group) =>
-                                                                  group
-                                                                      .groupId ==
-                                                                  product
-                                                                      .groupId,
-                                                            )
-                                                            .firstOrNull
-                                                            ?.groupName ??
-                                                        'หมวดสินค้า',
-                                                    orElse: () => 'หมวดสินค้า',
-                                                  ),
-                                                  style: TextStyle(
-                                                    fontSize: 10,
-                                                    fontWeight: FontWeight.w700,
-                                                    color: groupColor,
-                                                  ),
-                                                ),
-                                              ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  // Inline stepper when qty > 0, else "เพิ่ม" button
-                                  qtyInCart > 0
-                                      ? Container(
-                                          decoration: BoxDecoration(
-                                            color: actionColor.withValues(
-                                              alpha: 0.08,
-                                            ),
-                                            borderRadius: AppRadius.md,
-                                            border: Border.all(
-                                              color: actionColor.withValues(
-                                                alpha: 0.20,
-                                              ),
-                                            ),
-                                          ),
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              SizedBox(
-                                                width: 32,
-                                                height: 36,
-                                                child: IconButton(
-                                                  padding: EdgeInsets.zero,
-                                                  visualDensity:
-                                                      VisualDensity.compact,
-                                                  onPressed: () {
-                                                    _feedbackTap();
-                                                    ref
-                                                        .read(
-                                                          cartProvider.notifier,
-                                                        )
-                                                        .decreaseQuantity(
-                                                          product.productId,
-                                                        );
-                                                  },
-                                                  icon: Icon(
-                                                    Icons.remove_rounded,
-                                                    size: 15,
-                                                    color: actionColor,
-                                                  ),
-                                                ),
-                                              ),
-                                              Container(
-                                                constraints:
-                                                    const BoxConstraints(
-                                                      minWidth: 28,
-                                                    ),
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                      horizontal: 2,
-                                                    ),
                                                 child: Text(
                                                   qtyInCart.toStringAsFixed(
                                                     qtyInCart % 1 == 0 ? 0 : 1,
                                                   ),
-                                                  textAlign: TextAlign.center,
-                                                  style: TextStyle(
-                                                    fontSize: 13,
+                                                  style: const TextStyle(
+                                                    fontSize: 10,
                                                     fontWeight: FontWeight.w800,
-                                                    color: actionColor,
+                                                    color: Colors.white,
                                                   ),
                                                 ),
                                               ),
-                                              SizedBox(
-                                                width: 32,
-                                                height: 36,
-                                                child: IconButton(
-                                                  padding: EdgeInsets.zero,
-                                                  visualDensity:
-                                                      VisualDensity.compact,
-                                                  onPressed: () {
-                                                    _feedbackTap();
-                                                    final stockMap =
-                                                        _currentStockMap();
-                                                    if (!_ensureStockAvailable(
-                                                      product,
-                                                      1,
-                                                      stockMap,
-                                                    )) {
-                                                      return;
-                                                    }
-                                                    _addProduct(product);
-                                                  },
-                                                  icon: Icon(
-                                                    Icons.add_rounded,
-                                                    size: 15,
-                                                    color: actionColor,
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                    Padding(
+                                      padding: EdgeInsets.fromLTRB(
+                                        compactTile ? 6 : 8,
+                                        6,
+                                        compactTile ? 6 : 8,
+                                        compactTile ? 6 : 8,
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            product.productName,
+                                            style: TextStyle(
+                                              fontSize: compactTile ? 10 : 11,
+                                              fontWeight: FontWeight.w700,
+                                              color: AppTheme.textColorOf(
+                                                context,
+                                              ),
+                                              height: 1.15,
+                                            ),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          SizedBox(height: compactTile ? 5 : 6),
+                                          Row(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.center,
+                                            children: [
+                                              Expanded(
+                                                child: Text(
+                                                  '฿${lookup.price.toStringAsFixed(2)}',
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w800,
+                                                    color:
+                                                        AppTheme.primaryColor,
+                                                  ),
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                              GestureDetector(
+                                                onTap: () {
+                                                  _feedbackTap();
+                                                  if (!_ensureStockAvailable(
+                                                    product,
+                                                    1,
+                                                    _currentStockMap(),
+                                                  )) {
+                                                    return;
+                                                  }
+                                                  _addProduct(product);
+                                                },
+                                                child: Container(
+                                                  width: compactTile ? 28 : 30,
+                                                  height: compactTile ? 28 : 30,
+                                                  decoration: BoxDecoration(
+                                                    color: AppTheme.primary,
+                                                    borderRadius: AppRadius.sm,
+                                                    boxShadow: [
+                                                      BoxShadow(
+                                                        color: AppTheme.primary
+                                                            .withValues(
+                                                              alpha: 0.25,
+                                                            ),
+                                                        blurRadius: 8,
+                                                        offset: const Offset(
+                                                          0,
+                                                          3,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  child: const Icon(
+                                                    Icons.add,
+                                                    size: 16,
+                                                    color: Colors.white,
                                                   ),
                                                 ),
                                               ),
                                             ],
                                           ),
-                                        )
-                                      : FilledButton(
-                                          onPressed: () {
-                                            _feedbackTap();
-                                            final stockMap = _currentStockMap();
-                                            if (!_ensureStockAvailable(
-                                              product,
-                                              1,
-                                              stockMap,
-                                            )) {
-                                              return;
-                                            }
-                                            _addProduct(product);
-                                          },
-                                          style: FilledButton.styleFrom(
-                                            backgroundColor: actionColor
-                                                .withValues(alpha: 0.10),
-                                            foregroundColor: actionColor,
-                                            elevation: 0,
-                                            side: BorderSide(
-                                              color: actionColor.withValues(
-                                                alpha: 0.20,
-                                              ),
-                                            ),
-                                            padding: EdgeInsets.symmetric(
-                                              horizontal: isCompactCard
-                                                  ? 10
-                                                  : 16,
-                                              vertical: isCompactCard ? 0 : 2,
-                                            ),
-                                            minimumSize: Size(
-                                              0,
-                                              isCompactCard ? 34 : 38,
-                                            ),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  AppRadius.md,
-                                            ),
-                                          ),
-                                          child: const Text(
-                                            'เพิ่ม',
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                          ),
-                                        ),
-                                ],
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          ),
+                            );
+                          },
                         );
                       },
                     );
@@ -3036,8 +2771,7 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                                                   ),
                                               decoration: BoxDecoration(
                                                 color: AppTheme.primaryColor,
-                                                borderRadius:
-                                                    AppRadius.sm,
+                                                borderRadius: AppRadius.sm,
                                               ),
                                               child: Text(
                                                 '${cartState.itemCount}',

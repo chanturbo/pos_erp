@@ -34,24 +34,25 @@ class BillItemModel {
   bool get isHeld => kitchenStatus == 'HELD';
 
   factory BillItemModel.fromJson(Map<String, dynamic> json) => BillItemModel(
-        itemId: json['item_id'] as String,
-        orderId: json['order_id'] as String,
-        lineNo: json['line_no'] as int? ?? 0,
-        productId: json['product_id'] as String,
-        productName: json['product_name'] as String,
-        quantity: (json['quantity'] as num).toDouble(),
-        unit: json['unit'] as String? ?? '',
-        unitPrice: (json['unit_price'] as num).toDouble(),
-        discountAmount: (json['discount_amount'] as num?)?.toDouble() ?? 0,
-        amount: (json['amount'] as num).toDouble(),
-        kitchenStatus: json['kitchen_status'] as String? ?? 'PENDING',
-        courseNo: json['course_no'] as int? ?? 1,
-        specialInstructions: json['special_instructions'] as String?,
-        modifiers: (json['modifiers'] as List?)
-                ?.map((item) => Map<String, dynamic>.from(item as Map))
-                .toList() ??
-            const [],
-      );
+    itemId: json['item_id'] as String,
+    orderId: json['order_id'] as String,
+    lineNo: json['line_no'] as int? ?? 0,
+    productId: json['product_id'] as String,
+    productName: json['product_name'] as String,
+    quantity: (json['quantity'] as num).toDouble(),
+    unit: json['unit'] as String? ?? '',
+    unitPrice: (json['unit_price'] as num).toDouble(),
+    discountAmount: (json['discount_amount'] as num?)?.toDouble() ?? 0,
+    amount: (json['amount'] as num).toDouble(),
+    kitchenStatus: json['kitchen_status'] as String? ?? 'PENDING',
+    courseNo: json['course_no'] as int? ?? 1,
+    specialInstructions: json['special_instructions'] as String?,
+    modifiers:
+        (json['modifiers'] as List?)
+            ?.map((item) => Map<String, dynamic>.from(item as Map))
+            .toList() ??
+        const [],
+  );
 }
 
 class BillModel {
@@ -70,6 +71,7 @@ class BillModel {
   final double serviceChargeAmount;
   final double grandTotal;
   final String? previewToken;
+  final String status;
 
   const BillModel({
     this.orderNo,
@@ -87,59 +89,63 @@ class BillModel {
     required this.serviceChargeAmount,
     required this.grandTotal,
     this.previewToken,
+    this.status = 'OPEN',
   });
 
   factory BillModel.fromJson(Map<String, dynamic> json) => BillModel(
-        orderNo: json['order_no'] as String?,
-        sessionId: json['session_id'] as String? ?? '',
-        tableId: json['table_id'] as String? ?? '',
-        guestCount: json['guest_count'] as int? ?? 0,
-        openedAt: json['opened_at'] != null
-            ? DateTime.tryParse(json['opened_at'] as String)
-            : null,
-        customerId: json['customer_id'] as String?,
-        customerName: json['customer_name'] as String?,
-        orderIds: (json['order_ids'] as List).map((e) => e as String).toList(),
-        items: (json['items'] as List)
-            .map((j) => BillItemModel.fromJson(j as Map<String, dynamic>))
-            .toList(),
-        subtotal: (json['subtotal'] as num).toDouble(),
-        discountAmount: (json['discount_amount'] as num).toDouble(),
-        serviceChargeRate: (json['service_charge_rate'] as num).toDouble(),
-        serviceChargeAmount: (json['service_charge_amount'] as num).toDouble(),
-        grandTotal: (json['grand_total'] as num).toDouble(),
-        previewToken: json['preview_token'] as String?,
-      );
+    orderNo: json['order_no'] as String?,
+    sessionId: json['session_id'] as String? ?? '',
+    tableId: json['table_id'] as String? ?? '',
+    guestCount: json['guest_count'] as int? ?? 0,
+    openedAt: json['opened_at'] != null
+        ? DateTime.tryParse(json['opened_at'] as String)
+        : null,
+    customerId: json['customer_id'] as String?,
+    customerName: json['customer_name'] as String?,
+    orderIds: (json['order_ids'] as List).map((e) => e as String).toList(),
+    items: (json['items'] as List)
+        .map((j) => BillItemModel.fromJson(j as Map<String, dynamic>))
+        .toList(),
+    subtotal: (json['subtotal'] as num).toDouble(),
+    discountAmount: (json['discount_amount'] as num).toDouble(),
+    serviceChargeRate: (json['service_charge_rate'] as num).toDouble(),
+    serviceChargeAmount: (json['service_charge_amount'] as num).toDouble(),
+    grandTotal: (json['grand_total'] as num).toDouble(),
+    previewToken: json['preview_token'] as String?,
+    status: json['status'] as String? ?? 'OPEN',
+  );
 
   factory BillModel.fromSalesOrderJson(Map<String, dynamic> json) => BillModel(
-        orderNo: json['order_no'] as String?,
-        sessionId: json['session_id'] as String? ?? '',
-        tableId: json['table_id'] as String? ?? '',
-        guestCount: (json['party_size'] as num?)?.toInt() ?? 1,
-        customerId: json['customer_id'] as String?,
-        customerName: json['customer_name'] as String?,
-        orderIds: [
-          if ((json['order_id'] as String?)?.isNotEmpty ?? false)
-            json['order_id'] as String,
-        ],
-        items: ((json['items'] as List?) ?? const [])
-            .map((j) => BillItemModel.fromJson(j as Map<String, dynamic>))
-            .toList(),
-        subtotal:
-            (json['subtotal'] as num?)?.toDouble() ??
-            (json['total_amount'] as num?)?.toDouble() ??
-            0,
-        discountAmount: (json['discount_amount'] as num?)?.toDouble() ?? 0,
-        serviceChargeRate:
-            (json['service_charge_rate'] as num?)?.toDouble() ?? 0,
-        serviceChargeAmount:
-            (json['service_charge_amount'] as num?)?.toDouble() ?? 0,
-        grandTotal: (json['total_amount'] as num?)?.toDouble() ?? 0,
-      );
+    orderNo: json['order_no'] as String?,
+    sessionId: json['session_id'] as String? ?? '',
+    tableId: json['table_id'] as String? ?? '',
+    guestCount: (json['party_size'] as num?)?.toInt() ?? 1,
+    customerId: json['customer_id'] as String?,
+    customerName: json['customer_name'] as String?,
+    orderIds: [
+      if ((json['order_id'] as String?)?.isNotEmpty ?? false)
+        json['order_id'] as String,
+    ],
+    items: ((json['items'] as List?) ?? const [])
+        .map((j) => BillItemModel.fromJson(j as Map<String, dynamic>))
+        .toList(),
+    subtotal:
+        (json['subtotal'] as num?)?.toDouble() ??
+        (json['total_amount'] as num?)?.toDouble() ??
+        0,
+    discountAmount: (json['discount_amount'] as num?)?.toDouble() ?? 0,
+    serviceChargeRate: (json['service_charge_rate'] as num?)?.toDouble() ?? 0,
+    serviceChargeAmount:
+        (json['service_charge_amount'] as num?)?.toDouble() ?? 0,
+    grandTotal: (json['total_amount'] as num?)?.toDouble() ?? 0,
+    status: json['status'] as String? ?? 'OPEN',
+  );
 
   bool get isEmpty => items.isEmpty;
   bool get hasServiceCharge => serviceChargeRate > 0;
   bool get hasTable => tableId.trim().isNotEmpty;
+  bool get isOpen => status.toUpperCase() == 'OPEN';
+  bool get isCompleted => status.toUpperCase() == 'COMPLETED';
 }
 
 /// ผลลัพธ์จากการ split bill
@@ -161,18 +167,17 @@ class SplitResult {
   });
 
   factory SplitResult.fromJson(Map<String, dynamic> json) => SplitResult(
-        mode: json['mode'] as String,
-        count: (json['count'] as int?) ??
-            (json['splits'] != null
-                ? (json['splits'] as List).length
-                : 0),
-        grandTotal: (json['grand_total'] as num?)?.toDouble() ?? 0,
-        perPerson: (json['per_person'] as num?)?.toDouble() ?? 0,
-        splits: (json['splits'] as List)
-            .map((j) => SplitPortion.fromJson(j as Map<String, dynamic>))
-            .toList(),
-        previewToken: json['preview_token'] as String?,
-      );
+    mode: json['mode'] as String,
+    count:
+        (json['count'] as int?) ??
+        (json['splits'] != null ? (json['splits'] as List).length : 0),
+    grandTotal: (json['grand_total'] as num?)?.toDouble() ?? 0,
+    perPerson: (json['per_person'] as num?)?.toDouble() ?? 0,
+    splits: (json['splits'] as List)
+        .map((j) => SplitPortion.fromJson(j as Map<String, dynamic>))
+        .toList(),
+    previewToken: json['preview_token'] as String?,
+  );
 }
 
 class SplitPortion {
@@ -195,20 +200,24 @@ class SplitPortion {
   });
 
   factory SplitPortion.fromJson(Map<String, dynamic> json) => SplitPortion(
-        label: json['label'] as String? ?? '',
-        subtotal: (json['subtotal'] as num?)?.toDouble() ??
-            (json['amount'] as num?)?.toDouble() ?? 0,
-        discountAmount: (json['discount_amount'] as num?)?.toDouble() ?? 0,
-        serviceCharge: (json['service_charge'] as num?)?.toDouble() ?? 0,
-        total: (json['total'] as num?)?.toDouble() ??
-            (json['amount'] as num?)?.toDouble() ?? 0,
-        orderIds: (json['order_ids'] as List?)
-                ?.map((e) => e.toString())
-                .toList() ??
-            const [],
-        items: (json['items'] as List?)
-                ?.map((j) => j as Map<String, dynamic>)
-                .toList() ??
-            [],
-      );
+    label: json['label'] as String? ?? '',
+    subtotal:
+        (json['subtotal'] as num?)?.toDouble() ??
+        (json['amount'] as num?)?.toDouble() ??
+        0,
+    discountAmount: (json['discount_amount'] as num?)?.toDouble() ?? 0,
+    serviceCharge: (json['service_charge'] as num?)?.toDouble() ?? 0,
+    total:
+        (json['total'] as num?)?.toDouble() ??
+        (json['amount'] as num?)?.toDouble() ??
+        0,
+    orderIds:
+        (json['order_ids'] as List?)?.map((e) => e.toString()).toList() ??
+        const [],
+    items:
+        (json['items'] as List?)
+            ?.map((j) => j as Map<String, dynamic>)
+            .toList() ??
+        [],
+  );
 }

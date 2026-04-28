@@ -111,6 +111,7 @@ class TableCard extends StatelessWidget {
                       foregroundColor: AppTheme.successColor,
                       side: BorderSide(color: AppTheme.successColor),
                       padding: const EdgeInsets.symmetric(vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: AppRadius.sm),
                       visualDensity: VisualDensity.compact,
                       textStyle: const TextStyle(
                         fontSize: 11,

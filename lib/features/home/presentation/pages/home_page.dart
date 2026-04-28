@@ -384,6 +384,12 @@ class _HomePageState extends ConsumerState<HomePage> {
     final nav = Navigator.of(context);
     if (nav.canPop()) nav.pop();
 
+    final item = _allItems[i];
+    if (!context.hasPermanentSidebar && item.title == 'ขายกลับบ้าน') {
+      _push(context, item.page);
+      return;
+    }
+
     setState(() {
       _selectedIndex = i;
       _overridePage = null;
@@ -699,7 +705,6 @@ class _HomePageState extends ConsumerState<HomePage> {
                   ),
               ],
             ),
-            tooltip: connection.detail,
             onPressed: () => _push(context, const SyncStatusPage()),
           ),
           loading: () => const SizedBox(width: 48),

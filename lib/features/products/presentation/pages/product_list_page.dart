@@ -1230,51 +1230,54 @@ class _ProductListTopBar extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            if (canPop) ...[
-              _PBackBtn(onTap: () => Navigator.of(context).pop()),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              if (canPop) ...[
+                _PBackBtn(onTap: () => Navigator.of(context).pop()),
+                const SizedBox(width: 8),
+              ],
+              _PPageIcon(),
               const SizedBox(width: 8),
-            ],
-            _PPageIcon(),
-            const SizedBox(width: 8),
-            const Expanded(
-              child: Text(
-                'รายการสินค้า',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
+              const Expanded(
+                child: Text(
+                  'รายการสินค้า',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-                overflow: TextOverflow.ellipsis,
               ),
-            ),
-            _PToggleBtn(
-              icon: Icons.check_circle_outline,
-              tooltip: isActiveOnly ? 'แสดงทั้งหมด' : 'เฉพาะที่ใช้งาน',
-              active: isActiveOnly,
-              activeColor: AppTheme.success,
-              onTap: onToggleActive,
-            ),
-            const SizedBox(width: 4),
-            _PToggleBtn(
-              icon: isTableView
-                  ? Icons.view_agenda_outlined
-                  : Icons.table_rows_outlined,
-              tooltip: isTableView ? 'Card View' : 'Table View',
-              active: false,
-              activeColor: AppTheme.navy,
-              onTap: onToggleView,
-            ),
-            const SizedBox(width: 4),
-            _PRefreshBtn(onTap: onRefresh),
-            const SizedBox(width: 4),
-            _PManageGroupsBtn(onTap: onManageGroups, compact: true),
-            const SizedBox(width: 4),
-            _PBarcodeBtn(onTap: onBarcodeGenerator, compact: true),
-            const SizedBox(width: 4),
-            _PAddBtn(onTap: onAdd, compact: true),
-          ],
+              _PToggleBtn(
+                icon: Icons.check_circle_outline,
+                tooltip: isActiveOnly ? 'แสดงทั้งหมด' : 'เฉพาะที่ใช้งาน',
+                active: isActiveOnly,
+                activeColor: AppTheme.success,
+                onTap: onToggleActive,
+              ),
+              const SizedBox(width: 4),
+              _PToggleBtn(
+                icon: isTableView
+                    ? Icons.view_agenda_outlined
+                    : Icons.table_rows_outlined,
+                tooltip: isTableView ? 'Card View' : 'Table View',
+                active: false,
+                activeColor: AppTheme.navy,
+                onTap: onToggleView,
+              ),
+              const SizedBox(width: 4),
+              _PRefreshBtn(onTap: onRefresh),
+              const SizedBox(width: 4),
+              _PManageGroupsBtn(onTap: onManageGroups, compact: true),
+              const SizedBox(width: 4),
+              _PBarcodeBtn(onTap: onBarcodeGenerator, compact: true),
+              const SizedBox(width: 4),
+              _PAddBtn(onTap: onAdd, compact: true),
+            ],
+          ),
         ),
         const SizedBox(height: 10),
         Row(
