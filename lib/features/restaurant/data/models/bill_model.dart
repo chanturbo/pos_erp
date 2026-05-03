@@ -32,6 +32,7 @@ class BillItemModel {
   });
 
   bool get isHeld => kitchenStatus == 'HELD';
+  bool get isPreparing => kitchenStatus.toUpperCase() == 'PREPARING';
 
   factory BillItemModel.fromJson(Map<String, dynamic> json) => BillItemModel(
     itemId: json['item_id'] as String,
@@ -146,6 +147,7 @@ class BillModel {
   bool get hasTable => tableId.trim().isNotEmpty;
   bool get isOpen => status.toUpperCase() == 'OPEN';
   bool get isCompleted => status.toUpperCase() == 'COMPLETED';
+  bool get hasPreparingItems => items.any((i) => i.isPreparing);
 }
 
 /// ผลลัพธ์จากการ split bill

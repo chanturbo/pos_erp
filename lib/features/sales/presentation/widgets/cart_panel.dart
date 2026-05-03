@@ -10,7 +10,9 @@ import '../../../products/presentation/providers/product_provider.dart'; // ✅ 
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../branches/presentation/providers/branch_provider.dart';
 import '../../../restaurant/data/models/restaurant_order_context.dart';
+import '../../../restaurant/presentation/pages/takeaway_orders_page.dart';
 import '../../../restaurant/presentation/providers/table_provider.dart';
+import '../providers/sales_provider.dart';
 import '../../../../core/client/api_client.dart';
 import '../../../../shared/services/mobile_scanner_service.dart'; // ✅ MobileScannerService
 import '../../../../shared/services/thermal_print_service.dart';
@@ -231,20 +233,35 @@ class _CartPanelState extends ConsumerState<CartPanel> {
       }
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            orderNo == null || orderNo.isEmpty
-                ? 'ส่งออเดอร์เข้าครัวแล้ว'
-                : 'ส่งออเดอร์ $orderNo เข้าครัวแล้ว',
-          ),
-          backgroundColor: _success,
-        ),
-      );
-      // Takeaway: pop back to overview so cashier can serve next customer.
+      // Takeaway: navigate to TakeawayOrdersPage so cashier can track / void items.
       // dispose() will clear the cart (items are kitchen-sent → no hold needed).
       if (restaurantContext.isTakeaway && mounted) {
-        Navigator.maybePop(context);
+        ref.invalidate(salesHistoryProvider);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              orderNo == null || orderNo.isEmpty
+                  ? 'ส่งออเดอร์เข้าครัวแล้ว — ดูบิลค้างเพื่อยกเลิกหรือชำระเงิน'
+                  : 'ส่งออเดอร์ $orderNo เข้าครัวแล้ว',
+            ),
+            backgroundColor: _success,
+          ),
+        );
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const TakeawayOrdersPage()),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              orderNo == null || orderNo.isEmpty
+                  ? 'ส่งออเดอร์เข้าครัวแล้ว'
+                  : 'ส่งออเดอร์ $orderNo เข้าครัวแล้ว',
+            ),
+            backgroundColor: _success,
+          ),
+        );
       }
     } on DioException catch (e) {
       if (!mounted) return;
@@ -950,6 +967,9 @@ class _CartRowState extends ConsumerState<_CartRow> {
   }
 
   Future<void> _showNoteSheet(CartItem item) async {
+    const sweetLevels = ['หวาน 50%', 'หวาน 25%', 'หวาน 0%'];
+    const sweetColor = Color(0xFFE91E8C);
+
     final presets = [
       'ไม่ผงชูรส',
       'ไม่หวาน',
@@ -965,9 +985,33 @@ class _CartRowState extends ConsumerState<_CartRow> {
 
     final ctrl = TextEditingController(text: item.note ?? '');
     final selected = <String>{};
+    String? selectedSweet;
+
     // pre-tick any preset that already appears in the existing note
     for (final p in presets) {
       if (ctrl.text.contains(p)) selected.add(p);
+    }
+    for (final s in sweetLevels) {
+      if (ctrl.text.contains(s)) {
+        selectedSweet = s;
+        break;
+      }
+    }
+
+    void applySweetToText(String? sweet, String? previousSweet) {
+      String text = ctrl.text;
+      // remove previous sweet level
+      if (previousSweet != null) {
+        text = text
+            .replaceAll(previousSweet, '')
+            .replaceAll(RegExp(r', *,'), ',')
+            .replaceAll(RegExp(r'^,\s*|,\s*$'), '')
+            .trim();
+      }
+      if (sweet != null) {
+        text = text.isEmpty ? sweet : '$text, $sweet';
+      }
+      ctrl.text = text;
     }
 
     await showModalBottomSheet<void>(
@@ -990,6 +1034,19 @@ class _CartRowState extends ConsumerState<_CartRow> {
                   selected.add(preset);
                   final base = ctrl.text.trim();
                   ctrl.text = base.isEmpty ? preset : '$base, $preset';
+                }
+              });
+            }
+
+            void toggleSweet(String sweet) {
+              setSheet(() {
+                final previous = selectedSweet;
+                if (selectedSweet == sweet) {
+                  selectedSweet = null;
+                  applySweetToText(null, previous);
+                } else {
+                  selectedSweet = sweet;
+                  applySweetToText(sweet, previous);
                 }
               });
             }
@@ -1046,9 +1103,76 @@ class _CartRowState extends ConsumerState<_CartRow> {
                         ],
                       ),
                     ),
-                    // preset chips
+                    // sweet level chips (exclusive)
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.water_drop_outlined,
+                            size: 13,
+                            color: sweetColor,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'ระดับความหวาน',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: sweetColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Row(
+                        children: sweetLevels.map((s) {
+                          final active = selectedSweet == s;
+                          return Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 3),
+                              child: GestureDetector(
+                                onTap: () => toggleSweet(s),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 150),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 7,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: active
+                                        ? sweetColor
+                                        : AppTheme.surface3Of(ctx),
+                                    borderRadius: AppRadius.sm,
+                                    border: Border.all(
+                                      color: active
+                                          ? sweetColor
+                                          : AppTheme.borderColorOf(ctx),
+                                    ),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      s,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: active
+                                            ? Colors.white
+                                            : AppTheme.textColorOf(ctx),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                    // preset chips
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
                       child: Text(
                         'เลือกได้เลย',
                         style: TextStyle(
@@ -1930,6 +2054,17 @@ class _CartSummary extends ConsumerWidget {
     final canCheckout =
         cartState.items.isNotEmpty &&
         (!isRestaurantFlow || isKitchenSent || skipKitchen);
+    final isCheckoutBlockedByKitchen =
+        isRestaurantFlow && !isKitchenSent && !skipKitchen;
+    final showCheckoutAction =
+        showCheckoutButton && !isCheckoutBlockedByKitchen;
+    final useDesktopRestaurantActionSize = context.isTablet && isRestaurantFlow;
+    final actionButtonHeight = useDesktopRestaurantActionSize
+        ? 48.0
+        : (density.compactHeight ? 38.0 : (context.isMobile ? 44.0 : 48.0));
+    final actionPadding = useDesktopRestaurantActionSize
+        ? 10.0
+        : (density.compactHeight ? 6.0 : 10.0);
 
     return Container(
       decoration: BoxDecoration(
@@ -2069,216 +2204,299 @@ class _CartSummary extends ConsumerWidget {
               ),
             ),
 
-          if (showCheckoutButton || showHoldButton || isRestaurantFlow)
+          if (showCheckoutAction || showHoldButton || isRestaurantFlow)
             Padding(
-              padding: EdgeInsets.all(density.compactHeight ? 6 : 10),
-              child: Row(
-                children: [
-                  if (isRestaurantFlow && hasUnsentItems && !skipKitchen) ...[
-                    Expanded(
-                      flex: showCheckoutButton || showHoldButton ? 6 : 1,
-                      child: SizedBox(
-                        height: density.compactHeight
-                            ? 38
-                            : (context.isMobile ? 44 : 48),
-                        child: ElevatedButton(
-                          onPressed:
-                              cartState.items.isEmpty ||
-                                  isSendingRestaurantOrder
-                              ? null
-                              : onSendToKitchen,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _info,
-                            foregroundColor: Colors.white,
-                            disabledBackgroundColor: disabledColor,
-                            disabledForegroundColor: isDark
-                                ? Colors.white30
-                                : Colors.grey[500],
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: AppRadius.md,
-                            ),
-                          ),
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (isSendingRestaurantOrder)
-                                  const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                else
-                                  const Icon(Icons.kitchen_outlined, size: 18),
-                                const SizedBox(width: 8),
-                                Text(
-                                  isSendingRestaurantOrder
-                                      ? 'กำลังส่ง...'
-                                      : 'ส่งเข้าครัว',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.fade,
-                                  softWrap: false,
-                                  style: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                  ],
-                  if (showHoldButton) ...[
-                    Expanded(
-                      flex: 5,
-                      child: OutlinedButton(
-                        onPressed: cartState.items.isEmpty ? null : onHold,
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: Size(
-                            0,
-                            density.compactHeight
-                                ? 38
-                                : (context.isMobile ? 44 : 48),
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: AppRadius.md,
-                          ),
-                        ),
-                        child: const FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.pause_circle_outline_rounded,
-                                size: 17,
-                              ),
-                              SizedBox(width: 6),
-                              Text(
-                                'พักบิล',
-                                maxLines: 1,
-                                overflow: TextOverflow.fade,
-                                softWrap: false,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 13,
+              padding: EdgeInsets.all(actionPadding),
+              child: useDesktopRestaurantActionSize
+                  ? Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          children: [
+                            if (isRestaurantFlow &&
+                                hasUnsentItems &&
+                                !skipKitchen) ...[
+                              Expanded(
+                                flex: showHoldButton ? 6 : 1,
+                                child: _SendToKitchenButton(
+                                  height: actionButtonHeight,
+                                  disabledColor: disabledColor,
+                                  isDark: isDark,
+                                  isSending: isSendingRestaurantOrder,
+                                  onPressed:
+                                      cartState.items.isEmpty ||
+                                          isSendingRestaurantOrder
+                                      ? null
+                                      : onSendToKitchen,
                                 ),
                               ),
+                              if (showHoldButton) const SizedBox(width: 8),
                             ],
-                          ),
+                            if (showHoldButton)
+                              Expanded(
+                                flex:
+                                    isRestaurantFlow &&
+                                        hasUnsentItems &&
+                                        !skipKitchen
+                                    ? 5
+                                    : 1,
+                                child: _HoldBillButton(
+                                  height: actionButtonHeight,
+                                  onPressed: cartState.items.isEmpty
+                                      ? null
+                                      : onHold,
+                                ),
+                              ),
+                          ],
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                  ],
-                  if (showCheckoutButton)
-                    Expanded(
-                      flex: showHoldButton ? 11 : 1,
-                      child: SizedBox(
-                        height: density.compactHeight
-                            ? 38
-                            : (context.isMobile ? 44 : 48),
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: canCheckout
-                                ? _success
-                                : disabledColor,
-                            foregroundColor: Colors.white,
-                            disabledForegroundColor: isDark
-                                ? Colors.white30
-                                : Colors.grey[500],
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: AppRadius.md,
+                        if (showCheckoutAction) ...[
+                          const SizedBox(height: 8),
+                          _CheckoutButton(
+                            cartState: cartState,
+                            height: actionButtonHeight,
+                            canCheckout: canCheckout,
+                            isRestaurantFlow: isRestaurantFlow,
+                            disabledColor: disabledColor,
+                            isDark: isDark,
+                            onOpenNewBill: onOpenNewBill,
+                          ),
+                        ],
+                      ],
+                    )
+                  : Row(
+                      children: [
+                        if (isRestaurantFlow &&
+                            hasUnsentItems &&
+                            !skipKitchen) ...[
+                          Expanded(
+                            flex: showCheckoutAction || showHoldButton ? 6 : 1,
+                            child: _SendToKitchenButton(
+                              height: actionButtonHeight,
+                              disabledColor: disabledColor,
+                              isDark: isDark,
+                              isSending: isSendingRestaurantOrder,
+                              onPressed:
+                                  cartState.items.isEmpty ||
+                                      isSendingRestaurantOrder
+                                  ? null
+                                  : onSendToKitchen,
                             ),
                           ),
-                          onPressed: !canCheckout
-                              ? null
-                              : () async {
-                                  final checkoutContext = ref.read(
-                                    restaurantOrderContextProvider,
-                                  );
-                                  final result =
-                                      await Navigator.push<ReceiptExitAction>(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) => const PaymentPage(
-                                            preferBackButton: true,
-                                          ),
-                                        ),
-                                      );
-                                  if (checkoutContext?.isTakeaway == true &&
-                                      ref.read(
-                                            restaurantOrderContextProvider,
-                                          ) ==
-                                          null) {
-                                    ref
-                                            .read(
-                                              restaurantOrderContextProvider
-                                                  .notifier,
-                                            )
-                                            .state =
-                                        RestaurantOrderContext.takeaway(
-                                          branchId: checkoutContext!.branchId,
-                                          skipKitchen:
-                                              checkoutContext.skipKitchen,
-                                        );
-                                  }
-                                  if (result == ReceiptExitAction.openNewBill) {
-                                    onOpenNewBill?.call();
-                                  }
-                                },
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  !canCheckout &&
-                                          isRestaurantFlow &&
-                                          !isKitchenSent &&
-                                          !skipKitchen
-                                      ? Icons.lock_outline_rounded
-                                      : Icons.payment,
-                                  size: 18,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  !canCheckout
-                                      ? (isRestaurantFlow &&
-                                                !isKitchenSent &&
-                                                !skipKitchen
-                                            ? 'กรุณาส่งเข้าครัวก่อน'
-                                            : 'ชำระเงิน')
-                                      : (isRestaurantFlow
-                                            ? 'ปิดบิล  ฿${cartState.total.toStringAsFixed(2)}'
-                                            : 'ชำระเงิน  ฿${cartState.total.toStringAsFixed(2)}'),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.fade,
-                                  softWrap: false,
-                                  style: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
+                          const SizedBox(width: 8),
+                        ],
+                        if (showHoldButton) ...[
+                          Expanded(
+                            flex: 5,
+                            child: _HoldBillButton(
+                              height: actionButtonHeight,
+                              onPressed: cartState.items.isEmpty
+                                  ? null
+                                  : onHold,
                             ),
                           ),
-                        ),
-                      ),
+                          const SizedBox(width: 8),
+                        ],
+                        if (showCheckoutAction)
+                          Expanded(
+                            flex: showHoldButton ? 11 : 1,
+                            child: _CheckoutButton(
+                              cartState: cartState,
+                              height: actionButtonHeight,
+                              canCheckout: canCheckout,
+                              isRestaurantFlow: isRestaurantFlow,
+                              disabledColor: disabledColor,
+                              isDark: isDark,
+                              onOpenNewBill: onOpenNewBill,
+                            ),
+                          ),
+                      ],
                     ),
-                ],
-              ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _SendToKitchenButton extends StatelessWidget {
+  final double height;
+  final Color? disabledColor;
+  final bool isDark;
+  final bool isSending;
+  final Future<void> Function()? onPressed;
+
+  const _SendToKitchenButton({
+    required this.height,
+    required this.disabledColor,
+    required this.isDark,
+    required this.isSending,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: height,
+      child: ElevatedButton(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: _info,
+          foregroundColor: Colors.white,
+          disabledBackgroundColor: disabledColor,
+          disabledForegroundColor: isDark ? Colors.white30 : Colors.grey[500],
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: AppRadius.md),
+        ),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (isSending)
+                const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              else
+                const Icon(Icons.kitchen_outlined, size: 18),
+              const SizedBox(width: 8),
+              Text(
+                isSending ? 'กำลังส่ง...' : 'ส่งเข้าครัว',
+                maxLines: 1,
+                overflow: TextOverflow.fade,
+                softWrap: false,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HoldBillButton extends StatelessWidget {
+  final double height;
+  final VoidCallback? onPressed;
+
+  const _HoldBillButton({required this.height, required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton(
+      onPressed: onPressed,
+      style: OutlinedButton.styleFrom(
+        minimumSize: Size(0, height),
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.md),
+      ),
+      child: const FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.pause_circle_outline_rounded, size: 17),
+            SizedBox(width: 6),
+            Text(
+              'พักบิล',
+              maxLines: 1,
+              overflow: TextOverflow.fade,
+              softWrap: false,
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CheckoutButton extends ConsumerWidget {
+  final CartState cartState;
+  final double height;
+  final bool canCheckout;
+  final bool isRestaurantFlow;
+  final Color? disabledColor;
+  final bool isDark;
+  final VoidCallback? onOpenNewBill;
+
+  const _CheckoutButton({
+    required this.cartState,
+    required this.height,
+    required this.canCheckout,
+    required this.isRestaurantFlow,
+    required this.disabledColor,
+    required this.isDark,
+    required this.onOpenNewBill,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return SizedBox(
+      height: height,
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: canCheckout ? _success : disabledColor,
+          foregroundColor: Colors.white,
+          disabledForegroundColor: isDark ? Colors.white30 : Colors.grey[500],
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: AppRadius.md),
+        ),
+        onPressed: !canCheckout
+            ? null
+            : () async {
+                final checkoutContext = ref.read(
+                  restaurantOrderContextProvider,
+                );
+                final result = await Navigator.push<ReceiptExitAction>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const PaymentPage(preferBackButton: true),
+                  ),
+                );
+                if (checkoutContext?.isTakeaway == true &&
+                    ref.read(restaurantOrderContextProvider) == null) {
+                  ref
+                      .read(restaurantOrderContextProvider.notifier)
+                      .state = RestaurantOrderContext.takeaway(
+                    branchId: checkoutContext!.branchId,
+                    skipKitchen: checkoutContext.skipKitchen,
+                  );
+                }
+                if (result == ReceiptExitAction.openNewBill) {
+                  onOpenNewBill?.call();
+                }
+              },
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.payment, size: 18),
+              const SizedBox(width: 8),
+              Text(
+                !canCheckout
+                    ? 'ชำระเงิน'
+                    : (isRestaurantFlow
+                          ? 'ปิดบิล  ฿${cartState.total.toStringAsFixed(2)}'
+                          : 'ชำระเงิน  ฿${cartState.total.toStringAsFixed(2)}'),
+                maxLines: 1,
+                overflow: TextOverflow.fade,
+                softWrap: false,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

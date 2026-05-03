@@ -26,10 +26,13 @@ import '../../../restaurant/presentation/pages/kitchen_analytics_page.dart';
 import '../../../restaurant/presentation/pages/reservations_page.dart';
 import '../../../restaurant/presentation/pages/takeaway_sales_page.dart';
 import '../../../restaurant/presentation/pages/takeaway_orders_page.dart';
+import '../../../restaurant/data/models/restaurant_order_context.dart';
 import '../../../sales/presentation/pages/pos_page.dart';
 import '../../../sales/presentation/pages/sales_history_page.dart';
+import '../../../sales/presentation/providers/cart_provider.dart';
 import '../../../sales/presentation/providers/sales_provider.dart';
 import '../../../dashboard/presentation/pages/dashboard_page.dart';
+import '../../../dashboard/presentation/providers/dashboard_provider.dart';
 import '../../../inventory/presentation/pages/stock_balance_page.dart';
 import '../../../inventory/presentation/pages/stock_adjustment_page.dart';
 import '../../../reports/presentation/pages/reports_page.dart';
@@ -110,12 +113,6 @@ class _HomePageState extends ConsumerState<HomePage> {
             permissionKey: AppPermission.pos,
           ),
           _MenuItem(
-            icon: Icons.table_restaurant,
-            title: 'โต๊ะอาหาร',
-            page: const TableOverviewPage(),
-            permissionKey: AppPermission.pos,
-          ),
-          _MenuItem(
             icon: Icons.kitchen,
             title: 'หน้าจอครัว (KDS)',
             page: const KitchenDisplayPage(),
@@ -128,6 +125,12 @@ class _HomePageState extends ConsumerState<HomePage> {
             page: const TakeawayOrdersPage(),
             permissionKey: AppPermission.pos,
             badgeId: 'takeaway_pending',
+          ),
+          _MenuItem(
+            icon: Icons.table_restaurant,
+            title: 'โต๊ะอาหาร',
+            page: const TableOverviewPage(),
+            permissionKey: AppPermission.pos,
           ),
           _MenuItem(
             icon: Icons.event_note,
@@ -286,7 +289,17 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   List<_MenuItem> get _allItems => _sections.expand((s) => s.items).toList();
 
-  Widget get _currentPage => _overridePage ?? _allItems[_selectedIndex].page;
+  int _safeSelectedIndex(List<_MenuItem> items) {
+    if (items.isEmpty || _selectedIndex <= 0) return 0;
+    if (_selectedIndex >= items.length) return 0;
+    return _selectedIndex;
+  }
+
+  Widget _pageFor(List<_MenuItem> items) {
+    if (_overridePage != null) return _overridePage!;
+    if (items.isEmpty) return const SizedBox.shrink();
+    return items[_safeSelectedIndex(items)].page;
+  }
 
   DashboardPage _buildDashboardPage() {
     final selectedBranch = ref.read(selectedBranchProvider);
@@ -294,22 +307,25 @@ class _HomePageState extends ConsumerState<HomePage> {
 
     return DashboardPage(
       showBackButton: false,
+      showAppBar: context.hasPermanentSidebar,
       isRestaurantMode: isRestaurantMode,
       onGoToPos: _openPointOfSaleShortcut,
       onGoToTableOverview: () => _openShortcutByTitle(
         title: 'โต๊ะอาหาร',
         fallbackPage: const TableOverviewPage(),
       ),
-      onGoToTakeaway: () => _showOverridePageByTitle(
-        const TakeawaySalesPage(autoStartSkipKitchen: true),
-        'ขายกลับบ้าน',
-      ),
-      onGoToTakeawayKitchen: () => _showOverridePageByTitle(
-        const TakeawaySalesPage(autoStartSkipKitchen: false),
-        'ขายกลับบ้าน',
-      ),
+      onGoToTakeaway: () => _startTakeawayShortcut(skipKitchen: true),
+      onGoToTakeawayKitchen: () => _startTakeawayShortcut(skipKitchen: false),
       onGoToSalesHistory: () =>
           _showOverridePageByTitle(const SalesHistoryPage(), 'รายการขาย'),
+      onGoToStock: () => _openShortcutByTitle(
+        title: 'สต๊อกสินค้า',
+        fallbackPage: const StockBalancePage(),
+      ),
+      onGoToSettings: () => _openShortcutByTitle(
+        title: 'ตั้งค่า',
+        fallbackPage: const SettingsPage(),
+      ),
       onGoToProducts: () => _openShortcutByTitle(
         title: 'สินค้า',
         fallbackPage: const ProductListPage(),
@@ -384,7 +400,16 @@ class _HomePageState extends ConsumerState<HomePage> {
     final nav = Navigator.of(context);
     if (nav.canPop()) nav.pop();
 
-    final item = _allItems[i];
+    final items = _allItems;
+    if (i < 0 || i >= items.length) {
+      setState(() {
+        _selectedIndex = 0;
+        _overridePage = null;
+      });
+      return;
+    }
+
+    final item = items[i];
     if (!context.hasPermanentSidebar && item.title == 'ขายกลับบ้าน') {
       _push(context, item.page);
       return;
@@ -421,6 +446,60 @@ class _HomePageState extends ConsumerState<HomePage> {
       titles: const ['หน้าขาย (POS)', 'โต๊ะอาหาร'],
       fallbackPages: const [PosPage(), TableOverviewPage()],
     );
+  }
+
+  void _startTakeawayShortcut({required bool skipKitchen}) {
+    final cartState = ref.read(cartProvider);
+    final hasPendingCart =
+        cartState.items.isNotEmpty ||
+        cartState.freeItems.isNotEmpty ||
+        cartState.appliedCoupons.isNotEmpty ||
+        cartState.discountAmount > 0 ||
+        cartState.discountPercent > 0;
+
+    String? autoHoldName;
+    if (hasPendingCart) {
+      final now = DateTime.now();
+      final baseName =
+          'ซื้อกลับ ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+      autoHoldName = _uniqueTakeawayHoldName(baseName);
+      ref
+          .read(cartProvider.notifier)
+          .hold(autoHoldName, isTakeaway: true, skipKitchen: skipKitchen);
+    }
+
+    ref
+        .read(restaurantOrderContextProvider.notifier)
+        .state = RestaurantOrderContext.takeaway(
+      branchId: ref.read(selectedBranchProvider)?.branchId ?? '',
+      skipKitchen: skipKitchen,
+    );
+
+    if (autoHoldName != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('พักบิล "$autoHoldName" ไว้แล้ว'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+
+    _push(context, const PosPage());
+  }
+
+  String _uniqueTakeawayHoldName(String base) {
+    final existing = ref
+        .read(holdOrdersProvider)
+        .orders
+        .map((entry) => entry.name)
+        .toSet();
+    if (!existing.contains(base)) return base;
+
+    var suffix = 2;
+    while (existing.contains('$base ($suffix)')) {
+      suffix++;
+    }
+    return '$base ($suffix)';
   }
 
   Future<void> _handleAbout(BuildContext context) async {
@@ -534,6 +613,18 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(selectedBranchProvider, (previous, next) {
+      if (previous?.branchId == next?.branchId &&
+          previous?.businessMode == next?.businessMode) {
+        return;
+      }
+      if (!mounted) return;
+      setState(() {
+        _selectedIndex = 0;
+        _overridePage = null;
+      });
+    });
+
     ref.watch(posContextBootstrapProvider);
     ref.watch(takeawayPollingProvider(null));
     final user = ref.watch(authProvider).user;
@@ -541,14 +632,24 @@ class _HomePageState extends ConsumerState<HomePage> {
     final connectionAsync = ref.watch(connectionStatusProvider);
     final takeawayPendingCount = ref.watch(takeawayOpenOrdersCountProvider);
     final kdsPendingCount = ref.watch(kdsPendingCountProvider);
+    final isRestaurantMode = ref.watch(selectedBranchProvider)?.isRestaurantMode ?? true;
     final roleId = user?.roleId?.toUpperCase();
     // watch provider (ไม่ใช่ notifier) เพื่อ rebuild เมื่อ async data โหลดเสร็จ
     final permData = ref.watch(rolePermissionsProvider).value;
+    final sections = _sections;
+    final allItems = sections.expand((s) => s.items).toList();
+    final safeSelectedIndex = _safeSelectedIndex(allItems);
+    final currentPage = _pageFor(allItems);
+    final selectedItem = allItems.isEmpty ? null : allItems[safeSelectedIndex];
+    final showCompactDashboardHeader =
+        !context.hasPermanentSidebar &&
+        _overridePage == null &&
+        selectedItem?.title == 'แดชบอร์ด';
 
     // คำนวณ indices ที่ user มีสิทธิ์เห็น
     final visibleIndices = <int>{};
     int idx = 0;
-    for (final section in _sections) {
+    for (final section in sections) {
       for (final item in section.items) {
         final key = item.permissionKey;
         final canSee =
@@ -570,9 +671,9 @@ class _HomePageState extends ConsumerState<HomePage> {
 
     // ── Sidebar Widget ─────────────────────────────────────────
     Widget sidebarWidget = _SidebarContent(
-      sections: _sections,
-      allItems: _allItems,
-      selectedIndex: _selectedIndex,
+      sections: sections,
+      allItems: allItems,
+      selectedIndex: safeSelectedIndex,
       visibleIndices: visibleIndices,
       menuBadges: {
         'takeaway_pending': takeawayPendingCount,
@@ -636,7 +737,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                     child: sidebarWidget,
                   ),
                   const VerticalDivider(width: 1, thickness: 1),
-                  Expanded(child: LicenseNoticeBanner(child: _currentPage)),
+                  Expanded(child: LicenseNoticeBanner(child: currentPage)),
                 ],
               ),
             )
@@ -647,13 +748,16 @@ class _HomePageState extends ConsumerState<HomePage> {
                 user,
                 syncAsync,
                 connectionAsync,
+                showDashboardHeader: showCompactDashboardHeader,
+                isRestaurantMode: isRestaurantMode,
+                takeawayPendingCount: takeawayPendingCount,
               ),
               drawer: Drawer(
                 width: context.sidebarWidth,
                 backgroundColor: AppTheme.navyColor,
                 child: sidebarWidget,
               ),
-              body: LicenseNoticeBanner(child: _currentPage),
+              body: LicenseNoticeBanner(child: currentPage),
             ),
     );
   }
@@ -663,8 +767,11 @@ class _HomePageState extends ConsumerState<HomePage> {
     BuildContext context,
     dynamic user,
     AsyncValue syncAsync,
-    AsyncValue connectionAsync,
-  ) {
+    AsyncValue connectionAsync, {
+    bool showDashboardHeader = false,
+    bool isRestaurantMode = false,
+    int takeawayPendingCount = 0,
+  }) {
     final syncValue = syncAsync.maybeWhen(
       data: (value) => value,
       orElse: () => null,
@@ -678,7 +785,59 @@ class _HomePageState extends ConsumerState<HomePage> {
           onPressed: () => Scaffold.of(ctx).openDrawer(),
         ),
       ),
+      title: showDashboardHeader
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('แดชบอร์ด'),
+                Text(
+                  'ภาพรวมระบบ',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.white.withValues(alpha: 0.65),
+                    fontWeight: FontWeight.normal,
+                  ),
+                ),
+              ],
+            )
+          : null,
       actions: [
+        if (showDashboardHeader)
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'รีเฟรช',
+            onPressed: () => ref.read(dashboardProvider.notifier).refresh(),
+          ),
+        if (showDashboardHeader && isRestaurantMode)
+          IconButton(
+            icon: Stack(
+              children: [
+                const Icon(Icons.receipt_long),
+                if (takeawayPendingCount > 0)
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        takeawayPendingCount > 99 ? '99+' : '$takeawayPendingCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 8,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            tooltip: 'บิลค้าง',
+            onPressed: () => _push(context, const TakeawayOrdersPage()),
+          ),
         // Sync badge
         connectionAsync.when(
           data: (connection) => IconButton(

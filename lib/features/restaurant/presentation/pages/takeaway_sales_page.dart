@@ -175,15 +175,21 @@ class _TakeawaySalesPageState extends ConsumerState<TakeawaySalesPage> {
   @override
   Widget build(BuildContext context) {
     final holdOrders = ref.watch(holdOrdersProvider);
-    final takeawayEntries = holdOrders.orders
+    // บิลพักไว้ฝั่งส่งครัว (skipKitchen=false)
+    final kitchenEntries = holdOrders.orders
         .asMap()
         .entries
-        .where(
-          (entry) =>
-              entry.value.isTakeaway &&
-              !entry.value.cartState.hasKitchenSentItems,
-        )
+        .where((e) => e.value.isTakeaway && !e.value.skipKitchen)
         .toList();
+    // บิลพักไว้ฝั่งจำหน่ายเลย (skipKitchen=true)
+    final directEntries = holdOrders.orders
+        .asMap()
+        .entries
+        .where((e) => e.value.isTakeaway && e.value.skipKitchen)
+        .toList();
+
+    const kitchenColor = Color(0xFF2C82C9);
+    const directColor = Color(0xFFFF9224);
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -211,21 +217,21 @@ class _TakeawaySalesPageState extends ConsumerState<TakeawaySalesPage> {
               final isWide = constraints.maxWidth >= 760;
               final cards = [
                 _TakeawayModeCard(
-                  icon: Icons.kitchen_outlined,
+                  icon: Icons.soup_kitchen_rounded,
                   title: 'ส่งเข้าครัวก่อน',
                   subtitle:
                       'เหมาะกับเมนูที่ต้องปรุง รอครัว แล้วค่อยปิดบิลจากบิลกลับบ้านค้าง',
                   buttonLabel: 'เริ่มขายแบบส่งครัว',
-                  color: AppTheme.infoColor,
+                  color: kitchenColor,
                   onTap: () => _startTakeawayOrder(skipKitchen: false),
                 ),
                 _TakeawayModeCard(
-                  icon: Icons.shopping_bag_rounded,
+                  icon: Icons.qr_code_scanner_rounded,
                   title: 'จำหน่ายเลย',
                   subtitle:
                       'เหมาะกับอาหารพร้อมขายหรือหยิบส่งได้ทันที ชำระเงินได้เลยโดยไม่ต้องส่งครัว',
                   buttonLabel: 'เริ่มขายและชำระได้ทันที',
-                  color: Colors.orange.shade700,
+                  color: directColor,
                   onTap: () => _startTakeawayOrder(skipKitchen: true),
                 ),
               ];
@@ -245,8 +251,22 @@ class _TakeawaySalesPageState extends ConsumerState<TakeawaySalesPage> {
             },
           ),
           const SizedBox(height: 18),
+          if (kitchenEntries.isNotEmpty) ...[
+            _TakeawayHoldPanel(
+              entries: kitchenEntries,
+              color: kitchenColor,
+              title: 'พักไว้ (ส่งครัว)',
+              emptyLabel: 'ยังไม่มีบิลส่งครัวที่พักไว้',
+              onResume: _resumeTakeawayHold,
+              onDelete: _confirmDeleteHold,
+            ),
+            const SizedBox(height: 14),
+          ],
           _TakeawayHoldPanel(
-            entries: takeawayEntries,
+            entries: directEntries,
+            color: directColor,
+            title: 'พักไว้ (จำหน่ายเลย)',
+            emptyLabel: 'ยังไม่มีบิลจำหน่ายเลยที่พักไว้',
             onResume: _resumeTakeawayHold,
             onDelete: _confirmDeleteHold,
           ),
@@ -276,65 +296,158 @@ class _TakeawayModeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = AppTheme.isDark(context);
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppTheme.cardColor(context),
-        borderRadius: AppRadius.md,
-        border: Border.all(color: color.withValues(alpha: isDark ? 0.5 : 0.35)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.14),
-                  borderRadius: AppRadius.sm,
-                ),
-                child: Icon(icon, color: color, size: 24),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  title,
-                  style: TextStyle(
-                    color: AppTheme.textColorOf(context),
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
+    final cardColor = AppTheme.cardColor(context);
+    final softColor = color.withValues(alpha: isDark ? 0.18 : 0.10);
+    final borderColor = color.withValues(alpha: isDark ? 0.55 : 0.24);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: AppRadius.lg,
+        child: Ink(
+          decoration: BoxDecoration(
+            color: cardColor,
+            borderRadius: AppRadius.lg,
+            border: Border.all(color: borderColor),
+            boxShadow: [
+              BoxShadow(
+                color: color.withValues(alpha: isDark ? 0.10 : 0.14),
+                blurRadius: 16,
+                offset: const Offset(0, 7),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Text(
-            subtitle,
-            style: TextStyle(
-              color: AppTheme.mutedTextOf(context),
-              fontSize: 13,
-              height: 1.35,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 58,
+                      height: 58,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            color.withValues(alpha: 0.84),
+                            Color.lerp(color, Colors.black, 0.18)!,
+                          ],
+                        ),
+                        borderRadius: AppRadius.md,
+                        boxShadow: [
+                          BoxShadow(
+                            color: color.withValues(alpha: 0.25),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Icon(icon, color: Colors.white, size: 32),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            style: TextStyle(
+                              color: AppTheme.textColorOf(context),
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                              height: 1.1,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 9,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: softColor,
+                              borderRadius: AppRadius.pill,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.touch_app_rounded,
+                                  size: 14,
+                                  color: color,
+                                ),
+                                const SizedBox(width: 5),
+                                Text(
+                                  'แตะเพื่อเริ่ม',
+                                  style: TextStyle(
+                                    color: color,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    color: AppTheme.mutedTextOf(context),
+                    fontSize: 13,
+                    height: 1.45,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: color,
+                    borderRadius: AppRadius.md,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(icon, color: Colors.white, size: 18),
+                      const SizedBox(width: 9),
+                      Flexible(
+                        child: Text(
+                          buttonLabel,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Icon(
+                        Icons.arrow_forward_rounded,
+                        color: Colors.white,
+                        size: 18,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: onTap,
-              icon: Icon(icon, size: 18),
-              label: Text(buttonLabel),
-              style: FilledButton.styleFrom(
-                backgroundColor: color,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 13),
-                shape: RoundedRectangleBorder(borderRadius: AppRadius.md),
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -342,11 +455,17 @@ class _TakeawayModeCard extends StatelessWidget {
 
 class _TakeawayHoldPanel extends StatelessWidget {
   final List<MapEntry<int, HoldOrder>> entries;
+  final Color color;
+  final String title;
+  final String emptyLabel;
   final void Function(int index) onResume;
   final Future<void> Function(int index, String name) onDelete;
 
   const _TakeawayHoldPanel({
     required this.entries,
+    required this.color,
+    required this.title,
+    required this.emptyLabel,
     required this.onResume,
     required this.onDelete,
   });
@@ -366,10 +485,10 @@ class _TakeawayHoldPanel extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
             child: Row(
               children: [
-                Icon(Icons.pause_circle_outline, color: Colors.orange.shade700),
+                Icon(Icons.pause_circle_outline, color: color),
                 const SizedBox(width: 8),
                 Text(
-                  'บิลกลับบ้านที่พักไว้',
+                  title,
                   style: TextStyle(
                     color: AppTheme.textColorOf(context),
                     fontSize: 15,
@@ -384,7 +503,7 @@ class _TakeawayHoldPanel extends StatelessWidget {
                       vertical: 3,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.orange.shade600,
+                      color: color,
                       borderRadius: AppRadius.pill,
                     ),
                     child: Text(
@@ -412,7 +531,7 @@ class _TakeawayHoldPanel extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    'ยังไม่มีออเดอร์ที่พักไว้',
+                    emptyLabel,
                     style: TextStyle(color: AppTheme.mutedTextOf(context)),
                   ),
                 ],

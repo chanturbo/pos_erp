@@ -68,14 +68,16 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
   bool _restoredRestaurantOrder = false;
 
   static const _groupPalette = <Color>[
-    Color(0xFF1565C0),
-    Color(0xFF2E7D32),
-    Color(0xFFEF6C00),
-    Color(0xFF6A1B9A),
-    Color(0xFFC62828),
-    Color(0xFF00838F),
-    Color(0xFF5D4037),
-    Color(0xFFAD1457),
+    Color(0xFF39A9E8),
+    Color(0xFF6B4122),
+    Color(0xFFFF9224),
+    Color(0xFF63B946),
+    Color(0xFFB45628),
+    Color(0xFFE65D90),
+    Color(0xFFFF4338),
+    Color(0xFFF7B912),
+    Color(0xFF159AA4),
+    Color(0xFF2C82C9),
   ];
 
   static const _groupIcons = <IconData>[
@@ -88,6 +90,11 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
     Icons.inventory_2_outlined,
     Icons.sell_outlined,
   ];
+
+  static const _drinkCategoryColor = Color(0xFF39A9E8);
+  static const _drinkCategoryIcon = Icons.emoji_food_beverage_rounded;
+  static const _dessertCategoryColor = Color(0xFFE65D90);
+  static const _dessertCategoryIcon = Icons.cake_rounded;
 
   @override
   void dispose() {
@@ -146,11 +153,22 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
           (p.barcode?.toLowerCase().contains(q) ?? false);
     }).toList();
 
+    final salesRank =
+        restaurantContext != null
+            ? (ref.read(topSellingProductRankProvider).asData?.value ?? {})
+            : const <String, int>{};
+
     filtered.sort((a, b) {
       final usageCompare = (_productUsageCounts[b.productId] ?? 0).compareTo(
         _productUsageCounts[a.productId] ?? 0,
       );
       if (usageCompare != 0) return usageCompare;
+      if (salesRank.isNotEmpty) {
+        final ra = salesRank[a.productId] ?? 999999;
+        final rb = salesRank[b.productId] ?? 999999;
+        final rankCompare = ra.compareTo(rb);
+        if (rankCompare != 0) return rankCompare;
+      }
       return a.productName.compareTo(b.productName);
     });
 
@@ -744,7 +762,44 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
     }
   }
 
+  bool _isDrinkCategory(String? groupId) {
+    final group = _groupFor(groupId);
+    final text = [
+      group?.groupId,
+      group?.groupCode,
+      group?.groupName,
+      group?.mobileIcon,
+      groupId,
+    ].whereType<String>().join(' ').toLowerCase();
+
+    return text.contains('drink') ||
+        text.contains('beverage') ||
+        text.contains('local_drink') ||
+        text.contains('เครื่องดื่ม');
+  }
+
+  bool _isDessertCategory(String? groupId) {
+    final group = _groupFor(groupId);
+    final text = [
+      group?.groupId,
+      group?.groupCode,
+      group?.groupName,
+      group?.mobileIcon,
+      groupId,
+    ].whereType<String>().join(' ').toLowerCase();
+
+    return text.contains('dessert') ||
+        text.contains('sweet') ||
+        text.contains('icecream') ||
+        text.contains('cake') ||
+        text.contains('ของหวาน') ||
+        text.contains('ขนมหวาน');
+  }
+
   Color _groupColor(String? groupId) {
+    if (_isDrinkCategory(groupId)) return _drinkCategoryColor;
+    if (_isDessertCategory(groupId)) return _dessertCategoryColor;
+
     final configured = _parseConfiguredColor(_groupFor(groupId)?.mobileColor);
     if (configured != Colors.transparent) return configured;
     final index = _groupSeed(groupId) % _groupPalette.length;
@@ -752,6 +807,9 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
   }
 
   IconData _groupIcon(String? groupId) {
+    if (_isDrinkCategory(groupId)) return _drinkCategoryIcon;
+    if (_isDessertCategory(groupId)) return _dessertCategoryIcon;
+
     final configured = _groupFor(groupId)?.mobileIcon;
     if (configured != null && configured.trim().isNotEmpty) {
       return _iconFromKey(configured);
@@ -1392,16 +1450,32 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
     return 'หมวดสินค้า';
   }
 
-  Widget _gridImgPlaceholder() {
+  Widget _gridImgPlaceholder({Color? color, IconData? icon}) {
+    final accentColor = color ?? AppTheme.primary;
     return Container(
       decoration: BoxDecoration(
-        color: AppTheme.primary.withValues(alpha: 0.06),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            accentColor.withValues(alpha: 0.34),
+            accentColor.withValues(alpha: 0.14),
+          ],
+        ),
       ),
       child: Center(
-        child: Icon(
-          Icons.inventory_2_outlined,
-          size: 36,
-          color: AppTheme.primary.withValues(alpha: 0.45),
+        child: Container(
+          width: 54,
+          height: 54,
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.72),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            icon ?? Icons.inventory_2_outlined,
+            size: 34,
+            color: accentColor.withValues(alpha: 0.78),
+          ),
         ),
       ),
     );
@@ -2476,6 +2550,8 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                           itemCount: filtered.length,
                           itemBuilder: (_, index) {
                             final product = filtered[index];
+                            final categoryColor = _groupColor(product.groupId);
+                            final categoryIcon = _groupIcon(product.groupId);
                             final priceLevel = cartState.customerPriceLevel;
                             final lookup = getPriceByLevel(product, priceLevel);
                             final availableStock =
@@ -2498,17 +2574,20 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                                 imgFile != null && imgFile.existsSync();
 
                             return Card(
-                              elevation: 0,
+                              elevation: 1,
+                              shadowColor: categoryColor.withValues(
+                                alpha: 0.12,
+                              ),
                               color: AppTheme.cardColor(context),
                               shape: RoundedRectangleBorder(
                                 borderRadius: AppRadius.md,
                                 side: BorderSide(
-                                  color: AppTheme.borderColorOf(context),
+                                  color: categoryColor.withValues(alpha: 0.26),
                                 ),
                               ),
                               child: InkWell(
                                 borderRadius: AppRadius.md,
-                                splashColor: AppTheme.primary.withValues(
+                                splashColor: categoryColor.withValues(
                                   alpha: 0.12,
                                 ),
                                 onTap: () {
@@ -2535,6 +2614,29 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                                     Expanded(
                                       child: Stack(
                                         children: [
+                                          Positioned.fill(
+                                            child: DecoratedBox(
+                                              decoration: BoxDecoration(
+                                                gradient: LinearGradient(
+                                                  begin: Alignment.topLeft,
+                                                  end: Alignment.bottomRight,
+                                                  colors: [
+                                                    categoryColor.withValues(
+                                                      alpha: 0.28,
+                                                    ),
+                                                    categoryColor.withValues(
+                                                      alpha: 0.11,
+                                                    ),
+                                                    AppTheme.cardColor(context),
+                                                  ],
+                                                ),
+                                                borderRadius:
+                                                    const BorderRadius.vertical(
+                                                      top: Radius.circular(10),
+                                                    ),
+                                              ),
+                                            ),
+                                          ),
                                           ClipRRect(
                                             borderRadius:
                                                 const BorderRadius.vertical(
@@ -2543,7 +2645,7 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                                             child: SizedBox.expand(
                                               child: hasImg
                                                   ? Container(
-                                                      color: AppTheme.primary
+                                                      color: categoryColor
                                                           .withValues(
                                                             alpha: 0.06,
                                                           ),
@@ -2555,11 +2657,38 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                                                         child: Image.file(
                                                           imgFile,
                                                           errorBuilder: (_, _, _) =>
-                                                              _gridImgPlaceholder(),
+                                                              _gridImgPlaceholder(
+                                                                color:
+                                                                    categoryColor,
+                                                                icon:
+                                                                    categoryIcon,
+                                                              ),
                                                         ),
                                                       ),
                                                     )
-                                                  : _gridImgPlaceholder(),
+                                                  : _gridImgPlaceholder(
+                                                      color: categoryColor,
+                                                      icon: categoryIcon,
+                                                    ),
+                                            ),
+                                          ),
+                                          Positioned(
+                                            left: 5,
+                                            top: 5,
+                                            child: Container(
+                                              width: 24,
+                                              height: 24,
+                                              decoration: BoxDecoration(
+                                                color: categoryColor.withValues(
+                                                  alpha: 0.92,
+                                                ),
+                                                borderRadius: AppRadius.sm,
+                                              ),
+                                              child: Icon(
+                                                categoryIcon,
+                                                size: 14,
+                                                color: Colors.white,
+                                              ),
                                             ),
                                           ),
                                           if (qtyInCart > 0)
@@ -2589,6 +2718,12 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                                               ),
                                             ),
                                         ],
+                                      ),
+                                    ),
+                                    Container(
+                                      height: 3,
+                                      color: categoryColor.withValues(
+                                        alpha: 0.75,
                                       ),
                                     ),
                                     Padding(
@@ -2650,11 +2785,11 @@ class _MobileOrderPageState extends ConsumerState<MobileOrderPage> {
                                                   width: compactTile ? 28 : 30,
                                                   height: compactTile ? 28 : 30,
                                                   decoration: BoxDecoration(
-                                                    color: AppTheme.primary,
+                                                    color: categoryColor,
                                                     borderRadius: AppRadius.sm,
                                                     boxShadow: [
                                                       BoxShadow(
-                                                        color: AppTheme.primary
+                                                        color: categoryColor
                                                             .withValues(
                                                               alpha: 0.25,
                                                             ),

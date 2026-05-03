@@ -391,6 +391,7 @@ class _PosPageState extends ConsumerState<PosPage> {
   List<ProductModel> _filterProducts(
     List<ProductModel> src, {
     Map<String, double> stockMap = const {},
+    Map<String, int> salesRank = const {},
   }) {
     final restaurantContext = ref.read(restaurantOrderContextProvider);
 
@@ -424,6 +425,15 @@ class _PosPageState extends ConsumerState<PosPage> {
                 (p.barcode?.toLowerCase().contains(q) ?? false),
           )
           .toList();
+    }
+
+    // เรียงตามขายดีในโหมดร้านอาหาร (สินค้าที่ไม่มีในรายการขายดีจะอยู่ท้าย)
+    if (restaurantContext != null && salesRank.isNotEmpty) {
+      result.sort((a, b) {
+        final ra = salesRank[a.productId] ?? 999999;
+        final rb = salesRank[b.productId] ?? 999999;
+        return ra.compareTo(rb);
+      });
     }
 
     return result;
@@ -478,13 +488,21 @@ class _PosPageState extends ConsumerState<PosPage> {
         if (s.warehouseId == warehouseId) s.productId: s.balance,
     };
 
+    // ── Sales rank map (ใช้เรียงสินค้าขายดีในโหมดร้านอาหาร) ──
+    final salesRank =
+        restaurantContext != null
+            ? (ref.watch(topSellingProductRankProvider).asData?.value ?? {})
+            : const <String, int>{};
+
     final hasCustomer =
         cartState.customerId != null && cartState.customerId != 'WALK_IN';
 
     // ── Responsive ───────────────────────────────────────────────
     final isMobile = context.isMobile;
     final isTablet = context.isTablet;
-    final hideTabletTopBar = isTablet && !widget.isCashierMode;
+    final canNavigateBack = Navigator.of(context).canPop();
+    final hideTabletTopBar =
+        isTablet && !widget.isCashierMode && !canNavigateBack;
 
     if (isMobile) {
       return const MobileOrderPage();
@@ -579,116 +597,118 @@ class _PosPageState extends ConsumerState<PosPage> {
                         ),
                       ),
                       const Spacer(),
-                      // Desktop: chips อยู่ใน toolbar โดยตรง
-                      if (!isTablet) ...[
-                        if (restaurantContext != null) ...[
-                          _RestaurantContextChip(
-                            contextData: restaurantContext,
-                          ),
-                          const SizedBox(width: 8),
-                        ],
-                        _CustomerChip(
-                          cartState: cartState,
-                          hasCustomer: hasCustomer,
-                        ),
+                      if (restaurantContext != null) ...[
+                        _RestaurantContextChip(contextData: restaurantContext),
                         const SizedBox(width: 8),
-                        if (selectedBranch != null && selectedWarehouse != null)
-                          InkWell(
-                            onTap: _openConnectionSettings,
-                            borderRadius: AppRadius.xl,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 7,
+                      ],
+                      _CustomerChip(
+                        cartState: cartState,
+                        hasCustomer: hasCustomer,
+                      ),
+                      const SizedBox(width: 8),
+                      if (selectedBranch != null && selectedWarehouse != null)
+                        InkWell(
+                          onTap: _openConnectionSettings,
+                          borderRadius: AppRadius.xl,
+                          child: Container(
+                            constraints: BoxConstraints(
+                              maxWidth: isTablet ? 140 : 220,
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 7,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.10),
+                              borderRadius: AppRadius.xl,
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.20),
                               ),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.10),
-                                borderRadius: AppRadius.xl,
-                                border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.20),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.storefront_outlined,
+                                  size: 13,
+                                  color: Colors.white70,
                                 ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(
-                                    Icons.storefront_outlined,
-                                    size: 13,
-                                    color: Colors.white70,
-                                  ),
-                                  const SizedBox(width: 5),
-                                  Text(
+                                const SizedBox(width: 5),
+                                Flexible(
+                                  child: Text(
                                     selectedBranch.branchName,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w600,
                                       color: Colors.white,
                                     ),
                                   ),
-                                ],
-                              ),
-                            ),
-                          )
-                        else
-                          InkWell(
-                            onTap: _openConnectionSettings,
-                            borderRadius: AppRadius.xl,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 7,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.orange.withValues(alpha: 0.1),
-                                borderRadius: AppRadius.xl,
-                                border: Border.all(
-                                  color: Colors.orange.withValues(alpha: 0.4),
                                 ),
-                              ),
-                              child: const Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.warning_amber_rounded,
-                                    size: 13,
-                                    color: Colors.orange,
-                                  ),
-                                  SizedBox(width: 5),
-                                  Text(
-                                    'ตั้งค่าสาขา',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.orange,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                              ],
                             ),
                           ),
-                        if (cartState.itemCount > 0) ...[
-                          const SizedBox(width: 8),
-                          Container(
+                        )
+                      else
+                        InkWell(
+                          onTap: _openConnectionSettings,
+                          borderRadius: AppRadius.xl,
+                          child: Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 10,
-                              vertical: 5,
+                              vertical: 7,
                             ),
                             decoration: BoxDecoration(
-                              color: AppTheme.primary,
-                              borderRadius: AppRadius.pill,
-                            ),
-                            child: Text(
-                              '${cartState.itemCount} รายการ',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
+                              color: Colors.orange.withValues(alpha: 0.1),
+                              borderRadius: AppRadius.xl,
+                              border: Border.all(
+                                color: Colors.orange.withValues(alpha: 0.4),
                               ),
                             ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.warning_amber_rounded,
+                                  size: 13,
+                                  color: Colors.orange,
+                                ),
+                                SizedBox(width: 5),
+                                Text(
+                                  'ตั้งค่าสาขา',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.orange,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ],
+                        ),
+                      if (cartState.itemCount > 0) ...[
                         const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primary,
+                            borderRadius: AppRadius.pill,
+                          ),
+                          child: Text(
+                            '${cartState.itemCount} รายการ',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
                       ],
+                      const SizedBox(width: 8),
                       // POS module badge
                       Container(
                         padding: const EdgeInsets.symmetric(
@@ -715,125 +735,6 @@ class _PosPageState extends ConsumerState<PosPage> {
                   ),
 
             actions: const [],
-            bottom: isTablet
-                ? PreferredSize(
-                    preferredSize: const Size.fromHeight(40),
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
-                      alignment: Alignment.centerLeft,
-                      child: Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          if (restaurantContext != null)
-                            _RestaurantContextChip(
-                              contextData: restaurantContext,
-                            ),
-                          _CustomerChip(
-                            cartState: cartState,
-                            hasCustomer: hasCustomer,
-                          ),
-                          if (selectedBranch != null &&
-                              selectedWarehouse != null)
-                            InkWell(
-                              onTap: _openConnectionSettings,
-                              borderRadius: AppRadius.xl,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 7,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.10),
-                                  borderRadius: AppRadius.xl,
-                                  border: Border.all(
-                                    color: Colors.white.withValues(alpha: 0.20),
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(
-                                      Icons.storefront_outlined,
-                                      size: 13,
-                                      color: Colors.white70,
-                                    ),
-                                    const SizedBox(width: 5),
-                                    Text(
-                                      selectedBranch.branchName,
-                                      style: const TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            )
-                          else
-                            InkWell(
-                              onTap: _openConnectionSettings,
-                              borderRadius: AppRadius.xl,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 7,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.orange.withValues(alpha: 0.1),
-                                  borderRadius: AppRadius.xl,
-                                  border: Border.all(
-                                    color: Colors.orange.withValues(alpha: 0.4),
-                                  ),
-                                ),
-                                child: const Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.warning_amber_rounded,
-                                      size: 13,
-                                      color: Colors.orange,
-                                    ),
-                                    SizedBox(width: 5),
-                                    Text(
-                                      'ตั้งค่าสาขา',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.orange,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          if (cartState.itemCount > 0)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 5,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppTheme.primary,
-                                borderRadius: AppRadius.pill,
-                              ),
-                              child: Text(
-                                '${cartState.itemCount} รายการ',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  )
-                : null,
           ),
 
           // ── Body ─────────────────────────────────────────────
@@ -841,7 +742,7 @@ class _PosPageState extends ConsumerState<PosPage> {
           // Mobile (<768px): cart only
           body: Stack(
             children: [
-              _buildDesktopBody(productAsync, cartState, stockMap),
+              _buildDesktopBody(productAsync, cartState, stockMap, salesRank),
               const CartToastOverlay(),
             ],
           ),
@@ -858,6 +759,7 @@ class _PosPageState extends ConsumerState<PosPage> {
     AsyncValue<List<ProductModel>> productAsync,
     CartState cartState,
     Map<String, double> stockMap,
+    Map<String, int> salesRank,
   ) {
     return Column(
       children: [
@@ -875,6 +777,7 @@ class _PosPageState extends ConsumerState<PosPage> {
                     final filtered = _filterProducts(
                       products,
                       stockMap: stockMap,
+                      salesRank: salesRank,
                     );
                     final displayed = _selectedGroupId != null
                         ? filtered
@@ -1135,42 +1038,72 @@ class _PosPageState extends ConsumerState<PosPage> {
       }
     }
     switch (value.toLowerCase()) {
-      case 'red':       return Colors.red;
-      case 'pink':      return Colors.pink;
-      case 'purple':    return Colors.purple;
-      case 'indigo':    return Colors.indigo;
-      case 'blue':      return Colors.blue;
-      case 'cyan':      return Colors.cyan;
-      case 'teal':      return Colors.teal;
-      case 'green':     return Colors.green;
-      case 'lime':      return Colors.lime;
-      case 'yellow':    return Colors.yellow;
-      case 'amber':     return Colors.amber;
-      case 'orange':    return Colors.orange;
-      case 'brown':     return Colors.brown;
+      case 'red':
+        return Colors.red;
+      case 'pink':
+        return Colors.pink;
+      case 'purple':
+        return Colors.purple;
+      case 'indigo':
+        return Colors.indigo;
+      case 'blue':
+        return Colors.blue;
+      case 'cyan':
+        return Colors.cyan;
+      case 'teal':
+        return Colors.teal;
+      case 'green':
+        return Colors.green;
+      case 'lime':
+        return Colors.lime;
+      case 'yellow':
+        return Colors.yellow;
+      case 'amber':
+        return Colors.amber;
+      case 'orange':
+        return Colors.orange;
+      case 'brown':
+        return Colors.brown;
       case 'grey':
-      case 'gray':      return Colors.grey;
-      default:          return Colors.transparent;
+      case 'gray':
+        return Colors.grey;
+      default:
+        return Colors.transparent;
     }
   }
 
   IconData _iconFromKey(String? key) {
     switch (key?.trim().toLowerCase()) {
-      case 'apps':              return Icons.apps_rounded;
-      case 'inventory':         return Icons.inventory_outlined;
-      case 'inventory_2':       return Icons.inventory_2_outlined;
-      case 'shopping_basket':   return Icons.shopping_basket_outlined;
-      case 'sell':              return Icons.sell_outlined;
-      case 'local_drink':       return Icons.local_drink_outlined;
-      case 'fastfood':          return Icons.fastfood_outlined;
-      case 'icecream':          return Icons.icecream_outlined;
-      case 'kitchen':           return Icons.kitchen_outlined;
-      case 'spa':               return Icons.spa_outlined;
-      case 'bakery_dining':     return Icons.bakery_dining_outlined;
-      case 'lunch_dining':      return Icons.lunch_dining_outlined;
-      case 'local_cafe':        return Icons.local_cafe_outlined;
-      case 'storefront':        return Icons.storefront_outlined;
-      default:                  return _groupIcon(null);
+      case 'apps':
+        return Icons.apps_rounded;
+      case 'inventory':
+        return Icons.inventory_outlined;
+      case 'inventory_2':
+        return Icons.inventory_2_outlined;
+      case 'shopping_basket':
+        return Icons.shopping_basket_outlined;
+      case 'sell':
+        return Icons.sell_outlined;
+      case 'local_drink':
+        return Icons.local_drink_outlined;
+      case 'fastfood':
+        return Icons.fastfood_outlined;
+      case 'icecream':
+        return Icons.icecream_outlined;
+      case 'kitchen':
+        return Icons.kitchen_outlined;
+      case 'spa':
+        return Icons.spa_outlined;
+      case 'bakery_dining':
+        return Icons.bakery_dining_outlined;
+      case 'lunch_dining':
+        return Icons.lunch_dining_outlined;
+      case 'local_cafe':
+        return Icons.local_cafe_outlined;
+      case 'storefront':
+        return Icons.storefront_outlined;
+      default:
+        return _groupIcon(null);
     }
   }
 
@@ -1248,8 +1181,9 @@ class _PosPageState extends ConsumerState<PosPage> {
               onTap: () {
                 HapticFeedback.selectionClick();
                 setState(() {
-                  _selectedGroupId =
-                      _selectedGroupId == group.groupId ? null : group.groupId;
+                  _selectedGroupId = _selectedGroupId == group.groupId
+                      ? null
+                      : group.groupId;
                 });
                 _scrollChipIntoView(
                   _selectedGroupId == null ? null : group.groupId,
@@ -1284,18 +1218,16 @@ class _PosPageState extends ConsumerState<PosPage> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              size: 14,
-              color: selected ? Colors.white : color,
-            ),
+            Icon(icon, size: 14, color: selected ? Colors.white : color),
             const SizedBox(width: 6),
             Text(
               label,
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                color: selected ? Colors.white : Colors.white.withValues(alpha: 0.85),
+                color: selected
+                    ? Colors.white
+                    : Colors.white.withValues(alpha: 0.85),
               ),
             ),
           ],

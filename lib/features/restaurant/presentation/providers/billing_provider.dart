@@ -1,4 +1,6 @@
 
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
@@ -6,6 +8,7 @@ import '../../../../core/client/api_client.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/models/restaurant_order_context.dart';
 import '../../data/models/bill_model.dart';
+import 'kitchen_provider.dart';
 
 // ── Billing context ───────────────────────────────────────────────────────────
 final billingContextProvider =
@@ -161,6 +164,7 @@ class BillNotifier extends AsyncNotifier<BillModel?> {
       );
       if (res.statusCode == 200) {
         await refresh();
+        unawaited(ref.read(kitchenQueueProvider.notifier).silentRefresh());
         return true;
       }
       return false;
@@ -170,6 +174,61 @@ class BillNotifier extends AsyncNotifier<BillModel?> {
       }
       return false;
     }
+  }
+
+  /// Void all non-cancelled items in one call (bulk cancel)
+  Future<({int success, int failed})> voidAllItems({
+    required String reason,
+    String? managerPin,
+  }) async {
+    final bill = state.asData?.value;
+    if (bill == null) return (success: 0, failed: 0);
+
+    final itemsToVoid = bill.items
+        .where((i) => i.kitchenStatus.toUpperCase() != 'CANCELLED')
+        .toList();
+    if (itemsToVoid.isEmpty) return (success: 0, failed: 0);
+
+    final api = ref.read(apiClientProvider);
+    int success = 0;
+    int failed = 0;
+
+    for (final item in itemsToVoid) {
+      try {
+        final res = await api.put(
+          '/api/kitchen/items/${item.itemId}/status',
+          data: {
+            'status': 'CANCELLED',
+            'reason': reason,
+            if (managerPin != null && managerPin.isNotEmpty)
+              'manager_pin': managerPin,
+          },
+        );
+        if (res.statusCode == 200) {
+          success++;
+        } else {
+          failed++;
+        }
+      } catch (e) {
+        failed++;
+        if (kDebugMode) debugPrint('❌ voidAllItems item error: $e');
+      }
+    }
+
+    // ถ้า void ครบทุกรายการ → cancel order ด้วย เพื่อเปลี่ยน status บิลเป็น CANCELLED
+    if (failed == 0 && success > 0) {
+      for (final orderId in bill.orderIds) {
+        try {
+          await api.post('/api/sales/$orderId/cancel');
+        } catch (e) {
+          if (kDebugMode) debugPrint('⚠️ voidAllItems auto-cancel error: $e');
+        }
+      }
+    }
+
+    await refresh();
+    unawaited(ref.read(kitchenQueueProvider.notifier).silentRefresh());
+    return (success: success, failed: failed);
   }
 
   Future<SplitResult?> applySplit(

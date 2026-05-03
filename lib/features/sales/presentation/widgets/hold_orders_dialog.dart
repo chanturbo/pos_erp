@@ -143,7 +143,7 @@ class _HoldOrdersDialogState extends ConsumerState<HoldOrdersDialog> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'มี $takeawayCount บิลซื้อกลับบ้าน — จัดการได้จากหน้าภาพรวมโต๊ะ',
+                        'มี $takeawayCount บิลซื้อกลับบ้าน — จัดการได้จากหน้าขายกลับบ้าน',
                         style: TextStyle(fontSize: 12, color: Colors.orange.shade800),
                       ),
                     ),

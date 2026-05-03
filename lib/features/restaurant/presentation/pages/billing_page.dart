@@ -17,6 +17,9 @@ import 'split_bill_page.dart';
 final _fmt = NumberFormat('#,##0.00');
 const _takeawayBillMaxWidth = 520.0;
 
+String _fmtQty(double q) =>
+    q == q.truncateToDouble() ? q.toInt().toString() : q.toString();
+
 class BillingPage extends ConsumerStatefulWidget {
   final RestaurantOrderContext tableContext;
 
@@ -131,6 +134,7 @@ class _BillingPageState extends ConsumerState<BillingPage> {
             onPay: () => _proceedToPayment(bill),
             onFireCourse: _fireCourse,
             onVoidItem: _showVoidDialog,
+            onVoidAll: () => _showVoidAllDialog(bill),
           );
         },
       ),
@@ -205,16 +209,192 @@ class _BillingPageState extends ConsumerState<BillingPage> {
     final reasonCtrl = TextEditingController();
     final pinCtrl = TextEditingController();
     final hasPin = settings.managerPinConfigured;
+    final requirePin = hasPin || item.isPreparing;
 
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('ยกเลิกรายการ'),
+        title: Row(
+          children: [
+            Icon(
+              item.isPreparing
+                  ? Icons.warning_amber_rounded
+                  : Icons.delete_outline,
+              color: item.isPreparing ? Colors.orange : AppTheme.errorColor,
+              size: 22,
+            ),
+            const SizedBox(width: 8),
+            Text(item.isPreparing ? 'ยกเลิกบังคับ' : 'ยกเลิกรายการ'),
+          ],
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (item.isPreparing)
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange.shade300),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.soup_kitchen_rounded,
+                        size: 16, color: Colors.orange.shade700),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'รายการนี้กำลังทำอยู่ในครัว\nการยกเลิกจะแจ้งครัวทันที',
+                        style: TextStyle(
+                            fontSize: 12, color: Colors.orange.shade800),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             Text(
-              '${item.productName}  x${item.quantity}',
+              '${item.productName}  x${_fmtQty(item.quantity)}',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: reasonCtrl,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'เหตุผล *',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.edit_note),
+              ),
+            ),
+            if (requirePin) ...[
+              const SizedBox(height: 10),
+              TextField(
+                controller: pinCtrl,
+                obscureText: true,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: 'Manager PIN',
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.lock_outline),
+                  helperText: item.isPreparing && !hasPin
+                      ? 'ตั้งค่า Manager PIN เพื่อเปิดใช้งาน'
+                      : null,
+                ),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('ยกเลิก'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (reasonCtrl.text.trim().isEmpty) return;
+              if (hasPin &&
+                  !_matchesManagerPin(
+                      pinCtrl.text.trim(), settings.managerPin)) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  const SnackBar(
+                    content: Text('PIN ไม่ถูกต้อง'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+                return;
+              }
+              Navigator.pop(ctx, true);
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor:
+                  item.isPreparing ? Colors.orange : AppTheme.errorColor,
+            ),
+            child:
+                Text(item.isPreparing ? 'ยืนยันยกเลิกบังคับ' : 'ยืนยันยกเลิก'),
+          ),
+        ],
+      ),
+    );
+
+    final reason = reasonCtrl.text.trim();
+    final managerPin = pinCtrl.text.trim();
+    reasonCtrl.dispose();
+    pinCtrl.dispose();
+
+    if (confirmed != true || !mounted) return;
+    final ok = await ref
+        .read(billProvider.notifier)
+        .voidItem(
+          item.itemId,
+          reason: reason,
+          managerPin: hasPin ? managerPin : null,
+        );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          ok ? 'ยกเลิกรายการ ${item.productName} แล้ว' : 'ยกเลิกไม่สำเร็จ',
+        ),
+        backgroundColor: ok ? AppTheme.errorColor : Colors.grey,
+      ),
+    );
+  }
+
+  Future<void> _showVoidAllDialog(BillModel bill) async {
+    final voidable = bill.items
+        .where((i) => i.kitchenStatus.toUpperCase() != 'CANCELLED')
+        .toList();
+    if (voidable.isEmpty) return;
+
+    final settings = ref.read(settingsProvider);
+    final reasonCtrl = TextEditingController();
+    final pinCtrl = TextEditingController();
+    final hasPin = settings.managerPinConfigured;
+    final preparingCount = voidable.where((i) => i.isPreparing).length;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.delete_sweep_outlined, color: AppTheme.errorColor, size: 22),
+            const SizedBox(width: 8),
+            const Text('ยกเลิกทั้งหมด'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (preparingCount > 0)
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange.shade300),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.warning_amber_rounded, size: 16, color: Colors.orange.shade700),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'มี $preparingCount รายการกำลังทำอยู่ในครัว\nการยกเลิกจะแจ้งครัวทันที',
+                        style: TextStyle(fontSize: 12, color: Colors.orange.shade800),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            Text(
+              'จะยกเลิก ${voidable.length} รายการ',
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
@@ -250,47 +430,49 @@ class _BillingPageState extends ConsumerState<BillingPage> {
           FilledButton(
             onPressed: () {
               if (reasonCtrl.text.trim().isEmpty) return;
-              if (hasPin &&
-                  !_matchesManagerPin(
-                    pinCtrl.text.trim(),
-                    settings.managerPin,
-                  )) {
+              if (hasPin && !_matchesManagerPin(pinCtrl.text.trim(), settings.managerPin)) {
                 ScaffoldMessenger.of(ctx).showSnackBar(
-                  const SnackBar(
-                    content: Text('PIN ไม่ถูกต้อง'),
-                    backgroundColor: Colors.red,
-                  ),
+                  const SnackBar(content: Text('PIN ไม่ถูกต้อง'), backgroundColor: Colors.red),
                 );
                 return;
               }
               Navigator.pop(ctx, true);
             },
             style: FilledButton.styleFrom(backgroundColor: AppTheme.errorColor),
-            child: const Text('ยืนยันยกเลิก'),
+            child: const Text('ยืนยันยกเลิกทั้งหมด'),
           ),
         ],
       ),
     );
-    if (confirmed != true || !mounted) return;
 
     final reason = reasonCtrl.text.trim();
     final managerPin = pinCtrl.text.trim();
-    final ok = await ref
-        .read(billProvider.notifier)
-        .voidItem(
-          item.itemId,
-          reason: reason,
-          managerPin: hasPin ? managerPin : null,
-        );
+    reasonCtrl.dispose();
+    pinCtrl.dispose();
+
+    if (confirmed != true || !mounted) return;
+    final result = await ref.read(billProvider.notifier).voidAllItems(
+      reason: reason,
+      managerPin: hasPin ? managerPin : null,
+    );
     if (!mounted) return;
+
+    final allOk = result.failed == 0 && result.success > 0;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          ok ? 'ยกเลิกรายการ ${item.productName} แล้ว' : 'ยกเลิกไม่สำเร็จ',
+          result.failed == 0
+              ? 'ยกเลิก ${result.success} รายการแล้ว'
+              : 'ยกเลิก ${result.success} รายการ, ไม่สำเร็จ ${result.failed} รายการ',
         ),
-        backgroundColor: ok ? AppTheme.errorColor : Colors.grey,
+        backgroundColor: allOk ? AppTheme.errorColor : AppTheme.warningColor,
       ),
     );
+
+    // กลับหน้าก่อนหน้าเมื่อยกเลิกสำเร็จทั้งหมด
+    if (allOk && mounted) {
+      Navigator.of(context).pop();
+    }
   }
 
   bool _matchesManagerPin(String inputPin, String storedPin) {
@@ -418,6 +600,16 @@ class _BillingPageState extends ConsumerState<BillingPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(message),
+          backgroundColor: AppTheme.warningColor,
+        ),
+      );
+      return;
+    }
+
+    if (bill.hasPreparingItems) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('ยังชำระเงินไม่ได้: มีรายการที่กำลังทำอยู่ในครัว'),
           backgroundColor: AppTheme.warningColor,
         ),
       );
@@ -601,6 +793,7 @@ class _BillBody extends StatelessWidget {
   final VoidCallback onPay;
   final void Function(int courseNo) onFireCourse;
   final void Function(BillItemModel item) onVoidItem;
+  final VoidCallback? onVoidAll;
 
   const _BillBody({
     required this.bill,
@@ -616,13 +809,15 @@ class _BillBody extends StatelessWidget {
     required this.onPay,
     required this.onFireCourse,
     required this.onVoidItem,
+    this.onVoidAll,
   });
 
   @override
   Widget build(BuildContext context) {
     final canManageTable = tableContext.hasTable;
     final compact = tableContext.isTakeaway;
-    final canPay = bill.isOpen;
+    final isLockedByKitchen = bill.isOpen && bill.hasPreparingItems;
+    final canPay = bill.isOpen && !isLockedByKitchen;
     return Column(
       children: [
         Expanded(
@@ -680,8 +875,17 @@ class _BillBody extends StatelessWidget {
                   );
                 }(),
 
-              // ── Items ──────────────────────────────────────────────────
-              if (!canPay) ...[
+              // ── Status banners ─────────────────────────────────────
+              if (isLockedByKitchen) ...[
+                _SectionCard(
+                  title: 'สถานะครัว',
+                  compact: compact,
+                  child: _PreparingWarningBanner(
+                    preparingCount: bill.items.where((i) => i.isPreparing).length,
+                  ),
+                ),
+                SizedBox(height: compact ? 8 : 12),
+              ] else if (!canPay) ...[
                 _SectionCard(
                   title: 'สถานะบิล',
                   compact: compact,
@@ -826,84 +1030,111 @@ class _BillBody extends StatelessWidget {
                 constraints: BoxConstraints(
                   maxWidth: compact ? _takeawayBillMaxWidth : double.infinity,
                 ),
-                child: canManageTable
-                    ? Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
-                              OutlinedButton.icon(
-                                onPressed: onMerge,
-                                icon: const Icon(Icons.merge_type, size: 18),
-                                label: const Text('รวมโต๊ะ'),
-                              ),
-                              OutlinedButton.icon(
-                                onPressed: onPrintPreBill,
-                                icon: const Icon(
-                                  Icons.print_outlined,
-                                  size: 18,
+                child: () {
+                  final hasVoidable = bill.isOpen &&
+                      bill.items.any(
+                        (i) => i.kitchenStatus.toUpperCase() != 'CANCELLED',
+                      );
+                  final voidAllBtn = hasVoidable && onVoidAll != null
+                      ? OutlinedButton.icon(
+                          onPressed: onVoidAll,
+                          icon: const Icon(Icons.delete_sweep_outlined, size: 18),
+                          label: const Text('ยกเลิกทั้งหมด'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppTheme.errorColor,
+                            side: BorderSide(
+                              color: AppTheme.errorColor.withValues(alpha: 0.5),
+                            ),
+                          ),
+                        )
+                      : null;
+
+                  return canManageTable
+                      ? Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                OutlinedButton.icon(
+                                  onPressed: onMerge,
+                                  icon: const Icon(Icons.merge_type, size: 18),
+                                  label: const Text('รวมโต๊ะ'),
                                 ),
-                                label: const Text('Pre-bill'),
+                                OutlinedButton.icon(
+                                  onPressed: onPrintPreBill,
+                                  icon: const Icon(Icons.print_outlined, size: 18),
+                                  label: const Text('Pre-bill'),
+                                ),
+                                OutlinedButton.icon(
+                                  onPressed: onSplitBill,
+                                  icon: const Icon(Icons.call_split, size: 18),
+                                  label: const Text('แยกบิล'),
+                                ),
+                                if (voidAllBtn != null) voidAllBtn,
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            SizedBox(
+                              width: double.infinity,
+                              child: FilledButton.icon(
+                                onPressed: canPay ? onPay : null,
+                                icon: Icon(
+                                  canPay
+                                      ? Icons.payment
+                                      : Icons.check_circle_outline,
+                                ),
+                                label: Text(
+                                  canPay
+                                      ? 'ชำระเงิน  ฿${_fmt.format(bill.grandTotal)}'
+                                      : 'ชำระแล้ว  ฿${_fmt.format(bill.grandTotal)}',
+                                ),
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: AppTheme.primaryColor,
+                                ),
                               ),
-                              OutlinedButton.icon(
-                                onPressed: onSplitBill,
-                                icon: const Icon(Icons.call_split, size: 18),
-                                label: const Text('แยกบิล'),
-                              ),
+                            ),
+                          ],
+                        )
+                      : Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (voidAllBtn != null) ...[
+                              SizedBox(width: double.infinity, child: voidAllBtn),
+                              const SizedBox(height: 8),
                             ],
-                          ),
-                          const SizedBox(height: 8),
-                          SizedBox(
-                            width: double.infinity,
-                            child: FilledButton.icon(
-                              onPressed: canPay ? onPay : null,
-                              icon: Icon(
-                                canPay
-                                    ? Icons.payment
-                                    : Icons.check_circle_outline,
-                              ),
-                              label: Text(
-                                canPay
-                                    ? 'ชำระเงิน  ฿${_fmt.format(bill.grandTotal)}'
-                                    : 'ชำระแล้ว  ฿${_fmt.format(bill.grandTotal)}',
-                              ),
-                              style: FilledButton.styleFrom(
-                                backgroundColor: AppTheme.primaryColor,
-                              ),
+                            Row(
+                              children: [
+                                OutlinedButton.icon(
+                                  onPressed: onPrintPreBill,
+                                  icon: const Icon(Icons.print_outlined, size: 18),
+                                  label: const Text('Pre-bill'),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: FilledButton.icon(
+                                    onPressed: canPay ? onPay : null,
+                                    icon: Icon(
+                                      canPay
+                                          ? Icons.payment
+                                          : Icons.check_circle_outline,
+                                    ),
+                                    label: Text(
+                                      canPay
+                                          ? 'ชำระเงิน  ฿${_fmt.format(bill.grandTotal)}'
+                                          : 'ชำระแล้ว  ฿${_fmt.format(bill.grandTotal)}',
+                                    ),
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: AppTheme.primaryColor,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                        ],
-                      )
-                    : Row(
-                        children: [
-                          OutlinedButton.icon(
-                            onPressed: onPrintPreBill,
-                            icon: const Icon(Icons.print_outlined, size: 18),
-                            label: const Text('Pre-bill'),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: FilledButton.icon(
-                              onPressed: canPay ? onPay : null,
-                              icon: Icon(
-                                canPay
-                                    ? Icons.payment
-                                    : Icons.check_circle_outline,
-                              ),
-                              label: Text(
-                                canPay
-                                    ? 'ชำระเงิน  ฿${_fmt.format(bill.grandTotal)}'
-                                    : 'ชำระแล้ว  ฿${_fmt.format(bill.grandTotal)}',
-                              ),
-                              style: FilledButton.styleFrom(
-                                backgroundColor: AppTheme.primaryColor,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                          ],
+                        );
+                }(),
               ),
             ),
           ),
@@ -972,15 +1203,22 @@ class _ItemRow extends StatelessWidget {
           ),
           if (onVoid != null) ...[
             const SizedBox(width: 4),
-            InkWell(
-              onTap: onVoid,
-              borderRadius: AppRadius.sm,
-              child: Padding(
-                padding: const EdgeInsets.all(4),
-                child: Icon(
-                  Icons.delete_outline,
-                  size: 18,
-                  color: Colors.red.shade400,
+            Tooltip(
+              message: item.isPreparing ? 'ยกเลิกบังคับ (กำลังทำในครัว)' : 'ยกเลิกรายการ',
+              child: InkWell(
+                onTap: onVoid,
+                borderRadius: AppRadius.sm,
+                child: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: Icon(
+                    item.isPreparing
+                        ? Icons.cancel_outlined
+                        : Icons.delete_outline,
+                    size: 18,
+                    color: item.isPreparing
+                        ? Colors.orange.shade600
+                        : Colors.red.shade400,
+                  ),
                 ),
               ),
             ),
@@ -989,9 +1227,6 @@ class _ItemRow extends StatelessWidget {
       ),
     );
   }
-
-  String _fmtQty(double q) =>
-      q == q.truncateToDouble() ? q.toInt().toString() : q.toString();
 }
 
 class _BillStatusBanner extends StatelessWidget {
@@ -1031,6 +1266,43 @@ class _BillStatusBanner extends StatelessWidget {
             child: Text(
               label,
               style: TextStyle(
+                color: color,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Preparing warning banner ──────────────────────────────────────────────────
+
+class _PreparingWarningBanner extends StatelessWidget {
+  final int preparingCount;
+  const _PreparingWarningBanner({required this.preparingCount});
+
+  @override
+  Widget build(BuildContext context) {
+    const color = Color(0xFF1565C0); // blue — matches KDS PREPARING header
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: AppRadius.sm,
+        border: Border.all(color: color.withValues(alpha: 0.30)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.soup_kitchen_rounded, color: color, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'มี $preparingCount รายการ${preparingCount > 1 ? '' : ''} กำลังทำอยู่ในครัว — ยังแก้ไขหรือชำระเงินไม่ได้',
+              style: const TextStyle(
                 color: color,
                 fontSize: 13,
                 fontWeight: FontWeight.w700,

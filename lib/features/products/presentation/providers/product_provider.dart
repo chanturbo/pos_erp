@@ -393,3 +393,33 @@ class ProductGroupRepository {
     }
   }
 }
+
+// ─────────────────────────────────────────────────────────────
+// topSellingProductRankProvider
+// คืน Map<productId, rank> โดย rank=1 คือขายดีที่สุด
+// ─────────────────────────────────────────────────────────────
+final topSellingProductRankProvider =
+    FutureProvider<Map<String, int>>((ref) async {
+  try {
+    final authState = ref.watch(authProvider);
+    if (authState.isRestoring || !authState.isAuthenticated) return {};
+    final api = ref.read(apiClientProvider);
+    final res = await api.get(
+      '/api/reports/top-products',
+      queryParameters: {'limit': 500},
+    );
+    if (res.statusCode == 200 && res.data != null) {
+      final list = res.data['data'] as List? ?? [];
+      final Map<String, int> rank = {};
+      for (var i = 0; i < list.length; i++) {
+        final item = list[i] as Map<String, dynamic>;
+        final id = item['product_id'] as String?;
+        if (id != null) rank[id] = i + 1;
+      }
+      return rank;
+    }
+    return {};
+  } catch (_) {
+    return {};
+  }
+});

@@ -325,9 +325,9 @@ class _TakeawayOrdersPageState extends ConsumerState<TakeawayOrdersPage> {
       ),
     );
 
-    // refresh หลัง BillingPage ปิด เพื่อให้รายการ OPEN/COMPLETED อัปเดตทันที
+    // refresh หลัง BillingPage ปิด เพื่อให้รายการ OPEN/COMPLETED/CANCELLED อัปเดตทันที
     if (mounted) {
-      unawaited(ref.read(salesHistoryProvider.notifier).refreshSilently());
+      unawaited(ref.read(salesHistoryProvider.notifier).refresh());
     }
   }
 }

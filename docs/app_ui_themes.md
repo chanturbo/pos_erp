@@ -6,7 +6,7 @@
 ## สถานะเอกสาร
 
 - เวอร์ชันเริ่มต้น: บันทึกรูปแบบ Card จากหน้า `รายการสินค้า`
-- แหล่งอ้างอิงปัจจุบัน: `lib/features/products/presentation/pages/product_list_page.dart`
+- แหล่งอ้างอิงปัจจุบัน: `lib/features/products/presentation/pages/product_list_page.dart`, `lib/features/restaurant/presentation/pages/takeaway_sales_page.dart`, `lib/features/restaurant/presentation/pages/takeaway_orders_page.dart`
 - หมายเหตุ: ค่า `AppTheme.*` เดิมถูกใช้เป็นชื่ออ้างอิงในโค้ดเดิม ให้แปลงเป็น design token ของธีมใหม่ภายหลัง
 
 ## Responsive Theme Breakpoints
@@ -1506,6 +1506,353 @@ Empty icons
 - ใช้ border เพื่อแยกชั้น card แทน shadow
 - สี semantic container ของ success/error/warning/info ต้องทดสอบ contrast กับข้อความใน dark mode
 - ถ้าใช้สีเดิมจาก light mode แล้วอ่านยาก ให้เพิ่ม token `displayColor` สำหรับ dark mode โดยเฉพาะ
+
+## Takeaway Sales UI Theme
+
+ใช้กับหน้า `ขายกลับบ้าน` และ `บิลซื้อกลับบ้านค้าง`
+
+แหล่งอ้างอิง:
+
+- `lib/features/restaurant/presentation/pages/takeaway_sales_page.dart`
+- `lib/features/restaurant/presentation/pages/takeaway_orders_page.dart`
+
+### Takeaway Page Roles
+
+| Page | Purpose | Primary flow |
+| --- | --- | --- |
+| `ขายกลับบ้าน` | เลือกวิธีเริ่มออเดอร์ takeaway และกลับมาทำบิลพักไว้ต่อ | เริ่มขายแบบส่งครัว / เริ่มขายและชำระทันที |
+| `บิลซื้อกลับบ้านค้าง` | ติดตามบิล takeaway ตามสถานะ พร้อมค้นหา กรอง และเปิดไปชำระบิล | ดู OPEN / COMPLETED / CANCELLED / ทั้งหมด |
+
+### Takeaway App Bar
+
+| คุณสมบัติ | ค่า |
+| --- | --- |
+| widget | `AppBar` |
+| background | `AppTheme.navyColor` |
+| foreground | `Colors.white` |
+| title sales | `ขายกลับบ้าน` |
+| title orders | `บิลซื้อกลับบ้านค้าง` |
+| sales action | `TextButton.icon` label `บิลค้าง`, icon `Icons.receipt_long`, text/icon `Colors.white` |
+| orders action | countdown refresh button พร้อม progress ring และตัวเลขวินาที |
+| action right gap | `8` |
+
+### Takeaway Sales Layout
+
+| Area | Placement | Behavior |
+| --- | --- | --- |
+| root | `Scaffold` + `ListView` | scroll ทั้งหน้า |
+| body padding | `20` รอบด้าน | ใช้เหมือนกันทุกขนาดในหน้าอ้างอิง |
+| mode cards | บนสุด | เลือกประเภทการขาย |
+| hold panels | ใต้ mode cards | แสดงบิลพักไว้แยกตามประเภท |
+| gap mode to holds | `18` |
+| gap between panels | `14` |
+| wide breakpoint | `760` | mode cards วาง 2 columns |
+| narrow layout | `< 760` | mode cards เรียงแนวตั้ง gap `12` |
+| wide gap | `14` ระหว่าง card |
+
+### Takeaway Mode Card
+
+ใช้กับ card ใหญ่ 2 ใบในหน้า `ขายกลับบ้าน`
+
+| Mode | Icon | Color | Title | Button |
+| --- | --- | --- | --- | --- |
+| ส่งครัว | `Icons.soup_kitchen_rounded` | `Color(0xFF2C82C9)` | `ส่งเข้าครัวก่อน` | `เริ่มขายแบบส่งครัว` |
+| จำหน่ายเลย | `Icons.qr_code_scanner_rounded` | `Color(0xFFFF9224)` | `จำหน่ายเลย` | `เริ่มขายและชำระได้ทันที` |
+
+| คุณสมบัติ | ค่า |
+| --- | --- |
+| interaction | ทั้ง card เป็น `InkWell` |
+| card background | `AppTheme.cardColor(context)` |
+| radius | `AppRadius.lg` |
+| border | mode color alpha `0.24` light / `0.55` dark |
+| shadow | mode color alpha `0.14` light / `0.10` dark, blur `16`, offset `0,7` |
+| padding | `16` |
+| icon box size | `58 x 58` |
+| icon box radius | `AppRadius.md` |
+| icon box fill | diagonal gradient จาก mode color alpha `0.84` ไป mode color lerp black `0.18` |
+| icon size | `32`, color `Colors.white` |
+| title size | `18`, weight `w900`, height `1.1` |
+| subtitle size | `13`, height `1.45`, color `AppTheme.mutedTextOf(context)` |
+| touch hint | pill `แตะเพื่อเริ่ม`, icon `Icons.touch_app_rounded`, text size `12`, weight `w800` |
+| primary CTA | full width filled container ใช้ mode color |
+| CTA padding | horizontal `14`, vertical `12` |
+| CTA radius | `AppRadius.md` |
+| CTA text | size `14`, weight `w800`, maxLines `1`, ellipsis |
+| CTA icons | leading mode icon size `18`, trailing `Icons.arrow_forward_rounded` size `18` |
+
+### Takeaway Hold Panel
+
+ใช้กับกลุ่ม `พักไว้ (ส่งครัว)` และ `พักไว้ (จำหน่ายเลย)`
+
+| คุณสมบัติ | ค่า |
+| --- | --- |
+| background | `AppTheme.cardColor(context)` |
+| radius | `AppRadius.md` |
+| border | `AppTheme.borderColorOf(context)` |
+| header padding | left/right `16`, top `14`, bottom `10` |
+| header icon | `Icons.pause_circle_outline`, color ตาม panel |
+| header title | size `15`, weight `w800` |
+| count badge | pill filled ด้วย panel color, padding `8 x 3`, text size `12`, bold |
+| divider | height `1`, color `AppTheme.borderColorOf(context)` |
+| empty padding | `16` |
+| empty icon | `Icons.inbox_outlined`, size `18`, muted color |
+| row padding | horizontal `16`, vertical `12` |
+| row leading box | padding `8`, radius `AppRadius.sm`, orange alpha `0.10` |
+| row leading icon | `Icons.kitchen_outlined` หรือ `Icons.shopping_bag_rounded`, size `17`, `Colors.orange.shade700` |
+| row title | order name, size `13`, weight `w700`, ellipsis |
+| row metadata | item count, amount, time `HH:mm`; size `11`, muted color |
+| resume action | `FilledButton` label `ต่อ`, orange `shade600`, compact padding `12 x 8` |
+| delete action | `IconButton.filled`, icon `Icons.close` size `15`, bg red `shade400`, minimum `28 x 28` |
+
+### Takeaway Orders Layout
+
+| Area | Placement | Behavior |
+| --- | --- | --- |
+| scaffold background | `AppTheme.surfaceColor` |
+| root body | `Column` | app bar fixed, content controls fixed, order list expands |
+| summary panel | padding `16,16,16,0` | card พร้อม search และ date toggle |
+| status filter | padding `16,12,16,0` | horizontal list height `38` |
+| list toolbar | padding `16,8,16,0` | count + latest update left, sort right |
+| order column | `Expanded` + padding `16` | list หรือ empty state |
+| refresh | `RefreshIndicator` ใน list | pull-to-refresh |
+| auto refresh | default `30s` | countdown action ใน app bar |
+
+### Takeaway Summary Panel
+
+| คุณสมบัติ | ค่า |
+| --- | --- |
+| background | `AppTheme.cardColor(context)` |
+| radius | `AppRadius.lg` |
+| border | `AppTheme.borderColorOf(context)` |
+| padding | `12` |
+| title icon box | padding `8`, bg `AppTheme.primaryColor` alpha `0.12`, radius `AppRadius.md` |
+| title icon | `Icons.takeout_dining`, size `18`, color `AppTheme.primaryColor` |
+| title text | `ภาพรวมซื้อกลับบ้าน`, size `15`, weight `w700`, color `AppTheme.navyColor` |
+| date toggle | pill `วันนี้` / `ทั้งหมด` อยู่ขวาของ title row |
+| summary cards | horizontal scroll, gap `8` |
+| search | อยู่ใต้ summary cards, full width |
+
+### Takeaway Summary Cards
+
+| Metric | Icon | Color | Background |
+| --- | --- | --- | --- |
+| `ค้างอยู่` | `Icons.hourglass_top_rounded` | `AppTheme.warningColor` | `AppTheme.warningContainer` |
+| `ปิดแล้ว` | `Icons.done_all_rounded` | `AppTheme.successColor` | `AppTheme.successContainer` |
+| `ยกเลิก` | `Icons.cancel_outlined` | `AppTheme.errorColor` | `AppTheme.errorColor` alpha `0.10` |
+
+| คุณสมบัติ | ค่า compact |
+| --- | --- |
+| width | `132` |
+| padding | horizontal `10`, vertical `8` |
+| radius | `AppRadius.md` |
+| icon size | `16` |
+| icon gap | `6` |
+| label size | `10`, color `AppTheme.subtextColor` |
+| value size | `15`, weight `w800`, color ตาม metric |
+
+### Takeaway Search Field
+
+| คุณสมบัติ | ค่า |
+| --- | --- |
+| hint | `ค้นหาเลขบิลหรือชื่อลูกค้า` |
+| prefix icon | `Icons.search`, size `20`, color `AppTheme.iconOf(context)` |
+| clear icon | `Icons.close`, size `18`, tooltip `ล้างคำค้น` |
+| fill | `AppTheme.surface3Of(context)` |
+| dense | `true` |
+| padding | horizontal `12`, vertical `10` |
+| radius | `AppRadius.md` |
+| border | `AppTheme.inputBorderOf(context)` |
+| focused border | `AppTheme.primaryColor` |
+| hint style | size `13`, muted color |
+
+### Takeaway Toggles
+
+| Toggle | Options | Selected color | Padding |
+| --- | --- | --- | --- |
+| date | `วันนี้`, `ทั้งหมด` | `AppTheme.primaryColor` | `12 x 6` |
+| sort | `ล่าสุด`, `ยอดสูงสุด` | `AppTheme.navyColor` | `10 x 6` |
+
+| คุณสมบัติ | ค่า |
+| --- | --- |
+| container fill | `AppTheme.surface3Of(context)` |
+| container radius | `AppRadius.pill` |
+| border | `AppTheme.borderColorOf(context)` |
+| animation | `AnimatedContainer`, `160ms` |
+| selected text | `Colors.white` |
+| unselected text | `AppTheme.mutedTextOf(context)` |
+| text size | `12` |
+| text weight | date `w600`, sort `w700` |
+
+### Takeaway Status Filter Bar
+
+| Filter | Label | Color |
+| --- | --- | --- |
+| open | `OPEN` | `AppTheme.warningColor` |
+| completed | `COMPLETED` | `AppTheme.successColor` |
+| cancelled | `CANCELLED` | `AppTheme.errorColor` |
+| all | `ทั้งหมด` | `AppTheme.navyColor` |
+
+| คุณสมบัติ | ค่า |
+| --- | --- |
+| height | `38` |
+| scroll | horizontal `ListView.separated` |
+| gap | `8` |
+| item padding | horizontal `12`, vertical `8` |
+| radius | `AppRadius.pill` |
+| selected fill | filter color alpha `0.14` |
+| unselected fill | `AppTheme.cardColor(context)` |
+| selected border | filter color |
+| unselected border | `AppTheme.borderColorOf(context)` |
+| dot | `8 x 8`, filter color |
+| label size | `12`, weight `w700` |
+| count badge | padding `6 x 2`, radius pill, size `11`, weight `w700` |
+
+### Takeaway List Toolbar
+
+| คุณสมบัติ | ค่า |
+| --- | --- |
+| result label | `พบ {count} รายการ`, size `12`, weight `w700` |
+| updated label | `อัปเดตล่าสุดเมื่อ HH:mm`, size `12`, muted color |
+| left layout | `Wrap` spacing `8`, runSpacing `2` |
+| right layout | sort toggle |
+| gap left/right | `12` |
+
+### Takeaway Order Column
+
+| Status filter | Header bg | Header color | Header title |
+| --- | --- | --- | --- |
+| open | `AppTheme.warningContainer` | `AppTheme.warningColor` | `ค้างอยู่` |
+| completed | `AppTheme.successContainer` | `AppTheme.successColor` | `ปิดแล้ว` |
+| cancelled | `AppTheme.errorColor` alpha `0.10` | `AppTheme.errorColor` | `ยกเลิก` |
+| all | `AppTheme.headerBg` | `AppTheme.navyColor` | `ทั้งหมด` |
+
+| คุณสมบัติ | ค่า |
+| --- | --- |
+| container bg | `AppTheme.cardColor(context)` |
+| radius | `AppRadius.lg` |
+| border | `AppTheme.borderColorOf(context)` |
+| header padding | horizontal `14`, vertical `12` |
+| header top radius | `15` |
+| header dot | `10 x 10` |
+| header title | size `14`, weight `w700`, color `AppTheme.navyColor` |
+| header count badge | padding `10 x 4`, bg header color alpha `0.12`, radius pill |
+| list padding | `10` |
+| item bottom gap | `10` |
+
+### Takeaway Order Card
+
+| คุณสมบัติ | ค่า |
+| --- | --- |
+| animation | `AnimatedContainer`, `300ms`, `Curves.easeOut` |
+| card elevation | `0` |
+| margin | `EdgeInsets.zero` |
+| clip | `Clip.antiAlias` |
+| background normal | `AppTheme.cardColor(context)` |
+| background highlighted light | `Color(0xFFFFF8E6)` |
+| background highlighted dark | `Color(0xFF2A2000)` |
+| radius | `AppRadius.md` |
+| border normal | `AppTheme.borderColorOf(context)`, width `1` |
+| border highlighted | `AppTheme.primaryColor` alpha `0.6`, width `1.5` |
+| highlight shadow | primary alpha `0.18`, blur `18`, spread `1`, offset `0,6` |
+| padding | `12` |
+| avatar radius | `22` |
+| avatar text | first char of order no, size `15`, bold, white |
+| avatar palette | primary, info, success, warning, purple, teal |
+| new marker | `14 x 14`, primary circle, `Icons.fiber_new_rounded` size `8` |
+| order no | size `13`, weight `w700`, ellipsis |
+| customer name | fallback `ลูกค้าทั่วไป`, size `12`, subtext color, ellipsis |
+| meta chips | amount + time, icons `Icons.payments_outlined` และ `Icons.schedule` |
+| trailing | `Icons.chevron_right`, size `20`, subtext color |
+
+### Takeaway Status Badge
+
+| Status | Background | Foreground | Label |
+| --- | --- | --- | --- |
+| OPEN | `Color(0xFFFFF3E0)` | `Color(0xFFE65100)` | `ค้างอยู่` |
+| COMPLETED | `Color(0xFFE8F5E9)` | `Color(0xFF2E7D32)` | `ปิดแล้ว` |
+| CANCELLED | `Color(0xFFFFEBEE)` | `Color(0xFFC62828)` | `ยกเลิก` |
+| highlighted | `AppTheme.primaryColor` alpha `0.12` | `AppTheme.primaryColor` | `บิลใหม่` |
+
+| คุณสมบัติ | ค่า |
+| --- | --- |
+| padding | horizontal `8`, vertical `2` |
+| radius | `10` |
+| border | foreground alpha `0.18` |
+| dot | `5 x 5`, foreground color |
+| text | size `10`, weight `w600` |
+
+### Takeaway Meta Chip
+
+| คุณสมบัติ | ค่า |
+| --- | --- |
+| padding | horizontal `10`, vertical `7` |
+| background | `AppTheme.surface3Of(context)` |
+| border | `AppTheme.inputBorderOf(context)` |
+| radius | `AppRadius.pill` |
+| icon size | `16` |
+| icon/text color | `AppTheme.mutedTextOf(context)` |
+| icon gap | `6` |
+
+### Takeaway Empty / Error State
+
+| Status | Icon | Icon color | Title |
+| --- | --- | --- | --- |
+| open empty | `Icons.check_circle_outline` | `AppTheme.successColor` | `ไม่มีบิลซื้อกลับบ้านที่ค้างอยู่` |
+| completed empty | `Icons.receipt_long_outlined` | `AppTheme.subtextColor` | `ยังไม่มีบิลซื้อกลับบ้านที่ปิดแล้ว` |
+| cancelled empty | `Icons.block_outlined` | `AppTheme.subtextColor` | `ยังไม่มีบิลซื้อกลับบ้านที่ยกเลิก` |
+| all empty | `Icons.takeout_dining` | `AppTheme.subtextColor` | `ยังไม่มีรายการซื้อกลับบ้าน` |
+| load error | `Icons.receipt_long_outlined` | `AppTheme.errorColor` | `โหลดรายการไม่สำเร็จ` |
+
+| คุณสมบัติ | ค่า |
+| --- | --- |
+| max width | `420` |
+| background | `AppTheme.cardColor(context)` |
+| radius | `AppRadius.lg` |
+| border | `AppTheme.borderColorOf(context)` |
+| normal padding | `24` |
+| compact padding | `16` เมื่อ height `< 160` |
+| icon size | `56` normal / `40` compact |
+| title size | `18` normal / `16` compact |
+| title weight | `w700` |
+| message size | `13` normal / `12` compact |
+| scroll behavior | `SingleChildScrollView` เพื่อกัน overflow ในพื้นที่เตี้ย |
+
+### Takeaway Countdown Refresh
+
+| คุณสมบัติ | ค่า |
+| --- | --- |
+| default interval | `30s` |
+| tooltip | `อัพเดทใน {countdown} วิ  (กดเพื่อรีเฟรชทันที)` |
+| tap behavior | spin animation `600ms` และ refresh ทันที |
+| container padding | horizontal `8`, vertical `4` |
+| progress size | `22 x 22` |
+| progress stroke | `2.5` |
+| progress background | `Colors.white24` |
+| progress color normal | `Colors.white` |
+| progress color urgent | `Colors.orangeAccent` เมื่อ countdown `<= 5` |
+| center icon | `Icons.refresh`, size `12`, white |
+| text | `{countdown}s`, size `12`, weight `w600` |
+| text color normal | `Colors.white70` |
+| text color urgent | `Colors.orangeAccent` |
+
+### Takeaway Responsive Rules
+
+| Area | Mobile / Narrow | Tablet / Desktop |
+| --- | --- | --- |
+| sales mode cards | stacked, gap `12` | 2 columns เมื่อ width `>= 760`, gap `14` |
+| orders summary metrics | horizontal scroll | horizontal scroll ยังคงใช้ได้เมื่อ metric เพิ่ม |
+| status filter | horizontal scroll เสมอ | horizontal scroll เพื่อกัน label ยาว |
+| list toolbar | left `Wrap` กัน overflow | sort toggle ชิดขวา |
+| order list | card list เท่านั้น | card list; ยังไม่มี table view ใน reference |
+| empty state | compact เมื่อ height น้อย | centered max width `420` |
+
+### Takeaway Dark Mode Notes
+
+- ใช้ `AppTheme.cardColor(context)`, `AppTheme.borderColorOf(context)`, `AppTheme.surface3Of(context)`, `AppTheme.textColorOf(context)`, และ `AppTheme.mutedTextOf(context)` เป็น default token แทน hardcode สีพื้นผิว
+- Mode card เพิ่ม border alpha เป็น `0.55` ใน dark mode เพื่อคงความชัดของ card
+- Highlighted order ใช้พื้น `Color(0xFF2A2000)` ใน dark mode เพื่อรักษา state บิลใหม่โดยไม่สว่างเกิน
+- Shadow ใน dark mode ใช้ได้เฉพาะ mode card และ highlighted order ด้วย alpha ต่ำ ไม่ใช้ shadow เป็นตัวแยก hierarchy หลัก
+- Semantic status badge สี light container ปัจจุบันควรแยกเป็น dark display token ภายหลัง หาก contrast ไม่ผ่านกับ theme มืด
 
 ## Pending Sections
 

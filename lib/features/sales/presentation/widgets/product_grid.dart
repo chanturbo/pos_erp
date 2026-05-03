@@ -5,22 +5,51 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../products/data/models/product_model.dart';
 import '../../../products/data/models/modifier_model.dart';
 import '../../../products/presentation/providers/modifier_provider.dart';
+import '../../../products/presentation/providers/product_provider.dart';
 import '../providers/cart_provider.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/cart_toast.dart';
 
 // ── Color Tokens ──────────────────────────────────────────────────
-const _navy    = AppTheme.navyColor;
-const _orange  = AppTheme.primaryColor;
+const _navy = AppTheme.navyColor;
+const _orange = AppTheme.primaryColor;
 const _surface = AppTheme.surfaceColor;
-const _border  = AppTheme.borderColor;
+const _border = AppTheme.borderColor;
 const _success = AppTheme.successColor;
-const _info    = AppTheme.infoColor;
+const _info = AppTheme.infoColor;
+
+const _categoryPalette = <Color>[
+  Color(0xFF39A9E8),
+  Color(0xFF6B4122),
+  Color(0xFFFF9224),
+  Color(0xFF63B946),
+  Color(0xFFB45628),
+  Color(0xFFE65D90),
+  Color(0xFFFF4338),
+  Color(0xFFF7B912),
+  Color(0xFF159AA4),
+  Color(0xFF2C82C9),
+];
+
+const _categoryIcons = <IconData>[
+  Icons.inventory_2_outlined,
+  Icons.local_drink_outlined,
+  Icons.local_cafe_outlined,
+  Icons.bakery_dining_outlined,
+  Icons.fastfood_outlined,
+  Icons.icecream_outlined,
+  Icons.spa_outlined,
+  Icons.storefront_outlined,
+];
+
+const _drinkCategoryColor = Color(0xFF39A9E8);
+const _drinkCategoryIcon = Icons.emoji_food_beverage_rounded;
+const _dessertCategoryColor = Color(0xFFE65D90);
+const _dessertCategoryIcon = Icons.cake_rounded;
 
 // ── View Mode Provider ────────────────────────────────────────────
 final productViewModeProvider =
-    NotifierProvider<_ViewModeNotifier, ProductViewMode>(
-        _ViewModeNotifier.new);
+    NotifierProvider<_ViewModeNotifier, ProductViewMode>(_ViewModeNotifier.new);
 
 class _ViewModeNotifier extends Notifier<ProductViewMode> {
   @override
@@ -63,30 +92,34 @@ PriceLookupResult getPriceByLevel(ProductModel product, int level) {
     case 2:
       if (product.priceLevel2 > 0) {
         return PriceLookupResult(
-            price: product.priceLevel2,
-            isFallback: false,
-            requestedLevel: level);
+          price: product.priceLevel2,
+          isFallback: false,
+          requestedLevel: level,
+        );
       }
     case 3:
       if (product.priceLevel3 > 0) {
         return PriceLookupResult(
-            price: product.priceLevel3,
-            isFallback: false,
-            requestedLevel: level);
+          price: product.priceLevel3,
+          isFallback: false,
+          requestedLevel: level,
+        );
       }
     case 4:
       if (product.priceLevel4 > 0) {
         return PriceLookupResult(
-            price: product.priceLevel4,
-            isFallback: false,
-            requestedLevel: level);
+          price: product.priceLevel4,
+          isFallback: false,
+          requestedLevel: level,
+        );
       }
     case 5:
       if (product.priceLevel5 > 0) {
         return PriceLookupResult(
-            price: product.priceLevel5,
-            isFallback: false,
-            requestedLevel: level);
+          price: product.priceLevel5,
+          isFallback: false,
+          requestedLevel: level,
+        );
       }
   }
 
@@ -96,6 +129,153 @@ PriceLookupResult getPriceByLevel(ProductModel product, int level) {
     isFallback: level > 1, // fallback เฉพาะตอนขอ Lv.2-5 แต่ไม่มีราคา
     requestedLevel: level,
   );
+}
+
+int _categorySeed(String? groupId) {
+  final key = (groupId == null || groupId.isEmpty) ? 'ungrouped' : groupId;
+  return key.codeUnits.fold<int>(0, (sum, code) => sum + code);
+}
+
+Color _parseCategoryColor(String? raw) {
+  if (raw == null || raw.trim().isEmpty) return Colors.transparent;
+  final value = raw.trim();
+  if (value.startsWith('#')) {
+    final hex = value.substring(1);
+    if (hex.length == 6 || hex.length == 8) {
+      final normalized = hex.length == 6 ? 'FF$hex' : hex;
+      final parsed = int.tryParse(normalized, radix: 16);
+      if (parsed != null) return Color(parsed);
+    }
+  }
+  switch (value.toLowerCase()) {
+    case 'red':
+      return Colors.red;
+    case 'pink':
+      return Colors.pink;
+    case 'purple':
+      return Colors.purple;
+    case 'indigo':
+      return Colors.indigo;
+    case 'blue':
+      return Colors.blue;
+    case 'cyan':
+      return Colors.cyan;
+    case 'teal':
+      return Colors.teal;
+    case 'green':
+      return Colors.green;
+    case 'lime':
+      return Colors.lime;
+    case 'yellow':
+      return Colors.yellow;
+    case 'amber':
+      return Colors.amber;
+    case 'orange':
+      return Colors.orange;
+    case 'brown':
+      return Colors.brown;
+    case 'grey':
+    case 'gray':
+      return Colors.grey;
+    default:
+      return Colors.transparent;
+  }
+}
+
+bool _isDrinkCategory(ProductGroupModel? group, String? groupId) {
+  final text = [
+    group?.groupId,
+    group?.groupCode,
+    group?.groupName,
+    group?.mobileIcon,
+    groupId,
+  ].whereType<String>().join(' ').toLowerCase();
+
+  return text.contains('drink') ||
+      text.contains('beverage') ||
+      text.contains('local_drink') ||
+      text.contains('เครื่องดื่ม');
+}
+
+bool _isDessertCategory(ProductGroupModel? group, String? groupId) {
+  final text = [
+    group?.groupId,
+    group?.groupCode,
+    group?.groupName,
+    group?.mobileIcon,
+    groupId,
+  ].whereType<String>().join(' ').toLowerCase();
+
+  return text.contains('dessert') ||
+      text.contains('sweet') ||
+      text.contains('icecream') ||
+      text.contains('cake') ||
+      text.contains('ของหวาน') ||
+      text.contains('ขนมหวาน');
+}
+
+IconData _categoryIconFromKey(
+  String? key,
+  String? groupId, {
+  ProductGroupModel? group,
+}) {
+  if (_isDrinkCategory(group, groupId)) return _drinkCategoryIcon;
+  if (_isDessertCategory(group, groupId)) return _dessertCategoryIcon;
+
+  switch (key?.trim().toLowerCase()) {
+    case 'apps':
+      return Icons.apps_rounded;
+    case 'inventory':
+      return Icons.inventory_outlined;
+    case 'inventory_2':
+      return Icons.inventory_2_outlined;
+    case 'shopping_basket':
+      return Icons.shopping_basket_outlined;
+    case 'sell':
+      return Icons.sell_outlined;
+    case 'local_drink':
+      return Icons.local_drink_outlined;
+    case 'fastfood':
+      return Icons.fastfood_outlined;
+    case 'icecream':
+      return Icons.icecream_outlined;
+    case 'kitchen':
+      return Icons.kitchen_outlined;
+    case 'spa':
+      return Icons.spa_outlined;
+    case 'bakery_dining':
+      return Icons.bakery_dining_outlined;
+    case 'lunch_dining':
+      return Icons.lunch_dining_outlined;
+    case 'local_cafe':
+      return Icons.local_cafe_outlined;
+    case 'storefront':
+      return Icons.storefront_outlined;
+    default:
+      final index = _categorySeed(groupId) % _categoryIcons.length;
+      return _categoryIcons[index];
+  }
+}
+
+ProductGroupModel? _productGroupFor(
+  List<ProductGroupModel> groups,
+  String? groupId,
+) {
+  if (groupId == null || groupId.isEmpty) return null;
+  for (final group in groups) {
+    if (group.groupId == groupId) return group;
+  }
+  return null;
+}
+
+Color _categoryColorFor(ProductGroupModel? group, String? groupId) {
+  if (_isDrinkCategory(group, groupId)) return _drinkCategoryColor;
+  if (_isDessertCategory(group, groupId)) return _dessertCategoryColor;
+
+  final configured = _parseCategoryColor(group?.mobileColor);
+  if (configured != Colors.transparent) return configured;
+  final index = _categorySeed(groupId) % _categoryPalette.length;
+  return _categoryPalette[index];
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -115,10 +295,16 @@ class ProductGrid extends ConsumerWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.search_off, size: 80, color: AppTheme.iconSubtleOf(context)),
+            Icon(
+              Icons.search_off,
+              size: 80,
+              color: AppTheme.iconSubtleOf(context),
+            ),
             const SizedBox(height: 16),
-            Text('ไม่พบสินค้า',
-                style: TextStyle(color: AppTheme.subtextColorOf(context))),
+            Text(
+              'ไม่พบสินค้า',
+              style: TextStyle(color: AppTheme.subtextColorOf(context)),
+            ),
           ],
         ),
       );
@@ -127,10 +313,7 @@ class ProductGrid extends ConsumerWidget {
     return Column(
       children: [
         // ── Toolbar: count + toggle ──────────────────────────
-        _ProductToolbar(
-          viewMode: viewMode,
-          productCount: products.length,
-        ),
+        _ProductToolbar(viewMode: viewMode, productCount: products.length),
 
         // ── Content ─────────────────────────────────────────
         Expanded(
@@ -150,10 +333,7 @@ class _ProductToolbar extends ConsumerWidget {
   final ProductViewMode viewMode;
   final int productCount;
 
-  const _ProductToolbar({
-    required this.viewMode,
-    required this.productCount,
-  });
+  const _ProductToolbar({required this.viewMode, required this.productCount});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -165,7 +345,9 @@ class _ProductToolbar extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: AppTheme.cardColor(context),
-        border: Border(bottom: BorderSide(color: AppTheme.borderColorOf(context))),
+        border: Border(
+          bottom: BorderSide(color: AppTheme.borderColorOf(context)),
+        ),
       ),
       child: Row(
         children: [
@@ -190,8 +372,7 @@ class _ProductToolbar extends ConsumerWidget {
           if (hasSpecialPrice) ...[
             const SizedBox(width: 8),
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
                 color: _success.withValues(alpha: 0.12),
                 borderRadius: AppRadius.md,
@@ -200,8 +381,11 @@ class _ProductToolbar extends ConsumerWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.loyalty,
-                      size: 11, color: _success.withValues(alpha: 0.8)),
+                  Icon(
+                    Icons.loyalty,
+                    size: 11,
+                    color: _success.withValues(alpha: 0.8),
+                  ),
                   const SizedBox(width: 4),
                   Text(
                     'ราคา Lv.$priceLevel · ${customerName ?? ''}',
@@ -220,33 +404,33 @@ class _ProductToolbar extends ConsumerWidget {
 
           // View toggle
           Container(
-              decoration: BoxDecoration(
-                color: _surface,
-                borderRadius: AppRadius.sm,
-                border: Border.all(color: _border),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _ToggleBtn(
-                    icon: Icons.grid_view,
-                    active: viewMode == ProductViewMode.grid,
-                    tooltip: 'Grid View',
-                    onTap: () => ref
-                        .read(productViewModeProvider.notifier)
-                        .set(ProductViewMode.grid),
-                  ),
-                  _ToggleBtn(
-                    icon: Icons.view_list,
-                    active: viewMode == ProductViewMode.list,
-                    tooltip: 'List View',
-                    onTap: () => ref
-                        .read(productViewModeProvider.notifier)
-                        .set(ProductViewMode.list),
-                  ),
-                ],
-              ),
+            decoration: BoxDecoration(
+              color: _surface,
+              borderRadius: AppRadius.sm,
+              border: Border.all(color: _border),
             ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _ToggleBtn(
+                  icon: Icons.grid_view,
+                  active: viewMode == ProductViewMode.grid,
+                  tooltip: 'Grid View',
+                  onTap: () => ref
+                      .read(productViewModeProvider.notifier)
+                      .set(ProductViewMode.grid),
+                ),
+                _ToggleBtn(
+                  icon: Icons.view_list,
+                  active: viewMode == ProductViewMode.list,
+                  tooltip: 'List View',
+                  onTap: () => ref
+                      .read(productViewModeProvider.notifier)
+                      .set(ProductViewMode.list),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -275,8 +459,7 @@ class _ToggleBtn extends StatelessWidget {
         borderRadius: AppRadius.sm,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
-          padding:
-              const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
             color: active ? _orange : Colors.transparent,
             borderRadius: AppRadius.sm,
@@ -299,11 +482,15 @@ class _ProductImage extends StatelessWidget {
   final String? imagePath;
   final double size;
   final BorderRadius borderRadius;
+  final Color accentColor;
+  final IconData placeholderIcon;
 
   const _ProductImage({
     required this.imagePath,
     required this.size,
     required this.borderRadius,
+    this.accentColor = _orange,
+    this.placeholderIcon = Icons.inventory_2_outlined,
   });
 
   bool get _isExpand => size <= 0;
@@ -321,7 +508,14 @@ class _ProductImage extends StatelessWidget {
         // ใช้ FittedBox ห่อ ClipRRect เพื่อให้ clip ตรงขอบรูปจริง (ไม่ใช่ขอบ widget)
         content = Container(
           decoration: BoxDecoration(
-            color: _orange.withValues(alpha: 0.06),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                accentColor.withValues(alpha: 0.14),
+                accentColor.withValues(alpha: 0.07),
+              ],
+            ),
             borderRadius: borderRadius,
           ),
           padding: const EdgeInsets.all(5),
@@ -340,7 +534,7 @@ class _ProductImage extends StatelessWidget {
         // List view: thumbnail เล็ก เห็นภาพครบ
         content = Container(
           decoration: BoxDecoration(
-            color: _orange.withValues(alpha: 0.06),
+            color: accentColor.withValues(alpha: 0.08),
             borderRadius: borderRadius,
           ),
           padding: const EdgeInsets.all(2),
@@ -363,14 +557,29 @@ class _ProductImage extends StatelessWidget {
     final iconSize = _isExpand ? 36.0 : (size * 0.38).clamp(14.0, 48.0);
     return Container(
       decoration: BoxDecoration(
-        color: _orange.withValues(alpha: 0.06),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            accentColor.withValues(alpha: 0.34),
+            accentColor.withValues(alpha: 0.14),
+          ],
+        ),
         borderRadius: borderRadius,
       ),
       child: Center(
-        child: Icon(
-          Icons.inventory_2_outlined,
-          size: iconSize,
-          color: _orange.withValues(alpha: 0.45),
+        child: Container(
+          width: iconSize + 18,
+          height: iconSize + 18,
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.72),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            placeholderIcon,
+            size: iconSize,
+            color: accentColor.withValues(alpha: 0.78),
+          ),
         ),
       ),
     );
@@ -432,10 +641,8 @@ class _ListViewContent extends ConsumerWidget {
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       itemCount: products.length,
-      itemBuilder: (_, i) => _ProductListRow(
-        product: products[i],
-        isEven: i.isEven,
-      ),
+      itemBuilder: (_, i) =>
+          _ProductListRow(product: products[i], isEven: i.isEven),
     );
   }
 }
@@ -450,26 +657,34 @@ class _ProductGridCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final priceLevel = ref.watch(cartProvider).customerPriceLevel;
+    final productGroups = ref.watch(productGroupsProvider).value ?? const [];
+    final productGroup = _productGroupFor(productGroups, product.groupId);
+    final categoryColor = _categoryColorFor(productGroup, product.groupId);
+    final categoryIcon = _categoryIconFromKey(
+      productGroup?.mobileIcon,
+      product.groupId,
+      group: productGroup,
+    );
     final lookup = getPriceByLevel(product, priceLevel);
     final unitPrice = lookup.price;
-    final hasDiscount = priceLevel > 1 &&
-        !lookup.isFallback &&
-        unitPrice < product.priceLevel1;
+    final hasDiscount =
+        priceLevel > 1 && !lookup.isFallback && unitPrice < product.priceLevel1;
 
     final nameColor = AppTheme.textColorOf(context);
     final codeColor = AppTheme.subtextColorOf(context);
 
     return Card(
-      elevation: 0,
+      elevation: 1,
+      shadowColor: categoryColor.withValues(alpha: 0.12),
       color: AppTheme.cardColor(context),
       shape: RoundedRectangleBorder(
         borderRadius: AppRadius.md,
-        side: BorderSide(color: AppTheme.borderColorOf(context)),
+        side: BorderSide(color: categoryColor.withValues(alpha: 0.26)),
       ),
       child: InkWell(
         borderRadius: AppRadius.md,
-        hoverColor: _orange.withValues(alpha: 0.06),
-        splashColor: _orange.withValues(alpha: 0.12),
+        hoverColor: categoryColor.withValues(alpha: 0.07),
+        splashColor: categoryColor.withValues(alpha: 0.13),
         onTap: () => _addToCart(context, ref, lookup),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -478,11 +693,52 @@ class _ProductGridCard extends ConsumerWidget {
             Expanded(
               child: Stack(
                 children: [
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            categoryColor.withValues(alpha: 0.28),
+                            categoryColor.withValues(alpha: 0.11),
+                            AppTheme.cardColor(context),
+                          ],
+                        ),
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(10),
+                        ),
+                      ),
+                    ),
+                  ),
                   _ProductImage(
                     imagePath: product.imagePath,
                     size: 0,
                     borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(10)),
+                      top: Radius.circular(10),
+                    ),
+                    accentColor: categoryColor,
+                    placeholderIcon: categoryIcon,
+                  ),
+                  Positioned(
+                    left: 6,
+                    top: 6,
+                    child: Container(
+                      width: 25,
+                      height: 25,
+                      decoration: BoxDecoration(
+                        color: categoryColor.withValues(alpha: 0.92),
+                        borderRadius: AppRadius.sm,
+                        boxShadow: [
+                          BoxShadow(
+                            color: categoryColor.withValues(alpha: 0.24),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Icon(categoryIcon, size: 15, color: Colors.white),
+                    ),
                   ),
                   // ✅ Warning badge: ราคา Lv.X ยังไม่ได้ตั้งค่า
                   if (lookup.isFallback)
@@ -494,7 +750,9 @@ class _ProductGridCard extends ConsumerWidget {
                             'ราคา Lv.${lookup.requestedLevel} ยังไม่ได้ตั้งค่า\nใช้ราคาปกติ (Lv.1) แทน',
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 5, vertical: 2),
+                            horizontal: 5,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.orange.shade700,
                             borderRadius: AppRadius.xs,
@@ -502,9 +760,10 @@ class _ProductGridCard extends ConsumerWidget {
                           child: const Text(
                             'ราคาปกติ',
                             style: TextStyle(
-                                fontSize: 8,
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold),
+                              fontSize: 8,
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ),
@@ -514,14 +773,16 @@ class _ProductGridCard extends ConsumerWidget {
             ),
 
             // ข้อมูลสินค้า
+            Container(height: 3, color: categoryColor.withValues(alpha: 0.75)),
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(product.productCode,
-                      style:
-                          TextStyle(fontSize: 10, color: codeColor)),
+                  Text(
+                    product.productCode,
+                    style: TextStyle(fontSize: 10, color: codeColor),
+                  ),
                   const SizedBox(height: 2),
                   Text(
                     product.productName,
@@ -557,8 +818,8 @@ class _ProductGridCard extends ConsumerWidget {
                               color: lookup.isFallback
                                   ? Colors.orange.shade700
                                   : hasDiscount
-                                      ? _success
-                                      : _info,
+                                  ? _success
+                                  : _info,
                             ),
                           ),
                         ],
@@ -566,11 +827,14 @@ class _ProductGridCard extends ConsumerWidget {
                       Container(
                         padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
-                          color: _orange,
+                          color: categoryColor,
                           borderRadius: AppRadius.sm,
                         ),
-                        child: const Icon(Icons.add,
-                            size: 14, color: Colors.white),
+                        child: const Icon(
+                          Icons.add,
+                          size: 14,
+                          color: Colors.white,
+                        ),
                       ),
                     ],
                   ),
@@ -584,9 +848,13 @@ class _ProductGridCard extends ConsumerWidget {
   }
 
   Future<void> _addToCart(
-      BuildContext context, WidgetRef ref, PriceLookupResult lookup) async {
-    final groups = await ref
-        .read(productModifierGroupsProvider(product.productId).future);
+    BuildContext context,
+    WidgetRef ref,
+    PriceLookupResult lookup,
+  ) async {
+    final groups = await ref.read(
+      productModifierGroupsProvider(product.productId).future,
+    );
 
     List<CartItemModifier> modifiers = const [];
     if (groups.isNotEmpty && context.mounted) {
@@ -604,7 +872,9 @@ class _ProductGridCard extends ConsumerWidget {
       modifiers = picked;
     }
 
-    ref.read(cartProvider.notifier).addItem(
+    ref
+        .read(cartProvider.notifier)
+        .addItem(
           productId: product.productId,
           productCode: product.productCode,
           productName: product.productName,
@@ -621,18 +891,22 @@ class _ProductGridCard extends ConsumerWidget {
 
     if (!context.mounted) return;
     if (lookup.isFallback) {
-      ref.read(cartToastProvider.notifier).show(
-        '⚠ ราคา Lv.${lookup.requestedLevel} ยังไม่ได้ตั้งค่า '
-        '— ใช้ราคาปกติ ฿${lookup.price.toStringAsFixed(2)}',
-        backgroundColor: Colors.orange.shade700,
-        icon: Icons.warning_amber_rounded,
-        duration: const Duration(seconds: 3),
-      );
+      ref
+          .read(cartToastProvider.notifier)
+          .show(
+            '⚠ ราคา Lv.${lookup.requestedLevel} ยังไม่ได้ตั้งค่า '
+            '— ใช้ราคาปกติ ฿${lookup.price.toStringAsFixed(2)}',
+            backgroundColor: Colors.orange.shade700,
+            icon: Icons.warning_amber_rounded,
+            duration: const Duration(seconds: 3),
+          );
     } else {
-      ref.read(cartToastProvider.notifier).show(
-        'เพิ่ม ${product.productName} แล้ว',
-        duration: const Duration(milliseconds: 1500),
-      );
+      ref
+          .read(cartToastProvider.notifier)
+          .show(
+            'เพิ่ม ${product.productName} แล้ว',
+            duration: const Duration(milliseconds: 1500),
+          );
     }
   }
 }
@@ -644,42 +918,37 @@ class _ProductListRow extends ConsumerWidget {
   final ProductModel product;
   final bool isEven;
 
-  const _ProductListRow({
-    required this.product,
-    required this.isEven,
-  });
+  const _ProductListRow({required this.product, required this.isEven});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final priceLevel = ref.watch(cartProvider).customerPriceLevel;
     final lookup = getPriceByLevel(product, priceLevel);
     final unitPrice = lookup.price;
-    final hasDiscount = priceLevel > 1 &&
-        !lookup.isFallback &&
-        unitPrice < product.priceLevel1;
+    final hasDiscount =
+        priceLevel > 1 && !lookup.isFallback && unitPrice < product.priceLevel1;
 
     return InkWell(
       onTap: () => _addToCart(context, ref, lookup),
       hoverColor: _orange.withValues(alpha: 0.05),
       child: Container(
         margin: const EdgeInsets.only(bottom: 2),
-        padding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
         decoration: BoxDecoration(
           // fallback = orange tint; otherwise alternating row stripe
           color: lookup.isFallback
               ? (AppTheme.isDark(context)
-                  ? const Color(0xFF3A2800)
-                  : Colors.orange.shade50)
+                    ? const Color(0xFF3A2800)
+                    : Colors.orange.shade50)
               : (isEven
-                  ? AppTheme.rowEvenOf(context)
-                  : AppTheme.rowOddOf(context)),
+                    ? AppTheme.rowEvenOf(context)
+                    : AppTheme.rowOddOf(context)),
           borderRadius: AppRadius.sm,
           border: Border.all(
             color: lookup.isFallback
                 ? (AppTheme.isDark(context)
-                    ? Colors.orange.shade800
-                    : Colors.orange.shade200)
+                      ? Colors.orange.shade800
+                      : Colors.orange.shade200)
                 : AppTheme.borderColorOf(context).withValues(alpha: 0.6),
           ),
         ),
@@ -710,15 +979,18 @@ class _ProductListRow extends ConsumerWidget {
                       Text(
                         product.productCode,
                         style: TextStyle(
-                            fontSize: 11,
-                            color: AppTheme.subtextColorOf(context)),
+                          fontSize: 11,
+                          color: AppTheme.subtextColorOf(context),
+                        ),
                       ),
                       // ✅ Warning label ในแถว
                       if (lookup.isFallback) ...[
                         const SizedBox(width: 6),
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 4, vertical: 1),
+                            horizontal: 4,
+                            vertical: 1,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.orange.shade700,
                             borderRadius: BorderRadius.circular(3),
@@ -726,9 +998,10 @@ class _ProductListRow extends ConsumerWidget {
                           child: Text(
                             'Lv.${lookup.requestedLevel} ไม่มีราคา',
                             style: const TextStyle(
-                                fontSize: 8,
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold),
+                              fontSize: 8,
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ],
@@ -759,8 +1032,8 @@ class _ProductListRow extends ConsumerWidget {
                     color: lookup.isFallback
                         ? Colors.orange.shade700
                         : hasDiscount
-                            ? _success
-                            : _info,
+                        ? _success
+                        : _info,
                   ),
                 ),
               ],
@@ -787,9 +1060,13 @@ class _ProductListRow extends ConsumerWidget {
   }
 
   Future<void> _addToCart(
-      BuildContext context, WidgetRef ref, PriceLookupResult lookup) async {
-    final groups = await ref
-        .read(productModifierGroupsProvider(product.productId).future);
+    BuildContext context,
+    WidgetRef ref,
+    PriceLookupResult lookup,
+  ) async {
+    final groups = await ref.read(
+      productModifierGroupsProvider(product.productId).future,
+    );
 
     List<CartItemModifier> modifiers = const [];
     if (groups.isNotEmpty && context.mounted) {
@@ -807,7 +1084,9 @@ class _ProductListRow extends ConsumerWidget {
       modifiers = picked;
     }
 
-    ref.read(cartProvider.notifier).addItem(
+    ref
+        .read(cartProvider.notifier)
+        .addItem(
           productId: product.productId,
           productCode: product.productCode,
           productName: product.productName,
@@ -824,22 +1103,28 @@ class _ProductListRow extends ConsumerWidget {
 
     if (!context.mounted) return;
     if (lookup.isFallback) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('⚠ ราคา Lv.${lookup.requestedLevel} ยังไม่ได้ตั้งค่า '
-            '— ใช้ราคาปกติ ฿${lookup.price.toStringAsFixed(2)}'),
-        backgroundColor: Colors.orange.shade700,
-        duration: const Duration(seconds: 3),
-        behavior: SnackBarBehavior.floating,
-        width: 380,
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '⚠ ราคา Lv.${lookup.requestedLevel} ยังไม่ได้ตั้งค่า '
+            '— ใช้ราคาปกติ ฿${lookup.price.toStringAsFixed(2)}',
+          ),
+          backgroundColor: Colors.orange.shade700,
+          duration: const Duration(seconds: 3),
+          behavior: SnackBarBehavior.floating,
+          width: 380,
+        ),
+      );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('เพิ่ม ${product.productName} แล้ว'),
-        duration: const Duration(milliseconds: 500),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: _success,
-        width: 300,
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('เพิ่ม ${product.productName} แล้ว'),
+          duration: const Duration(milliseconds: 500),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: _success,
+          width: 300,
+        ),
+      );
     }
   }
 }
@@ -859,8 +1144,7 @@ class _ModifierPickerSheet extends StatefulWidget {
   });
 
   @override
-  State<_ModifierPickerSheet> createState() =>
-      _ModifierPickerSheetState();
+  State<_ModifierPickerSheet> createState() => _ModifierPickerSheetState();
 }
 
 class _ModifierPickerSheetState extends State<_ModifierPickerSheet> {
@@ -876,8 +1160,7 @@ class _ModifierPickerSheetState extends State<_ModifierPickerSheet> {
           .where((o) => o.isDefault)
           .map((o) => o.modifierId)
           .toSet();
-      _selections[g.modifierGroupId] =
-          defaults.isNotEmpty ? defaults : {};
+      _selections[g.modifierGroupId] = defaults.isNotEmpty ? defaults : {};
     }
   }
 
@@ -907,11 +1190,13 @@ class _ModifierPickerSheetState extends State<_ModifierPickerSheet> {
       final sel = _selections[g.modifierGroupId] ?? {};
       for (final opt in g.options) {
         if (sel.contains(opt.modifierId)) {
-          result.add(CartItemModifier(
-            modifierId: opt.modifierId,
-            modifierName: opt.modifierName,
-            priceAdjustment: opt.priceAdjustment,
-          ));
+          result.add(
+            CartItemModifier(
+              modifierId: opt.modifierId,
+              modifierName: opt.modifierName,
+              priceAdjustment: opt.priceAdjustment,
+            ),
+          );
         }
       }
     }
@@ -930,8 +1215,7 @@ class _ModifierPickerSheetState extends State<_ModifierPickerSheet> {
       builder: (_, scrollCtrl) => Container(
         decoration: BoxDecoration(
           color: AppTheme.cardColor(context),
-          borderRadius:
-              const BorderRadius.vertical(top: Radius.circular(20)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         child: Column(
           children: [
@@ -1004,22 +1288,20 @@ class _ModifierPickerSheetState extends State<_ModifierPickerSheet> {
                   width: double.infinity,
                   child: FilledButton(
                     onPressed: _canConfirm
-                        ? () => Navigator.pop(
-                            context, _buildModifiers())
+                        ? () => Navigator.pop(context, _buildModifiers())
                         : null,
                     style: FilledButton.styleFrom(
                       backgroundColor: _orange,
-                      disabledBackgroundColor:
-                          _orange.withValues(alpha: 0.3),
-                      padding:
-                          const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: AppRadius.md),
+                      disabledBackgroundColor: _orange.withValues(alpha: 0.3),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: AppRadius.md),
                     ),
                     child: Text(
                       'เพิ่มลงตะกร้า · ฿${totalPrice.toStringAsFixed(2)}',
                       style: const TextStyle(
-                          fontSize: 15, fontWeight: FontWeight.w600),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ),
@@ -1050,8 +1332,7 @@ class _ModifierPickerSheetState extends State<_ModifierPickerSheet> {
             const SizedBox(width: 6),
             if (group.isRequired)
               Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 6, vertical: 1),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                 decoration: BoxDecoration(
                   color: AppTheme.errorColor.withValues(alpha: 0.1),
                   borderRadius: AppRadius.xs,
@@ -1059,25 +1340,27 @@ class _ModifierPickerSheetState extends State<_ModifierPickerSheet> {
                 child: Text(
                   'บังคับเลือก',
                   style: TextStyle(
-                      fontSize: 10,
-                      color: AppTheme.errorColor,
-                      fontWeight: FontWeight.w500),
+                    fontSize: 10,
+                    color: AppTheme.errorColor,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               )
             else
               Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 6, vertical: 1),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                 decoration: BoxDecoration(
-                  color: AppTheme.subtextColorOf(context)
-                      .withValues(alpha: 0.1),
+                  color: AppTheme.subtextColorOf(
+                    context,
+                  ).withValues(alpha: 0.1),
                   borderRadius: AppRadius.xs,
                 ),
                 child: Text(
                   'ไม่บังคับ',
                   style: TextStyle(
-                      fontSize: 10,
-                      color: AppTheme.subtextColorOf(context)),
+                    fontSize: 10,
+                    color: AppTheme.subtextColorOf(context),
+                  ),
                 ),
               ),
           ],
@@ -1091,8 +1374,9 @@ class _ModifierPickerSheetState extends State<_ModifierPickerSheet> {
             isSingle: group.isSingle,
             onTap: () => setState(() {
               if (group.isSingle) {
-                _selections[group.modifierGroupId] =
-                    isSelected ? {} : {opt.modifierId};
+                _selections[group.modifierGroupId] = isSelected
+                    ? {}
+                    : {opt.modifierId};
               } else {
                 final updated = Set<String>.from(sel);
                 isSelected
@@ -1128,27 +1412,25 @@ class _OptionTile extends StatelessWidget {
     final adjText = adj == 0
         ? ''
         : adj > 0
-            ? '+฿${adj.toStringAsFixed(2)}'
-            : '-฿${adj.abs().toStringAsFixed(2)}';
-    final adjColor =
-        adj > 0 ? _success : (adj < 0 ? AppTheme.errorColor : null);
+        ? '+฿${adj.toStringAsFixed(2)}'
+        : '-฿${adj.abs().toStringAsFixed(2)}';
+    final adjColor = adj > 0
+        ? _success
+        : (adj < 0 ? AppTheme.errorColor : null);
 
     return InkWell(
       onTap: onTap,
       borderRadius: AppRadius.sm,
       child: Container(
         margin: const EdgeInsets.only(bottom: 6),
-        padding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
         decoration: BoxDecoration(
           color: isSelected
               ? _orange.withValues(alpha: 0.08)
               : AppTheme.surfaceColorOf(context),
           borderRadius: AppRadius.sm,
           border: Border.all(
-            color: isSelected
-                ? _orange
-                : AppTheme.borderColorOf(context),
+            color: isSelected ? _orange : AppTheme.borderColorOf(context),
             width: isSelected ? 1.5 : 1,
           ),
         ),
@@ -1157,15 +1439,13 @@ class _OptionTile extends StatelessWidget {
             Icon(
               isSingle
                   ? (isSelected
-                      ? Icons.radio_button_checked
-                      : Icons.radio_button_unchecked)
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_unchecked)
                   : (isSelected
-                      ? Icons.check_box
-                      : Icons.check_box_outline_blank),
+                        ? Icons.check_box
+                        : Icons.check_box_outline_blank),
               size: 18,
-              color: isSelected
-                  ? _orange
-                  : AppTheme.subtextColorOf(context),
+              color: isSelected ? _orange : AppTheme.subtextColorOf(context),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -1173,9 +1453,7 @@ class _OptionTile extends StatelessWidget {
                 option.modifierName,
                 style: TextStyle(
                   fontSize: 14,
-                  fontWeight: isSelected
-                      ? FontWeight.w600
-                      : FontWeight.normal,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                   color: AppTheme.textColorOf(context),
                 ),
               ),
@@ -1186,8 +1464,7 @@ class _OptionTile extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: adjColor ??
-                      AppTheme.subtextColorOf(context),
+                  color: adjColor ?? AppTheme.subtextColorOf(context),
                 ),
               ),
           ],

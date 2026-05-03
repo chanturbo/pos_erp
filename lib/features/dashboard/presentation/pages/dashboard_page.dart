@@ -5,6 +5,8 @@ import '../providers/dashboard_provider.dart';
 import '../../../sales/presentation/pages/sales_history_page.dart';
 import '../../../products/presentation/pages/product_list_page.dart';
 import '../../../customers/presentation/pages/customer_list_page.dart';
+import '../../../inventory/presentation/pages/stock_balance_page.dart';
+import '../../../settings/presentation/pages/settings_page.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/responsive_utils.dart';
 import '../../../../shared/widgets/escape_pop_scope.dart';
@@ -14,11 +16,14 @@ class DashboardPage extends ConsumerWidget {
   final VoidCallback? onGoToProducts;
   final VoidCallback? onGoToCustomers;
   final VoidCallback? onGoToSalesHistory;
+  final VoidCallback? onGoToStock;
+  final VoidCallback? onGoToSettings;
   final bool showBackButton;
   final bool isRestaurantMode;
   final VoidCallback? onGoToTakeaway;
   final VoidCallback? onGoToTakeawayKitchen;
   final VoidCallback? onGoToTableOverview;
+  final bool showAppBar;
 
   /// เปิดหน้ารายการขาย กรองเฉพาะวันนี้ (ใช้ตอนกด card ยอดขายวันนี้/ออเดอร์วันนี้)
   final VoidCallback? onGoToTodaySales;
@@ -32,6 +37,8 @@ class DashboardPage extends ConsumerWidget {
     this.onGoToProducts,
     this.onGoToCustomers,
     this.onGoToSalesHistory,
+    this.onGoToStock,
+    this.onGoToSettings,
     this.onGoToTodaySales,
     this.onGoToMonthSales,
     this.showBackButton = true,
@@ -39,6 +46,7 @@ class DashboardPage extends ConsumerWidget {
     this.onGoToTakeaway,
     this.onGoToTakeawayKitchen,
     this.onGoToTableOverview,
+    this.showAppBar = true,
   });
 
   @override
@@ -48,30 +56,33 @@ class DashboardPage extends ConsumerWidget {
     return EscapePopScope(
       child: Scaffold(
         backgroundColor: AppTheme.surfaceColor,
-        appBar: AppBar(
-          automaticallyImplyLeading: showBackButton,
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('แดชบอร์ด'),
-              Text(
-                'ภาพรวมระบบ',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.white.withValues(alpha: 0.65),
-                  fontWeight: FontWeight.normal,
+        appBar: showAppBar
+            ? AppBar(
+                automaticallyImplyLeading: showBackButton,
+                title: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('แดชบอร์ด'),
+                    Text(
+                      'ภาพรวมระบบ',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.white.withValues(alpha: 0.65),
+                        fontWeight: FontWeight.normal,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              tooltip: 'รีเฟรช',
-              onPressed: () => ref.read(dashboardProvider.notifier).refresh(),
-            ),
-          ],
-        ),
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.refresh),
+                    tooltip: 'รีเฟรช',
+                    onPressed: () =>
+                        ref.read(dashboardProvider.notifier).refresh(),
+                  ),
+                ],
+              )
+            : null,
 
         body: dashboardAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
@@ -101,6 +112,8 @@ class DashboardPage extends ConsumerWidget {
             onGoToProducts: onGoToProducts,
             onGoToCustomers: onGoToCustomers,
             onGoToSalesHistory: onGoToSalesHistory,
+            onGoToStock: onGoToStock,
+            onGoToSettings: onGoToSettings,
             onGoToTodaySales: onGoToTodaySales,
             onGoToMonthSales: onGoToMonthSales,
             isRestaurantMode: isRestaurantMode,
@@ -123,6 +136,8 @@ class _DashboardBody extends StatelessWidget {
   final VoidCallback? onGoToProducts;
   final VoidCallback? onGoToCustomers;
   final VoidCallback? onGoToSalesHistory;
+  final VoidCallback? onGoToStock;
+  final VoidCallback? onGoToSettings;
   final VoidCallback? onGoToTodaySales;
   final VoidCallback? onGoToMonthSales;
   final bool isRestaurantMode;
@@ -136,6 +151,8 @@ class _DashboardBody extends StatelessWidget {
     this.onGoToProducts,
     this.onGoToCustomers,
     this.onGoToSalesHistory,
+    this.onGoToStock,
+    this.onGoToSettings,
     this.onGoToTodaySales,
     this.onGoToMonthSales,
     this.isRestaurantMode = false,
@@ -169,6 +186,9 @@ class _DashboardBody extends StatelessWidget {
                         onGoToProducts: onGoToProducts,
                         onGoToCustomers: onGoToCustomers,
                         onGoToSalesHistory: onGoToSalesHistory,
+                        onGoToStock: onGoToStock,
+                        onGoToSettings: onGoToSettings,
+                        onGoToTodaySales: onGoToTodaySales,
                         isRestaurantMode: isRestaurantMode,
                         onGoToTakeaway: onGoToTakeaway,
                         onGoToTakeawayKitchen: onGoToTakeawayKitchen,
@@ -192,6 +212,9 @@ class _DashboardBody extends StatelessWidget {
                   onGoToProducts: onGoToProducts,
                   onGoToCustomers: onGoToCustomers,
                   onGoToSalesHistory: onGoToSalesHistory,
+                  onGoToStock: onGoToStock,
+                  onGoToSettings: onGoToSettings,
+                  onGoToTodaySales: onGoToTodaySales,
                   isRestaurantMode: isRestaurantMode,
                   onGoToTakeaway: onGoToTakeaway,
                   onGoToTakeawayKitchen: onGoToTakeawayKitchen,
@@ -470,32 +493,38 @@ class _TodayCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _CardHeader(title: 'ภาพรวมทั้งหมด'),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             _OverviewRow(
               label: 'ยอดขายทั้งหมด',
               value: '฿${NumberFormat('#,##0.00').format(stats.totalSales)}',
               color: AppTheme.successColor,
+              icon: Icons.monetization_on_outlined,
               onTap: onOpenAllSales,
             ),
-            const Divider(height: 18, color: AppTheme.borderColor),
+            const SizedBox(height: 8),
             _OverviewRow(
               label: 'ออเดอร์ทั้งหมด',
-              value: '${NumberFormat('#,##0').format(stats.totalOrders)} ออเดอร์',
+              value:
+                  '${NumberFormat('#,##0').format(stats.totalOrders)} ออเดอร์',
               color: AppTheme.infoColor,
+              icon: Icons.receipt_long_outlined,
               onTap: onOpenAllSales,
             ),
-            const Divider(height: 18, color: AppTheme.borderColor),
+            const SizedBox(height: 8),
             _OverviewRow(
               label: 'ยอดขายเดือนนี้',
               value: '฿${NumberFormat('#,##0.00').format(stats.monthSales)}',
               color: AppTheme.primaryColor,
+              icon: Icons.calendar_month_outlined,
               onTap: onOpenMonthSales,
             ),
-            const Divider(height: 18, color: AppTheme.borderColor),
+            const SizedBox(height: 8),
             _OverviewRow(
               label: 'ออเดอร์เดือนนี้',
-              value: '${NumberFormat('#,##0').format(stats.monthOrders)} ออเดอร์',
+              value:
+                  '${NumberFormat('#,##0').format(stats.monthOrders)} ออเดอร์',
               color: AppTheme.warningColor,
+              icon: Icons.shopping_bag_outlined,
               onTap: onOpenMonthSales,
             ),
           ],
@@ -513,6 +542,9 @@ class _QuickActionsCard extends StatelessWidget {
   final VoidCallback? onGoToProducts;
   final VoidCallback? onGoToCustomers;
   final VoidCallback? onGoToSalesHistory;
+  final VoidCallback? onGoToStock;
+  final VoidCallback? onGoToSettings;
+  final VoidCallback? onGoToTodaySales;
   final bool isRestaurantMode;
   final VoidCallback? onGoToTakeaway;
   final VoidCallback? onGoToTakeawayKitchen;
@@ -523,6 +555,9 @@ class _QuickActionsCard extends StatelessWidget {
     this.onGoToProducts,
     this.onGoToCustomers,
     this.onGoToSalesHistory,
+    this.onGoToStock,
+    this.onGoToSettings,
+    this.onGoToTodaySales,
     this.isRestaurantMode = false,
     this.onGoToTakeaway,
     this.onGoToTakeawayKitchen,
@@ -532,33 +567,36 @@ class _QuickActionsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final posAction = _QuickAction(
-      icon: Icons.add_shopping_cart,
+      icon: Icons.qr_code_scanner_rounded,
       label: 'เปิดจุดขาย',
-      color: AppTheme.primaryColor,
+      color: const Color(0xFF35A8E0),
       onTap: onGoToPos ?? () => Navigator.pushNamed(context, '/pos'),
     );
     final tableAction = _QuickAction(
       icon: Icons.table_restaurant,
       label: 'เปิดโต๊ะอาหาร',
-      color: AppTheme.primaryColor,
-      onTap: onGoToTableOverview ?? onGoToPos ?? () => Navigator.pushNamed(context, '/pos'),
+      color: const Color(0xFF63B946),
+      onTap:
+          onGoToTableOverview ??
+          onGoToPos ??
+          () => Navigator.pushNamed(context, '/pos'),
     );
     final takeawayAction = _QuickAction(
-      icon: Icons.takeout_dining,
+      icon: Icons.qr_code_scanner_rounded,
       label: 'ขายหน้าร้าน',
-      color: const Color(0xFF6D4C41),
+      color: const Color(0xFF39A9E8),
       onTap: onGoToTakeaway ?? () {},
     );
     final kitchenTakeawayAction = _QuickAction(
       icon: Icons.kitchen_outlined,
       label: 'ขายหน้าร้าน (ส่งเข้าครัว)',
-      color: AppTheme.infoColor,
+      color: const Color(0xFF6B4122),
       onTap: onGoToTakeawayKitchen ?? onGoToTakeaway ?? () {},
     );
     final productsAction = _QuickAction(
       icon: Icons.add_box_outlined,
       label: 'เพิ่มสินค้า',
-      color: AppTheme.infoColor,
+      color: const Color(0xFFFF9224),
       onTap:
           onGoToProducts ??
           () => Navigator.push(
@@ -569,7 +607,7 @@ class _QuickActionsCard extends StatelessWidget {
     final customersAction = _QuickAction(
       icon: Icons.person_add_outlined,
       label: 'เพิ่มลูกค้า',
-      color: AppTheme.successColor,
+      color: const Color(0xFF159AA4),
       onTap:
           onGoToCustomers ??
           () => Navigator.push(
@@ -580,7 +618,7 @@ class _QuickActionsCard extends StatelessWidget {
     final salesAction = _QuickAction(
       icon: Icons.receipt_long_outlined,
       label: 'รายการขาย',
-      color: const Color(0xFFAD1457),
+      color: const Color(0xFF2C82C9),
       onTap:
           onGoToSalesHistory ??
           () => Navigator.push(
@@ -589,75 +627,93 @@ class _QuickActionsCard extends StatelessWidget {
           ),
     );
 
-    final Widget grid;
-    if (isRestaurantMode) {
-      grid = Column(
-        children: [
-          Row(
-            children: [
-              Expanded(child: _QuickItemCard(action: takeawayAction)),
-              const SizedBox(width: 10),
-              Expanded(child: _QuickItemCard(action: kitchenTakeawayAction)),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(child: _QuickItemCard(action: tableAction)),
-              const SizedBox(width: 10),
-              Expanded(child: _QuickItemCard(action: productsAction)),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(child: _QuickItemCard(action: customersAction)),
-              const SizedBox(width: 10),
-              Expanded(child: _QuickItemCard(action: salesAction)),
-            ],
-          ),
-        ],
-      );
-    } else {
-      grid = Column(
-        children: [
-          Row(
-            children: [
-              Expanded(child: _QuickItemCard(action: posAction)),
-              const SizedBox(width: 10),
-              Expanded(child: _QuickItemCard(action: productsAction)),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(child: _QuickItemCard(action: customersAction)),
-              const SizedBox(width: 10),
-              Expanded(child: _QuickItemCard(action: salesAction)),
-            ],
-          ),
-        ],
-      );
-    }
+    final quickActions = isRestaurantMode
+        ? [
+            takeawayAction,
+            kitchenTakeawayAction,
+            tableAction,
+            productsAction,
+            customersAction,
+            salesAction,
+          ]
+        : [
+            posAction,
+            productsAction,
+            customersAction,
+            salesAction,
+            _QuickAction(
+              icon: Icons.inventory_2_rounded,
+              label: 'จัดการสต็อก',
+              color: const Color(0xFFE48928),
+              onTap:
+                  onGoToStock ??
+                  () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const StockBalancePage()),
+                  ),
+            ),
+            _QuickAction(
+              icon: Icons.settings_rounded,
+              label: 'ตั้งค่า',
+              color: const Color(0xFF6F7B86),
+              onTap:
+                  onGoToSettings ??
+                  () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SettingsPage()),
+                  ),
+            ),
+          ];
 
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: AppTheme.borderColor),
+    final mainActions = [
+      _MainFunctionAction(
+        icon: Icons.assessment_rounded,
+        label: 'รายงานวันนี้',
+        color: const Color(0xFF2C82C9),
+        onTap: onGoToTodaySales ?? salesAction.onTap,
       ),
-      color: Colors.white,
-      child: Padding(
-        padding: context.cardPadding,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _CardHeader(title: 'เมนูด่วน'),
-            const SizedBox(height: 14),
-            grid,
-          ],
+      _MainFunctionAction(
+        icon: Icons.description_rounded,
+        label: 'ประวัติขาย',
+        color: const Color(0xFF30A15B),
+        onTap: salesAction.onTap,
+      ),
+      _MainFunctionAction(
+        icon: Icons.inventory_2_rounded,
+        label: 'จัดการสต็อก',
+        color: const Color(0xFFE48928),
+        onTap:
+            onGoToStock ??
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const StockBalancePage()),
+            ),
+      ),
+      _MainFunctionAction(
+        icon: Icons.settings_rounded,
+        label: 'ตั้งค่า',
+        color: const Color(0xFF6F7B86),
+        onTap:
+            onGoToSettings ??
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SettingsPage()),
+            ),
+      ),
+    ];
+
+    return Column(
+      children: [
+        _DashboardPanel(
+          title: 'เมนูด่วน',
+          child: _QuickMenuGrid(actions: quickActions),
         ),
-      ),
+        const SizedBox(height: 8),
+        _DashboardPanel(
+          title: 'ฟังก์ชันหลัก',
+          child: _MainFunctionGrid(actions: mainActions),
+        ),
+      ],
     );
   }
 }
@@ -699,91 +755,100 @@ class _OverviewRow extends StatelessWidget {
   final String label;
   final String value;
   final Color color;
+  final IconData icon;
   final VoidCallback onTap;
 
   const _OverviewRow({
     required this.label,
     required this.value,
     required this.color,
+    required this.icon,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final stacked = constraints.maxWidth < 340;
+    final iconBoxSize = context.isMobile ? 38.0 : 42.0;
+    final iconSize = context.isMobile ? 19.0 : 21.0;
+    final valueFontSize = context.isMobile ? 15.0 : 17.0;
+    final labelFontSize = context.isMobile ? 11.0 : 12.0;
 
-        return InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(10),
+    final darkTop = Color.lerp(color, Colors.black, 0.15)!;
+    final lightBottom = Color.lerp(color, Colors.white, 0.1)!;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.07),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: color.withValues(alpha: 0.18)),
+          ),
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-            child: stacked
-                ? Column(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+            child: Row(
+              children: [
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [lightBottom, darkTop],
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: color.withValues(alpha: 0.25),
+                        blurRadius: 5,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: SizedBox(
+                    width: iconBoxSize,
+                    height: iconBoxSize,
+                    child: Icon(icon, color: Colors.white, size: iconSize),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
                         label,
                         style: TextStyle(
-                          fontSize: context.isMobile ? 12 : 13,
+                          fontSize: labelFontSize,
                           color: AppTheme.subtextColor,
                         ),
                       ),
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              value,
-                              style: TextStyle(
-                                fontSize: context.isMobile ? 12 : 14,
-                                fontWeight: FontWeight.w600,
-                                color: color,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Icon(
-                            Icons.open_in_new_rounded,
-                            size: context.isMobile ? 14 : 15,
-                            color: AppTheme.subtextColor,
-                          ),
-                        ],
-                      ),
-                    ],
-                  )
-                : Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          label,
-                          style: TextStyle(
-                            fontSize: context.isMobile ? 12 : 13,
-                            color: AppTheme.subtextColor,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
+                      const SizedBox(height: 2),
                       Text(
                         value,
                         style: TextStyle(
-                          fontSize: context.isMobile ? 12 : 14,
-                          fontWeight: FontWeight.w600,
+                          fontSize: valueFontSize,
+                          fontWeight: FontWeight.w700,
                           color: color,
+                          height: 1.1,
                         ),
-                      ),
-                      const SizedBox(width: 6),
-                      Icon(
-                        Icons.open_in_new_rounded,
-                        size: context.isMobile ? 14 : 15,
-                        color: AppTheme.subtextColor,
                       ),
                     ],
                   ),
+                ),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  size: context.isMobile ? 18 : 20,
+                  color: color.withValues(alpha: 0.55),
+                ),
+              ],
+            ),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }
@@ -801,58 +866,242 @@ class _QuickAction {
   });
 }
 
+class _DashboardPanel extends StatelessWidget {
+  final String title;
+  final Widget child;
+  const _DashboardPanel({required this.title, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 2,
+      shadowColor: Colors.black.withValues(alpha: 0.10),
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: const BorderSide(color: Color(0xFFD8DEE6)),
+      ),
+      color: Colors.white,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 8, 8, 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: context.isMobile ? 16 : 17,
+                fontWeight: FontWeight.w800,
+                color: const Color(0xFF151515),
+                height: 1.1,
+              ),
+            ),
+            const SizedBox(height: 7),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _QuickMenuGrid extends StatelessWidget {
+  final List<_QuickAction> actions;
+  const _QuickMenuGrid({required this.actions});
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final spacing = constraints.maxWidth < 360 ? 6.0 : 8.0;
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: actions.length,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            mainAxisSpacing: spacing,
+            crossAxisSpacing: spacing,
+            childAspectRatio: 1.34,
+          ),
+          itemBuilder: (context, index) =>
+              _QuickItemCard(action: actions[index]),
+        );
+      },
+    );
+  }
+}
+
 class _QuickItemCard extends StatelessWidget {
   final _QuickAction action;
   const _QuickItemCard({required this.action});
 
   @override
   Widget build(BuildContext context) {
+    final darkTop = Color.lerp(action.color, Colors.black, 0.12)!;
+    final lightBottom = Color.lerp(action.color, Colors.white, 0.08)!;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(6),
+        boxShadow: [
+          BoxShadow(
+            color: action.color.withValues(alpha: 0.22),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: Ink(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [lightBottom, darkTop],
+            ),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: InkWell(
+            onTap: action.onTap,
+            borderRadius: BorderRadius.circular(6),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 7),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    action.icon,
+                    color: Colors.white,
+                    size: context.isMobile ? 29 : 34,
+                    shadows: const [
+                      Shadow(
+                        color: Color(0x66000000),
+                        blurRadius: 3,
+                        offset: Offset(0, 1),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Flexible(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        action.label,
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        style: TextStyle(
+                          fontSize: context.isMobile ? 14 : 15,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                          height: 1.05,
+                          shadows: const [
+                            Shadow(
+                              color: Color(0x66000000),
+                              blurRadius: 2,
+                              offset: Offset(0, 1),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MainFunctionAction {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+  const _MainFunctionAction({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+}
+
+class _MainFunctionGrid extends StatelessWidget {
+  final List<_MainFunctionAction> actions;
+  const _MainFunctionGrid({required this.actions});
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final spacing = constraints.maxWidth < 360 ? 6.0 : 8.0;
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: actions.length,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 4,
+            mainAxisSpacing: spacing,
+            crossAxisSpacing: spacing,
+            childAspectRatio: 0.96,
+          ),
+          itemBuilder: (context, index) =>
+              _MainFunctionButton(action: actions[index]),
+        );
+      },
+    );
+  }
+}
+
+class _MainFunctionButton extends StatelessWidget {
+  final _MainFunctionAction action;
+  const _MainFunctionButton({required this.action});
+
+  @override
+  Widget build(BuildContext context) {
     return Material(
-      color: Colors.transparent,
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(6),
       child: InkWell(
         onTap: action.onTap,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(6),
         child: Container(
-          padding: EdgeInsets.symmetric(
-            horizontal: context.isMobile ? 12 : 14,
-            vertical: context.isMobile ? 10 : 12,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 7),
           decoration: BoxDecoration(
-            color: action.color.withValues(alpha: 0.07),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: action.color.withValues(alpha: 0.2)),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: const Color(0xFFD5DAE1)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 3,
+                offset: const Offset(0, 1),
+              ),
+            ],
           ),
-          child: Row(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: action.color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  action.icon,
-                  size: context.isMobile ? 18 : 20,
-                  color: action.color,
-                ),
-              ),
-              SizedBox(width: context.isMobile ? 10 : 12),
-              Expanded(
-                child: Text(
-                  action.label,
-                  style: TextStyle(
-                    fontSize: context.isMobile ? 12 : 13,
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFF1A1A1A),
+              Icon(action.icon, color: action.color, size: 25),
+              const SizedBox(height: 11),
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    action.label,
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    style: TextStyle(
+                      fontSize: context.isMobile ? 12 : 13,
+                      fontWeight: FontWeight.w800,
+                      color: const Color(0xFF111111),
+                      height: 1.05,
+                    ),
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-              Icon(
-                Icons.chevron_right,
-                size: 16,
-                color: action.color.withValues(alpha: 0.5),
               ),
             ],
           ),
